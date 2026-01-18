@@ -1,99 +1,107 @@
-import { createFileRoute, redirect, Link } from "@tanstack/react-router";
-import { createServerFn } from "@tanstack/react-start";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { createFileRoute, Link, redirect } from "@tanstack/react-router"
+import { createServerFn } from "@tanstack/react-start"
+import { ArrowLeft, Check, Copy, Mail, Plus, Trash2, Users } from "lucide-react"
+import { useState } from "react"
+import { Button } from "@/components/ui/button"
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
-import { ArrowLeft, Users, Mail, Plus, Trash2, Copy, Check } from "lucide-react";
-import { useState } from "react";
+} from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
 
-const getSession = createServerFn({ method: "GET" }).handler(async ({ context }) => {
-  const session = await context.auth.api.getSession({
-    headers: context.request.headers,
-  });
-  return session;
-});
+const getSession = createServerFn({ method: "GET" }).handler(
+  async ({ context }) => {
+    const session = await context.auth.api.getSession({
+      headers: context.request.headers,
+    })
+    return session
+  },
+)
 
-const checkSetup = createServerFn({ method: "GET" }).handler(async ({ context }) => {
-  return context.users.isSetupComplete();
-});
+const checkSetup = createServerFn({ method: "GET" }).handler(
+  async ({ context }) => {
+    return context.users.isSetupComplete()
+  },
+)
 
-const fetchUsers = createServerFn({ method: "GET" }).handler(async ({ context }) => {
-  return context.users.getAllUsers();
-});
+const fetchUsers = createServerFn({ method: "GET" }).handler(
+  async ({ context }) => {
+    return context.users.getAllUsers()
+  },
+)
 
-const fetchInvites = createServerFn({ method: "GET" }).handler(async ({ context }) => {
-  return context.invites.getPendingInvites();
-});
+const fetchInvites = createServerFn({ method: "GET" }).handler(
+  async ({ context }) => {
+    return context.invites.getPendingInvites()
+  },
+)
 
 const sendInvite = createServerFn({ method: "POST" })
   .inputValidator((data: { email: string }) => data)
   .handler(async ({ data, context }) => {
     const session = await context.auth.api.getSession({
       headers: context.request.headers,
-    });
-    if (!session?.user) throw new Error("Unauthorized");
-    return context.invites.createInvite(data.email, session.user.id);
-  });
+    })
+    if (!session?.user) throw new Error("Unauthorized")
+    return context.invites.createInvite(data.email, session.user.id)
+  })
 
 const removeInvite = createServerFn({ method: "POST" })
   .inputValidator((data: { id: string }) => data)
   .handler(async ({ data, context }) => {
-    await context.invites.deleteInvite(data.id);
-  });
+    await context.invites.deleteInvite(data.id)
+  })
 
 const fetchUserById = createServerFn({ method: "GET" })
   .inputValidator((data: { id: string }) => data)
   .handler(async ({ data, context }) => {
-    return context.users.getUserById(data.id);
-  });
+    return context.users.getUserById(data.id)
+  })
 
 export const Route = createFileRoute("/admin/")({
   beforeLoad: async () => {
-    const setupComplete = await checkSetup();
+    const setupComplete = await checkSetup()
     if (!setupComplete) {
-      throw redirect({ to: "/setup" });
+      throw redirect({ to: "/setup" })
     }
 
-    const session = await getSession();
+    const session = await getSession()
     if (!session?.user) {
-      throw redirect({ to: "/login" });
+      throw redirect({ to: "/login" })
     }
 
-    const user = await fetchUserById({ data: { id: session.user.id } });
+    const user = await fetchUserById({ data: { id: session.user.id } })
     if (user?.role !== "admin") {
-      throw redirect({ to: "/" });
+      throw redirect({ to: "/" })
     }
 
-    return { session };
+    return { session }
   },
   loader: async () => {
-    const [users, invites] = await Promise.all([fetchUsers(), fetchInvites()]);
-    return { users, invites };
+    const [users, invites] = await Promise.all([fetchUsers(), fetchInvites()])
+    return { users, invites }
   },
   component: AdminPage,
-});
+})
 
 function AdminPage() {
-  const { users, invites } = Route.useLoaderData();
-  const [email, setEmail] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [copiedToken, setCopiedToken] = useState<string | null>(null);
-  const [localInvites, setLocalInvites] = useState(invites);
+  const { users, invites } = Route.useLoaderData()
+  const [email, setEmail] = useState("")
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState("")
+  const [copiedToken, setCopiedToken] = useState<string | null>(null)
+  const [localInvites, setLocalInvites] = useState(invites)
 
   const handleInvite = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError("");
+    e.preventDefault()
+    setLoading(true)
+    setError("")
 
     try {
-      const result = await sendInvite({ data: { email } });
+      const result = await sendInvite({ data: { email } })
       const newInvite = {
         id: result.id,
         email,
@@ -102,27 +110,27 @@ function AdminPage() {
         usedAt: null,
         expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
         createdAt: new Date(),
-      };
-      setLocalInvites([...localInvites, newInvite]);
-      setEmail("");
+      }
+      setLocalInvites([...localInvites, newInvite])
+      setEmail("")
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create invite");
+      setError(err instanceof Error ? err.message : "Failed to create invite")
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
   const handleDeleteInvite = async (id: string) => {
-    await removeInvite({ data: { id } });
-    setLocalInvites(localInvites.filter((i) => i.id !== id));
-  };
+    await removeInvite({ data: { id } })
+    setLocalInvites(localInvites.filter((i) => i.id !== id))
+  }
 
   const copyInviteLink = (token: string) => {
-    const link = `${window.location.origin}/invite?token=${token}`;
-    navigator.clipboard.writeText(link);
-    setCopiedToken(token);
-    setTimeout(() => setCopiedToken(null), 2000);
-  };
+    const link = `${window.location.origin}/invite?token=${token}`
+    navigator.clipboard.writeText(link)
+    setCopiedToken(token)
+    setTimeout(() => setCopiedToken(null), 2000)
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -158,7 +166,9 @@ function AdminPage() {
                   >
                     <div>
                       <p className="font-medium">{user.name || user.email}</p>
-                      <p className="text-sm text-muted-foreground">{user.email}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {user.email}
+                      </p>
                     </div>
                     <span
                       className={`text-xs px-2 py-1 rounded ${
@@ -199,7 +209,9 @@ function AdminPage() {
                   Invite
                 </Button>
               </form>
-              {error && <p className="mb-4 text-sm text-destructive">{error}</p>}
+              {error && (
+                <p className="mb-4 text-sm text-destructive">{error}</p>
+              )}
               <div className="space-y-2">
                 {localInvites.map((invite) => (
                   <div
@@ -209,7 +221,8 @@ function AdminPage() {
                     <div>
                       <p className="font-medium">{invite.email}</p>
                       <p className="text-xs text-muted-foreground">
-                        Expires: {new Date(invite.expiresAt).toLocaleDateString()}
+                        Expires:{" "}
+                        {new Date(invite.expiresAt).toLocaleDateString()}
                       </p>
                     </div>
                     <div className="flex gap-2">
@@ -245,5 +258,5 @@ function AdminPage() {
         </div>
       </main>
     </div>
-  );
+  )
 }

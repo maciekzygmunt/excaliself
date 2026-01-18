@@ -1,70 +1,70 @@
-import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
-import { createServerFn } from "@tanstack/react-start";
-import { useState } from "react";
-import { signIn } from "@/lib/auth-client";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router"
+import { createServerFn } from "@tanstack/react-start"
+import { useState } from "react"
+import { signIn } from "@/lib/auth-client"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
+} from "@/components/ui/card"
 
-const checkSetup = createServerFn({ method: "GET" }).handler(async ({ context }) => {
-  return context.users.isSetupComplete();
-});
+const checkSetup = createServerFn({ method: "GET" }).handler(
+  async ({ context }) => {
+    return context.users.isSetupComplete()
+  },
+)
 
 export const Route = createFileRoute("/login")({
   beforeLoad: async () => {
-    const setupComplete = await checkSetup();
+    const setupComplete = await checkSetup()
     if (!setupComplete) {
-      throw redirect({ to: "/setup" });
+      throw redirect({ to: "/setup" })
     }
   },
   component: LoginPage,
-});
+})
 
 function LoginPage() {
-  const navigate = useNavigate();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
+  const navigate = useNavigate()
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
+  const [error, setError] = useState("")
+  const [loading, setLoading] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
-    setLoading(true);
+    e.preventDefault()
+    setError("")
+    setLoading(true)
 
     try {
       const result = await signIn.email({
         email,
         password,
-      });
+      })
 
       if (result.error) {
-        setError(result.error.message || "Login failed");
+        setError(result.error.message || "Login failed")
       } else {
-        navigate({ to: "/" });
+        navigate({ to: "/" })
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Login failed");
+      setError(err instanceof Error ? err.message : "Login failed")
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
   return (
     <div className="flex min-h-screen items-center justify-center p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl">Welcome Back</CardTitle>
-          <CardDescription>
-            Sign in to your Excalidraw account
-          </CardDescription>
+          <CardDescription>Sign in to your Excalidraw account</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -90,9 +90,7 @@ function LoginPage() {
                 required
               />
             </div>
-            {error && (
-              <p className="text-sm text-destructive">{error}</p>
-            )}
+            {error && <p className="text-sm text-destructive">{error}</p>}
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? "Signing in..." : "Sign In"}
             </Button>
@@ -100,5 +98,5 @@ function LoginPage() {
         </CardContent>
       </Card>
     </div>
-  );
+  )
 }

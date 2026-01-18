@@ -1,93 +1,104 @@
-import { createFileRoute, redirect, Link, useNavigate } from "@tanstack/react-router";
-import { createServerFn } from "@tanstack/react-start";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Plus, Trash2, Settings, LogOut, Pencil } from "lucide-react";
-import { signOut } from "@/lib/auth-client";
+import {
+  createFileRoute,
+  redirect,
+  Link,
+  useNavigate,
+} from "@tanstack/react-router"
+import { createServerFn } from "@tanstack/react-start"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Plus, Trash2, Settings, LogOut, Pencil } from "lucide-react"
+import { signOut } from "@/lib/auth-client"
 
-const getSession = createServerFn({ method: "GET" }).handler(async ({ context }) => {
-  const session = await context.auth.api.getSession({
-    headers: context.request.headers,
-  });
-  return session;
-});
+const getSession = createServerFn({ method: "GET" }).handler(
+  async ({ context }) => {
+    const session = await context.auth.api.getSession({
+      headers: context.request.headers,
+    })
+    return session
+  },
+)
 
-const checkSetup = createServerFn({ method: "GET" }).handler(async ({ context }) => {
-  return context.users.isSetupComplete();
-});
+const checkSetup = createServerFn({ method: "GET" }).handler(
+  async ({ context }) => {
+    return context.users.isSetupComplete()
+  },
+)
 
-const fetchDrawings = createServerFn({ method: "GET" }).handler(async ({ context }) => {
-  const session = await context.auth.api.getSession({
-    headers: context.request.headers,
-  });
-  if (!session?.user) return [];
-  return context.drawings.getDrawings(session.user.id);
-});
+const fetchDrawings = createServerFn({ method: "GET" }).handler(
+  async ({ context }) => {
+    const session = await context.auth.api.getSession({
+      headers: context.request.headers,
+    })
+    if (!session?.user) return []
+    return context.drawings.getDrawings(session.user.id)
+  },
+)
 
 const createNewDrawing = createServerFn({ method: "POST" }).handler(
   async ({ context }) => {
     const session = await context.auth.api.getSession({
       headers: context.request.headers,
-    });
-    if (!session?.user) throw new Error("Unauthorized");
-    return context.drawings.createDrawing(session.user.id);
-  }
-);
+    })
+    if (!session?.user) throw new Error("Unauthorized")
+    return context.drawings.createDrawing(session.user.id)
+  },
+)
 
 const removeDrawing = createServerFn({ method: "POST" })
   .inputValidator((data: { id: string }) => data)
   .handler(async ({ data, context }) => {
     const session = await context.auth.api.getSession({
       headers: context.request.headers,
-    });
-    if (!session?.user) throw new Error("Unauthorized");
-    await context.drawings.deleteDrawing(data.id, session.user.id);
-  });
+    })
+    if (!session?.user) throw new Error("Unauthorized")
+    await context.drawings.deleteDrawing(data.id, session.user.id)
+  })
 
 export const Route = createFileRoute("/")({
   beforeLoad: async () => {
-    const setupComplete = await checkSetup();
+    const setupComplete = await checkSetup()
     if (!setupComplete) {
-      throw redirect({ to: "/setup" });
+      throw redirect({ to: "/setup" })
     }
 
-    const session = await getSession();
+    const session = await getSession()
     if (!session?.user) {
-      throw redirect({ to: "/login" });
+      throw redirect({ to: "/login" })
     }
 
-    return { session };
+    return { session }
   },
   loader: async () => {
-    const drawings = await fetchDrawings();
-    return { drawings };
+    const drawings = await fetchDrawings()
+    return { drawings }
   },
   component: DashboardPage,
-});
+})
 
 function DashboardPage() {
-  const { session } = Route.useRouteContext();
-  const { drawings } = Route.useLoaderData();
-  const navigate = useNavigate();
+  const { session } = Route.useRouteContext()
+  const { drawings } = Route.useLoaderData()
+  const navigate = useNavigate()
 
   const handleNewDrawing = async () => {
-    const id = await createNewDrawing();
-    navigate({ to: "/draw/$id", params: { id } });
-  };
+    const id = await createNewDrawing()
+    navigate({ to: "/draw/$id", params: { id } })
+  }
 
   const handleDelete = async (id: string) => {
     if (confirm("Are you sure you want to delete this drawing?")) {
-      await removeDrawing({ data: { id } });
-      navigate({ to: "/" });
+      await removeDrawing({ data: { id } })
+      navigate({ to: "/" })
     }
-  };
+  }
 
   const handleSignOut = async () => {
-    await signOut();
-    navigate({ to: "/login" });
-  };
+    await signOut()
+    navigate({ to: "/login" })
+  }
 
-  const isAdmin = session?.user?.role === "admin";
+  const isAdmin = session?.user?.role === "admin"
 
   return (
     <div className="min-h-screen bg-background">
@@ -169,8 +180,8 @@ function DashboardPage() {
                   size="icon"
                   className="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity"
                   onClick={(e) => {
-                    e.preventDefault();
-                    handleDelete(drawing.id);
+                    e.preventDefault()
+                    handleDelete(drawing.id)
                   }}
                 >
                   <Trash2 className="h-4 w-4" />
@@ -181,5 +192,5 @@ function DashboardPage() {
         )}
       </main>
     </div>
-  );
+  )
 }

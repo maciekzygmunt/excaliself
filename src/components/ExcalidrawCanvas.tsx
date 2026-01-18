@@ -1,54 +1,57 @@
-"use client";
+"use client"
 
-import { useEffect, useRef, useState } from "react";
-import "@excalidraw/excalidraw/index.css";
+import { useEffect, useState } from "react"
+import type { ComponentType } from "react"
+import "@excalidraw/excalidraw/index.css"
 
 interface ExcalidrawCanvasProps {
   initialData: {
-    elements: readonly unknown[];
-    appState: unknown;
-    files: Record<string, unknown>;
-  };
+    elements: readonly unknown[]
+    appState: unknown
+    files: Record<string, unknown>
+  }
   onChange?: (
     elements: readonly unknown[],
     appState: unknown,
-    files: Record<string, unknown>
-  ) => void;
+    files: Record<string, unknown>,
+  ) => void
 }
 
 export function ExcalidrawCanvas({
   initialData,
   onChange,
 }: ExcalidrawCanvasProps) {
-  const [Excalidraw, setExcalidraw] = useState<any>(null);
-  const excalidrawRef = useRef<any>(null);
+  const [Excalidraw, setExcalidraw] = useState<ComponentType<
+    Record<string, unknown>
+  > | null>(null)
 
   useEffect(() => {
     import("@excalidraw/excalidraw").then((module) => {
-      setExcalidraw(() => module.Excalidraw);
-    });
-  }, []);
+      setExcalidraw(
+        () => module.Excalidraw as ComponentType<Record<string, unknown>>,
+      )
+    })
+  }, [])
 
   const handleChange = (
     elements: readonly unknown[],
     appState: unknown,
-    files: Record<string, unknown>
+    files: Record<string, unknown>,
   ) => {
-    onChange?.(elements, appState, files);
-  };
+    onChange?.(elements, appState, files)
+  }
 
   if (!Excalidraw) {
     return (
       <div className="flex h-full items-center justify-center">
         <div className="text-muted-foreground">Loading canvas...</div>
       </div>
-    );
+    )
   }
 
   return (
     <div style={{ height: "100%", width: "100%" }}>
       <Excalidraw
-        ref={excalidrawRef}
         initialData={initialData}
         onChange={handleChange}
         UIOptions={{
@@ -58,5 +61,5 @@ export function ExcalidrawCanvas({
         }}
       />
     </div>
-  );
+  )
 }

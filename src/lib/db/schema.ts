@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
+import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core"
 
 export const users = sqliteTable("users", {
   id: text("id").primaryKey(),
@@ -15,7 +15,7 @@ export const users = sqliteTable("users", {
   updatedAt: integer("updatedAt", { mode: "timestamp" })
     .notNull()
     .$defaultFn(() => new Date()),
-});
+})
 
 export const sessions = sqliteTable("sessions", {
   id: text("id").primaryKey(),
@@ -32,7 +32,7 @@ export const sessions = sqliteTable("sessions", {
   updatedAt: integer("updatedAt", { mode: "timestamp" })
     .notNull()
     .$defaultFn(() => new Date()),
-});
+})
 
 export const accounts = sqliteTable("accounts", {
   id: text("id").primaryKey(),
@@ -44,7 +44,9 @@ export const accounts = sqliteTable("accounts", {
   accessToken: text("accessToken"),
   refreshToken: text("refreshToken"),
   accessTokenExpiresAt: integer("accessTokenExpiresAt", { mode: "timestamp" }),
-  refreshTokenExpiresAt: integer("refreshTokenExpiresAt", { mode: "timestamp" }),
+  refreshTokenExpiresAt: integer("refreshTokenExpiresAt", {
+    mode: "timestamp",
+  }),
   scope: text("scope"),
   password: text("password"),
   idToken: text("idToken"),
@@ -54,7 +56,7 @@ export const accounts = sqliteTable("accounts", {
   updatedAt: integer("updatedAt", { mode: "timestamp" })
     .notNull()
     .$defaultFn(() => new Date()),
-});
+})
 
 export const verifications = sqliteTable("verifications", {
   id: text("id").primaryKey(),
@@ -67,7 +69,7 @@ export const verifications = sqliteTable("verifications", {
   updatedAt: integer("updatedAt", { mode: "timestamp" })
     .notNull()
     .$defaultFn(() => new Date()),
-});
+})
 
 export const invites = sqliteTable("invites", {
   id: text("id").primaryKey(),
@@ -81,7 +83,7 @@ export const invites = sqliteTable("invites", {
   createdAt: integer("createdAt", { mode: "timestamp" })
     .notNull()
     .$defaultFn(() => new Date()),
-});
+})
 
 export const drawings = sqliteTable("drawings", {
   id: text("id").primaryKey(),
@@ -98,7 +100,7 @@ export const drawings = sqliteTable("drawings", {
   updatedAt: integer("updatedAt", { mode: "timestamp" })
     .notNull()
     .$defaultFn(() => new Date()),
-});
+})
 
 export const drawingFiles = sqliteTable("drawing_files", {
   id: text("id").primaryKey(),
@@ -111,4 +113,4 @@ export const drawingFiles = sqliteTable("drawing_files", {
   createdAt: integer("createdAt", { mode: "timestamp" })
     .notNull()
     .$defaultFn(() => new Date()),
-});
+})

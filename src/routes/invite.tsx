@@ -1,36 +1,37 @@
-import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
-import { createServerFn } from "@tanstack/react-start";
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router"
+import { createServerFn } from "@tanstack/react-start"
+import { useState } from "react"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
+} from "@/components/ui/card"
 
 const checkInvite = createServerFn({ method: "GET" })
   .inputValidator((data: { token: string }) => data)
   .handler(async ({ data, context }) => {
-    const invite = await context.invites.validateInvite(data.token);
-    return invite;
-  });
+    const invite = await context.invites.validateInvite(data.token)
+    return invite
+  })
 
 const registerWithInvite = createServerFn({ method: "POST" })
   .inputValidator(
-    (data: { token: string; email: string; password: string; name: string }) => data
+    (data: { token: string; email: string; password: string; name: string }) =>
+      data,
   )
   .handler(async ({ data, context }) => {
-    const invite = await context.invites.validateInvite(data.token);
+    const invite = await context.invites.validateInvite(data.token)
     if (!invite) {
-      throw new Error("Invalid or expired invite");
+      throw new Error("Invalid or expired invite")
     }
 
     if (invite.email.toLowerCase() !== data.email.toLowerCase()) {
-      throw new Error("Email does not match invitation");
+      throw new Error("Email does not match invitation")
     }
 
     const result = await context.auth.api.signUpEmail({
@@ -39,74 +40,74 @@ const registerWithInvite = createServerFn({ method: "POST" })
         password: data.password,
         name: data.name,
       },
-    });
+    })
 
     if (!result.user) {
-      throw new Error("Failed to create account");
+      throw new Error("Failed to create account")
     }
 
-    await context.invites.consumeInvite(data.token);
+    await context.invites.consumeInvite(data.token)
 
-    return { success: true };
-  });
+    return { success: true }
+  })
 
 export const Route = createFileRoute("/invite")({
   validateSearch: (search: Record<string, unknown>) => {
     return {
       token: (search.token as string) || "",
-    };
+    }
   },
   beforeLoad: async ({ search }) => {
     if (!search.token) {
-      throw redirect({ to: "/login" });
+      throw redirect({ to: "/login" })
     }
 
-    const invite = await checkInvite({ data: { token: search.token } });
+    const invite = await checkInvite({ data: { token: search.token } })
     if (!invite) {
-      throw redirect({ to: "/login" });
+      throw redirect({ to: "/login" })
     }
 
-    return { invite };
+    return { invite }
   },
   component: InvitePage,
-});
+})
 
 function InvitePage() {
-  const { invite } = Route.useRouteContext();
-  const { token } = Route.useSearch();
-  const navigate = useNavigate();
+  const { invite } = Route.useRouteContext()
+  const { token } = Route.useSearch()
+  const navigate = useNavigate()
 
-  const [email, setEmail] = useState(invite?.email || "");
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [name, setName] = useState("");
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [email, setEmail] = useState(invite?.email || "")
+  const [password, setPassword] = useState("")
+  const [confirmPassword, setConfirmPassword] = useState("")
+  const [name, setName] = useState("")
+  const [error, setError] = useState("")
+  const [loading, setLoading] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
+    e.preventDefault()
+    setError("")
 
     if (password !== confirmPassword) {
-      setError("Passwords do not match");
-      return;
+      setError("Passwords do not match")
+      return
     }
 
     if (password.length < 8) {
-      setError("Password must be at least 8 characters");
-      return;
+      setError("Password must be at least 8 characters")
+      return
     }
 
-    setLoading(true);
+    setLoading(true)
     try {
-      await registerWithInvite({ data: { token, email, password, name } });
-      navigate({ to: "/login" });
+      await registerWithInvite({ data: { token, email, password, name } })
+      navigate({ to: "/login" })
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Registration failed");
+      setError(err instanceof Error ? err.message : "Registration failed")
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
   return (
     <div className="flex min-h-screen items-center justify-center p-4">
@@ -171,5 +172,5 @@ function InvitePage() {
         </CardContent>
       </Card>
     </div>
-  );
+  )
 }

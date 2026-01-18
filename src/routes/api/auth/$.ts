@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router"
 
 export const Route = createFileRoute("/api/auth/$")({
   server: {
@@ -7,4 +7,4 @@ export const Route = createFileRoute("/api/auth/$")({
       POST: ({ request, context }) => context.auth.handler(request),
     },
   },
-});
+})

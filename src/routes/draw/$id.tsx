@@ -1,109 +1,119 @@
-import { createFileRoute, redirect, Link } from "@tanstack/react-router";
-import { createServerFn } from "@tanstack/react-start";
-import { useState, useCallback, useRef } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { ArrowLeft, Check } from "lucide-react";
-import { ExcalidrawCanvas } from "@/components/ExcalidrawCanvas";
+import { createFileRoute, redirect, Link } from "@tanstack/react-router"
+import { createServerFn } from "@tanstack/react-start"
+import { useState, useCallback, useRef } from "react"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { ArrowLeft, Check } from "lucide-react"
+import { ExcalidrawCanvas } from "@/components/ExcalidrawCanvas"
 
-const getSession = createServerFn({ method: "GET" }).handler(async ({ context }) => {
-  const session = await context.auth.api.getSession({
-    headers: context.request.headers,
-  });
-  return session;
-});
+type ExcalidrawBinaryFile = {
+  mimeType?: string
+  dataURL?: string
+}
 
-const checkSetup = createServerFn({ method: "GET" }).handler(async ({ context }) => {
-  return context.users.isSetupComplete();
-});
+const getSession = createServerFn({ method: "GET" }).handler(
+  async ({ context }) => {
+    const session = await context.auth.api.getSession({
+      headers: context.request.headers,
+    })
+    return session
+  },
+)
+
+const checkSetup = createServerFn({ method: "GET" }).handler(
+  async ({ context }) => {
+    return context.users.isSetupComplete()
+  },
+)
 
 const fetchDrawing = createServerFn({ method: "GET" })
   .inputValidator((data: { id: string }) => data)
   .handler(async ({ data, context }) => {
     const session = await context.auth.api.getSession({
       headers: context.request.headers,
-    });
-    if (!session?.user) throw new Error("Unauthorized");
-    return context.drawings.getDrawingWithFiles(data.id, session.user.id);
-  });
+    })
+    if (!session?.user) throw new Error("Unauthorized")
+    return context.drawings.getDrawingWithFiles(data.id, session.user.id)
+  })
 
 const saveDrawing = createServerFn({ method: "POST" })
   .inputValidator(
     (data: {
-      id: string;
-      name?: string;
-      data?: string;
-      thumbnail?: string;
-      files?: { fileId: string; mimeType: string; dataUrl: string }[];
-    }) => data
+      id: string
+      name?: string
+      data?: string
+      thumbnail?: string
+      files?: { fileId: string; mimeType: string; dataUrl: string }[]
+    }) => data,
   )
   .handler(async ({ data, context }) => {
     const session = await context.auth.api.getSession({
       headers: context.request.headers,
-    });
-    if (!session?.user) throw new Error("Unauthorized");
+    })
+    if (!session?.user) throw new Error("Unauthorized")
 
-    const { id, files, ...updateData } = data;
-    await context.drawings.updateDrawing(id, session.user.id, updateData);
+    const { id, files, ...updateData } = data
+    await context.drawings.updateDrawing(id, session.user.id, updateData)
 
     if (files) {
-      await context.drawings.updateDrawingFiles(id, files);
+      await context.drawings.updateDrawingFiles(id, files)
     }
-  });
+  })
 
 export const Route = createFileRoute("/draw/$id")({
   beforeLoad: async () => {
-    const setupComplete = await checkSetup();
+    const setupComplete = await checkSetup()
     if (!setupComplete) {
-      throw redirect({ to: "/setup" });
+      throw redirect({ to: "/setup" })
     }
 
-    const session = await getSession();
+    const session = await getSession()
     if (!session?.user) {
-      throw redirect({ to: "/login" });
+      throw redirect({ to: "/login" })
     }
   },
   loader: async ({ params }) => {
-    const drawing = await fetchDrawing({ data: { id: params.id } });
+    const drawing = await fetchDrawing({ data: { id: params.id } })
     if (!drawing) {
-      throw redirect({ to: "/" });
+      throw redirect({ to: "/" })
     }
-    return { drawing };
+    return { drawing }
   },
   component: DrawingEditorPage,
-});
+})
 
 function DrawingEditorPage() {
-  const { drawing } = Route.useLoaderData();
-  const { id } = Route.useParams();
+  const { drawing } = Route.useLoaderData()
+  const { id } = Route.useParams()
 
-  const [name, setName] = useState(drawing.name);
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const lastSavedDataRef = useRef<string>(drawing.data);
+  const [name, setName] = useState(drawing.name)
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const lastSavedDataRef = useRef<string>(drawing.data)
 
   const handleSave = useCallback(
     async (
       elements: readonly unknown[],
       appState: unknown,
-      files: Record<string, unknown>
+      files: Record<string, unknown>,
     ) => {
-      const dataString = JSON.stringify({ elements, appState });
+      const dataString = JSON.stringify({ elements, appState })
 
       if (dataString === lastSavedDataRef.current) {
-        return;
+        return
       }
 
-      setSaving(true);
+      setSaving(true)
 
-      const fileArray = Object.entries(files || {}).map(
-        ([fileId, file]: [string, any]) => ({
+      const fileArray = Object.entries(files || {}).map(([fileId, file]) => {
+        const fileData = file as ExcalidrawBinaryFile
+        return {
           fileId,
-          mimeType: file.mimeType || "image/png",
-          dataUrl: file.dataURL || "",
-        })
-      );
+          mimeType: fileData.mimeType || "image/png",
+          dataUrl: fileData.dataURL || "",
+        }
+      })
 
       try {
         await saveDrawing({
@@ -112,71 +122,77 @@ function DrawingEditorPage() {
             data: dataString,
             files: fileArray,
           },
-        });
+        })
 
-        lastSavedDataRef.current = dataString;
-        setSaved(true);
-        setTimeout(() => setSaved(false), 2000);
+        lastSavedDataRef.current = dataString
+        setSaved(true)
+        setTimeout(() => setSaved(false), 2000)
       } catch (err) {
-        console.error("Failed to save:", err);
+        console.error("Failed to save:", err)
       } finally {
-        setSaving(false);
+        setSaving(false)
       }
     },
-    [id]
-  );
+    [id],
+  )
 
   const handleDebouncedSave = useCallback(
     (
       elements: readonly unknown[],
       appState: unknown,
-      files: Record<string, unknown>
+      files: Record<string, unknown>,
     ) => {
       if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current);
+        clearTimeout(saveTimeoutRef.current)
       }
 
       saveTimeoutRef.current = setTimeout(() => {
-        handleSave(elements, appState, files);
-      }, 300);
+        handleSave(elements, appState, files)
+      }, 300)
     },
-    [handleSave]
-  );
+    [handleSave],
+  )
 
   const handleNameChange = async (newName: string) => {
-    setName(newName);
-    await saveDrawing({ data: { id, name: newName } });
-  };
+    setName(newName)
+    await saveDrawing({ data: { id, name: newName } })
+  }
 
   const initialData = (() => {
     try {
-      const parsed = JSON.parse(drawing.data);
+      const parsed = JSON.parse(drawing.data)
       const appState =
         parsed.appState && typeof parsed.appState === "object"
           ? parsed.appState
-          : {};
+          : {}
       const normalizedAppState = {
         ...appState,
         collaborators:
-          appState.collaborators instanceof Map ? appState.collaborators : new Map(),
-      };
-      const filesMap: Record<string, unknown> = {};
+          appState.collaborators instanceof Map
+            ? appState.collaborators
+            : new Map(),
+      }
+      const filesMap: Record<string, unknown> = {}
       drawing.files?.forEach((file) => {
         filesMap[file.fileId] = {
           id: file.fileId,
           mimeType: file.mimeType,
           dataURL: file.dataUrl,
-        };
-      });
+        }
+      })
       return {
         elements: parsed.elements || [],
         appState: normalizedAppState,
         files: filesMap,
-      };
+      }
     } catch {
-      return { elements: [], appState: { collaborators: new Map() }, files: {} };
+      return {
+        elements: [],
+        appState: { collaborators: new Map() },
+        files: {},
+      }
     }
-  })();
+  })()
 
   return (
     <div className="flex h-screen flex-col">
@@ -195,7 +211,9 @@ function DrawingEditorPage() {
           />
         </div>
         <div className="flex items-center gap-2">
-          {saving && <span className="text-sm text-muted-foreground">Saving...</span>}
+          {saving && (
+            <span className="text-sm text-muted-foreground">Saving...</span>
+          )}
           {saved && (
             <span className="flex items-center gap-1 text-sm text-green-600">
               <Check className="h-4 w-4" />
@@ -211,5 +229,5 @@ function DrawingEditorPage() {
         />
       </div>
     </div>
-  );
+  )
 }
