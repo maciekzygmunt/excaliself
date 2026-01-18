@@ -1,13 +1,13 @@
 import {
   createFileRoute,
-  redirect,
   Link,
+  redirect,
   useNavigate,
 } from "@tanstack/react-router"
 import { createServerFn } from "@tanstack/react-start"
+import { LogOut, Pencil, Plus, Settings, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Plus, Trash2, Settings, LogOut, Pencil } from "lucide-react"
 import { signOut } from "@/lib/auth-client"
 
 const getSession = createServerFn({ method: "GET" }).handler(

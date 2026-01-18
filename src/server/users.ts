@@ -1,8 +1,8 @@
 "use server"
 
+import { count, eq } from "drizzle-orm"
 import { getDb } from "@/lib/db"
 import { users } from "@/lib/db/schema"
-import { count, eq } from "drizzle-orm"
 
 export async function getUserCount() {
   const db = getDb()

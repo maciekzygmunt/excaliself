@@ -1,9 +1,9 @@
 "use server"
 
+import { randomBytes, randomUUID } from "node:crypto"
+import { and, eq, gt, isNull } from "drizzle-orm"
 import { getDb } from "@/lib/db"
 import { invites } from "@/lib/db/schema"
-import { eq, and, isNull, gt } from "drizzle-orm"
-import { randomUUID, randomBytes } from "node:crypto"
 
 export async function createInvite(email: string, invitedById: string) {
   const db = getDb()

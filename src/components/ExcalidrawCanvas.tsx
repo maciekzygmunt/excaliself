@@ -1,15 +1,22 @@
 "use client"
 
-import { useEffect, useState } from "react"
 import type { ComponentType } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import "@excalidraw/excalidraw/index.css"
 
+type ExcalidrawScene = {
+  elements: readonly unknown[]
+  appState: unknown
+  files: Record<string, unknown>
+}
+
+type ExcalidrawApi = {
+  updateScene: (scene: ExcalidrawScene) => void
+}
+
 interface ExcalidrawCanvasProps {
-  initialData: {
-    elements: readonly unknown[]
-    appState: unknown
-    files: Record<string, unknown>
-  }
+  initialData: ExcalidrawScene
+  scene?: ExcalidrawScene
   onChange?: (
     elements: readonly unknown[],
     appState: unknown,
@@ -19,11 +26,14 @@ interface ExcalidrawCanvasProps {
 
 export function ExcalidrawCanvas({
   initialData,
+  scene,
   onChange,
 }: ExcalidrawCanvasProps) {
   const [Excalidraw, setExcalidraw] = useState<ComponentType<
     Record<string, unknown>
   > | null>(null)
+  const apiRef = useRef<ExcalidrawApi | null>(null)
+  const sceneRef = useRef<ExcalidrawScene | null>(null)
 
   useEffect(() => {
     import("@excalidraw/excalidraw").then((module) => {
@@ -31,6 +41,22 @@ export function ExcalidrawCanvas({
         () => module.Excalidraw as ComponentType<Record<string, unknown>>,
       )
     })
+  }, [])
+
+  useEffect(() => {
+    if (!scene) return
+    sceneRef.current = scene
+    const api = apiRef.current
+    if (api) {
+      api.updateScene(scene)
+    }
+  }, [scene])
+
+  const handleApi = useCallback((api: unknown) => {
+    apiRef.current = api as ExcalidrawApi
+    if (sceneRef.current) {
+      apiRef.current.updateScene(sceneRef.current)
+    }
   }, [])
 
   const handleChange = (
@@ -53,6 +79,7 @@ export function ExcalidrawCanvas({
     <div style={{ height: "100%", width: "100%" }}>
       <Excalidraw
         initialData={initialData}
+        excalidrawAPI={handleApi}
         onChange={handleChange}
         UIOptions={{
           canvasActions: {

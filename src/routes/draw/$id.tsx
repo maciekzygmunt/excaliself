@@ -1,10 +1,10 @@
-import { createFileRoute, redirect, Link } from "@tanstack/react-router"
+import { createFileRoute, Link, redirect } from "@tanstack/react-router"
 import { createServerFn } from "@tanstack/react-start"
-import { useState, useCallback, useRef } from "react"
+import { ArrowLeft, Check } from "lucide-react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { ExcalidrawCanvas } from "@/components/ExcalidrawCanvas"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { ArrowLeft, Check } from "lucide-react"
-import { ExcalidrawCanvas } from "@/components/ExcalidrawCanvas"
 
 type ExcalidrawBinaryFile = {
   mimeType?: string
@@ -90,13 +90,26 @@ function DrawingEditorPage() {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const savedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const lastSavedDataRef = useRef<string>(drawing.data)
+  const latestSceneRef = useRef<{
+    elements: readonly unknown[]
+    appState: unknown
+    files: Record<string, unknown>
+  } | null>(null)
+  const isMountedRef = useRef(true)
+
+  useEffect(() => {
+    setName(drawing.name)
+    lastSavedDataRef.current = drawing.data
+  }, [drawing.data, drawing.name])
 
   const handleSave = useCallback(
     async (
       elements: readonly unknown[],
       appState: unknown,
       files: Record<string, unknown>,
+      updateUi: boolean = true,
     ) => {
       const dataString = JSON.stringify({ elements, appState })
 
@@ -104,7 +117,9 @@ function DrawingEditorPage() {
         return
       }
 
-      setSaving(true)
+      if (updateUi && isMountedRef.current) {
+        setSaving(true)
+      }
 
       const fileArray = Object.entries(files || {}).map(([fileId, file]) => {
         const fileData = file as ExcalidrawBinaryFile
@@ -125,12 +140,23 @@ function DrawingEditorPage() {
         })
 
         lastSavedDataRef.current = dataString
-        setSaved(true)
-        setTimeout(() => setSaved(false), 2000)
+        if (updateUi && isMountedRef.current) {
+          setSaved(true)
+          if (savedTimeoutRef.current) {
+            clearTimeout(savedTimeoutRef.current)
+          }
+          savedTimeoutRef.current = setTimeout(() => {
+            if (isMountedRef.current) {
+              setSaved(false)
+            }
+          }, 2000)
+        }
       } catch (err) {
         console.error("Failed to save:", err)
       } finally {
-        setSaving(false)
+        if (updateUi && isMountedRef.current) {
+          setSaving(false)
+        }
       }
     },
     [id],
@@ -142,23 +168,42 @@ function DrawingEditorPage() {
       appState: unknown,
       files: Record<string, unknown>,
     ) => {
+      latestSceneRef.current = { elements, appState, files }
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current)
       }
 
       saveTimeoutRef.current = setTimeout(() => {
-        handleSave(elements, appState, files)
+        void handleSave(elements, appState, files)
       }, 300)
     },
     [handleSave],
   )
+
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current)
+        saveTimeoutRef.current = null
+      }
+      if (savedTimeoutRef.current) {
+        clearTimeout(savedTimeoutRef.current)
+        savedTimeoutRef.current = null
+      }
+      const latest = latestSceneRef.current
+      if (latest) {
+        void handleSave(latest.elements, latest.appState, latest.files, false)
+      }
+    }
+  }, [handleSave])
 
   const handleNameChange = async (newName: string) => {
     setName(newName)
     await saveDrawing({ data: { id, name: newName } })
   }
 
-  const initialData = (() => {
+  const sceneData = useMemo(() => {
     try {
       const parsed = JSON.parse(drawing.data)
       const appState =
@@ -192,7 +237,7 @@ function DrawingEditorPage() {
         files: {},
       }
     }
-  })()
+  }, [drawing.data, drawing.files])
 
   return (
     <div className="flex h-screen flex-col">
@@ -224,7 +269,8 @@ function DrawingEditorPage() {
       </header>
       <div className="flex-1">
         <ExcalidrawCanvas
-          initialData={initialData}
+          initialData={sceneData}
+          scene={sceneData}
           onChange={handleDebouncedSave}
         />
       </div>
