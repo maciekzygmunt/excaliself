@@ -11,6 +11,7 @@ import {
   updateDrawing,
   updateDrawingFiles,
 } from "@/server/drawings"
+import { isSetupComplete } from "@/server/users"
 
 type ExcalidrawBinaryFile = {
   mimeType?: string
@@ -23,12 +24,6 @@ const getSession = createServerFn({ method: "GET" }).handler(
       headers: context.request.headers,
     })
     return session
-  },
-)
-
-const checkSetup = createServerFn({ method: "GET" }).handler(
-  async ({ context }) => {
-    return context.users.isSetupComplete()
   },
 )
 
@@ -64,7 +59,7 @@ const saveDrawing = createServerFn({ method: "POST" })
 
 export const Route = createFileRoute("/draw/$id")({
   beforeLoad: async () => {
-    const setupComplete = await checkSetup()
+    const setupComplete = await isSetupComplete()
     if (!setupComplete) {
       throw redirect({ to: "/setup" })
     }

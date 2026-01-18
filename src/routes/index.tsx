@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { signOut } from "@/lib/auth-client"
 import { createDrawing, deleteDrawing, getDrawings } from "@/server/drawings"
+import { isSetupComplete } from "@/server/users"
 
 const getSession = createServerFn({ method: "GET" }).handler(
   async ({ context }) => {
@@ -20,15 +21,9 @@ const getSession = createServerFn({ method: "GET" }).handler(
   },
 )
 
-const checkSetup = createServerFn({ method: "GET" }).handler(
-  async ({ context }) => {
-    return context.users.isSetupComplete()
-  },
-)
-
 export const Route = createFileRoute("/")({
   beforeLoad: async () => {
-    const setupComplete = await checkSetup()
+    const setupComplete = await isSetupComplete()
     if (!setupComplete) {
       throw redirect({ to: "/setup" })
     }

@@ -11,12 +11,7 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-
-const checkSetup = createServerFn({ method: "GET" }).handler(
-  async ({ context }) => {
-    return context.users.isSetupComplete()
-  },
-)
+import { getAllUsers, getUserById, isSetupComplete } from "@/server/users"
 
 const getSession = createServerFn({ method: "GET" }).handler(
   async ({ context }) => {
@@ -45,22 +40,23 @@ const removeInvite = createServerFn({ method: "POST" })
 
 const fetchUserById = createServerFn({ method: "GET" })
   .inputValidator((data: { id: string }) => data)
-  .handler(async ({ data, context }) => {
-    return context.users.getUserById(data.id)
+  .handler(async ({ data }) => {
+    return getUserById({ data: data.id })
   })
 
 const fetchAdminData = createServerFn({ method: "GET" }).handler(
   async ({ context }) => {
     const [users, invites] = await Promise.all([
-      context.users.getAllUsers(),
+      getAllUsers(),
       context.invites.getPendingInvites(),
     ])
     return { users, invites }
-  })
+  },
+)
 
 export const Route = createFileRoute("/admin/")({
   beforeLoad: async () => {
-    const setupComplete = await checkSetup()
+    const setupComplete = await isSetupComplete()
     if (!setupComplete) {
       throw redirect({ to: "/setup" })
     }
