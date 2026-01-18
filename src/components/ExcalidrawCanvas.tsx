@@ -32,15 +32,20 @@ export function ExcalidrawCanvas({
   const [Excalidraw, setExcalidraw] = useState<ComponentType<
     Record<string, unknown>
   > | null>(null)
+  const [loadError, setLoadError] = useState<Error | null>(null)
   const apiRef = useRef<ExcalidrawApi | null>(null)
   const sceneRef = useRef<ExcalidrawScene | null>(null)
 
   useEffect(() => {
-    import("@excalidraw/excalidraw").then((module) => {
-      setExcalidraw(
-        () => module.Excalidraw as ComponentType<Record<string, unknown>>,
-      )
-    })
+    import("@excalidraw/excalidraw")
+      .then((module) => {
+        setExcalidraw(
+          () => module.Excalidraw as ComponentType<Record<string, unknown>>,
+        )
+      })
+      .catch((err: unknown) => {
+        setLoadError(err instanceof Error ? err : new Error(String(err)))
+      })
   }, [])
 
   useEffect(() => {
@@ -65,6 +70,14 @@ export function ExcalidrawCanvas({
     files: Record<string, unknown>,
   ) => {
     onChange?.(elements, appState, files)
+  }
+
+  if (loadError) {
+    return (
+      <div className="flex h-full items-center justify-center">
+        <div className="text-red-600">Failed to load canvas.</div>
+      </div>
+    )
   }
 
   if (!Excalidraw) {

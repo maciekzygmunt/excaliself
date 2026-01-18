@@ -11,8 +11,12 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { createInvite, deleteInvite, getPendingInvites } from "@/server/invites"
-import { getAllUsers, getUserById, isSetupComplete } from "@/server/users"
+
+const checkSetup = createServerFn({ method: "GET" }).handler(
+  async ({ context }) => {
+    return context.users.isSetupComplete()
+  },
+)
 
 const getSession = createServerFn({ method: "GET" }).handler(
   async ({ context }) => {
@@ -30,24 +34,33 @@ const sendInvite = createServerFn({ method: "POST" })
       headers: context.request.headers,
     })
     if (!session?.user) throw new Error("Unauthorized")
-    return createInvite(data.email, session.user.id)
+    return context.invites.createInvite(data.email, session.user.id)
   })
 
 const removeInvite = createServerFn({ method: "POST" })
   .inputValidator((data: { id: string }) => data)
-  .handler(async ({ data }) => {
-    await deleteInvite(data.id)
+  .handler(async ({ data, context }) => {
+    await context.invites.deleteInvite(data.id)
   })
 
 const fetchUserById = createServerFn({ method: "GET" })
   .inputValidator((data: { id: string }) => data)
-  .handler(async ({ data }) => {
-    return getUserById(data.id)
+  .handler(async ({ data, context }) => {
+    return context.users.getUserById(data.id)
+  })
+
+const fetchAdminData = createServerFn({ method: "GET" }).handler(
+  async ({ context }) => {
+    const [users, invites] = await Promise.all([
+      context.users.getAllUsers(),
+      context.invites.getPendingInvites(),
+    ])
+    return { users, invites }
   })
 
 export const Route = createFileRoute("/admin/")({
   beforeLoad: async () => {
-    const setupComplete = await isSetupComplete()
+    const setupComplete = await checkSetup()
     if (!setupComplete) {
       throw redirect({ to: "/setup" })
     }
@@ -65,11 +78,7 @@ export const Route = createFileRoute("/admin/")({
     return { session }
   },
   loader: async () => {
-    const [users, invites] = await Promise.all([
-      getAllUsers(),
-      getPendingInvites(),
-    ])
-    return { users, invites }
+    return await fetchAdminData()
   },
   component: AdminPage,
 })

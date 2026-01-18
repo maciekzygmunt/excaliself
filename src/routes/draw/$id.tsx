@@ -5,12 +5,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { ExcalidrawCanvas } from "@/components/ExcalidrawCanvas"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import {
-  getDrawingWithFiles,
-  updateDrawing,
-  updateDrawingFiles,
-} from "@/server/drawings"
-import { isSetupComplete } from "@/server/users"
 
 type ExcalidrawBinaryFile = {
   mimeType?: string
@@ -26,6 +20,12 @@ const getSession = createServerFn({ method: "GET" }).handler(
   },
 )
 
+const checkSetup = createServerFn({ method: "GET" }).handler(
+  async ({ context }) => {
+    return context.users.isSetupComplete()
+  },
+)
+
 const fetchDrawing = createServerFn({ method: "GET" })
   .inputValidator((data: { id: string }) => data)
   .handler(async ({ data, context }) => {
@@ -33,7 +33,7 @@ const fetchDrawing = createServerFn({ method: "GET" })
       headers: context.request.headers,
     })
     if (!session?.user) throw new Error("Unauthorized")
-    return await getDrawingWithFiles(data.id, session.user.id)
+    return await context.drawings.getDrawingWithFiles(data.id, session.user.id)
   })
 
 const saveDrawing = createServerFn({ method: "POST" })
@@ -53,16 +53,16 @@ const saveDrawing = createServerFn({ method: "POST" })
     if (!session?.user) throw new Error("Unauthorized")
 
     const { id, files, ...updateData } = data
-    await updateDrawing(id, session.user.id, updateData)
+    await context.drawings.updateDrawing(id, session.user.id, updateData)
 
     if (files) {
-      await updateDrawingFiles(id, files)
+      await context.drawings.updateDrawingFiles(id, files)
     }
   })
 
 export const Route = createFileRoute("/draw/$id")({
   beforeLoad: async () => {
-    const setupComplete = await isSetupComplete()
+    const setupComplete = await checkSetup()
     if (!setupComplete) {
       throw redirect({ to: "/setup" })
     }
