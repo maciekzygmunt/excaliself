@@ -5,6 +5,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { ExcalidrawCanvas } from "@/components/ExcalidrawCanvas"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { authMiddleware } from "@/middleware/auth"
+import {
+  getDrawingWithFiles,
+  updateDrawing,
+  updateDrawingFiles,
+} from "@/server/drawings"
 
 type ExcalidrawBinaryFile = {
   mimeType?: string
@@ -26,17 +32,8 @@ const checkSetup = createServerFn({ method: "GET" }).handler(
   },
 )
 
-const fetchDrawing = createServerFn({ method: "GET" })
-  .inputValidator((data: { id: string }) => data)
-  .handler(async ({ data, context }) => {
-    const session = await context.auth.api.getSession({
-      headers: context.request.headers,
-    })
-    if (!session?.user) throw new Error("Unauthorized")
-    return await context.drawings.getDrawingWithFiles(data.id, session.user.id)
-  })
-
 const saveDrawing = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
   .inputValidator(
     (data: {
       id: string
@@ -46,17 +43,22 @@ const saveDrawing = createServerFn({ method: "POST" })
       files?: { fileId: string; mimeType: string; dataUrl: string }[]
     }) => data,
   )
-  .handler(async ({ data, context }) => {
-    const session = await context.auth.api.getSession({
-      headers: context.request.headers,
-    })
-    if (!session?.user) throw new Error("Unauthorized")
-
+  .handler(async ({ data }) => {
     const { id, files, ...updateData } = data
-    await context.drawings.updateDrawing(id, session.user.id, updateData)
+    await updateDrawing({
+      data: {
+        id,
+        updateData,
+      },
+    })
 
     if (files) {
-      await context.drawings.updateDrawingFiles(id, files)
+      await updateDrawingFiles({
+        data: {
+          drawingId: id,
+          files,
+        },
+      })
     }
   })
 
@@ -73,7 +75,9 @@ export const Route = createFileRoute("/draw/$id")({
     }
   },
   loader: async ({ params }) => {
-    const drawing = await fetchDrawing({ data: { id: params.id } })
+    const drawing = await getDrawingWithFiles({
+      data: params.id,
+    })
     if (!drawing) {
       throw redirect({ to: "/" })
     }

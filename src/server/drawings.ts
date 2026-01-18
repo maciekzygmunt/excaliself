@@ -1,95 +1,124 @@
 "use server"
 
 import { randomUUID } from "node:crypto"
+import { createServerFn } from "@tanstack/react-start"
 import { and, desc, eq } from "drizzle-orm"
-import { getDb } from "@/lib/db"
+import { z } from "zod"
 import { drawingFiles, drawings } from "@/lib/db/schema"
+import { authMiddleware } from "@/middleware/auth"
 
-export async function getDrawings(userId: string) {
-  const db = getDb()
-  return db
-    .select()
-    .from(drawings)
-    .where(eq(drawings.ownerId, userId))
-    .orderBy(desc(drawings.updatedAt))
-}
-
-export async function getDrawing(id: string, userId: string) {
-  const db = getDb()
-  const result = await db
-    .select()
-    .from(drawings)
-    .where(and(eq(drawings.id, id), eq(drawings.ownerId, userId)))
-  return result[0] || null
-}
-
-export async function getDrawingWithFiles(id: string, userId: string) {
-  const db = getDb()
-  const drawing = await getDrawing(id, userId)
-  if (!drawing) return null
-
-  const files = await db
-    .select()
-    .from(drawingFiles)
-    .where(eq(drawingFiles.drawingId, id))
-
-  return { ...drawing, files }
-}
-
-export async function createDrawing(userId: string, name: string = "Untitled") {
-  const db = getDb()
-  const id = randomUUID()
-  const now = new Date()
-
-  await db.insert(drawings).values({
-    id,
-    name,
-    data: JSON.stringify({ elements: [], appState: {} }),
-    ownerId: userId,
-    isPublic: false,
-    createdAt: now,
-    updatedAt: now,
+export const getDrawings = createServerFn({ method: "GET" })
+  .middleware([authMiddleware])
+  .handler(async ({ context }) => {
+    const userId = context.session.user.id
+    return context.db
+      .select()
+      .from(drawings)
+      .where(eq(drawings.ownerId, userId))
+      .orderBy(desc(drawings.updatedAt))
   })
 
-  return id
-}
+export const getDrawingWithFiles = createServerFn({ method: "GET" })
+  .middleware([authMiddleware])
+  .inputValidator((id: string) => id)
+  .handler(async ({ data, context }) => {
+    const id = data
+    const userId = context.session.user.id
+    const result = await context.db
+      .select()
+      .from(drawings)
+      .where(and(eq(drawings.id, id), eq(drawings.ownerId, userId)))
+    const drawing = result[0]
+    if (!drawing) return null
 
-export async function updateDrawing(
-  id: string,
-  userId: string,
-  data: { name?: string; data?: string; thumbnail?: string },
-) {
-  const db = getDb()
-  await db
-    .update(drawings)
-    .set({ ...data, updatedAt: new Date() })
-    .where(and(eq(drawings.id, id), eq(drawings.ownerId, userId)))
-}
+    const files = await context.db
+      .select()
+      .from(drawingFiles)
+      .where(eq(drawingFiles.drawingId, id))
 
-export async function deleteDrawing(id: string, userId: string) {
-  const db = getDb()
-  await db
-    .delete(drawings)
-    .where(and(eq(drawings.id, id), eq(drawings.ownerId, userId)))
-}
+    return { ...drawing, files }
+  })
 
-export async function updateDrawingFiles(
-  drawingId: string,
-  files: { fileId: string; mimeType: string; dataUrl: string }[],
-) {
-  const db = getDb()
-  await db.delete(drawingFiles).where(eq(drawingFiles.drawingId, drawingId))
+export const createDrawing = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .inputValidator(z.string().optional().default("Untitled"))
+  .handler(async ({ data, context }) => {
+    const userId = context.session.user.id
+    const id = randomUUID()
+    const now = new Date()
 
-  if (files.length > 0) {
-    await db.insert(drawingFiles).values(
-      files.map((file) => ({
-        id: randomUUID(),
-        drawingId,
-        fileId: file.fileId,
-        mimeType: file.mimeType,
-        dataUrl: file.dataUrl,
-        createdAt: new Date(),
-      })),
-    )
-  }
-}
+    await context.db.insert(drawings).values({
+      id,
+      name: data,
+      data: JSON.stringify({ elements: [], appState: {} }),
+      ownerId: userId,
+      isPublic: false,
+      createdAt: now,
+      updatedAt: now,
+    })
+
+    return id
+  })
+
+export const updateDrawing = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .inputValidator(
+    z.object({
+      id: z.string(),
+      updateData: z.object({
+        name: z.string().optional(),
+        data: z.string().optional(),
+        thumbnail: z.string().optional(),
+      }),
+    }),
+  )
+  .handler(async ({ data: { updateData, id }, context }) => {
+    const userId = context.session.user.id
+    await context.db
+      .update(drawings)
+      .set({ ...updateData, updatedAt: new Date() })
+      .where(and(eq(drawings.id, id), eq(drawings.ownerId, userId)))
+  })
+
+export const deleteDrawing = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .inputValidator(z.string())
+  .handler(async ({ data, context }) => {
+    const id = data
+    const userId = context.session.user.id
+    await context.db
+      .delete(drawings)
+      .where(and(eq(drawings.id, id), eq(drawings.ownerId, userId)))
+  })
+
+export const updateDrawingFiles = createServerFn({ method: "POST" })
+  .inputValidator(
+    z.object({
+      drawingId: z.string(),
+      files: z.array(
+        z.object({
+          fileId: z.string(),
+          mimeType: z.string(),
+          dataUrl: z.string(),
+        }),
+      ),
+    }),
+  )
+  .handler(async ({ data: { drawingId, files }, context }) => {
+    await context.db
+      .delete(drawingFiles)
+      .where(eq(drawingFiles.drawingId, drawingId))
+
+    if (files.length > 0) {
+      await context.db.insert(drawingFiles).values(
+        files.map((file) => ({
+          id: randomUUID(),
+          drawingId,
+          fileId: file.fileId,
+          mimeType: file.mimeType,
+          dataUrl: file.dataUrl,
+          createdAt: new Date(),
+        })),
+      )
+    }
+  })

@@ -35,34 +35,61 @@ export function ExcalidrawCanvas({
   const [loadError, setLoadError] = useState<Error | null>(null)
   const apiRef = useRef<ExcalidrawApi | null>(null)
   const sceneRef = useRef<ExcalidrawScene | null>(null)
+  const isMountedRef = useRef(false)
 
   useEffect(() => {
+    let isActive = true
     import("@excalidraw/excalidraw")
       .then((module) => {
+        if (!isActive) return
         setExcalidraw(
           () => module.Excalidraw as ComponentType<Record<string, unknown>>,
         )
       })
       .catch((err: unknown) => {
+        if (!isActive) return
         setLoadError(err instanceof Error ? err : new Error(String(err)))
       })
+    return () => {
+      isActive = false
+    }
+  }, [])
+
+  useEffect(() => {
+    isMountedRef.current = true
+    return () => {
+      isMountedRef.current = false
+    }
+  }, [])
+
+  const scheduleSceneUpdate = useCallback((sceneToApply: ExcalidrawScene) => {
+    // Defer updates until after mount to avoid setState-before-mount warnings.
+    requestAnimationFrame(() => {
+      if (!isMountedRef.current) return
+      const api = apiRef.current
+      if (api) {
+        api.updateScene(sceneToApply)
+      }
+    })
   }, [])
 
   useEffect(() => {
     if (!scene) return
     sceneRef.current = scene
-    const api = apiRef.current
-    if (api) {
-      api.updateScene(scene)
+    if (apiRef.current) {
+      scheduleSceneUpdate(scene)
     }
-  }, [scene])
+  }, [scene, scheduleSceneUpdate])
 
-  const handleApi = useCallback((api: unknown) => {
-    apiRef.current = api as ExcalidrawApi
-    if (sceneRef.current) {
-      apiRef.current.updateScene(sceneRef.current)
-    }
-  }, [])
+  const handleApi = useCallback(
+    (api: unknown) => {
+      apiRef.current = api as ExcalidrawApi
+      if (sceneRef.current) {
+        scheduleSceneUpdate(sceneRef.current)
+      }
+    },
+    [scheduleSceneUpdate],
+  )
 
   const handleChange = (
     elements: readonly unknown[],

@@ -9,6 +9,7 @@ import { LogOut, Pencil, Plus, Settings, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { signOut } from "@/lib/auth-client"
+import { createDrawing, deleteDrawing, getDrawings } from "@/server/drawings"
 
 const getSession = createServerFn({ method: "GET" }).handler(
   async ({ context }) => {
@@ -25,36 +26,6 @@ const checkSetup = createServerFn({ method: "GET" }).handler(
   },
 )
 
-const fetchDrawings = createServerFn({ method: "GET" }).handler(
-  async ({ context }) => {
-    const session = await context.auth.api.getSession({
-      headers: context.request.headers,
-    })
-    if (!session?.user) return []
-    return context.drawings.getDrawings(session.user.id)
-  },
-)
-
-const createNewDrawing = createServerFn({ method: "POST" }).handler(
-  async ({ context }) => {
-    const session = await context.auth.api.getSession({
-      headers: context.request.headers,
-    })
-    if (!session?.user) throw new Error("Unauthorized")
-    return context.drawings.createDrawing(session.user.id)
-  },
-)
-
-const removeDrawing = createServerFn({ method: "POST" })
-  .inputValidator((data: { id: string }) => data)
-  .handler(async ({ data, context }) => {
-    const session = await context.auth.api.getSession({
-      headers: context.request.headers,
-    })
-    if (!session?.user) throw new Error("Unauthorized")
-    await context.drawings.deleteDrawing(data.id, session.user.id)
-  })
-
 export const Route = createFileRoute("/")({
   beforeLoad: async () => {
     const setupComplete = await checkSetup()
@@ -70,7 +41,7 @@ export const Route = createFileRoute("/")({
     return { session }
   },
   loader: async () => {
-    const drawings = await fetchDrawings()
+    const drawings = await getDrawings()
     return { drawings }
   },
   component: DashboardPage,
@@ -82,13 +53,13 @@ function DashboardPage() {
   const navigate = useNavigate()
 
   const handleNewDrawing = async () => {
-    const id = await createNewDrawing()
+    const id = await createDrawing()
     navigate({ to: "/draw/$id", params: { id } })
   }
 
   const handleDelete = async (id: string) => {
     if (confirm("Are you sure you want to delete this drawing?")) {
-      await removeDrawing({ data: { id } })
+      await deleteDrawing({ data: id })
       navigate({ to: "/" })
     }
   }
