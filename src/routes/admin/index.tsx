@@ -1,4 +1,4 @@
-import { createFileRoute, Link, redirect } from "@tanstack/react-router"
+import { createFileRoute, Link } from "@tanstack/react-router"
 import { createServerFn } from "@tanstack/react-start"
 import { ArrowLeft, Check, Copy, Mail, Plus, Trash2, Users } from "lucide-react"
 import { useState } from "react"
@@ -11,68 +11,24 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { getAllUsers, getUserById, isSetupComplete } from "@/server/users"
+import { createInvite, deleteInvite, getPendingInvites } from "@/server/invites"
+import { getAllUsers } from "@/server/users"
 
-const getSession = createServerFn({ method: "GET" }).handler(
-  async ({ context }) => {
-    const session = await context.auth.api.getSession({
-      headers: context.request.headers,
-    })
-    return session
-  },
-)
+// const fetchUserById = createServerFn({ method: "GET" })
+//   .inputValidator((data: { id: string }) => data)
+//   .handler(async ({ data }) => {
+//     return getUserById({ data: data.id })
+//   })
 
-const sendInvite = createServerFn({ method: "POST" })
-  .inputValidator((data: { email: string }) => data)
-  .handler(async ({ data, context }) => {
-    const session = await context.auth.api.getSession({
-      headers: context.request.headers,
-    })
-    if (!session?.user) throw new Error("Unauthorized")
-    return context.invites.createInvite(data.email, session.user.id)
-  })
-
-const removeInvite = createServerFn({ method: "POST" })
-  .inputValidator((data: { id: string }) => data)
-  .handler(async ({ data, context }) => {
-    await context.invites.deleteInvite(data.id)
-  })
-
-const fetchUserById = createServerFn({ method: "GET" })
-  .inputValidator((data: { id: string }) => data)
-  .handler(async ({ data }) => {
-    return getUserById({ data: data.id })
-  })
-
-const fetchAdminData = createServerFn({ method: "GET" }).handler(
-  async ({ context }) => {
-    const [users, invites] = await Promise.all([
-      getAllUsers(),
-      context.invites.getPendingInvites(),
-    ])
-    return { users, invites }
-  },
-)
+const fetchAdminData = createServerFn({ method: "GET" }).handler(async () => {
+  const [users, invites] = await Promise.all([
+    getAllUsers(),
+    getPendingInvites(),
+  ])
+  return { users, invites }
+})
 
 export const Route = createFileRoute("/admin/")({
-  beforeLoad: async () => {
-    const setupComplete = await isSetupComplete()
-    if (!setupComplete) {
-      throw redirect({ to: "/setup" })
-    }
-
-    const session = await getSession()
-    if (!session?.user) {
-      throw redirect({ to: "/login" })
-    }
-
-    const user = await fetchUserById({ data: { id: session.user.id } })
-    if (user?.role !== "admin") {
-      throw redirect({ to: "/" })
-    }
-
-    return { session }
-  },
   loader: async () => {
     return await fetchAdminData()
   },
@@ -93,7 +49,7 @@ function AdminPage() {
     setError("")
 
     try {
-      const result = await sendInvite({ data: { email } })
+      const result = await createInvite({ data: email })
       const newInvite = {
         id: result.id,
         email,
@@ -113,7 +69,7 @@ function AdminPage() {
   }
 
   const handleDeleteInvite = async (id: string) => {
-    await removeInvite({ data: { id } })
+    await deleteInvite({ data: id })
     setLocalInvites(localInvites.filter((i) => i.id !== id))
   }
 

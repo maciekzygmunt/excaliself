@@ -11,13 +11,7 @@ import {
 } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-
-const checkInvite = createServerFn({ method: "GET" })
-  .inputValidator((data: { token: string }) => data)
-  .handler(async ({ data, context }) => {
-    const invite = await context.invites.validateInvite(data.token)
-    return invite
-  })
+import { validateInvite } from "@/server/invites"
 
 const registerWithInvite = createServerFn({ method: "POST" })
   .inputValidator(
@@ -25,7 +19,7 @@ const registerWithInvite = createServerFn({ method: "POST" })
       data,
   )
   .handler(async ({ data, context }) => {
-    const invite = await context.invites.validateInvite(data.token)
+    const invite = await validateInvite({ data: data.token })
     if (!invite) {
       throw new Error("Invalid or expired invite")
     }
@@ -46,7 +40,7 @@ const registerWithInvite = createServerFn({ method: "POST" })
       throw new Error("Failed to create account")
     }
 
-    await context.invites.consumeInvite(data.token)
+    await validateInvite({ data: data.token })
 
     return { success: true }
   })
@@ -62,7 +56,7 @@ export const Route = createFileRoute("/invite")({
       throw redirect({ to: "/login" })
     }
 
-    const invite = await checkInvite({ data: { token: search.token } })
+    const invite = await validateInvite({ data: search.token })
     if (!invite) {
       throw redirect({ to: "/login" })
     }
