@@ -5,7 +5,6 @@ import {
   defaultStreamHandler,
 } from "@tanstack/react-start/server"
 import { createServerEntry } from "@tanstack/react-start/server-entry"
-import { auth } from "@/lib/auth"
 import { getDb } from "@/lib/db"
 
 const db = getDb()
@@ -16,7 +15,6 @@ const fetch: RequestHandler<Register> = (request, opts) => {
   const context = {
     ...baseContext,
     db,
-    auth,
     request,
   }
 

@@ -11,19 +11,20 @@ import {
 } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { auth } from "@/lib/auth"
 import { createFirstAdmin, isSetupComplete } from "@/server/users"
 
 const setupAdmin = createServerFn({ method: "POST" })
   .inputValidator(
     (data: { email: string; password: string; name: string }) => data,
   )
-  .handler(async ({ data, context }) => {
+  .handler(async ({ data }) => {
     const setupComplete = await isSetupComplete()
     if (setupComplete) {
       throw new Error("Setup already complete")
     }
 
-    const result = await context.auth.api.signUpEmail({
+    const result = await auth.api.signUpEmail({
       body: {
         email: data.email,
         password: data.password,

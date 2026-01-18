@@ -18,15 +18,6 @@ type ExcalidrawBinaryFile = {
   dataURL?: string
 }
 
-const getSession = createServerFn({ method: "GET" }).handler(
-  async ({ context }) => {
-    const session = await context.auth.api.getSession({
-      headers: context.request.headers,
-    })
-    return session
-  },
-)
-
 const saveDrawing = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
   .inputValidator(
@@ -58,15 +49,13 @@ const saveDrawing = createServerFn({ method: "POST" })
   })
 
 export const Route = createFileRoute("/draw/$id")({
+  server: {
+    middleware: [authMiddleware],
+  },
   beforeLoad: async () => {
     const setupComplete = await isSetupComplete()
     if (!setupComplete) {
       throw redirect({ to: "/setup" })
-    }
-
-    const session = await getSession()
-    if (!session?.user) {
-      throw redirect({ to: "/login" })
     }
   },
   loader: async ({ params }) => {

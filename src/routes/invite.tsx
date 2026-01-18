@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { auth } from "@/lib/auth"
 import { validateInvite } from "@/server/invites"
 
 const registerWithInvite = createServerFn({ method: "POST" })
@@ -18,7 +19,7 @@ const registerWithInvite = createServerFn({ method: "POST" })
     (data: { token: string; email: string; password: string; name: string }) =>
       data,
   )
-  .handler(async ({ data, context }) => {
+  .handler(async ({ data }) => {
     const invite = await validateInvite({ data: data.token })
     if (!invite) {
       throw new Error("Invalid or expired invite")
@@ -28,7 +29,7 @@ const registerWithInvite = createServerFn({ method: "POST" })
       throw new Error("Email does not match invitation")
     }
 
-    const result = await context.auth.api.signUpEmail({
+    const result = await auth.api.signUpEmail({
       body: {
         email: data.email,
         password: data.password,

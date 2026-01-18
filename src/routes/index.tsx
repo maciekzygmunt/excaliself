@@ -9,17 +9,13 @@ import { LogOut, Pencil, Plus, Settings, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { signOut } from "@/lib/auth-client"
+import { authMiddleware } from "@/middleware/auth"
 import { createDrawing, deleteDrawing, getDrawings } from "@/server/drawings"
 import { isSetupComplete } from "@/server/users"
 
-const getSession = createServerFn({ method: "GET" }).handler(
-  async ({ context }) => {
-    const session = await context.auth.api.getSession({
-      headers: context.request.headers,
-    })
-    return session
-  },
-)
+const getSession = createServerFn({ method: "GET" })
+  .middleware([authMiddleware])
+  .handler(async ({ context }) => context.session)
 
 export const Route = createFileRoute("/")({
   beforeLoad: async () => {
@@ -27,24 +23,21 @@ export const Route = createFileRoute("/")({
     if (!setupComplete) {
       throw redirect({ to: "/setup" })
     }
-
-    const session = await getSession()
-    if (!session?.user) {
-      throw redirect({ to: "/login" })
-    }
-
-    return { session }
   },
   loader: async () => {
     const drawings = await getDrawings()
-    return { drawings }
+    const session = await getSession()
+    return {
+      drawings,
+      email: session?.user.email,
+      role: session?.user.role,
+    }
   },
   component: DashboardPage,
 })
 
 function DashboardPage() {
-  const { session } = Route.useRouteContext()
-  const { drawings } = Route.useLoaderData()
+  const { drawings, email, role } = Route.useLoaderData()
   const navigate = useNavigate()
 
   const handleNewDrawing = async () => {
@@ -64,7 +57,7 @@ function DashboardPage() {
     navigate({ to: "/login" })
   }
 
-  const isAdmin = session?.user?.role === "admin"
+  const isAdmin = role === "admin"
 
   return (
     <div className="min-h-screen bg-background">
@@ -80,9 +73,7 @@ function DashboardPage() {
                 </Button>
               </Link>
             )}
-            <span className="text-sm text-muted-foreground">
-              {session?.user?.email}
-            </span>
+            <span className="text-sm text-muted-foreground">{email}</span>
             <Button variant="ghost" size="sm" onClick={handleSignOut}>
               <LogOut className="mr-2 h-4 w-4" />
               Sign Out
