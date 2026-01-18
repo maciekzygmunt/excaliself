@@ -1,17 +1,21 @@
-import { createFileRoute, Link, redirect } from "@tanstack/react-router"
+import { createFileRoute, redirect } from "@tanstack/react-router"
 import { createServerFn } from "@tanstack/react-start"
-import { ArrowLeft, Check } from "lucide-react"
+import { Check } from "lucide-react"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { ExcalidrawCanvas } from "@/components/ExcalidrawCanvas"
-import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { SidebarTrigger, useSidebar } from "@/components/ui/sidebar"
 import { authMiddleware } from "@/middleware/auth"
 import {
   getDrawingWithFiles,
   updateDrawing,
   updateDrawingFiles,
 } from "@/server/drawings"
-import { isSetupComplete } from "@/server/users"
+import { getFolders } from "@/server/folders"
+
+type DrawingWithFiles = NonNullable<
+  Awaited<ReturnType<typeof getDrawingWithFiles>>
+>
 
 type ExcalidrawBinaryFile = {
   mimeType?: string
@@ -49,32 +53,30 @@ const saveDrawing = createServerFn({ method: "POST" })
   })
 
 export const Route = createFileRoute("/draw/$id")({
-  server: {
-    middleware: [authMiddleware],
-  },
-  beforeLoad: async () => {
-    const setupComplete = await isSetupComplete()
-    if (!setupComplete) {
-      throw redirect({ to: "/setup" })
-    }
-  },
   loader: async ({ params }) => {
-    const drawing = await getDrawingWithFiles({
-      data: params.id,
-    })
+    const [drawing, folders] = await Promise.all([
+      getDrawingWithFiles({ data: params.id }),
+      getFolders(),
+    ])
+
     if (!drawing) {
       throw redirect({ to: "/" })
     }
-    return { drawing }
+
+    return { drawing, folders }
   },
-  component: DrawingEditorPage,
+  component: DrawingCanvas,
 })
 
-function DrawingEditorPage() {
-  const { drawing } = Route.useLoaderData()
+function DrawingCanvas() {
+  const { drawing, folders } = Route.useLoaderData()
   const { id } = Route.useParams()
+  const { open } = useSidebar()
 
   const [name, setName] = useState(drawing.name)
+  const [currentFolderId, setCurrentFolderId] = useState<string | null>(
+    drawing.folderId ?? null,
+  )
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -89,8 +91,16 @@ function DrawingEditorPage() {
 
   useEffect(() => {
     setName(drawing.name)
+    setCurrentFolderId(drawing.folderId ?? null)
     lastSavedDataRef.current = drawing.data
-  }, [drawing.data, drawing.name])
+  }, [drawing.data, drawing.folderId, drawing.name])
+
+  useEffect(() => {
+    isMountedRef.current = true
+    return () => {
+      isMountedRef.current = false
+    }
+  }, [])
 
   const handleSave = useCallback(
     async (
@@ -170,7 +180,6 @@ function DrawingEditorPage() {
 
   useEffect(() => {
     return () => {
-      isMountedRef.current = false
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current)
         saveTimeoutRef.current = null
@@ -190,6 +199,43 @@ function DrawingEditorPage() {
     setName(newName)
     await saveDrawing({ data: { id, name: newName } })
   }
+
+  const handleFolderChange = async (value: string) => {
+    const folderId = value === "" ? null : value
+    setCurrentFolderId(folderId)
+    await updateDrawing({ data: { id, updateData: { folderId } } })
+  }
+
+  const folderChildren = useMemo(() => {
+    const map = new Map<string | null, typeof folders>()
+    for (const folder of folders) {
+      const parentId = folder.parentId ?? null
+      if (!map.has(parentId)) {
+        map.set(parentId, [])
+      }
+      map.get(parentId)?.push(folder)
+    }
+    for (const entries of map.values()) {
+      entries.sort((a, b) => a.name.localeCompare(b.name))
+    }
+    return map
+  }, [folders])
+
+  const folderOptions = useMemo(() => {
+    const options: { id: string | null; label: string }[] = []
+    const walk = (parentId: string | null, depth: number) => {
+      const children = folderChildren.get(parentId) ?? []
+      for (const folder of children) {
+        options.push({
+          id: folder.id,
+          label: `${"- ".repeat(depth)}${folder.name}`,
+        })
+        walk(folder.id, depth + 1)
+      }
+    }
+    walk(null, 0)
+    return options
+  }, [folderChildren])
 
   const sceneData = useMemo(() => {
     try {
@@ -228,22 +274,30 @@ function DrawingEditorPage() {
   }, [drawing.data, drawing.files])
 
   return (
-    <div className="flex h-screen flex-col">
-      <header className="flex h-14 items-center justify-between border-b bg-background px-4">
-        <div className="flex items-center gap-4">
-          <Link to="/">
-            <Button variant="ghost" size="icon">
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
-          </Link>
+    <>
+      <header className="flex min-h-14 flex-wrap items-center justify-between gap-2 border-b bg-background/80 px-3 py-2">
+        <div className="flex items-center gap-2">
+          {open && <SidebarTrigger />}
           <Input
             value={name}
-            onChange={(e) => setName(e.target.value)}
-            onBlur={(e) => handleNameChange(e.target.value)}
+            onChange={(event) => setName(event.target.value)}
+            onBlur={(event) => handleNameChange(event.target.value)}
             className="h-8 w-64 border-transparent bg-transparent hover:border-input focus:border-input"
           />
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <select
+            value={currentFolderId ?? ""}
+            onChange={(event) => void handleFolderChange(event.target.value)}
+            className="h-8 rounded-md border border-input bg-background px-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <option value="">No folder</option>
+            {folderOptions.map((option) => (
+              <option key={option.id ?? "root"} value={option.id ?? ""}>
+                {option.label}
+              </option>
+            ))}
+          </select>
           {saving && (
             <span className="text-sm text-muted-foreground">Saving...</span>
           )}
@@ -255,13 +309,14 @@ function DrawingEditorPage() {
           )}
         </div>
       </header>
-      <div className="flex-1">
+
+      <div className="min-h-0 flex-1">
         <ExcalidrawCanvas
           initialData={sceneData}
           scene={sceneData}
           onChange={handleDebouncedSave}
         />
       </div>
-    </div>
+    </>
   )
 }

@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as SetupRouteImport } from './routes/setup'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as InviteRouteImport } from './routes/invite'
+import { Route as DrawRouteImport } from './routes/draw'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminIndexRouteImport } from './routes/admin/index'
 import { Route as DrawIdRouteImport } from './routes/draw/$id'
@@ -32,6 +33,11 @@ const InviteRoute = InviteRouteImport.update({
   path: '/invite',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DrawRoute = DrawRouteImport.update({
+  id: '/draw',
+  path: '/draw',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -43,9 +49,9 @@ const AdminIndexRoute = AdminIndexRouteImport.update({
   getParentRoute: () => rootRouteImport,
 } as any)
 const DrawIdRoute = DrawIdRouteImport.update({
-  id: '/draw/$id',
-  path: '/draw/$id',
-  getParentRoute: () => rootRouteImport,
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => DrawRoute,
 } as any)
 const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   id: '/api/auth/$',
@@ -55,6 +61,7 @@ const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/draw': typeof DrawRouteWithChildren
   '/invite': typeof InviteRoute
   '/login': typeof LoginRoute
   '/setup': typeof SetupRoute
@@ -64,6 +71,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/draw': typeof DrawRouteWithChildren
   '/invite': typeof InviteRoute
   '/login': typeof LoginRoute
   '/setup': typeof SetupRoute
@@ -74,6 +82,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/draw': typeof DrawRouteWithChildren
   '/invite': typeof InviteRoute
   '/login': typeof LoginRoute
   '/setup': typeof SetupRoute
@@ -85,6 +94,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/draw'
     | '/invite'
     | '/login'
     | '/setup'
@@ -94,6 +104,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/draw'
     | '/invite'
     | '/login'
     | '/setup'
@@ -103,6 +114,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/draw'
     | '/invite'
     | '/login'
     | '/setup'
@@ -113,10 +125,10 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  DrawRoute: typeof DrawRouteWithChildren
   InviteRoute: typeof InviteRoute
   LoginRoute: typeof LoginRoute
   SetupRoute: typeof SetupRoute
-  DrawIdRoute: typeof DrawIdRoute
   AdminIndexRoute: typeof AdminIndexRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
 }
@@ -144,6 +156,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof InviteRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/draw': {
+      id: '/draw'
+      path: '/draw'
+      fullPath: '/draw'
+      preLoaderRoute: typeof DrawRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -160,10 +179,10 @@ declare module '@tanstack/react-router' {
     }
     '/draw/$id': {
       id: '/draw/$id'
-      path: '/draw/$id'
+      path: '/$id'
       fullPath: '/draw/$id'
       preLoaderRoute: typeof DrawIdRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof DrawRoute
     }
     '/api/auth/$': {
       id: '/api/auth/$'
@@ -175,12 +194,22 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface DrawRouteChildren {
+  DrawIdRoute: typeof DrawIdRoute
+}
+
+const DrawRouteChildren: DrawRouteChildren = {
+  DrawIdRoute: DrawIdRoute,
+}
+
+const DrawRouteWithChildren = DrawRoute._addFileChildren(DrawRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  DrawRoute: DrawRouteWithChildren,
   InviteRoute: InviteRoute,
   LoginRoute: LoginRoute,
   SetupRoute: SetupRoute,
-  DrawIdRoute: DrawIdRoute,
   AdminIndexRoute: AdminIndexRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
 }

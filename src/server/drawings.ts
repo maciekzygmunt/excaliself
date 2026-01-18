@@ -41,16 +41,23 @@ export const getDrawingWithFiles = createServerFn({ method: "GET" })
 
 export const createDrawing = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
-  .inputValidator(z.string().optional().default("Untitled"))
+  .inputValidator(
+    z.object({
+      name: z.string().min(1).optional(),
+      folderId: z.string().nullable().optional(),
+    }),
+  )
   .handler(async ({ data, context }) => {
     const userId = context.session.user.id
     const id = randomUUID()
     const now = new Date()
+    const name = data.name ?? "Untitled"
 
     await context.db.insert(drawings).values({
       id,
-      name: data,
+      name,
       data: JSON.stringify({ elements: [], appState: {} }),
+      folderId: data.folderId ?? null,
       ownerId: userId,
       isPublic: false,
       createdAt: now,
@@ -69,14 +76,18 @@ export const updateDrawing = createServerFn({ method: "POST" })
         name: z.string().optional(),
         data: z.string().optional(),
         thumbnail: z.string().optional(),
+        folderId: z.string().nullable().optional(),
       }),
     }),
   )
   .handler(async ({ data: { updateData, id }, context }) => {
     const userId = context.session.user.id
+    const cleanedUpdateData = Object.fromEntries(
+      Object.entries(updateData).filter(([, value]) => value !== undefined),
+    )
     await context.db
       .update(drawings)
-      .set({ ...updateData, updatedAt: new Date() })
+      .set({ ...cleanedUpdateData, updatedAt: new Date() })
       .where(and(eq(drawings.id, id), eq(drawings.ownerId, userId)))
   })
 

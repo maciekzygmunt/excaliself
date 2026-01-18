@@ -1,4 +1,4 @@
-import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core"
+import { foreignKey, integer, sqliteTable, text } from "drizzle-orm/sqlite-core"
 
 export const users = sqliteTable("users", {
   id: text("id").primaryKey(),
@@ -85,11 +85,38 @@ export const invites = sqliteTable("invites", {
     .$defaultFn(() => new Date()),
 })
 
+export const folders = sqliteTable(
+  "folders",
+  {
+    id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    ownerId: text("ownerId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    parentId: text("parentId"),
+    createdAt: integer("createdAt", { mode: "timestamp" })
+      .notNull()
+      .$defaultFn(() => new Date()),
+    updatedAt: integer("updatedAt", { mode: "timestamp" })
+      .notNull()
+      .$defaultFn(() => new Date()),
+  },
+  (table) => ({
+    parentReference: foreignKey({
+      columns: [table.parentId],
+      foreignColumns: [table.id],
+    }).onDelete("cascade"),
+  }),
+)
+
 export const drawings = sqliteTable("drawings", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
   data: text("data").notNull().default("{}"),
   thumbnail: text("thumbnail"),
+  folderId: text("folderId").references(() => folders.id, {
+    onDelete: "set null",
+  }),
   ownerId: text("ownerId")
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),

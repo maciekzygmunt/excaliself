@@ -11,14 +11,9 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import { authMiddleware } from "@/middleware/auth"
 import { createInvite, deleteInvite, getPendingInvites } from "@/server/invites"
 import { getAllUsers } from "@/server/users"
-
-// const fetchUserById = createServerFn({ method: "GET" })
-//   .inputValidator((data: { id: string }) => data)
-//   .handler(async ({ data }) => {
-//     return getUserById({ data: data.id })
-//   })
 
 const fetchAdminData = createServerFn({ method: "GET" }).handler(async () => {
   const [users, invites] = await Promise.all([
@@ -29,6 +24,9 @@ const fetchAdminData = createServerFn({ method: "GET" }).handler(async () => {
 })
 
 export const Route = createFileRoute("/admin/")({
+  server: {
+    middleware: [authMiddleware],
+  },
   loader: async () => {
     return await fetchAdminData()
   },
