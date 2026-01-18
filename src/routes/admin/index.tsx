@@ -11,6 +11,8 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import { createInvite, deleteInvite, getPendingInvites } from "@/server/invites"
+import { getAllUsers, getUserById, isSetupComplete } from "@/server/users"
 
 const getSession = createServerFn({ method: "GET" }).handler(
   async ({ context }) => {
@@ -21,24 +23,6 @@ const getSession = createServerFn({ method: "GET" }).handler(
   },
 )
 
-const checkSetup = createServerFn({ method: "GET" }).handler(
-  async ({ context }) => {
-    return context.users.isSetupComplete()
-  },
-)
-
-const fetchUsers = createServerFn({ method: "GET" }).handler(
-  async ({ context }) => {
-    return context.users.getAllUsers()
-  },
-)
-
-const fetchInvites = createServerFn({ method: "GET" }).handler(
-  async ({ context }) => {
-    return context.invites.getPendingInvites()
-  },
-)
-
 const sendInvite = createServerFn({ method: "POST" })
   .inputValidator((data: { email: string }) => data)
   .handler(async ({ data, context }) => {
@@ -46,24 +30,24 @@ const sendInvite = createServerFn({ method: "POST" })
       headers: context.request.headers,
     })
     if (!session?.user) throw new Error("Unauthorized")
-    return context.invites.createInvite(data.email, session.user.id)
+    return createInvite(data.email, session.user.id)
   })
 
 const removeInvite = createServerFn({ method: "POST" })
   .inputValidator((data: { id: string }) => data)
-  .handler(async ({ data, context }) => {
-    await context.invites.deleteInvite(data.id)
+  .handler(async ({ data }) => {
+    await deleteInvite(data.id)
   })
 
 const fetchUserById = createServerFn({ method: "GET" })
   .inputValidator((data: { id: string }) => data)
-  .handler(async ({ data, context }) => {
-    return context.users.getUserById(data.id)
+  .handler(async ({ data }) => {
+    return getUserById(data.id)
   })
 
 export const Route = createFileRoute("/admin/")({
   beforeLoad: async () => {
-    const setupComplete = await checkSetup()
+    const setupComplete = await isSetupComplete()
     if (!setupComplete) {
       throw redirect({ to: "/setup" })
     }
@@ -81,7 +65,10 @@ export const Route = createFileRoute("/admin/")({
     return { session }
   },
   loader: async () => {
-    const [users, invites] = await Promise.all([fetchUsers(), fetchInvites()])
+    const [users, invites] = await Promise.all([
+      getAllUsers(),
+      getPendingInvites(),
+    ])
     return { users, invites }
   },
   component: AdminPage,

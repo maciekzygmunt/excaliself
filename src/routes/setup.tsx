@@ -11,19 +11,14 @@ import {
 } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-
-const checkSetup = createServerFn({ method: "GET" }).handler(
-  async ({ context }) => {
-    return context.users.isSetupComplete()
-  },
-)
+import { createFirstAdmin, isSetupComplete } from "@/server/users"
 
 const setupAdmin = createServerFn({ method: "POST" })
   .inputValidator(
     (data: { email: string; password: string; name: string }) => data,
   )
   .handler(async ({ data, context }) => {
-    const setupComplete = await context.users.isSetupComplete()
+    const setupComplete = await isSetupComplete()
     if (setupComplete) {
       throw new Error("Setup already complete")
     }
@@ -40,14 +35,14 @@ const setupAdmin = createServerFn({ method: "POST" })
       throw new Error("Failed to create admin account")
     }
 
-    await context.users.createFirstAdmin(result.user.id, data.name)
+    await createFirstAdmin(result.user.id, data.name)
 
     return { success: true }
   })
 
 export const Route = createFileRoute("/setup")({
   beforeLoad: async () => {
-    const setupComplete = await checkSetup()
+    const setupComplete = await isSetupComplete()
     if (setupComplete) {
       throw redirect({ to: "/login" })
     }

@@ -9,6 +9,8 @@ import { LogOut, Pencil, Plus, Settings, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { signOut } from "@/lib/auth-client"
+import { createDrawing, deleteDrawing, getDrawings } from "@/server/drawings"
+import { isSetupComplete } from "@/server/users"
 
 const getSession = createServerFn({ method: "GET" }).handler(
   async ({ context }) => {
@@ -19,19 +21,13 @@ const getSession = createServerFn({ method: "GET" }).handler(
   },
 )
 
-const checkSetup = createServerFn({ method: "GET" }).handler(
-  async ({ context }) => {
-    return context.users.isSetupComplete()
-  },
-)
-
 const fetchDrawings = createServerFn({ method: "GET" }).handler(
   async ({ context }) => {
     const session = await context.auth.api.getSession({
       headers: context.request.headers,
     })
     if (!session?.user) return []
-    return context.drawings.getDrawings(session.user.id)
+    return getDrawings(session.user.id)
   },
 )
 
@@ -41,7 +37,7 @@ const createNewDrawing = createServerFn({ method: "POST" }).handler(
       headers: context.request.headers,
     })
     if (!session?.user) throw new Error("Unauthorized")
-    return context.drawings.createDrawing(session.user.id)
+    return createDrawing(session.user.id)
   },
 )
 
@@ -52,12 +48,12 @@ const removeDrawing = createServerFn({ method: "POST" })
       headers: context.request.headers,
     })
     if (!session?.user) throw new Error("Unauthorized")
-    await context.drawings.deleteDrawing(data.id, session.user.id)
+    await deleteDrawing(data.id, session.user.id)
   })
 
 export const Route = createFileRoute("/")({
   beforeLoad: async () => {
-    const setupComplete = await checkSetup()
+    const setupComplete = await isSetupComplete()
     if (!setupComplete) {
       throw redirect({ to: "/setup" })
     }
