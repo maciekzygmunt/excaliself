@@ -1,6 +1,6 @@
 import { createFileRoute, redirect } from "@tanstack/react-router"
 import { createServerFn } from "@tanstack/react-start"
-import { Check } from "lucide-react"
+import { Check, Cloud, Loader2 } from "lucide-react"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { ExcalidrawCanvas } from "@/components/ExcalidrawCanvas"
 import { Input } from "@/components/ui/input"
@@ -274,39 +274,48 @@ function DrawingCanvas() {
   }, [drawing.data, drawing.files])
 
   return (
-    <>
-      <header className="flex min-h-14 flex-wrap items-center justify-between gap-2 border-b bg-background/80 px-3 py-2">
-        <div className="flex items-center gap-2">
-          {open && <SidebarTrigger />}
+    <div className="flex h-full flex-col bg-background">
+      <header className="flex h-14 items-center justify-between gap-4 border-b border-border/40 bg-background px-4">
+        <div className="flex items-center gap-4">
+          <SidebarTrigger className="-ml-2 h-9 w-9 text-muted-foreground hover:text-foreground" />
+          <div className="h-4 w-px bg-border/60" />
           <Input
             value={name}
             onChange={(event) => setName(event.target.value)}
             onBlur={(event) => handleNameChange(event.target.value)}
-            className="h-8 w-64 border-transparent bg-transparent hover:border-input focus:border-input"
+            className="h-9 w-[300px] border-none bg-transparent px-0 text-lg font-semibold shadow-none focus-visible:ring-0 placeholder:text-muted-foreground/50"
+            placeholder="Untitled Drawing"
           />
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <select
-            value={currentFolderId ?? ""}
-            onChange={(event) => void handleFolderChange(event.target.value)}
-            className="h-8 rounded-md border border-input bg-background px-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            <option value="">No folder</option>
-            {folderOptions.map((option) => (
-              <option key={option.id ?? "root"} value={option.id ?? ""}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-          {saving && (
-            <span className="text-sm text-muted-foreground">Saving...</span>
-          )}
-          {saved && (
-            <span className="flex items-center gap-1 text-sm text-green-600">
-              <Check className="h-4 w-4" />
-              Saved
-            </span>
-          )}
+        <div className="flex items-center gap-3">
+          <div className="relative">
+            <select
+              value={currentFolderId ?? ""}
+              onChange={(event) => void handleFolderChange(event.target.value)}
+              className="h-8 appearance-none rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            >
+              <option value="">No folder</option>
+              {folderOptions.map((option) => (
+                <option key={option.id ?? "root"} value={option.id ?? ""}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="flex items-center gap-2 px-2 text-muted-foreground">
+            {saving && (
+              <div className="flex items-center gap-1.5 text-xs">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                <span>Saving...</span>
+              </div>
+            )}
+            {saved && !saving && (
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Cloud className="h-3.5 w-3.5" />
+                <span>Saved</span>
+              </div>
+            )}
+          </div>
         </div>
       </header>
 
@@ -317,6 +326,6 @@ function DrawingCanvas() {
           onChange={handleDebouncedSave}
         />
       </div>
-    </>
+    </div>
   )
 }

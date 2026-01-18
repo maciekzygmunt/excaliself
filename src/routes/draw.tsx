@@ -8,19 +8,23 @@ import {
 import { createServerFn } from "@tanstack/react-start"
 import {
   ChevronRight,
-  FilePlus,
-  FileText,
+  File,
   Folder,
-  FolderPlus,
   LogOut,
+  MoreVertical,
+  Plus,
   Settings,
   Trash2,
+  User,
 } from "lucide-react"
 import type { DragEvent } from "react"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import {
   Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarHeader,
   SidebarInset,
   SidebarOverlay,
   SidebarProvider,
@@ -77,15 +81,14 @@ function CreateRow({
 
   return (
     <div
-      className="flex items-center gap-0.5 py-px"
-      style={open ? { paddingLeft: depth * 10 } : undefined}
+      className="flex items-center gap-2 py-1"
+      style={open ? { paddingLeft: depth * 12 + 8 } : undefined}
     >
-      {isDrawing && open && <div className="h-5 w-5" />}
       <div className="flex h-5 w-5 shrink-0 items-center justify-center text-muted-foreground">
         {isDrawing ? (
-          <FileText className="h-3.5 w-3.5" />
+          <File className="h-4 w-4" />
         ) : (
-          <Folder className="h-3.5 w-3.5" />
+          <Folder className="h-4 w-4" />
         )}
       </div>
       <input
@@ -103,7 +106,7 @@ function CreateRow({
             cancelCreate()
           }
         }}
-        className="h-5 flex-1 rounded-sm border border-input bg-background px-1.5 text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+        className="h-6 flex-1 rounded-sm border border-input bg-background px-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
       />
     </div>
   )
@@ -130,17 +133,16 @@ function DrawingItem({
 }: DrawingItemProps) {
   return (
     <div
-      className="group flex items-center gap-0.5 py-px"
-      style={open ? { paddingLeft: depth * 10 } : undefined}
+      className="group flex items-center gap-0.5 py-0.5"
+      style={open ? { paddingLeft: depth * 12 + 4 } : undefined}
     >
-      {open && <div className="h-5 w-5" />}
       <Link
         to="/draw/$id"
         params={{ id: item.id }}
         className={cn(
-          "flex flex-1 items-center gap-1.5 rounded-sm px-1.5 py-0.5 text-xs transition-colors",
+          "flex flex-1 items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors",
           isActive
-            ? "bg-accent text-accent-foreground"
+            ? "bg-accent text-accent-foreground font-medium"
             : "text-muted-foreground hover:bg-accent/50 hover:text-foreground",
           !open && "justify-center px-0",
         )}
@@ -148,20 +150,20 @@ function DrawingItem({
         onDragStart={onDragStart}
         onDragEnd={onDragEnd}
       >
-        <FileText className="h-3.5 w-3.5 shrink-0" />
+        <File className="h-4 w-4 shrink-0" />
         {open && <span className="truncate">{item.name}</span>}
       </Link>
       {open && (
         <button
           type="button"
-          className="flex h-5 w-5 shrink-0 items-center justify-center rounded-sm text-muted-foreground opacity-0 transition-opacity hover:bg-accent hover:text-foreground group-hover:opacity-100"
+          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-muted-foreground opacity-0 transition-opacity hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100"
           onClick={(event) => {
             event.preventDefault()
             event.stopPropagation()
             void onDelete(item.id)
           }}
         >
-          <Trash2 className="h-3 w-3" />
+          <Trash2 className="h-3.5 w-3.5" />
           <span className="sr-only">Delete drawing</span>
         </button>
       )}
@@ -235,14 +237,14 @@ function FolderItem({
   return (
     <div
       className={cn(
-        "rounded-sm border border-transparent",
+        "rounded-md border border-transparent transition-colors",
         isDropTarget ? "bg-accent/30 ring-1 ring-primary/30" : "",
       )}
     >
       {/* biome-ignore lint/a11y/noStaticElementInteractions: Drag-and-drop target */}
       <div
-        className="flex w-full items-center gap-0.5 rounded-sm py-px"
-        style={open ? { paddingLeft: depth * 10 } : undefined}
+        className="flex w-full items-center gap-0.5 rounded-md py-0.5"
+        style={open ? { paddingLeft: depth * 12 + 4 } : undefined}
         onDragOver={onDragOver}
         onDragLeave={onDragLeave}
         onDrop={onDrop}
@@ -251,14 +253,14 @@ function FolderItem({
           type="button"
           onClick={() => toggleFolder(folder.id)}
           className={cn(
-            "flex h-5 w-5 shrink-0 items-center justify-center rounded-sm text-muted-foreground transition-colors hover:bg-accent",
+            "flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground",
             !hasChildren && "opacity-30",
           )}
           disabled={!hasChildren}
         >
           <ChevronRight
             className={cn(
-              "h-3 w-3 transition-transform",
+              "h-3.5 w-3.5 transition-transform",
               isExpanded && "rotate-90",
             )}
           />
@@ -270,9 +272,9 @@ function FolderItem({
             toggleFolder(folder.id)
           }}
           className={cn(
-            "flex flex-1 items-center gap-1.5 rounded-sm px-1.5 py-0.5 text-xs transition-colors",
+            "flex flex-1 items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors",
             isActive
-              ? "bg-accent text-accent-foreground"
+              ? "bg-accent text-accent-foreground font-medium"
               : "text-muted-foreground hover:bg-accent/50 hover:text-foreground",
             !open && "justify-center px-0",
           )}
@@ -280,14 +282,14 @@ function FolderItem({
           onDragStart={onDragStart({ type: "folder", id: folder.id })}
           onDragEnd={onDragEnd}
         >
-          <Folder className="h-3.5 w-3.5 shrink-0" />
+          <Folder className="h-4 w-4 shrink-0" />
           {open && <span className="truncate">{folder.name}</span>}
         </button>
       </div>
       {isExpanded && (
         /* biome-ignore lint/a11y/noStaticElementInteractions: Drag-and-drop target */
         <div
-          className="ml-2.5 border-l border-border/50 pl-1"
+          className="ml-3 border-l border-border/40 pl-1"
           onDragOver={onDragOver}
           onDragLeave={onDragLeave}
           onDrop={onDrop}
@@ -713,65 +715,54 @@ function DrawLayoutInner({
   const userEmail = session?.user.email ?? ""
 
   return (
-    <div className="relative h-screen bg-muted/40">
+    <div className="h-screen w-full bg-muted/20 p-2">
       <SidebarOverlay />
       {!open && (
-        <div className="absolute left-5 top-5 z-40">
-          <SidebarTrigger className="h-9 w-9 rounded-full border bg-background shadow-sm" />
+        <div className="absolute left-4 top-4 z-40">
+          <SidebarTrigger className="h-8 w-8 rounded-md border bg-background shadow-sm" />
         </div>
       )}
-      <div className={cn("flex h-full w-full p-3", open ? "gap-3" : "gap-0")}>
-        <Sidebar>
-          <div className="flex items-center justify-between border-b px-2 py-1.5">
-            <div className="flex items-center gap-1.5">
-              <div className="flex h-5 w-5 items-center justify-center rounded bg-primary text-[9px] font-semibold text-primary-foreground">
-                EX
-              </div>
-              {open && (
-                <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-                  Explorer
-                </span>
-              )}
-            </div>
-            <SidebarTrigger className="h-5 w-5 md:hidden" />
-          </div>
-
-          {open && (
-            <div className="flex items-center justify-between border-b px-2 py-1">
-              <button
-                type="button"
-                onClick={() => setActiveFolderId(null)}
-                className={cn(
-                  "text-[10px] font-medium uppercase tracking-wider",
-                  activeFolderId === null
-                    ? "text-foreground"
-                    : "text-muted-foreground hover:text-foreground",
+      <div className="flex h-full w-full overflow-hidden rounded-xl border bg-background shadow-sm">
+        <Sidebar variant="sidebar" className="border-r border-border/40">
+          <SidebarHeader className="h-14 justify-center border-b border-border/40 px-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="flex h-6 w-6 items-center justify-center rounded-md bg-primary text-primary-foreground">
+                  <span className="text-xs font-bold">E</span>
+                </div>
+                {open && (
+                  <span className="font-semibold text-sm">Excalidraw</span>
                 )}
-              >
-                Excalidraw
-              </button>
-              <div className="flex items-center">
-                <button
-                  type="button"
-                  className="flex h-6 w-6 items-center justify-center rounded-sm text-muted-foreground hover:bg-accent hover:text-foreground"
+              </div>
+            </div>
+          </SidebarHeader>
+
+          <div className="px-4 py-2">
+            {open && (
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-8 flex-1 justify-start px-2 text-xs font-normal"
                   onClick={() => startCreate("drawing", activeFolderId)}
                 >
-                  <FilePlus className="h-3.5 w-3.5" />
-                  <span className="sr-only">New drawing</span>
-                </button>
-                <button
-                  type="button"
-                  className="flex h-6 w-6 items-center justify-center rounded-sm text-muted-foreground hover:bg-accent hover:text-foreground"
+                  <Plus className="mr-1 h-3.5 w-3.5" />
+                  New Drawing
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-8 w-8 px-0"
+                  title="New Folder"
                   onClick={() => startCreate("folder", activeFolderId)}
                 >
-                  <FolderPlus className="h-3.5 w-3.5" />
-                  <span className="sr-only">New folder</span>
-                </button>
+                  <Folder className="h-3.5 w-3.5" />
+                </Button>
               </div>
-            </div>
-          )}
+            )}
+          </div>
 
-          <div className="flex-1 overflow-auto px-1 py-1">
+          <SidebarContent className="px-2">
             {/* biome-ignore lint/a11y/noStaticElementInteractions: Drag-and-drop target */}
             <div
               onDragOver={handleDragOverTarget(
@@ -783,12 +774,25 @@ function DrawLayoutInner({
               onDragLeave={handleDragLeave}
               onDrop={handleDrop({ type: "root" }, { onlySelf: true })}
               className={cn(
-                "min-h-full rounded-sm border border-transparent",
+                "min-h-full rounded-md border border-transparent transition-all",
                 dropTarget?.type === "root"
                   ? "bg-accent/30 ring-1 ring-primary/30"
                   : "",
               )}
             >
+              <button
+                type="button"
+                onClick={() => setActiveFolderId(null)}
+                className={cn(
+                  "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors mb-1",
+                  activeFolderId === null
+                    ? "bg-accent text-accent-foreground font-medium"
+                    : "text-muted-foreground hover:bg-accent/50 hover:text-foreground",
+                )}
+              >
+                <span className="truncate">All Drawings</span>
+              </button>
+
               <CreateRow
                 depth={0}
                 parentId={null}
@@ -865,42 +869,61 @@ function DrawLayoutInner({
                 />
               ))}
             </div>
-          </div>
+          </SidebarContent>
 
-          <div className="border-t px-2 py-2">
-            {open && (
-              <div className="mb-1.5 truncate text-[10px] text-muted-foreground">
-                {userEmail}
+          <SidebarFooter className="border-t border-border/40 p-4">
+            {open ? (
+              <div className="flex items-center gap-3">
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted">
+                  <User className="h-4 w-4 text-muted-foreground" />
+                </div>
+                <div className="flex min-w-0 flex-1 flex-col">
+                  <span className="truncate text-xs font-medium text-foreground">
+                    {userEmail}
+                  </span>
+                  <span className="truncate text-[10px] text-muted-foreground">
+                    {isAdmin ? "Admin" : "User"}
+                  </span>
+                </div>
+                <div className="flex items-center">
+                  {isAdmin && (
+                    <Button
+                      asChild
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                    >
+                      <Link to="/admin">
+                        <Settings className="h-3.5 w-3.5" />
+                      </Link>
+                    </Button>
+                  )}
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                    onClick={handleSignOut}
+                  >
+                    <LogOut className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={handleSignOut}
+                >
+                  <LogOut className="h-4 w-4" />
+                </Button>
               </div>
             )}
-            <div className="flex items-center gap-1">
-              {isAdmin && (
-                <Button
-                  asChild
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 px-2 text-xs"
-                >
-                  <Link to="/admin">
-                    <Settings className="h-3.5 w-3.5" />
-                    {open && <span className="ml-1.5">Admin</span>}
-                  </Link>
-                </Button>
-              )}
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-7 px-2 text-xs"
-                onClick={handleSignOut}
-              >
-                <LogOut className="h-3.5 w-3.5" />
-                {open && <span className="ml-1.5">Sign out</span>}
-              </Button>
-            </div>
-          </div>
+          </SidebarFooter>
         </Sidebar>
 
-        <SidebarInset>
+        <SidebarInset className="bg-background border-0 rounded-none shadow-none">
           <Outlet />
         </SidebarInset>
       </div>
