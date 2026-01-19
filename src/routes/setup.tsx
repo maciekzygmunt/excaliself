@@ -12,16 +12,17 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { auth } from "@/lib/auth"
-import { createFirstAdmin, isSetupComplete } from "@/server/users"
+import { setupMiddleware } from "@/middleware/setup"
+import { createFirstAdmin } from "@/server/users"
 
 const setupAdmin = createServerFn({ method: "POST" })
+  .middleware([setupMiddleware])
   .inputValidator(
     (data: { email: string; password: string; name: string }) => data,
   )
-  .handler(async ({ data }) => {
-    const setupComplete = await isSetupComplete()
-    if (setupComplete) {
-      throw new Error("Setup already complete")
+  .handler(async ({ data, context: { setupCompleted } }) => {
+    if (setupCompleted) {
+      throw redirect({ to: "/login" })
     }
 
     const result = await auth.api.signUpEmail({
@@ -44,11 +45,8 @@ const setupAdmin = createServerFn({ method: "POST" })
   })
 
 export const Route = createFileRoute("/setup")({
-  beforeLoad: async () => {
-    const setupComplete = await isSetupComplete()
-    if (setupComplete) {
-      throw redirect({ to: "/login" })
-    }
+  server: {
+    middleware: [setupMiddleware],
   },
   component: SetupPage,
 })

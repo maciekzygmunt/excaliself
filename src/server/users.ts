@@ -12,13 +12,6 @@ export const getUserCount = createServerFn({ method: "GET" }).handler(
   },
 )
 
-export const isSetupComplete = createServerFn({ method: "GET" }).handler(
-  async () => {
-    const userCount = await getUserCount()
-    return userCount > 0
-  },
-)
-
 export const getUserById = createServerFn({ method: "GET" })
   .inputValidator(z.string())
   .handler(async ({ data: id, context }) => {

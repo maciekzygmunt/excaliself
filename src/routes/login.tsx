@@ -1,4 +1,4 @@
-import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router"
+import { createFileRoute, useNavigate } from "@tanstack/react-router"
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import {
@@ -11,14 +11,11 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { signIn } from "@/lib/auth-client"
-import { isSetupComplete } from "@/server/users"
+import { setupMiddleware } from "@/middleware/setup"
 
 export const Route = createFileRoute("/login")({
-  beforeLoad: async () => {
-    const setupComplete = await isSetupComplete()
-    if (!setupComplete) {
-      throw redirect({ to: "/setup" })
-    }
+  server: {
+    middleware: [setupMiddleware],
   },
   component: LoginPage,
 })

@@ -1,4 +1,4 @@
-import { createFileRoute, Outlet, redirect } from "@tanstack/react-router"
+import { createFileRoute, Outlet } from "@tanstack/react-router"
 import { createServerFn } from "@tanstack/react-start"
 import {
   SidebarInset,
@@ -8,9 +8,9 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar"
 import { authMiddleware } from "@/middleware/auth"
+import { setupMiddleware } from "@/middleware/setup"
 import { getDrawings } from "@/server/drawings"
 import { getFolders } from "@/server/folders"
-import { isSetupComplete } from "@/server/users"
 import { DrawSidebar } from "./-components/DrawSidebar"
 
 const getSession = createServerFn({ method: "GET" })
@@ -19,13 +19,7 @@ const getSession = createServerFn({ method: "GET" })
 
 export const Route = createFileRoute("/draw")({
   server: {
-    middleware: [authMiddleware],
-  },
-  beforeLoad: async () => {
-    const setupComplete = await isSetupComplete()
-    if (!setupComplete) {
-      throw redirect({ to: "/setup" })
-    }
+    middleware: [setupMiddleware, authMiddleware],
   },
   loader: async () => {
     const [drawings, folders, session] = await Promise.all([

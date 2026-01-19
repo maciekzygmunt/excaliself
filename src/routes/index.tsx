@@ -1,13 +1,10 @@
 import { createFileRoute, redirect } from "@tanstack/react-router"
+import { setupMiddleware } from "@/middleware/setup"
 import { createDrawing, getDrawings } from "@/server/drawings"
-import { isSetupComplete } from "@/server/users"
 
 export const Route = createFileRoute("/")({
-  beforeLoad: async () => {
-    const setupComplete = await isSetupComplete()
-    if (!setupComplete) {
-      throw redirect({ to: "/setup" })
-    }
+  server: {
+    middleware: [setupMiddleware],
   },
   loader: async () => {
     const drawings = await getDrawings()
