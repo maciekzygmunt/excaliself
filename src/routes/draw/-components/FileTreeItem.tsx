@@ -202,6 +202,7 @@ export function FolderItem({ folder }: FolderItemProps) {
         </CollapsibleTrigger>
         <CollapsibleContent>
           <SidebarMenuSub
+            className="mr-0 pr-0"
             onDragOver={onDragOver({
               type: "folder",
               id: folder.id,
