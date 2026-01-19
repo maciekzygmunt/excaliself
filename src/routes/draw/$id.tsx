@@ -1,21 +1,16 @@
 import { createFileRoute, redirect } from "@tanstack/react-router"
 import { createServerFn } from "@tanstack/react-start"
-import { Check, Cloud, Loader2 } from "lucide-react"
+import { Cloud, Loader2 } from "lucide-react"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { ExcalidrawCanvas } from "@/components/ExcalidrawCanvas"
 import { Input } from "@/components/ui/input"
-import { SidebarTrigger, useSidebar } from "@/components/ui/sidebar"
+import { SidebarTrigger } from "@/components/ui/sidebar"
 import { authMiddleware } from "@/middleware/auth"
 import {
   getDrawingWithFiles,
   updateDrawing,
   updateDrawingFiles,
 } from "@/server/drawings"
-import { getFolders } from "@/server/folders"
-
-type DrawingWithFiles = NonNullable<
-  Awaited<ReturnType<typeof getDrawingWithFiles>>
->
 
 type ExcalidrawBinaryFile = {
   mimeType?: string
@@ -54,29 +49,22 @@ const saveDrawing = createServerFn({ method: "POST" })
 
 export const Route = createFileRoute("/draw/$id")({
   loader: async ({ params }) => {
-    const [drawing, folders] = await Promise.all([
-      getDrawingWithFiles({ data: params.id }),
-      getFolders(),
-    ])
-
+    const drawing = await getDrawingWithFiles({ data: params.id })
     if (!drawing) {
       throw redirect({ to: "/" })
     }
 
-    return { drawing, folders }
+    return { drawing }
   },
   component: DrawingCanvas,
 })
 
 function DrawingCanvas() {
-  const { drawing, folders } = Route.useLoaderData()
+  const { drawing } = Route.useLoaderData()
   const { id } = Route.useParams()
-  const { open } = useSidebar()
 
   const [name, setName] = useState(drawing.name)
-  const [currentFolderId, setCurrentFolderId] = useState<string | null>(
-    drawing.folderId ?? null,
-  )
+
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -91,9 +79,8 @@ function DrawingCanvas() {
 
   useEffect(() => {
     setName(drawing.name)
-    setCurrentFolderId(drawing.folderId ?? null)
     lastSavedDataRef.current = drawing.data
-  }, [drawing.data, drawing.folderId, drawing.name])
+  }, [drawing.data, drawing.name])
 
   useEffect(() => {
     isMountedRef.current = true
@@ -200,43 +187,6 @@ function DrawingCanvas() {
     await saveDrawing({ data: { id, name: newName } })
   }
 
-  const handleFolderChange = async (value: string) => {
-    const folderId = value === "" ? null : value
-    setCurrentFolderId(folderId)
-    await updateDrawing({ data: { id, updateData: { folderId } } })
-  }
-
-  const folderChildren = useMemo(() => {
-    const map = new Map<string | null, typeof folders>()
-    for (const folder of folders) {
-      const parentId = folder.parentId ?? null
-      if (!map.has(parentId)) {
-        map.set(parentId, [])
-      }
-      map.get(parentId)?.push(folder)
-    }
-    for (const entries of map.values()) {
-      entries.sort((a, b) => a.name.localeCompare(b.name))
-    }
-    return map
-  }, [folders])
-
-  const folderOptions = useMemo(() => {
-    const options: { id: string | null; label: string }[] = []
-    const walk = (parentId: string | null, depth: number) => {
-      const children = folderChildren.get(parentId) ?? []
-      for (const folder of children) {
-        options.push({
-          id: folder.id,
-          label: `${"- ".repeat(depth)}${folder.name}`,
-        })
-        walk(folder.id, depth + 1)
-      }
-    }
-    walk(null, 0)
-    return options
-  }, [folderChildren])
-
   const sceneData = useMemo(() => {
     try {
       const parsed = JSON.parse(drawing.data)
@@ -288,20 +238,6 @@ function DrawingCanvas() {
           />
         </div>
         <div className="flex items-center gap-3">
-          <div className="relative">
-            <select
-              value={currentFolderId ?? ""}
-              onChange={(event) => void handleFolderChange(event.target.value)}
-              className="h-8 appearance-none rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-            >
-              <option value="">No folder</option>
-              {folderOptions.map((option) => (
-                <option key={option.id ?? "root"} value={option.id ?? ""}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </div>
           <div className="flex items-center gap-2 px-2 text-muted-foreground">
             {saving && (
               <div className="flex items-center gap-1.5 text-xs">
