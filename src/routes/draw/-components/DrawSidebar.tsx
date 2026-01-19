@@ -128,7 +128,7 @@ export function DrawSidebar({
             <SidebarGroupContent>
               <div
                 className={cn(
-                  "min-h-[200px] rounded-md transition-colors",
+                  "min-h-[200px] rounded-md transition-colors pb-8",
                   state.dropTarget?.type === "root" &&
                     "bg-sidebar-accent ring-2 ring-sidebar-ring",
                 )}
