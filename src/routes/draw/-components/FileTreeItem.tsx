@@ -90,7 +90,6 @@ export function FolderItem({ folder }: FolderItemProps) {
     >
       <SidebarMenuItem>
         <CollapsibleTrigger asChild>
-          {/* biome-ignore lint/a11y/noStaticElementInteractions: Drag-and-drop target */}
           <div
             className={cn(
               "flex w-full rounded-md transition-colors",

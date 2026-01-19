@@ -92,7 +92,6 @@ export function DrawSidebar({
         <SidebarContent>
           <SidebarGroup>
             <SidebarGroupContent>
-              {/* biome-ignore lint/a11y/noStaticElementInteractions: Drag-and-drop target */}
               <div
                 className={cn(
                   "min-h-[200px] rounded-md transition-colors",
