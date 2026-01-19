@@ -73,3 +73,13 @@ export const updateFolder = createServerFn({ method: "POST" })
       .set({ ...cleanedUpdateData, updatedAt: new Date() })
       .where(and(eq(folders.id, data.id), eq(folders.ownerId, userId)))
   })
+
+export const deleteFolder = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .inputValidator(z.string())
+  .handler(async ({ data: folderId, context }) => {
+    const userId = context.session.user.id
+    await context.db
+      .delete(folders)
+      .where(and(eq(folders.id, folderId), eq(folders.ownerId, userId)))
+  })

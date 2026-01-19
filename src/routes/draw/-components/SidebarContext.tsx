@@ -5,8 +5,16 @@ import type { getFolders } from "@/server/folders"
 
 export type Drawing = Awaited<ReturnType<typeof getDrawings>>[number]
 export type FolderType = Awaited<ReturnType<typeof getFolders>>[number]
+
+export type TreeItem =
+  | { type: "drawing"; data: Drawing }
+  | { type: "folder"; data: FolderType }
+
 export type DragItem = { type: "drawing" | "folder"; id: string }
-export type DropTarget = { type: "root" } | { type: "folder"; id: string } | null
+export type DropTarget =
+  | { type: "root" }
+  | { type: "folder"; id: string; position: "inside" | "above" | "below" }
+  | null
 
 export type SidebarContextValue = {
   // Data
@@ -15,12 +23,10 @@ export type SidebarContextValue = {
 
   // UI state
   currentDrawingId: string
-  activeFolderId: string | null
-  setActiveFolderId: (id: string | null) => void
   expandedFolders: Set<string>
   toggleFolder: (id: string) => void
   dropTarget: DropTarget
-  open: boolean
+  dragItem: DragItem | null
 
   // Create
   createDraft: { type: "drawing" | "folder"; parentId: string | null } | null
@@ -29,6 +35,7 @@ export type SidebarContextValue = {
   createInputRef: React.RefObject<HTMLInputElement | null>
   finalizeCreate: () => void
   cancelCreate: () => void
+  startCreate: (type: "drawing" | "folder", parentId?: string | null) => void
 
   // Drag & drop
   onDragStart: (item: DragItem) => (e: DragEvent) => void
@@ -39,6 +46,8 @@ export type SidebarContextValue = {
 
   // Actions
   onDeleteDrawing: (id: string) => void
+  onDeleteFolder: (id: string) => void
+  onRename: (item: DragItem, newName: string) => void
 }
 
 const SidebarContext = createContext<SidebarContextValue | null>(null)
@@ -50,13 +59,17 @@ export function SidebarContextProvider({
   children: React.ReactNode
   value: SidebarContextValue
 }) {
-  return <SidebarContext.Provider value={value}>{children}</SidebarContext.Provider>
+  return (
+    <SidebarContext.Provider value={value}>{children}</SidebarContext.Provider>
+  )
 }
 
 export function useSidebarContext() {
   const context = useContext(SidebarContext)
   if (!context) {
-    throw new Error("useSidebarContext must be used within SidebarContextProvider")
+    throw new Error(
+      "useSidebarContext must be used within SidebarContextProvider",
+    )
   }
   return context
 }

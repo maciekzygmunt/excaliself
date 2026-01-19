@@ -2,7 +2,6 @@ import { createFileRoute, Outlet } from "@tanstack/react-router"
 import { createServerFn } from "@tanstack/react-start"
 import {
   SidebarInset,
-  SidebarOverlay,
   SidebarProvider,
   SidebarTrigger,
   useSidebar,
@@ -62,28 +61,25 @@ function DrawLayoutShell({
   userEmail: string
   isAdmin: boolean
 }) {
-  const { open } = useSidebar()
+  const { state } = useSidebar()
 
   return (
-    <div className="h-screen w-full bg-muted/20 p-2">
-      <SidebarOverlay />
-      {!open && (
-        <div className="absolute left-4 top-4 z-40">
+    <>
+      {state === "collapsed" && (
+        <div className="fixed left-4 top-4 z-50">
           <SidebarTrigger className="h-8 w-8 rounded-md border bg-background shadow-sm" />
         </div>
       )}
-      <div className="flex h-full w-full overflow-hidden rounded-xl border bg-background shadow-sm">
-        <DrawSidebar
-          drawings={drawings}
-          folders={folders}
-          currentDrawingId={currentDrawingId}
-          userEmail={userEmail}
-          isAdmin={isAdmin}
-        />
-        <SidebarInset className="bg-background border-0 rounded-none shadow-none">
-          <Outlet />
-        </SidebarInset>
-      </div>
-    </div>
+      <DrawSidebar
+        drawings={drawings}
+        folders={folders}
+        currentDrawingId={currentDrawingId}
+        userEmail={userEmail}
+        isAdmin={isAdmin}
+      />
+      <SidebarInset>
+        <Outlet />
+      </SidebarInset>
+    </>
   )
 }

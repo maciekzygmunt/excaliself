@@ -1,7 +1,5 @@
-export { CreateRow } from "./CreateRow"
-export { DrawingItem } from "./DrawingItem"
 export { DrawSidebar } from "./DrawSidebar"
-export { FolderItem } from "./FolderItem"
+export { CreateRow, DrawingItem, FolderItem } from "./FileTreeItem"
 export {
   type DragItem,
   type Drawing,
