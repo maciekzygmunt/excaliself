@@ -20,7 +20,6 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarRail,
   SidebarSeparator,
 } from "@/components/ui/sidebar"
 import { signOut } from "@/lib/auth-client"
@@ -58,7 +57,7 @@ export function DrawSidebar({
 
   return (
     <SidebarContextProvider value={contextValue}>
-      <Sidebar collapsible="offcanvas" className="border-r">
+      <Sidebar collapsible="offcanvas" variant="inset">
         <SidebarHeader className="gap-2">
           <div className="flex gap-2">
             <DropdownMenu>
@@ -180,7 +179,6 @@ export function DrawSidebar({
             </SidebarMenuItem>
           </SidebarMenu>
         </SidebarFooter>
-        <SidebarRail />
       </Sidebar>
     </SidebarContextProvider>
   )

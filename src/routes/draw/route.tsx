@@ -77,7 +77,7 @@ function DrawLayoutShell({
         userEmail={userEmail}
         isAdmin={isAdmin}
       />
-      <SidebarInset>
+      <SidebarInset className="overflow-clip">
         <Outlet />
       </SidebarInset>
     </>
