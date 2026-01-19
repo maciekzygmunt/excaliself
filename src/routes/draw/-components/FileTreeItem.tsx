@@ -7,7 +7,7 @@ import {
   Pencil,
   Trash2,
 } from "lucide-react"
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import {
   Collapsible,
   CollapsibleContent,
@@ -63,6 +63,8 @@ export function FolderItem({ folder }: FolderItemProps) {
 
   const [isRenaming, setIsRenaming] = useState(false)
   const [renameValue, setRenameValue] = useState(folder.name)
+  const renameInputRef = useRef<HTMLInputElement | null>(null)
+  const pendingRenameFocus = useRef(false)
 
   const childFolders = folderChildren.get(folder.id) ?? []
   const folderDrawings = drawingsByFolder.get(folder.id) ?? []
@@ -83,6 +85,15 @@ export function FolderItem({ folder }: FolderItemProps) {
     setIsRenaming(false)
   }
 
+  useEffect(() => {
+    if (!isRenaming) return
+    const frame = requestAnimationFrame(() => {
+      renameInputRef.current?.focus()
+      renameInputRef.current?.select()
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [isRenaming])
+
   return (
     <Collapsible
       open={isExpanded}
@@ -98,7 +109,7 @@ export function FolderItem({ folder }: FolderItemProps) {
         <CollapsibleTrigger asChild>
           <div
             className={cn(
-              "flex w-full rounded-md transition-colors",
+              "group/folder-row relative flex w-full rounded-md transition-colors",
               isDragging && "opacity-50",
             )}
             onDragOver={onDragOver({
@@ -129,6 +140,7 @@ export function FolderItem({ folder }: FolderItemProps) {
               <Folder className="h-4 w-4 shrink-0" />
               {isRenaming ? (
                 <Input
+                  ref={renameInputRef}
                   value={renameValue}
                   onChange={(e) => setRenameValue(e.target.value)}
                   onBlur={handleRenameSubmit}
@@ -137,41 +149,57 @@ export function FolderItem({ folder }: FolderItemProps) {
                     if (e.key === "Escape") setIsRenaming(false)
                   }}
                   onClick={(e) => e.stopPropagation()}
-                  autoFocus
                   className="h-5 px-1 text-sm"
                 />
               ) : (
                 <span className="truncate">{folder.name}</span>
               )}
             </SidebarMenuButton>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <SidebarMenuAction
+                  className="md:opacity-0 group-hover/folder-row:opacity-100 group-focus-within/folder-row:opacity-100 data-[state=open]:opacity-100 peer-data-[active=true]/menu-button:text-sidebar-accent-foreground"
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <MoreHorizontal className="h-4 w-4" />
+                </SidebarMenuAction>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                side="right"
+                align="start"
+                onCloseAutoFocus={(event) => {
+                  if (!pendingRenameFocus.current) return
+                  event.preventDefault()
+                  pendingRenameFocus.current = false
+                  requestAnimationFrame(() => {
+                    renameInputRef.current?.focus()
+                    renameInputRef.current?.select()
+                  })
+                }}
+              >
+                <DropdownMenuItem
+                  onClick={() => {
+                    pendingRenameFocus.current = true
+                    setRenameValue(folder.name)
+                    setIsRenaming(true)
+                  }}
+                >
+                  <Pencil className="mr-2 h-4 w-4" />
+                  Rename
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() => onDeleteFolder(folder.id)}
+                  className="text-destructive focus:text-destructive"
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </CollapsibleTrigger>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <SidebarMenuAction showOnHover>
-              <MoreHorizontal className="h-4 w-4" />
-            </SidebarMenuAction>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent side="right" align="start">
-            <DropdownMenuItem
-              onClick={() => {
-                setRenameValue(folder.name)
-                setIsRenaming(true)
-              }}
-            >
-              <Pencil className="mr-2 h-4 w-4" />
-              Rename
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onClick={() => onDeleteFolder(folder.id)}
-              className="text-destructive focus:text-destructive"
-            >
-              <Trash2 className="mr-2 h-4 w-4" />
-              Delete
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
         <CollapsibleContent>
           <SidebarMenuSub
             onDragOver={onDragOver({
@@ -226,6 +254,8 @@ export function DrawingItem({ drawing, isNested }: DrawingItemProps) {
 
   const [isRenaming, setIsRenaming] = useState(false)
   const [renameValue, setRenameValue] = useState(drawing.name)
+  const renameInputRef = useRef<HTMLInputElement | null>(null)
+  const pendingRenameFocus = useRef(false)
 
   const isActive = drawing.id === currentDrawingId
   const isDragging = dragItem?.type === "drawing" && dragItem.id === drawing.id
@@ -237,11 +267,21 @@ export function DrawingItem({ drawing, isNested }: DrawingItemProps) {
     setIsRenaming(false)
   }
 
+  useEffect(() => {
+    if (!isRenaming) return
+    const frame = requestAnimationFrame(() => {
+      renameInputRef.current?.focus()
+      renameInputRef.current?.select()
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [isRenaming])
+
   const ButtonContent = (
     <>
       <File className="h-4 w-4 shrink-0" />
       {isRenaming ? (
         <Input
+          ref={renameInputRef}
           value={renameValue}
           onChange={(e) => setRenameValue(e.target.value)}
           onBlur={handleRenameSubmit}
@@ -250,7 +290,6 @@ export function DrawingItem({ drawing, isNested }: DrawingItemProps) {
             if (e.key === "Escape") setIsRenaming(false)
           }}
           onClick={(e) => e.stopPropagation()}
-          autoFocus
           className="h-5 px-1 text-sm"
         />
       ) : (
@@ -262,7 +301,7 @@ export function DrawingItem({ drawing, isNested }: DrawingItemProps) {
   if (isNested) {
     return (
       <SidebarMenuItem
-        className={cn(isDragging && "opacity-50")}
+        className={cn("group/drawing-item", isDragging && "opacity-50")}
         draggable
         onDragStart={onDragStart({ type: "drawing", id: drawing.id })}
         onDragEnd={onDragEnd}
@@ -278,13 +317,26 @@ export function DrawingItem({ drawing, isNested }: DrawingItemProps) {
         </SidebarMenuButton>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <SidebarMenuAction showOnHover>
+            <SidebarMenuAction className="md:opacity-0 group-hover/drawing-item:opacity-100 group-focus-within/drawing-item:opacity-100 data-[state=open]:opacity-100 peer-data-[active=true]/menu-button:text-sidebar-accent-foreground">
               <MoreHorizontal className="h-4 w-4" />
             </SidebarMenuAction>
           </DropdownMenuTrigger>
-          <DropdownMenuContent side="right" align="start">
+          <DropdownMenuContent
+            side="right"
+            align="start"
+            onCloseAutoFocus={(event) => {
+              if (!pendingRenameFocus.current) return
+              event.preventDefault()
+              pendingRenameFocus.current = false
+              requestAnimationFrame(() => {
+                renameInputRef.current?.focus()
+                renameInputRef.current?.select()
+              })
+            }}
+          >
             <DropdownMenuItem
               onClick={() => {
+                pendingRenameFocus.current = true
                 setRenameValue(drawing.name)
                 setIsRenaming(true)
               }}
@@ -308,7 +360,7 @@ export function DrawingItem({ drawing, isNested }: DrawingItemProps) {
 
   return (
     <SidebarMenuItem
-      className={cn(isDragging && "opacity-50")}
+      className={cn("group/drawing-item", isDragging && "opacity-50")}
       draggable
       onDragStart={onDragStart({ type: "drawing", id: drawing.id })}
       onDragEnd={onDragEnd}
@@ -324,13 +376,26 @@ export function DrawingItem({ drawing, isNested }: DrawingItemProps) {
       </SidebarMenuButton>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <SidebarMenuAction showOnHover>
+          <SidebarMenuAction className="md:opacity-0 group-hover/drawing-item:opacity-100 group-focus-within/drawing-item:opacity-100 data-[state=open]:opacity-100 peer-data-[active=true]/menu-button:text-sidebar-accent-foreground">
             <MoreHorizontal className="h-4 w-4" />
           </SidebarMenuAction>
         </DropdownMenuTrigger>
-        <DropdownMenuContent side="right" align="start">
+        <DropdownMenuContent
+          side="right"
+          align="start"
+          onCloseAutoFocus={(event) => {
+            if (!pendingRenameFocus.current) return
+            event.preventDefault()
+            pendingRenameFocus.current = false
+            requestAnimationFrame(() => {
+              renameInputRef.current?.focus()
+              renameInputRef.current?.select()
+            })
+          }}
+        >
           <DropdownMenuItem
             onClick={() => {
+              pendingRenameFocus.current = true
               setRenameValue(drawing.name)
               setIsRenaming(true)
             }}

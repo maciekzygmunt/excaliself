@@ -1,6 +1,6 @@
 import { useNavigate, useRouter } from "@tanstack/react-router"
 import type { DragEvent } from "react"
-import { useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { createDrawing, deleteDrawing, updateDrawing } from "@/server/drawings"
 import { createFolder, deleteFolder, updateFolder } from "@/server/folders"
 import type {
@@ -101,10 +101,6 @@ export function useSidebarState({
     setCreateDraft({ type, parentId: parentId ?? null })
     setCreateName(type === "drawing" ? "Untitled" : "New folder")
     if (parentId) expandFolder(parentId)
-    setTimeout(() => {
-      createInputRef.current?.focus()
-      createInputRef.current?.select()
-    }, 0)
   }
 
   const cancelCreate = () => {
@@ -132,6 +128,15 @@ export function useSidebarState({
       router.invalidate()
     }
   }
+
+  useEffect(() => {
+    if (!createDraft) return
+    const frame = requestAnimationFrame(() => {
+      createInputRef.current?.focus()
+      createInputRef.current?.select()
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [createDraft])
 
   const closeConfirmDialog = () => setConfirmDialog(null)
 

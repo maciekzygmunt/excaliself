@@ -1,7 +1,6 @@
 import { Link } from "@tanstack/react-router"
 import { File, Folder, LogOut, Plus, Settings } from "lucide-react"
-import { useMemo } from "react"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { useMemo, useRef } from "react"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -12,6 +11,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -63,6 +63,7 @@ export function DrawSidebar({
     folders,
     currentDrawingId,
   })
+  const pendingCreateFocus = useRef(false)
 
   const contextValue = useMemo(() => state, [state])
 
@@ -84,12 +85,34 @@ export function DrawSidebar({
                   </span>
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-48">
-                <DropdownMenuItem onClick={() => state.startCreate("drawing")}>
+              <DropdownMenuContent
+                align="start"
+                className="w-48"
+                onCloseAutoFocus={(event) => {
+                  if (!pendingCreateFocus.current) return
+                  event.preventDefault()
+                  pendingCreateFocus.current = false
+                  requestAnimationFrame(() => {
+                    state.createInputRef.current?.focus()
+                    state.createInputRef.current?.select()
+                  })
+                }}
+              >
+                <DropdownMenuItem
+                  onClick={() => {
+                    pendingCreateFocus.current = true
+                    state.startCreate("drawing")
+                  }}
+                >
                   <File className="mr-2 h-4 w-4" />
                   New Drawing
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => state.startCreate("folder")}>
+                <DropdownMenuItem
+                  onClick={() => {
+                    pendingCreateFocus.current = true
+                    state.startCreate("folder")
+                  }}
+                >
                   <Folder className="mr-2 h-4 w-4" />
                   New Folder
                 </DropdownMenuItem>
