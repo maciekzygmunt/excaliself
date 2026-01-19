@@ -311,7 +311,7 @@ export function DrawingItem({ drawing, isNested }: DrawingItemProps) {
           isActive={isActive}
           className="cursor-pointer active:cursor-grabbing"
         >
-          <Link to="/draw/$id" params={{ id: drawing.id }}>
+          <Link to="/draw/$id" params={{ id: drawing.id }} draggable={false}>
             {ButtonContent}
           </Link>
         </SidebarMenuButton>
@@ -370,7 +370,7 @@ export function DrawingItem({ drawing, isNested }: DrawingItemProps) {
         isActive={isActive}
         className="cursor-pointer active:cursor-grabbing"
       >
-        <Link to="/draw/$id" params={{ id: drawing.id }}>
+        <Link to="/draw/$id" params={{ id: drawing.id }} draggable={false}>
           {ButtonContent}
         </Link>
       </SidebarMenuButton>
