@@ -12,7 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as SetupRouteImport } from './routes/setup'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as InviteRouteImport } from './routes/invite'
-import { Route as DrawRouteImport } from './routes/draw'
+import { Route as DrawRouteRouteImport } from './routes/draw/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminIndexRouteImport } from './routes/admin/index'
 import { Route as DrawIdRouteImport } from './routes/draw/$id'
@@ -33,7 +33,7 @@ const InviteRoute = InviteRouteImport.update({
   path: '/invite',
   getParentRoute: () => rootRouteImport,
 } as any)
-const DrawRoute = DrawRouteImport.update({
+const DrawRouteRoute = DrawRouteRouteImport.update({
   id: '/draw',
   path: '/draw',
   getParentRoute: () => rootRouteImport,
@@ -51,7 +51,7 @@ const AdminIndexRoute = AdminIndexRouteImport.update({
 const DrawIdRoute = DrawIdRouteImport.update({
   id: '/$id',
   path: '/$id',
-  getParentRoute: () => DrawRoute,
+  getParentRoute: () => DrawRouteRoute,
 } as any)
 const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   id: '/api/auth/$',
@@ -61,7 +61,7 @@ const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/draw': typeof DrawRouteWithChildren
+  '/draw': typeof DrawRouteRouteWithChildren
   '/invite': typeof InviteRoute
   '/login': typeof LoginRoute
   '/setup': typeof SetupRoute
@@ -71,7 +71,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/draw': typeof DrawRouteWithChildren
+  '/draw': typeof DrawRouteRouteWithChildren
   '/invite': typeof InviteRoute
   '/login': typeof LoginRoute
   '/setup': typeof SetupRoute
@@ -82,7 +82,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/draw': typeof DrawRouteWithChildren
+  '/draw': typeof DrawRouteRouteWithChildren
   '/invite': typeof InviteRoute
   '/login': typeof LoginRoute
   '/setup': typeof SetupRoute
@@ -125,7 +125,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  DrawRoute: typeof DrawRouteWithChildren
+  DrawRouteRoute: typeof DrawRouteRouteWithChildren
   InviteRoute: typeof InviteRoute
   LoginRoute: typeof LoginRoute
   SetupRoute: typeof SetupRoute
@@ -160,7 +160,7 @@ declare module '@tanstack/react-router' {
       id: '/draw'
       path: '/draw'
       fullPath: '/draw'
-      preLoaderRoute: typeof DrawRouteImport
+      preLoaderRoute: typeof DrawRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -182,7 +182,7 @@ declare module '@tanstack/react-router' {
       path: '/$id'
       fullPath: '/draw/$id'
       preLoaderRoute: typeof DrawIdRouteImport
-      parentRoute: typeof DrawRoute
+      parentRoute: typeof DrawRouteRoute
     }
     '/api/auth/$': {
       id: '/api/auth/$'
@@ -194,19 +194,21 @@ declare module '@tanstack/react-router' {
   }
 }
 
-interface DrawRouteChildren {
+interface DrawRouteRouteChildren {
   DrawIdRoute: typeof DrawIdRoute
 }
 
-const DrawRouteChildren: DrawRouteChildren = {
+const DrawRouteRouteChildren: DrawRouteRouteChildren = {
   DrawIdRoute: DrawIdRoute,
 }
 
-const DrawRouteWithChildren = DrawRoute._addFileChildren(DrawRouteChildren)
+const DrawRouteRouteWithChildren = DrawRouteRoute._addFileChildren(
+  DrawRouteRouteChildren,
+)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  DrawRoute: DrawRouteWithChildren,
+  DrawRouteRoute: DrawRouteRouteWithChildren,
   InviteRoute: InviteRoute,
   LoginRoute: LoginRoute,
   SetupRoute: SetupRoute,
