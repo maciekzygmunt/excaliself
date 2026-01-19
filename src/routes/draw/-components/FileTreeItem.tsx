@@ -72,6 +72,7 @@ export function FolderItem({ folder }: FolderItemProps) {
     dropTarget?.type === "folder" &&
     dropTarget.id === folder.id &&
     dropTarget.position === "inside"
+  const showDropHighlight = isDropTarget && dragItem?.id !== folder.id
   const isDragging = dragItem?.type === "folder" && dragItem.id === folder.id
   const showCreateRow = createDraft?.parentId === folder.id
 
@@ -88,12 +89,16 @@ export function FolderItem({ folder }: FolderItemProps) {
       onOpenChange={() => toggleFolder(folder.id)}
       asChild
     >
-      <SidebarMenuItem>
+      <SidebarMenuItem
+        className={cn(
+          "rounded-md transition-colors",
+          showDropHighlight && "bg-sidebar-accent ring-1 ring-sidebar-ring",
+        )}
+      >
         <CollapsibleTrigger asChild>
           <div
             className={cn(
               "flex w-full rounded-md transition-colors",
-              isDropTarget && "bg-sidebar-accent ring-2 ring-sidebar-ring",
               isDragging && "opacity-50",
             )}
             onDragOver={onDragOver({
@@ -112,7 +117,7 @@ export function FolderItem({ folder }: FolderItemProps) {
               draggable
               onDragStart={onDragStart({ type: "folder", id: folder.id })}
               onDragEnd={onDragEnd}
-              className="cursor-grab active:cursor-grabbing"
+              className="cursor-pointer active:cursor-grabbing"
             >
               <ChevronRight
                 className={cn(
@@ -168,7 +173,19 @@ export function FolderItem({ folder }: FolderItemProps) {
           </DropdownMenuContent>
         </DropdownMenu>
         <CollapsibleContent>
-          <SidebarMenuSub>
+          <SidebarMenuSub
+            onDragOver={onDragOver({
+              type: "folder",
+              id: folder.id,
+              position: "inside",
+            })}
+            onDragLeave={onDragLeave}
+            onDrop={onDrop({
+              type: "folder",
+              id: folder.id,
+              position: "inside",
+            })}
+          >
             {showCreateRow && (
               <CreateRow
                 type={createDraft.type}
@@ -253,7 +270,7 @@ export function DrawingItem({ drawing, isNested }: DrawingItemProps) {
         <SidebarMenuButton
           asChild
           isActive={isActive}
-          className="cursor-grab active:cursor-grabbing"
+          className="cursor-pointer active:cursor-grabbing"
         >
           <Link to="/draw/$id" params={{ id: drawing.id }}>
             {ButtonContent}
@@ -299,7 +316,7 @@ export function DrawingItem({ drawing, isNested }: DrawingItemProps) {
       <SidebarMenuButton
         asChild
         isActive={isActive}
-        className="cursor-grab active:cursor-grabbing"
+        className="cursor-pointer active:cursor-grabbing"
       >
         <Link to="/draw/$id" params={{ id: drawing.id }}>
           {ButtonContent}

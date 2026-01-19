@@ -1,9 +1,10 @@
-import { useNavigate } from "@tanstack/react-router"
+import { useNavigate, useRouter } from "@tanstack/react-router"
 import type { DragEvent } from "react"
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useMemo, useRef, useState } from "react"
 import { createDrawing, deleteDrawing, updateDrawing } from "@/server/drawings"
 import { createFolder, deleteFolder, updateFolder } from "@/server/folders"
 import type {
+  ConfirmDialog,
   DragItem,
   Drawing,
   DropTarget,
@@ -22,38 +23,33 @@ export function useSidebarState({
   currentDrawingId,
 }: UseSidebarStateProps) {
   const navigate = useNavigate()
-
-  // Local state synced with props
-  const [localDrawings, setLocalDrawings] = useState(drawings)
-  const [localFolders, setLocalFolders] = useState(folders)
-
-  useEffect(() => setLocalDrawings(drawings), [drawings])
-  useEffect(() => setLocalFolders(folders), [folders])
+  const router = useRouter()
 
   // UI state
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(
-    () => new Set(folders.map((f) => f.id)),
+    () => new Set(),
   )
+  const [dragItem, setDragItem] = useState<DragItem | null>(null)
+  const [dropTarget, setDropTarget] = useState<DropTarget>(null)
+  const [confirmDialog, setConfirmDialog] = useState<ConfirmDialog>(null)
 
-  useEffect(() => {
-    setExpandedFolders((prev) => {
-      const next = new Set(prev)
-      for (const f of folders) {
-        next.add(f.id)
-      }
-      return next
-    })
-  }, [folders])
+  // Create state
+  const [createDraft, setCreateDraft] = useState<{
+    type: "drawing" | "folder"
+    parentId: string | null
+  } | null>(null)
+  const [createName, setCreateName] = useState("")
+  const createInputRef = useRef<HTMLInputElement | null>(null)
 
-  // Derived data
+  // Derived data - group items by parent
   const folderById = useMemo(
-    () => new Map(localFolders.map((f) => [f.id, f])),
-    [localFolders],
+    () => new Map(folders.map((f) => [f.id, f])),
+    [folders],
   )
 
   const folderChildren = useMemo(() => {
     const map = new Map<string | null, FolderType[]>()
-    for (const folder of localFolders) {
+    for (const folder of folders) {
       const pid = folder.parentId ?? null
       const arr = map.get(pid) ?? []
       if (!map.has(pid)) map.set(pid, arr)
@@ -63,12 +59,12 @@ export function useSidebarState({
       arr.sort((a, b) => a.name.localeCompare(b.name))
     }
     return map
-  }, [localFolders])
+  }, [folders])
 
   const drawingsByFolder = useMemo(() => {
     const map = new Map<string | null, Drawing[]>()
-    const folderIds = new Set(localFolders.map((f) => f.id))
-    for (const d of localDrawings) {
+    const folderIds = new Set(folders.map((f) => f.id))
+    for (const d of drawings) {
       const fid = d.folderId && folderIds.has(d.folderId) ? d.folderId : null
       const arr = map.get(fid) ?? []
       if (!map.has(fid)) map.set(fid, arr)
@@ -78,56 +74,51 @@ export function useSidebarState({
       arr.sort((a, b) => a.name.localeCompare(b.name))
     }
     return map
-  }, [localDrawings, localFolders])
+  }, [drawings, folders])
 
-  // Folder toggle
-  const toggleFolder = useCallback((folderId: string) => {
+  // Folder expand/collapse
+  const toggleFolder = (folderId: string) => {
     setExpandedFolders((prev) => {
       const next = new Set(prev)
-      next.has(folderId) ? next.delete(folderId) : next.add(folderId)
+      if (next.has(folderId)) {
+        next.delete(folderId)
+      } else {
+        next.add(folderId)
+      }
       return next
     })
-  }, [])
+  }
 
-  const expandFolder = useCallback((folderId: string) => {
+  const expandFolder = (folderId: string) => {
     setExpandedFolders((prev) => new Set(prev).add(folderId))
-  }, [])
+  }
 
-  // Create functionality
-  const [createDraft, setCreateDraft] = useState<{
-    type: "drawing" | "folder"
-    parentId: string | null
-  } | null>(null)
-  const [createName, setCreateName] = useState("")
-  const createInputRef = useRef<HTMLInputElement | null>(null)
+  // Create actions
+  const startCreate = (
+    type: "drawing" | "folder",
+    parentId?: string | null,
+  ) => {
+    setCreateDraft({ type, parentId: parentId ?? null })
+    setCreateName(type === "drawing" ? "Untitled" : "New folder")
+    if (parentId) expandFolder(parentId)
+    setTimeout(() => {
+      createInputRef.current?.focus()
+      createInputRef.current?.select()
+    }, 0)
+  }
 
-  useEffect(() => {
-    if (createDraft) {
-      requestAnimationFrame(() => {
-        createInputRef.current?.focus()
-        createInputRef.current?.select()
-      })
-    }
-  }, [createDraft])
-
-  const startCreate = useCallback(
-    (type: "drawing" | "folder", parentId?: string | null) => {
-      setCreateDraft({ type, parentId: parentId ?? null })
-      setCreateName(type === "drawing" ? "Untitled" : "New folder")
-      if (parentId) expandFolder(parentId)
-    },
-    [expandFolder],
-  )
-
-  const cancelCreate = useCallback(() => {
+  const cancelCreate = () => {
     setCreateDraft(null)
     setCreateName("")
-  }, [])
+  }
 
-  const finalizeCreate = useCallback(async () => {
+  const finalizeCreate = async () => {
     if (!createDraft) return
     const name = createName.trim()
-    if (!name) return cancelCreate()
+    if (!name) {
+      cancelCreate()
+      return
+    }
 
     if (createDraft.type === "drawing") {
       const newId = await createDrawing({
@@ -136,71 +127,68 @@ export function useSidebarState({
       cancelCreate()
       navigate({ to: "/draw/$id", params: { id: newId } })
     } else {
-      const newFolder = await createFolder({
-        data: { name, parentId: createDraft.parentId },
-      })
-      setLocalFolders((prev) => [...prev, newFolder])
-      expandFolder(newFolder.id)
+      await createFolder({ data: { name, parentId: createDraft.parentId } })
       cancelCreate()
+      router.invalidate()
     }
-  }, [createDraft, createName, cancelCreate, navigate, expandFolder])
+  }
 
-  // Delete drawing
-  const deleteDrawingById = useCallback(
-    async (drawingId: string) => {
-      if (!confirm("Are you sure you want to delete this drawing?")) return
-      await deleteDrawing({ data: drawingId })
-      const remaining = localDrawings.filter((d) => d.id !== drawingId)
-      setLocalDrawings(remaining)
+  const closeConfirmDialog = () => setConfirmDialog(null)
 
-      if (drawingId === currentDrawingId) {
-        if (remaining.length > 0) {
-          navigate({ to: "/draw/$id", params: { id: remaining[0].id } })
+  const openConfirmDialog = (dialog: Exclude<ConfirmDialog, null>) => {
+    setConfirmDialog({
+      ...dialog,
+      onConfirm: async () => {
+        setConfirmDialog(null)
+        await dialog.onConfirm()
+      },
+    })
+  }
+
+  // Delete actions
+  const onDeleteDrawing = async (drawingId: string) => {
+    openConfirmDialog({
+      title: "Delete drawing?",
+      description: "Are you sure you want to delete this drawing?",
+      onConfirm: async () => {
+        await deleteDrawing({ data: drawingId })
+
+        if (drawingId === currentDrawingId) {
+          const remaining = drawings.filter((d) => d.id !== drawingId)
+          if (remaining.length > 0) {
+            navigate({ to: "/draw/$id", params: { id: remaining[0].id } })
+          } else {
+            const newId = await createDrawing({ data: {} })
+            navigate({ to: "/draw/$id", params: { id: newId } })
+          }
         } else {
-          const newId = await createDrawing({ data: {} })
-          navigate({ to: "/draw/$id", params: { id: newId } })
+          router.invalidate()
         }
-      }
-    },
-    [localDrawings, currentDrawingId, navigate],
-  )
+      },
+    })
+  }
 
-  // Delete folder
-  const deleteFolderById = useCallback(
-    async (folderId: string) => {
-      const folderDrawings = drawingsByFolder.get(folderId) ?? []
-      const childFolders = folderChildren.get(folderId) ?? []
+  const onDeleteFolder = async (folderId: string) => {
+    const hasItems =
+      (drawingsByFolder.get(folderId)?.length ?? 0) > 0 ||
+      (folderChildren.get(folderId)?.length ?? 0) > 0
 
-      if (folderDrawings.length > 0 || childFolders.length > 0) {
-        if (
-          !confirm(
-            "This folder contains items. Delete folder and move items to root?",
-          )
-        )
-          return
-      } else {
-        if (!confirm("Delete this folder?")) return
-      }
+    const message = hasItems
+      ? "This folder contains items. Delete folder and move items to root?"
+      : "Delete this folder?"
 
-      await deleteFolder({ data: folderId })
-      setLocalFolders((prev) => prev.filter((f) => f.id !== folderId))
-      // Move children to root
-      setLocalDrawings((prev) =>
-        prev.map((d) =>
-          d.folderId === folderId ? { ...d, folderId: null } : d,
-        ),
-      )
-      setLocalFolders((prev) =>
-        prev.map((f) =>
-          f.parentId === folderId ? { ...f, parentId: null } : f,
-        ),
-      )
-    },
-    [drawingsByFolder, folderChildren],
-  )
+    openConfirmDialog({
+      title: "Delete folder?",
+      description: message,
+      onConfirm: async () => {
+        await deleteFolder({ data: folderId })
+        router.invalidate()
+      },
+    })
+  }
 
   // Rename
-  const handleRename = useCallback(async (item: DragItem, newName: string) => {
+  const onRename = async (item: DragItem, newName: string) => {
     const trimmed = newName.trim()
     if (!trimmed) return
 
@@ -208,132 +196,92 @@ export function useSidebarState({
       await updateDrawing({
         data: { id: item.id, updateData: { name: trimmed } },
       })
-      setLocalDrawings((prev) =>
-        prev.map((d) => (d.id === item.id ? { ...d, name: trimmed } : d)),
-      )
     } else {
       await updateFolder({ data: { id: item.id, name: trimmed } })
-      setLocalFolders((prev) =>
-        prev.map((f) => (f.id === item.id ? { ...f, name: trimmed } : f)),
-      )
     }
-  }, [])
+    router.invalidate()
+  }
 
-  // Drag and drop
-  const [dragItem, setDragItem] = useState<DragItem | null>(null)
-  const [dropTarget, setDropTarget] = useState<DropTarget>(null)
+  // Drag and drop helpers
+  const isDescendant = (
+    folderId: string,
+    potentialParentId: string | null,
+  ): boolean => {
+    let id = potentialParentId
+    while (id) {
+      if (id === folderId) return true
+      id = folderById.get(id)?.parentId ?? null
+    }
+    return false
+  }
 
-  const isDescendant = useCallback(
-    (folderId: string, potentialParentId: string | null): boolean => {
-      let id = potentialParentId
-      while (id) {
-        if (id === folderId) return true
-        id = folderById.get(id)?.parentId ?? null
-      }
-      return false
-    },
-    [folderById],
-  )
+  const onDragStart = (item: DragItem) => (e: DragEvent) => {
+    setDragItem(item)
+    e.dataTransfer.effectAllowed = "move"
+    e.dataTransfer.setData("text/plain", item.id)
+    e.dataTransfer.setData("application/x-sidebar-item", JSON.stringify(item))
+  }
 
-  const parseDragData = useCallback(
-    (e: DragEvent): DragItem | null => {
-      const raw = e.dataTransfer.getData("application/x-excalidraw-item")
-      if (!raw) return dragItem
-      try {
-        const parsed = JSON.parse(raw) as DragItem
-        if (
-          parsed?.id &&
-          (parsed.type === "drawing" || parsed.type === "folder")
-        ) {
-          return parsed
-        }
-      } catch {}
-      return dragItem
-    },
-    [dragItem],
-  )
-
-  const handleDragStart = useCallback(
-    (item: DragItem) => (e: DragEvent) => {
-      setDragItem(item)
-      e.dataTransfer.effectAllowed = "move"
-      e.dataTransfer.setData("text/plain", item.id)
-      e.dataTransfer.setData(
-        "application/x-excalidraw-item",
-        JSON.stringify(item),
-      )
-    },
-    [],
-  )
-
-  const handleDragEnd = useCallback(() => {
+  const onDragEnd = () => {
     setDragItem(null)
     setDropTarget(null)
-  }, [])
+  }
 
-  const handleDragOver = useCallback(
-    (target: DropTarget) => (e: DragEvent) => {
-      const item = dragItem ?? parseDragData(e)
-      if (!item) return
-      // Prevent dropping folder into itself or descendant
+  const onDragOver = (target: DropTarget) => (e: DragEvent) => {
+    if (!dragItem) return
+
+    // Prevent dropping folder into itself or descendant
+    if (
+      dragItem.type === "folder" &&
+      target?.type === "folder" &&
+      (dragItem.id === target.id || isDescendant(dragItem.id, target.id))
+    ) {
+      return
+    }
+
+    e.preventDefault()
+    e.stopPropagation()
+    e.dataTransfer.dropEffect = "move"
+    setDropTarget(target)
+  }
+
+  const onDragLeave = () => setDropTarget(null)
+
+  const onDrop = (target: DropTarget) => async (e: DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+
+    if (!dragItem) return
+
+    const targetFolderId =
+      target?.type === "folder" && target.position === "inside"
+        ? target.id
+        : null
+
+    setDropTarget(null)
+    setDragItem(null)
+
+    if (dragItem.type === "folder") {
       if (
-        item.type === "folder" &&
-        target?.type === "folder" &&
-        (item.id === target.id || isDescendant(item.id, target.id))
+        targetFolderId === dragItem.id ||
+        isDescendant(dragItem.id, targetFolderId)
       ) {
         return
       }
-      e.preventDefault()
-      e.stopPropagation()
-      e.dataTransfer.dropEffect = "move"
-      setDropTarget(target)
-    },
-    [dragItem, parseDragData, isDescendant],
-  )
+      await updateFolder({
+        data: { id: dragItem.id, parentId: targetFolderId },
+      })
+    } else {
+      const current = drawings.find((d) => d.id === dragItem.id)
+      if (current?.folderId === targetFolderId) return
+      await updateDrawing({
+        data: { id: dragItem.id, updateData: { folderId: targetFolderId } },
+      })
+    }
 
-  const handleDrop = useCallback(
-    (target: DropTarget) => async (e: DragEvent) => {
-      e.preventDefault()
-      e.stopPropagation()
-
-      const item = parseDragData(e)
-      setDropTarget(null)
-      setDragItem(null)
-      if (!item) return
-
-      const targetFolderId =
-        target?.type === "folder" && target.position === "inside"
-          ? target.id
-          : null
-
-      if (item.type === "folder") {
-        if (targetFolderId === item.id || isDescendant(item.id, targetFolderId))
-          return
-        await updateFolder({ data: { id: item.id, parentId: targetFolderId } })
-        setLocalFolders((prev) =>
-          prev.map((f) =>
-            f.id === item.id ? { ...f, parentId: targetFolderId } : f,
-          ),
-        )
-      } else {
-        const current = localDrawings.find((d) => d.id === item.id)
-        if (current?.folderId === targetFolderId) return
-        await updateDrawing({
-          data: { id: item.id, updateData: { folderId: targetFolderId } },
-        })
-        setLocalDrawings((prev) =>
-          prev.map((d) =>
-            d.id === item.id ? { ...d, folderId: targetFolderId } : d,
-          ),
-        )
-      }
-
-      if (targetFolderId) expandFolder(targetFolderId)
-    },
-    [parseDragData, isDescendant, localDrawings, expandFolder],
-  )
-
-  const handleDragLeave = useCallback(() => setDropTarget(null), [])
+    if (targetFolderId) expandFolder(targetFolderId)
+    router.invalidate()
+  }
 
   return {
     // Data
@@ -348,6 +296,8 @@ export function useSidebarState({
     toggleFolder,
     dropTarget,
     dragItem,
+    confirmDialog,
+    closeConfirmDialog,
 
     // Create
     createDraft,
@@ -359,15 +309,15 @@ export function useSidebarState({
     finalizeCreate,
 
     // Drag & drop
-    onDragStart: handleDragStart,
-    onDragEnd: handleDragEnd,
-    onDragOver: handleDragOver,
-    onDragLeave: handleDragLeave,
-    onDrop: handleDrop,
+    onDragStart,
+    onDragEnd,
+    onDragOver,
+    onDragLeave,
+    onDrop,
 
     // Actions
-    onDeleteDrawing: deleteDrawingById,
-    onDeleteFolder: deleteFolderById,
-    onRename: handleRename,
+    onDeleteDrawing,
+    onDeleteFolder,
+    onRename,
   }
 }

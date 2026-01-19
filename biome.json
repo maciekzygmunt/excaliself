@@ -16,9 +16,9 @@
   },
   "linter": {
     "enabled": true,
-    "a11y": {},
     "rules": {
-      "recommended": true
+      "recommended": true,
+      "a11y": "off"
     }
   },
   "javascript": {

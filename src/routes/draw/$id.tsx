@@ -1,4 +1,4 @@
-import { createFileRoute, redirect } from "@tanstack/react-router"
+import { createFileRoute, redirect, useRouter } from "@tanstack/react-router"
 import { createServerFn } from "@tanstack/react-start"
 import { Cloud, Loader2 } from "lucide-react"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
@@ -64,6 +64,7 @@ function DrawingCanvas() {
   const { id } = Route.useParams()
 
   const [name, setName] = useState(drawing.name)
+  const router = useRouter()
 
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -185,6 +186,7 @@ function DrawingCanvas() {
   const handleNameChange = async (newName: string) => {
     setName(newName)
     await saveDrawing({ data: { id, name: newName } })
+    router.invalidate()
   }
 
   const sceneData = useMemo(() => {

@@ -16,6 +16,12 @@ export type DropTarget =
   | { type: "folder"; id: string; position: "inside" | "above" | "below" }
   | null
 
+export type ConfirmDialog = {
+  title: string
+  description: string
+  onConfirm: () => void | Promise<void>
+} | null
+
 export type SidebarContextValue = {
   // Data
   folderChildren: Map<string | null, FolderType[]>
@@ -27,6 +33,10 @@ export type SidebarContextValue = {
   toggleFolder: (id: string) => void
   dropTarget: DropTarget
   dragItem: DragItem | null
+
+  // Confirm dialog
+  confirmDialog: ConfirmDialog
+  closeConfirmDialog: () => void
 
   // Create
   createDraft: { type: "drawing" | "folder"; parentId: string | null } | null

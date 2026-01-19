@@ -2,6 +2,16 @@ import { Link } from "@tanstack/react-router"
 import { File, Folder, LogOut, Plus, Settings } from "lucide-react"
 import { useMemo } from "react"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -29,6 +39,7 @@ import {
   type Drawing,
   type FolderType,
   SidebarContextProvider,
+  useSidebarContext,
 } from "./SidebarContext"
 import { useSidebarState } from "./useSidebarState"
 
@@ -179,6 +190,48 @@ export function DrawSidebar({
           </SidebarMenu>
         </SidebarFooter>
       </Sidebar>
+      <ConfirmDeleteDialog />
     </SidebarContextProvider>
+  )
+}
+
+function ConfirmDeleteDialog() {
+  const { confirmDialog, closeConfirmDialog } = useSidebarContext()
+
+  const handleConfirm = async () => {
+    const action = confirmDialog?.onConfirm
+    closeConfirmDialog()
+    if (action) {
+      await action()
+    }
+  }
+
+  return (
+    <AlertDialog
+      open={!!confirmDialog}
+      onOpenChange={(open) => {
+        if (!open) closeConfirmDialog()
+      }}
+    >
+      {confirmDialog && (
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{confirmDialog.title}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirmDialog.description}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={handleConfirm}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      )}
+    </AlertDialog>
   )
 }
