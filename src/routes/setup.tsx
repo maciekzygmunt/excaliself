@@ -12,16 +12,15 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { auth } from "@/lib/auth"
-import { setupMiddleware } from "@/middleware/setup"
-import { createFirstAdmin } from "@/server/users"
+import { createFirstAdmin, getUserCount } from "@/server/users"
 
 const setupAdmin = createServerFn({ method: "POST" })
-  .middleware([setupMiddleware])
   .inputValidator(
     (data: { email: string; password: string; name: string }) => data,
   )
-  .handler(async ({ data, context: { setupCompleted } }) => {
-    if (setupCompleted) {
+  .handler(async ({ data }) => {
+    const userCount = await getUserCount()
+    if (userCount > 0) {
       throw redirect({ to: "/login" })
     }
 
@@ -45,8 +44,11 @@ const setupAdmin = createServerFn({ method: "POST" })
   })
 
 export const Route = createFileRoute("/setup")({
-  server: {
-    middleware: [setupMiddleware],
+  beforeLoad: async () => {
+    const userCount = await getUserCount()
+    if (userCount > 0) {
+      throw redirect({ to: "/login" })
+    }
   },
   component: SetupPage,
 })

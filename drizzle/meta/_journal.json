@@ -8,6 +8,13 @@
       "when": 1768757293879,
       "tag": "0000_left_klaw",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1768936607567,
+      "tag": "0001_calm_miss_america",
+      "breakpoints": true
     }
   ]
 }

@@ -1,9 +1,17 @@
 "use server"
 
 import { createServerFn } from "@tanstack/react-start"
-import { count, eq } from "drizzle-orm"
+import { count, eq, inArray } from "drizzle-orm"
 import z from "zod"
-import { users } from "@/lib/db/schema"
+import {
+  accounts,
+  drawingFiles,
+  drawings,
+  folders,
+  invites,
+  sessions,
+  users,
+} from "@/lib/db/schema"
 
 export const getUserCount = createServerFn({ method: "GET" }).handler(
   async ({ context }) => {
@@ -43,4 +51,27 @@ export const createFirstAdmin = createServerFn({ method: "POST" })
       .update(users)
       .set({ role: "admin", name })
       .where(eq(users.id, userId))
+  })
+
+export const deleteUser = createServerFn({ method: "POST" })
+  .inputValidator(z.string())
+  .handler(async ({ data: userId, context }) => {
+    await context.db.transaction(async (tx) => {
+      const userDrawings = await tx
+        .select({ id: drawings.id })
+        .from(drawings)
+        .where(eq(drawings.ownerId, userId))
+      const drawingIds = userDrawings.map((d) => d.id)
+
+      if (drawingIds.length > 0) {
+        await tx.delete(drawingFiles).where(inArray(drawingFiles.drawingId, drawingIds))
+      }
+
+      await tx.delete(drawings).where(eq(drawings.ownerId, userId))
+      await tx.delete(folders).where(eq(folders.ownerId, userId))
+      await tx.delete(sessions).where(eq(sessions.userId, userId))
+      await tx.delete(accounts).where(eq(accounts.userId, userId))
+      await tx.delete(invites).where(eq(invites.invitedBy, userId))
+      await tx.delete(users).where(eq(users.id, userId))
+    })
   })

@@ -1,7 +1,26 @@
 import { createFileRoute, Link } from "@tanstack/react-router"
 import { createServerFn } from "@tanstack/react-start"
-import { ArrowLeft, Check, Copy, Mail, Plus, Trash2, Users } from "lucide-react"
+import {
+  ArrowLeft,
+  Check,
+  Copy,
+  LinkIcon,
+  Plus,
+  Trash2,
+  Users,
+} from "lucide-react"
 import { useState } from "react"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -10,10 +29,9 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { authMiddleware } from "@/middleware/auth"
+import { setupMiddleware } from "@/middleware/setup"
 import { createInvite, deleteInvite, getPendingInvites } from "@/server/invites"
-import { getAllUsers } from "@/server/users"
+import { deleteUser, getAllUsers } from "@/server/users"
 
 const fetchAdminData = createServerFn({ method: "GET" }).handler(async () => {
   const [users, invites] = await Promise.all([
@@ -25,7 +43,7 @@ const fetchAdminData = createServerFn({ method: "GET" }).handler(async () => {
 
 export const Route = createFileRoute("/admin/")({
   server: {
-    middleware: [authMiddleware],
+    middleware: [setupMiddleware],
   },
   loader: async () => {
     return await fetchAdminData()
@@ -35,30 +53,29 @@ export const Route = createFileRoute("/admin/")({
 
 function AdminPage() {
   const { users, invites } = Route.useLoaderData()
-  const [email, setEmail] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const [copiedToken, setCopiedToken] = useState<string | null>(null)
   const [localInvites, setLocalInvites] = useState(invites)
+  const [localUsers, setLocalUsers] = useState(users)
 
-  const handleInvite = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleCreateInvite = async () => {
     setLoading(true)
     setError("")
 
     try {
-      const result = await createInvite({ data: email })
+      const result = await createInvite()
       const newInvite = {
         id: result.id,
-        email,
         token: result.token,
         invitedBy: "",
+        usedBy: null,
         usedAt: null,
         expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
         createdAt: new Date(),
       }
       setLocalInvites([...localInvites, newInvite])
-      setEmail("")
+      copyInviteLink(result.token)
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create invite")
     } finally {
@@ -69,6 +86,11 @@ function AdminPage() {
   const handleDeleteInvite = async (id: string) => {
     await deleteInvite({ data: id })
     setLocalInvites(localInvites.filter((i) => i.id !== id))
+  }
+
+  const handleDeleteUser = async (id: string) => {
+    await deleteUser({ data: id })
+    setLocalUsers(localUsers.filter((u) => u.id !== id))
   }
 
   const copyInviteLink = (token: string) => {
@@ -99,13 +121,13 @@ function AdminPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Users className="h-5 w-5" />
-                Users ({users.length})
+                Users ({localUsers.length})
               </CardTitle>
               <CardDescription>Manage registered users</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-2">
-                {users.map((user) => (
+                {localUsers.map((user) => (
                   <div
                     key={user.id}
                     className="flex items-center justify-between rounded-lg border p-3"
@@ -116,15 +138,46 @@ function AdminPage() {
                         {user.email}
                       </p>
                     </div>
-                    <span
-                      className={`text-xs px-2 py-1 rounded ${
-                        user.role === "admin"
-                          ? "bg-primary text-primary-foreground"
-                          : "bg-secondary text-secondary-foreground"
-                      }`}
-                    >
-                      {user.role}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`text-xs px-2 py-1 rounded ${
+                          user.role === "admin"
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-secondary text-secondary-foreground"
+                        }`}
+                      >
+                        {user.role}
+                      </span>
+                      {user.role !== "admin" && (
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="destructive" size="icon">
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Delete User</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Are you sure you want to delete{" "}
+                                <strong>{user.name || user.email}</strong>? All
+                                their drawings and data will be permanently
+                                deleted.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction
+                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                onClick={() => handleDeleteUser(user.id)}
+                              >
+                                Delete
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -134,27 +187,20 @@ function AdminPage() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Mail className="h-5 w-5" />
-                Invitations
+                <LinkIcon className="h-5 w-5" />
+                Invite Links
               </CardTitle>
-              <CardDescription>Invite new users to join</CardDescription>
+              <CardDescription>
+                Generate invite links for new users
+              </CardDescription>
             </CardHeader>
             <CardContent>
-              <form onSubmit={handleInvite} className="mb-4 flex gap-2">
-                <div className="flex-1">
-                  <Input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="user@example.com"
-                    required
-                  />
-                </div>
-                <Button type="submit" disabled={loading}>
+              <div className="mb-4">
+                <Button onClick={handleCreateInvite} disabled={loading}>
                   <Plus className="mr-2 h-4 w-4" />
-                  Invite
+                  {loading ? "Generating..." : "Generate Invite Link"}
                 </Button>
-              </form>
+              </div>
               {error && (
                 <p className="mb-4 text-sm text-destructive">{error}</p>
               )}
@@ -165,7 +211,9 @@ function AdminPage() {
                     className="flex items-center justify-between rounded-lg border p-3"
                   >
                     <div>
-                      <p className="font-medium">{invite.email}</p>
+                      <p className="font-mono text-sm text-muted-foreground">
+                        {invite.token.slice(0, 16)}...
+                      </p>
                       <p className="text-xs text-muted-foreground">
                         Expires:{" "}
                         {new Date(invite.expiresAt).toLocaleDateString()}
@@ -195,7 +243,7 @@ function AdminPage() {
                 ))}
                 {localInvites.length === 0 && (
                   <p className="text-center text-sm text-muted-foreground py-4">
-                    No pending invitations
+                    No pending invite links
                   </p>
                 )}
               </div>

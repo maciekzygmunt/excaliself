@@ -9,8 +9,7 @@ import { authMiddleware } from "@/middleware/auth"
 
 export const createInvite = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
-  .inputValidator(z.string())
-  .handler(async ({ data, context }) => {
+  .handler(async ({ context }) => {
     const id = randomUUID()
     const token = randomBytes(32).toString("hex")
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days
@@ -18,7 +17,6 @@ export const createInvite = createServerFn({ method: "POST" })
 
     await context.db.insert(invites).values({
       id,
-      email: data,
       token,
       invitedBy: adminId,
       expiresAt,
@@ -45,12 +43,12 @@ export const validateInvite = createServerFn({ method: "GET" })
   })
 
 export const consumeInvite = createServerFn({ method: "POST" })
-  .inputValidator(z.string())
-  .handler(async ({ data: token, context }) => {
+  .inputValidator(z.object({ token: z.string(), userId: z.string() }))
+  .handler(async ({ data, context }) => {
     await context.db
       .update(invites)
-      .set({ usedAt: new Date() })
-      .where(eq(invites.token, token))
+      .set({ usedAt: new Date(), usedBy: data.userId })
+      .where(eq(invites.token, data.token))
   })
 
 export const getPendingInvites = createServerFn({ method: "GET" }).handler(

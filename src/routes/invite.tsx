@@ -12,7 +12,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { auth } from "@/lib/auth"
-import { validateInvite } from "@/server/invites"
+import { consumeInvite, validateInvite } from "@/server/invites"
 
 const registerWithInvite = createServerFn({ method: "POST" })
   .inputValidator(
@@ -22,11 +22,7 @@ const registerWithInvite = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const invite = await validateInvite({ data: data.token })
     if (!invite) {
-      throw new Error("Invalid or expired invite")
-    }
-
-    if (invite.email.toLowerCase() !== data.email.toLowerCase()) {
-      throw new Error("Email does not match invitation")
+      throw new Error("Invalid or expired invite link")
     }
 
     const result = await auth.api.signUpEmail({
@@ -41,7 +37,7 @@ const registerWithInvite = createServerFn({ method: "POST" })
       throw new Error("Failed to create account")
     }
 
-    await validateInvite({ data: data.token })
+    await consumeInvite({ data: { token: data.token, userId: result.user.id } })
 
     return { success: true }
   })
@@ -68,11 +64,10 @@ export const Route = createFileRoute("/invite")({
 })
 
 function InvitePage() {
-  const { invite } = Route.useRouteContext()
   const { token } = Route.useSearch()
   const navigate = useNavigate()
 
-  const [email, setEmail] = useState(invite?.email || "")
+  const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
   const [name, setName] = useState("")
@@ -133,8 +128,8 @@ function InvitePage() {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                disabled
-                className="bg-muted"
+                placeholder="you@example.com"
+                required
               />
             </div>
             <div className="space-y-2">

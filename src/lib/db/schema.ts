@@ -73,11 +73,11 @@ export const verifications = sqliteTable("verifications", {
 
 export const invites = sqliteTable("invites", {
   id: text("id").primaryKey(),
-  email: text("email").notNull(),
   token: text("token").notNull().unique(),
   invitedBy: text("invitedBy")
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
+  usedBy: text("usedBy"),
   usedAt: integer("usedAt", { mode: "timestamp" }),
   expiresAt: integer("expiresAt", { mode: "timestamp" }).notNull(),
   createdAt: integer("createdAt", { mode: "timestamp" })

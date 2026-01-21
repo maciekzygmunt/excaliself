@@ -8,9 +8,5 @@ export const setupMiddleware = createMiddleware().server(async ({ next }) => {
   if (userCount === 0) {
     throw redirect({ to: "/setup" })
   }
-  return await next({
-    context: {
-      setupCompleted: true,
-    },
-  })
+  return await next()
 })
