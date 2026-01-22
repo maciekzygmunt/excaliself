@@ -28,7 +28,8 @@ export const Route = createRootRoute({
       },
     ],
   }),
-
+  errorComponent: () => <div>Error</div>,
+  notFoundComponent: () => <div>Not Found</div>,
   shellComponent: RootDocument,
   component: RootComponent,
 })
