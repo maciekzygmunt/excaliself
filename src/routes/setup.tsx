@@ -91,7 +91,7 @@ function SetupPage() {
     <div className="flex min-h-screen items-center justify-center p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <CardTitle className="text-2xl">🔧 Setup Your Instance</CardTitle>
+          <CardTitle className="text-2xl">Setup Your Instance</CardTitle>
           <CardDescription>
             Create the admin account to get started
           </CardDescription>
@@ -144,7 +144,7 @@ function SetupPage() {
             </div>
             {error && <p className="text-sm text-destructive">{error}</p>}
             <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Creating..." : "Create Admin & Start →"}
+              {loading ? "Creating..." : "Create Admin & Start"}
             </Button>
           </form>
         </CardContent>

@@ -35,7 +35,6 @@ export function ExcalidrawCanvas({
   const [loadError, setLoadError] = useState<Error | null>(null)
   const apiRef = useRef<ExcalidrawApi | null>(null)
   const sceneRef = useRef<ExcalidrawScene | null>(null)
-  const isMountedRef = useRef(false)
 
   useEffect(() => {
     let isActive = true
@@ -55,17 +54,9 @@ export function ExcalidrawCanvas({
     }
   }, [])
 
-  useEffect(() => {
-    isMountedRef.current = true
-    return () => {
-      isMountedRef.current = false
-    }
-  }, [])
-
   const scheduleSceneUpdate = useCallback((sceneToApply: ExcalidrawScene) => {
     // Defer updates until after mount to avoid setState-before-mount warnings.
     requestAnimationFrame(() => {
-      if (!isMountedRef.current) return
       const api = apiRef.current
       if (api) {
         api.updateScene(sceneToApply)

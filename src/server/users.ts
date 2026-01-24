@@ -77,7 +77,9 @@ export const deleteUser = createServerFn({ method: "POST" })
         const drawingIds = userDrawings.map((d) => d.id)
 
         if (drawingIds.length > 0) {
-          tx.delete(drawingFiles).where(inArray(drawingFiles.drawingId, drawingIds)).run()
+          tx.delete(drawingFiles)
+            .where(inArray(drawingFiles.drawingId, drawingIds))
+            .run()
         }
 
         tx.delete(drawings).where(eq(drawings.ownerId, userId)).run()
@@ -89,7 +91,9 @@ export const deleteUser = createServerFn({ method: "POST" })
           .set({ usedBy: null })
           .where(eq(invites.usedBy, userId))
           .run()
-        tx.delete(verifications).where(eq(verifications.identifier, user.email)).run()
+        tx.delete(verifications)
+          .where(eq(verifications.identifier, user.email))
+          .run()
         tx.delete(users).where(eq(users.id, userId)).run()
       })
     } catch (error) {

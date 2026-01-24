@@ -1,5 +1,4 @@
 import { createFileRoute, Link } from "@tanstack/react-router"
-import { createServerFn } from "@tanstack/react-start"
 import {
   ArrowLeft,
   Check,
@@ -29,69 +28,69 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import { trpc } from "@/lib/trpc/client"
 import { setupMiddleware } from "@/middleware/setup"
-import { createInvite, deleteInvite, getPendingInvites } from "@/server/invites"
-import { deleteUser, getAllUsers } from "@/server/users"
-
-const fetchAdminData = createServerFn({ method: "GET" }).handler(async () => {
-  const [users, invites] = await Promise.all([
-    getAllUsers(),
-    getPendingInvites(),
-  ])
-  return { users, invites }
-})
 
 export const Route = createFileRoute("/admin/")({
   server: {
     middleware: [setupMiddleware],
   },
-  loader: async () => {
-    return await fetchAdminData()
-  },
   component: AdminPage,
 })
 
 function AdminPage() {
-  const { users, invites } = Route.useLoaderData()
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState("")
   const [copiedToken, setCopiedToken] = useState<string | null>(null)
-  const [localInvites, setLocalInvites] = useState(invites)
-  const [localUsers, setLocalUsers] = useState(users)
 
-  const handleCreateInvite = async () => {
-    setLoading(true)
-    setError("")
+  const { data, isLoading } = trpc.admin.getAdminData.useQuery()
+  const utils = trpc.useUtils()
 
-    try {
-      const result = await createInvite()
-      const newInvite = {
-        id: result.id,
-        token: result.token,
-        invitedBy: "",
-        usedBy: null,
-        usedAt: null,
-        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-        createdAt: new Date(),
+  const createInviteMutation = trpc.admin.createInvite.useMutation({
+    onSuccess: (newInvite) => {
+      // Invalidate and refetch to get proper server types
+      utils.admin.getAdminData.invalidate()
+      copyInviteLink(newInvite.token)
+    },
+  })
+
+  const deleteInviteMutation = trpc.admin.deleteInvite.useMutation({
+    onMutate: async (id) => {
+      await utils.admin.getAdminData.cancel()
+      const previous = utils.admin.getAdminData.getData()
+      utils.admin.getAdminData.setData(undefined, (old) => {
+        if (!old) return old
+        return {
+          ...old,
+          invites: old.invites.filter((invite) => invite.id !== id),
+        }
+      })
+      return { previous }
+    },
+    onError: (_err, _id, context) => {
+      if (context?.previous) {
+        utils.admin.getAdminData.setData(undefined, context.previous)
       }
-      setLocalInvites([...localInvites, newInvite])
-      copyInviteLink(result.token)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create invite")
-    } finally {
-      setLoading(false)
-    }
-  }
+    },
+  })
 
-  const handleDeleteInvite = async (id: string) => {
-    await deleteInvite({ data: id })
-    setLocalInvites(localInvites.filter((i) => i.id !== id))
-  }
-
-  const handleDeleteUser = async (id: string) => {
-    await deleteUser({ data: id })
-    setLocalUsers(localUsers.filter((u) => u.id !== id))
-  }
+  const deleteUserMutation = trpc.admin.deleteUser.useMutation({
+    onMutate: async (id) => {
+      await utils.admin.getAdminData.cancel()
+      const previous = utils.admin.getAdminData.getData()
+      utils.admin.getAdminData.setData(undefined, (old) => {
+        if (!old) return old
+        return {
+          ...old,
+          users: old.users.filter((user) => user.id !== id),
+        }
+      })
+      return { previous }
+    },
+    onError: (_err, _id, context) => {
+      if (context?.previous) {
+        utils.admin.getAdminData.setData(undefined, context.previous)
+      }
+    },
+  })
 
   const copyInviteLink = (token: string) => {
     const link = `${window.location.origin}/invite?token=${token}`
@@ -99,6 +98,16 @@ function AdminPage() {
     setCopiedToken(token)
     setTimeout(() => setCopiedToken(null), 2000)
   }
+
+  if (isLoading || !data) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="text-muted-foreground">Loading...</div>
+      </div>
+    )
+  }
+
+  const { users, invites } = data
 
   return (
     <div className="min-h-screen bg-background">
@@ -121,13 +130,13 @@ function AdminPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Users className="h-5 w-5" />
-                Users ({localUsers.length})
+                Users ({users.length})
               </CardTitle>
               <CardDescription>Manage registered users</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-2">
-                {localUsers.map((user) => (
+                {users.map((user) => (
                   <div
                     key={user.id}
                     className="flex items-center justify-between rounded-lg border p-3"
@@ -169,7 +178,9 @@ function AdminPage() {
                               <AlertDialogCancel>Cancel</AlertDialogCancel>
                               <AlertDialogAction
                                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                onClick={() => handleDeleteUser(user.id)}
+                                onClick={() =>
+                                  deleteUserMutation.mutate(user.id)
+                                }
                               >
                                 Delete
                               </AlertDialogAction>
@@ -196,16 +207,23 @@ function AdminPage() {
             </CardHeader>
             <CardContent>
               <div className="mb-4">
-                <Button onClick={handleCreateInvite} disabled={loading}>
+                <Button
+                  onClick={() => createInviteMutation.mutate()}
+                  disabled={createInviteMutation.isPending}
+                >
                   <Plus className="mr-2 h-4 w-4" />
-                  {loading ? "Generating..." : "Generate Invite Link"}
+                  {createInviteMutation.isPending
+                    ? "Generating..."
+                    : "Generate Invite Link"}
                 </Button>
               </div>
-              {error && (
-                <p className="mb-4 text-sm text-destructive">{error}</p>
+              {createInviteMutation.error && (
+                <p className="mb-4 text-sm text-destructive">
+                  {createInviteMutation.error.message}
+                </p>
               )}
               <div className="space-y-2">
-                {localInvites.map((invite) => (
+                {invites.map((invite) => (
                   <div
                     key={invite.id}
                     className="flex items-center justify-between rounded-lg border p-3"
@@ -234,14 +252,14 @@ function AdminPage() {
                       <Button
                         variant="destructive"
                         size="icon"
-                        onClick={() => handleDeleteInvite(invite.id)}
+                        onClick={() => deleteInviteMutation.mutate(invite.id)}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
                   </div>
                 ))}
-                {localInvites.length === 0 && (
+                {invites.length === 0 && (
                   <p className="text-center text-sm text-muted-foreground py-4">
                     No pending invite links
                   </p>

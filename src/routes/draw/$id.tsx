@@ -1,10 +1,11 @@
 import { createFileRoute, redirect, useRouter } from "@tanstack/react-router"
 import { createServerFn } from "@tanstack/react-start"
 import { Cloud, Loader2 } from "lucide-react"
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useMemo, useState } from "react"
 import { ExcalidrawCanvas } from "@/components/ExcalidrawCanvas"
 import { Input } from "@/components/ui/input"
 import { SidebarTrigger } from "@/components/ui/sidebar"
+import { useAutoSave } from "@/hooks/use-auto-save"
 import { authMiddleware } from "@/middleware/auth"
 import {
   getDrawingWithFiles,
@@ -59,134 +60,77 @@ export const Route = createFileRoute("/draw/$id")({
   component: DrawingCanvas,
 })
 
+type SceneData = {
+  elements: readonly unknown[]
+  appState: unknown
+  files: Record<string, unknown>
+}
+
 function DrawingCanvas() {
   const { drawing } = Route.useLoaderData()
   const { id } = Route.useParams()
-
-  const [name, setName] = useState(drawing.name)
   const router = useRouter()
 
-  const [saving, setSaving] = useState(false)
-  const [saved, setSaved] = useState(false)
-  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const savedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const lastSavedDataRef = useRef<string>(drawing.data)
-  const latestSceneRef = useRef<{
-    elements: readonly unknown[]
-    appState: unknown
-    files: Record<string, unknown>
-  } | null>(null)
-  const isMountedRef = useRef(true)
+  // Track local edits only - use prop directly for display when not editing
+  const [editingName, setEditingName] = useState<string | null>(null)
+  const displayName = editingName ?? drawing.name
 
-  useEffect(() => {
-    setName(drawing.name)
-    lastSavedDataRef.current = drawing.data
-  }, [drawing.data, drawing.name])
-
-  useEffect(() => {
-    isMountedRef.current = true
-    return () => {
-      isMountedRef.current = false
-    }
-  }, [])
-
-  const handleSave = useCallback(
-    async (
-      elements: readonly unknown[],
-      appState: unknown,
-      files: Record<string, unknown>,
-      updateUi: boolean = true,
-    ) => {
-      const dataString = JSON.stringify({ elements, appState })
-
-      if (dataString === lastSavedDataRef.current) {
-        return
-      }
-
-      if (updateUi && isMountedRef.current) {
-        setSaving(true)
-      }
-
-      const fileArray = Object.entries(files || {}).map(([fileId, file]) => {
-        const fileData = file as ExcalidrawBinaryFile
-        return {
-          fileId,
-          mimeType: fileData.mimeType || "image/png",
-          dataUrl: fileData.dataURL || "",
-        }
-      })
-
-      try {
-        await saveDrawing({
-          data: {
-            id,
-            data: dataString,
-            files: fileArray,
-          },
-        })
-
-        lastSavedDataRef.current = dataString
-        if (updateUi && isMountedRef.current) {
-          setSaved(true)
-          if (savedTimeoutRef.current) {
-            clearTimeout(savedTimeoutRef.current)
+  const onSave = useCallback(
+    async (scene: SceneData) => {
+      const fileArray = Object.entries(scene.files || {}).map(
+        ([fileId, file]) => {
+          const fileData = file as ExcalidrawBinaryFile
+          return {
+            fileId,
+            mimeType: fileData.mimeType || "image/png",
+            dataUrl: fileData.dataURL || "",
           }
-          savedTimeoutRef.current = setTimeout(() => {
-            if (isMountedRef.current) {
-              setSaved(false)
-            }
-          }, 2000)
-        }
-      } catch (err) {
-        console.error("Failed to save:", err)
-      } finally {
-        if (updateUi && isMountedRef.current) {
-          setSaving(false)
-        }
-      }
+        },
+      )
+
+      await saveDrawing({
+        data: {
+          id,
+          data: JSON.stringify({
+            elements: scene.elements,
+            appState: scene.appState,
+          }),
+          files: fileArray,
+        },
+      })
     },
     [id],
   )
 
-  const handleDebouncedSave = useCallback(
+  const serialize = useCallback(
+    (scene: SceneData) =>
+      JSON.stringify({ elements: scene.elements, appState: scene.appState }),
+    [],
+  )
+
+  const { saving, saved, handleChange } = useAutoSave<SceneData>({
+    initialData: drawing.data,
+    onSave,
+    serialize,
+  })
+
+  const handleSceneChange = useCallback(
     (
       elements: readonly unknown[],
       appState: unknown,
       files: Record<string, unknown>,
     ) => {
-      latestSceneRef.current = { elements, appState, files }
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current)
-      }
-
-      saveTimeoutRef.current = setTimeout(() => {
-        void handleSave(elements, appState, files)
-      }, 300)
+      handleChange({ elements, appState, files })
     },
-    [handleSave],
+    [handleChange],
   )
 
-  useEffect(() => {
-    return () => {
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current)
-        saveTimeoutRef.current = null
-      }
-      if (savedTimeoutRef.current) {
-        clearTimeout(savedTimeoutRef.current)
-        savedTimeoutRef.current = null
-      }
-      const latest = latestSceneRef.current
-      if (latest) {
-        void handleSave(latest.elements, latest.appState, latest.files, false)
-      }
+  const handleNameBlur = async (newName: string) => {
+    setEditingName(null)
+    if (newName !== drawing.name) {
+      await saveDrawing({ data: { id, name: newName } })
+      router.invalidate()
     }
-  }, [handleSave])
-
-  const handleNameChange = async (newName: string) => {
-    setName(newName)
-    await saveDrawing({ data: { id, name: newName } })
-    router.invalidate()
   }
 
   const sceneData = useMemo(() => {
@@ -232,9 +176,9 @@ function DrawingCanvas() {
           <SidebarTrigger className="-ml-2 h-9 w-9 text-muted-foreground hover:text-foreground" />
           <div className="h-4 w-px bg-border/60" />
           <Input
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            onBlur={(event) => handleNameChange(event.target.value)}
+            value={displayName}
+            onChange={(event) => setEditingName(event.target.value)}
+            onBlur={(event) => handleNameBlur(event.target.value)}
             className="h-9 w-[300px] border-none bg-transparent px-0 text-lg font-semibold shadow-none focus-visible:ring-0 placeholder:text-muted-foreground/50"
             placeholder="Untitled Drawing"
           />
@@ -261,7 +205,7 @@ function DrawingCanvas() {
         <ExcalidrawCanvas
           initialData={sceneData}
           scene={sceneData}
-          onChange={handleDebouncedSave}
+          onChange={handleSceneChange}
         />
       </div>
     </div>
