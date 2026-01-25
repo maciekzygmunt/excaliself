@@ -3,6 +3,7 @@
 import { createServerFn } from "@tanstack/react-start"
 import { count, eq, inArray } from "drizzle-orm"
 import z from "zod"
+import { db } from "@/db"
 import {
   accounts,
   drawingFiles,
@@ -12,25 +13,25 @@ import {
   sessions,
   users,
   verifications,
-} from "@/lib/db/schema"
+} from "@/db/schema"
 
 export const getUserCount = createServerFn({ method: "GET" }).handler(
-  async ({ context }) => {
-    const result = await context.db.select({ count: count() }).from(users)
+  async () => {
+    const result = await db.select({ count: count() }).from(users)
     return result[0].count
   },
 )
 
 export const getUserById = createServerFn({ method: "GET" })
   .inputValidator(z.string())
-  .handler(async ({ data: id, context }) => {
-    const result = await context.db.select().from(users).where(eq(users.id, id))
+  .handler(async ({ data: id }) => {
+    const result = await db.select().from(users).where(eq(users.id, id))
     return result[0] || null
   })
 
 export const getAllUsers = createServerFn({ method: "GET" }).handler(
-  async ({ context }) => {
-    return context.db.select().from(users)
+  async () => {
+    return db.select().from(users)
   },
 )
 
@@ -38,8 +39,8 @@ export const updateUserRole = createServerFn({ method: "POST" })
   .inputValidator(
     z.object({ userId: z.string(), role: z.enum(["admin", "user"]) }),
   )
-  .handler(async ({ data: { userId, role }, context }) => {
-    await context.db
+  .handler(async ({ data: { userId, role } }) => {
+    await db
       .update(users)
       .set({ role, updatedAt: new Date() })
       .where(eq(users.id, userId))
@@ -47,8 +48,8 @@ export const updateUserRole = createServerFn({ method: "POST" })
 
 export const createFirstAdmin = createServerFn({ method: "POST" })
   .inputValidator(z.object({ userId: z.string(), name: z.string().nullable() }))
-  .handler(async ({ data: { userId, name }, context }) => {
-    await context.db
+  .handler(async ({ data: { userId, name } }) => {
+    await db
       .update(users)
       .set({ role: "admin", name })
       .where(eq(users.id, userId))
@@ -56,9 +57,9 @@ export const createFirstAdmin = createServerFn({ method: "POST" })
 
 export const deleteUser = createServerFn({ method: "POST" })
   .inputValidator(z.string())
-  .handler(async ({ data: userId, context }) => {
+  .handler(async ({ data: userId }) => {
     try {
-      context.db.transaction((tx) => {
+      db.transaction((tx) => {
         const user = tx
           .select({ email: users.email })
           .from(users)
