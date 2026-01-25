@@ -115,6 +115,7 @@ export function ExcalidrawCanvas({
         UIOptions={{
           canvasActions: {
             loadScene: false,
+            saveToActiveFile: false,
           },
         }}
       />
