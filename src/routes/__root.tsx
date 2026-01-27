@@ -1,12 +1,12 @@
 import { TanStackDevtools } from "@tanstack/react-devtools"
 import type { QueryClient } from "@tanstack/react-query"
+import { ReactQueryDevtoolsPanel } from "@tanstack/react-query-devtools"
 import {
   createRootRouteWithContext,
   HeadContent,
   Scripts,
 } from "@tanstack/react-router"
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools"
-import TanStackQueryDevtools from "../lib/tanstack-query/devtools"
 import appCss from "../styles.css?url"
 
 interface MyRouterContext {
@@ -56,7 +56,10 @@ function RootDocument({ children }: { children: React.ReactNode }) {
               name: "Tanstack Router",
               render: <TanStackRouterDevtoolsPanel />,
             },
-            TanStackQueryDevtools,
+            {
+              name: "Tanstack Query",
+              render: <ReactQueryDevtoolsPanel />,
+            },
           ]}
         />
         <Scripts />
