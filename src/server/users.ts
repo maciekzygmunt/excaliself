@@ -1,5 +1,6 @@
 "use server"
 
+import { redirect } from "@tanstack/react-router"
 import { createServerFn } from "@tanstack/react-start"
 import { count, eq, inArray } from "drizzle-orm"
 import z from "zod"
@@ -14,6 +15,7 @@ import {
   users,
   verifications,
 } from "@/db/schema"
+import { auth } from "@/lib/auth"
 import { adminMiddleware } from "@/middleware/admin"
 
 export const getUserCount = createServerFn({ method: "GET" }).handler(
@@ -23,13 +25,32 @@ export const getUserCount = createServerFn({ method: "GET" }).handler(
   },
 )
 
-export const createFirstAdmin = createServerFn({ method: "POST" })
-  .inputValidator(z.object({ userId: z.string(), name: z.string().nullable() }))
-  .handler(async ({ data: { userId, name } }) => {
+export const setupAdmin = createServerFn({ method: "POST" })
+  .inputValidator(
+    (data: { email: string; password: string; name: string }) => data,
+  )
+  .handler(async ({ data }) => {
+    const userCount = await getUserCount()
+    if (userCount > 0) {
+      throw redirect({ to: "/login" })
+    }
+
+    const result = await auth.api.signUpEmail({
+      body: {
+        email: data.email,
+        password: data.password,
+        name: data.name,
+      },
+    })
+
+    if (!result.user) {
+      throw new Error("Failed to create admin account")
+    }
+
     await db
       .update(users)
-      .set({ role: "admin", name })
-      .where(eq(users.id, userId))
+      .set({ role: "admin", name: data.name })
+      .where(eq(users.id, result.user.id))
   })
 
 // ADMIN

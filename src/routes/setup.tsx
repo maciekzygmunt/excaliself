@@ -1,5 +1,5 @@
+import { useMutation } from "@tanstack/react-query"
 import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router"
-import { createServerFn } from "@tanstack/react-start"
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import {
@@ -11,37 +11,7 @@ import {
 } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { auth } from "@/lib/auth"
-import { createFirstAdmin, getUserCount } from "@/server/users"
-
-const setupAdmin = createServerFn({ method: "POST" })
-  .inputValidator(
-    (data: { email: string; password: string; name: string }) => data,
-  )
-  .handler(async ({ data }) => {
-    const userCount = await getUserCount()
-    if (userCount > 0) {
-      throw redirect({ to: "/login" })
-    }
-
-    const result = await auth.api.signUpEmail({
-      body: {
-        email: data.email,
-        password: data.password,
-        name: data.name,
-      },
-    })
-
-    if (!result.user) {
-      throw new Error("Failed to create admin account")
-    }
-
-    await createFirstAdmin({
-      data: { userId: result.user.id, name: data.name },
-    })
-
-    return { success: true }
-  })
+import { getUserCount, setupAdmin } from "@/server/users"
 
 export const Route = createFileRoute("/setup")({
   beforeLoad: async () => {
@@ -53,6 +23,7 @@ export const Route = createFileRoute("/setup")({
   component: SetupPage,
 })
 
+// TODO: migrate to tanstack form
 function SetupPage() {
   const navigate = useNavigate()
   const [email, setEmail] = useState("")
@@ -60,7 +31,13 @@ function SetupPage() {
   const [confirmPassword, setConfirmPassword] = useState("")
   const [name, setName] = useState("")
   const [error, setError] = useState("")
-  const [loading, setLoading] = useState(false)
+
+  const { mutate: setupAdminMutation, isPending } = useMutation({
+    mutationFn: setupAdmin,
+    onSuccess: () => {
+      navigate({ to: "/login" })
+    },
+  })
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -76,15 +53,7 @@ function SetupPage() {
       return
     }
 
-    setLoading(true)
-    try {
-      await setupAdmin({ data: { email, password, name } })
-      navigate({ to: "/login" })
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Setup failed")
-    } finally {
-      setLoading(false)
-    }
+    setupAdminMutation({ data: { email, password, name } })
   }
 
   return (
@@ -143,8 +112,8 @@ function SetupPage() {
               />
             </div>
             {error && <p className="text-sm text-destructive">{error}</p>}
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Creating..." : "Create Admin & Start"}
+            <Button type="submit" className="w-full" disabled={isPending}>
+              {isPending ? "Creating..." : "Create Admin & Start"}
             </Button>
           </form>
         </CardContent>
