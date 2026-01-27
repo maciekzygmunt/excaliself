@@ -14,6 +14,7 @@ import {
   users,
   verifications,
 } from "@/db/schema"
+import { adminMiddleware } from "@/middleware/admin"
 
 export const getUserCount = createServerFn({ method: "GET" }).handler(
   async () => {
@@ -21,30 +22,6 @@ export const getUserCount = createServerFn({ method: "GET" }).handler(
     return result[0].count
   },
 )
-
-export const getUserById = createServerFn({ method: "GET" })
-  .inputValidator(z.string())
-  .handler(async ({ data: id }) => {
-    const result = await db.select().from(users).where(eq(users.id, id))
-    return result[0] || null
-  })
-
-export const getAllUsers = createServerFn({ method: "GET" }).handler(
-  async () => {
-    return db.select().from(users)
-  },
-)
-
-export const updateUserRole = createServerFn({ method: "POST" })
-  .inputValidator(
-    z.object({ userId: z.string(), role: z.enum(["admin", "user"]) }),
-  )
-  .handler(async ({ data: { userId, role } }) => {
-    await db
-      .update(users)
-      .set({ role, updatedAt: new Date() })
-      .where(eq(users.id, userId))
-  })
 
 export const createFirstAdmin = createServerFn({ method: "POST" })
   .inputValidator(z.object({ userId: z.string(), name: z.string().nullable() }))
@@ -55,7 +32,15 @@ export const createFirstAdmin = createServerFn({ method: "POST" })
       .where(eq(users.id, userId))
   })
 
+// ADMIN
+export const getAllUsers = createServerFn({ method: "GET" })
+  .middleware([adminMiddleware])
+  .handler(async () => {
+    return db.select().from(users)
+  })
+
 export const deleteUser = createServerFn({ method: "POST" })
+  .middleware([adminMiddleware])
   .inputValidator(z.string())
   .handler(async ({ data: userId }) => {
     try {
