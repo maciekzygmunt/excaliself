@@ -32,7 +32,7 @@ import {
   SidebarMenuItem,
   SidebarSeparator,
 } from "@/components/ui/sidebar"
-import { signOut } from "@/lib/auth-client"
+import { authClient } from "@/lib/auth-client"
 import { cn } from "@/lib/utils"
 import { CreateRow, DrawingItem, FolderItem } from "./FileTreeItem"
 import {
@@ -200,7 +200,7 @@ export function DrawSidebar({
                   )}
                   <DropdownMenuItem
                     onClick={async () => {
-                      await signOut()
+                      await authClient.signOut()
                       window.location.href = "/login"
                     }}
                   >

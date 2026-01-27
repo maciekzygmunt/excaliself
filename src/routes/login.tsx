@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { signIn } from "@/lib/auth-client"
+import { authClient } from "@/lib/auth-client"
 import { setupMiddleware } from "@/middleware/setup"
 
 export const Route = createFileRoute("/login")({
@@ -33,7 +33,7 @@ function LoginPage() {
     setLoading(true)
 
     try {
-      const result = await signIn.email({
+      const result = await authClient.signIn.email({
         email,
         password,
       })

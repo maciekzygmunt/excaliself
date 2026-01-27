@@ -52,9 +52,9 @@ CREATE TABLE `folders` (
 --> statement-breakpoint
 CREATE TABLE `invites` (
 	`id` text PRIMARY KEY NOT NULL,
-	`email` text NOT NULL,
 	`token` text NOT NULL,
 	`invitedBy` text NOT NULL,
+	`usedBy` text,
 	`usedAt` integer,
 	`expiresAt` integer NOT NULL,
 	`createdAt` integer NOT NULL,

@@ -4,14 +4,15 @@ import { randomUUID } from "node:crypto"
 import { createServerFn } from "@tanstack/react-start"
 import { and, asc, eq } from "drizzle-orm"
 import { z } from "zod"
-import { folders } from "@/lib/db/schema"
+import { db } from "@/db"
+import { folders } from "@/db/schema"
 import { authMiddleware } from "@/middleware/auth"
 
 export const getFolders = createServerFn({ method: "GET" })
   .middleware([authMiddleware])
   .handler(async ({ context }) => {
     const userId = context.session.user.id
-    return context.db
+    return db
       .select()
       .from(folders)
       .where(eq(folders.ownerId, userId))
@@ -31,7 +32,7 @@ export const createFolder = createServerFn({ method: "POST" })
     const id = randomUUID()
     const now = new Date()
 
-    await context.db.insert(folders).values({
+    await db.insert(folders).values({
       id,
       name: data.name,
       ownerId: userId,
@@ -68,7 +69,7 @@ export const updateFolder = createServerFn({ method: "POST" })
       }).filter(([, value]) => value !== undefined),
     )
 
-    await context.db
+    await db
       .update(folders)
       .set({ ...cleanedUpdateData, updatedAt: new Date() })
       .where(and(eq(folders.id, data.id), eq(folders.ownerId, userId)))
@@ -79,7 +80,7 @@ export const deleteFolder = createServerFn({ method: "POST" })
   .inputValidator(z.string())
   .handler(async ({ data: folderId, context }) => {
     const userId = context.session.user.id
-    await context.db
+    await db
       .delete(folders)
       .where(and(eq(folders.id, folderId), eq(folders.ownerId, userId)))
   })

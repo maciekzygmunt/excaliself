@@ -4,14 +4,15 @@ import { randomUUID } from "node:crypto"
 import { createServerFn } from "@tanstack/react-start"
 import { and, desc, eq } from "drizzle-orm"
 import { z } from "zod"
-import { drawingFiles, drawings } from "@/lib/db/schema"
+import { db } from "@/db"
+import { drawingFiles, drawings } from "@/db/schema"
 import { authMiddleware } from "@/middleware/auth"
 
 export const getDrawings = createServerFn({ method: "GET" })
   .middleware([authMiddleware])
   .handler(async ({ context }) => {
     const userId = context.session.user.id
-    return context.db
+    return db
       .select()
       .from(drawings)
       .where(eq(drawings.ownerId, userId))
@@ -24,14 +25,14 @@ export const getDrawingWithFiles = createServerFn({ method: "GET" })
   .handler(async ({ data, context }) => {
     const id = data
     const userId = context.session.user.id
-    const result = await context.db
+    const result = await db
       .select()
       .from(drawings)
       .where(and(eq(drawings.id, id), eq(drawings.ownerId, userId)))
     const drawing = result[0]
     if (!drawing) return null
 
-    const files = await context.db
+    const files = await db
       .select()
       .from(drawingFiles)
       .where(eq(drawingFiles.drawingId, id))
@@ -53,7 +54,7 @@ export const createDrawing = createServerFn({ method: "POST" })
     const now = new Date()
     const name = data.name ?? "Untitled"
 
-    await context.db.insert(drawings).values({
+    await db.insert(drawings).values({
       id,
       name,
       data: JSON.stringify({ elements: [], appState: {} }),
@@ -85,7 +86,7 @@ export const updateDrawing = createServerFn({ method: "POST" })
     const cleanedUpdateData = Object.fromEntries(
       Object.entries(updateData).filter(([, value]) => value !== undefined),
     )
-    await context.db
+    await db
       .update(drawings)
       .set({ ...cleanedUpdateData, updatedAt: new Date() })
       .where(and(eq(drawings.id, id), eq(drawings.ownerId, userId)))
@@ -97,7 +98,7 @@ export const deleteDrawing = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const id = data
     const userId = context.session.user.id
-    await context.db
+    await db
       .delete(drawings)
       .where(and(eq(drawings.id, id), eq(drawings.ownerId, userId)))
   })
@@ -115,13 +116,11 @@ export const updateDrawingFiles = createServerFn({ method: "POST" })
       ),
     }),
   )
-  .handler(async ({ data: { drawingId, files }, context }) => {
-    await context.db
-      .delete(drawingFiles)
-      .where(eq(drawingFiles.drawingId, drawingId))
+  .handler(async ({ data: { drawingId, files } }) => {
+    await db.delete(drawingFiles).where(eq(drawingFiles.drawingId, drawingId))
 
     if (files.length > 0) {
-      await context.db.insert(drawingFiles).values(
+      await db.insert(drawingFiles).values(
         files.map((file) => ({
           id: randomUUID(),
           drawingId,

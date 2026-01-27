@@ -18,7 +18,13 @@
     "enabled": true,
     "rules": {
       "recommended": true,
-      "a11y": "off"
+      "a11y": "off",
+      "correctness": {
+        "noUnusedImports": {
+          "level": "error",
+          "fix": "safe"
+        }
+      }
     }
   },
   "javascript": {
