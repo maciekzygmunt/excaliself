@@ -1,5 +1,5 @@
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { createFileRoute, Link } from "@tanstack/react-router"
-import { createServerFn } from "@tanstack/react-start"
 import {
   ArrowLeft,
   Check,
@@ -33,66 +33,59 @@ import { setupMiddleware } from "@/middleware/setup"
 import { createInvite, deleteInvite, getPendingInvites } from "@/server/invites"
 import { deleteUser, getAllUsers } from "@/server/users"
 
-const fetchAdminData = createServerFn({ method: "GET" }).handler(async () => {
-  const [users, invites] = await Promise.all([
-    getAllUsers(),
-    getPendingInvites(),
-  ])
-  return { users, invites }
-})
-
-// TODO: to be refactored
 export const Route = createFileRoute("/admin/")({
   server: {
     middleware: [setupMiddleware],
   },
-  loader: async () => {
-    return await fetchAdminData()
+  loader: async ({ context }) => {
+    await Promise.all([
+      context.queryClient.ensureQueryData({
+        queryKey: ["admin", "invites"],
+        queryFn: getPendingInvites,
+      }),
+      context.queryClient.ensureQueryData({
+        queryKey: ["admin", "users"],
+        queryFn: getAllUsers,
+      }),
+    ])
   },
   component: AdminPage,
 })
 
 function AdminPage() {
-  const { users, invites } = Route.useLoaderData()
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState("")
+  const { data: invites } = useQuery({
+    queryKey: ["admin", "invites"],
+    queryFn: getPendingInvites,
+  })
+  const { data: users } = useQuery({
+    queryKey: ["admin", "users"],
+    queryFn: getAllUsers,
+  })
+  const {
+    mutate: createInviteMutation,
+    isPending: isCreatingInvite,
+    error: createInviteError,
+  } = useMutation({
+    mutationFn: () => createInvite(),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "invites"] })
+      copyInviteLink(data.token)
+    },
+  })
+  const { mutate: deleteInviteMutation } = useMutation({
+    mutationFn: deleteInvite,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "invites"] })
+    },
+  })
+  const { mutate: deleteUserMutation } = useMutation({
+    mutationFn: deleteUser,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "users"] })
+    },
+  })
   const [copiedToken, setCopiedToken] = useState<string | null>(null)
-  const [localInvites, setLocalInvites] = useState(invites)
-  const [localUsers, setLocalUsers] = useState(users)
-
-  const handleCreateInvite = async () => {
-    setLoading(true)
-    setError("")
-
-    try {
-      const result = await createInvite()
-      const newInvite = {
-        id: result.id,
-        token: result.token,
-        invitedBy: "",
-        usedBy: null,
-        usedAt: null,
-        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-        createdAt: new Date(),
-      }
-      setLocalInvites([...localInvites, newInvite])
-      copyInviteLink(result.token)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create invite")
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleDeleteInvite = async (id: string) => {
-    await deleteInvite({ data: id })
-    setLocalInvites(localInvites.filter((i) => i.id !== id))
-  }
-
-  const handleDeleteUser = async (id: string) => {
-    await deleteUser({ data: id })
-    setLocalUsers(localUsers.filter((u) => u.id !== id))
-  }
+  const queryClient = useQueryClient()
 
   const copyInviteLink = (token: string) => {
     const link = `${window.location.origin}/invite?token=${token}`
@@ -122,13 +115,13 @@ function AdminPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Users className="h-5 w-5" />
-                Users ({localUsers.length})
+                Users ({users?.length})
               </CardTitle>
               <CardDescription>Manage registered users</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-2">
-                {localUsers.map((user) => (
+                {users?.map((user) => (
                   <div
                     key={user.id}
                     className="flex items-center justify-between rounded-lg border p-3"
@@ -170,7 +163,9 @@ function AdminPage() {
                               <AlertDialogCancel>Cancel</AlertDialogCancel>
                               <AlertDialogAction
                                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                onClick={() => handleDeleteUser(user.id)}
+                                onClick={() =>
+                                  deleteUserMutation({ data: user.id })
+                                }
                               >
                                 Delete
                               </AlertDialogAction>
@@ -197,16 +192,23 @@ function AdminPage() {
             </CardHeader>
             <CardContent>
               <div className="mb-4">
-                <Button onClick={handleCreateInvite} disabled={loading}>
+                <Button
+                  onClick={() => {
+                    createInviteMutation()
+                  }}
+                  disabled={isCreatingInvite}
+                >
                   <Plus className="mr-2 h-4 w-4" />
-                  {loading ? "Generating..." : "Generate Invite Link"}
+                  {isCreatingInvite ? "Generating..." : "Generate Invite Link"}
                 </Button>
               </div>
-              {error && (
-                <p className="mb-4 text-sm text-destructive">{error}</p>
+              {createInviteError?.message && (
+                <p className="mb-4 text-sm text-destructive">
+                  {createInviteError?.message}
+                </p>
               )}
               <div className="space-y-2">
-                {localInvites.map((invite) => (
+                {invites?.map((invite) => (
                   <div
                     key={invite.id}
                     className="flex items-center justify-between rounded-lg border p-3"
@@ -235,14 +237,16 @@ function AdminPage() {
                       <Button
                         variant="destructive"
                         size="icon"
-                        onClick={() => handleDeleteInvite(invite.id)}
+                        onClick={() =>
+                          deleteInviteMutation({ data: invite.id })
+                        }
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
                   </div>
                 ))}
-                {localInvites.length === 0 && (
+                {invites && invites.length === 0 && (
                   <p className="text-center text-sm text-muted-foreground py-4">
                     No pending invite links
                   </p>
