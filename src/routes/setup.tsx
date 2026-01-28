@@ -32,7 +32,7 @@ export const Route = createFileRoute("/setup")({
 const formSchema = z
   .object({
     name: z.string(),
-    email: z.string().email(),
+    email: z.email(),
     password: z.string().min(8),
     confirmPassword: z.string().min(8),
   })
@@ -59,12 +59,11 @@ function SetupPage() {
       onSubmit: formSchema,
     },
     onSubmit: async ({ value }) => {
-      console.log(value)
       setupAdminMutation({ data: value })
     },
   })
 
-  const { mutate: setupAdminMutation, isPending } = useMutation({
+  const { mutate: setupAdminMutation } = useMutation({
     mutationFn: setupAdmin,
     onSuccess: () => {
       navigate({ to: "/login" })
@@ -198,9 +197,18 @@ function SetupPage() {
                 }}
               />
             </FieldGroup>
-            <Button type="submit" className="w-full" disabled={isPending}>
-              {isPending ? "Creating..." : "Create Admin & Start"}
-            </Button>
+            <form.Subscribe
+              selector={(formState) => [
+                formState.canSubmit,
+                formState.isSubmitting,
+              ]}
+            >
+              {([canSubmit, isSubmitting]) => (
+                <Button type="submit" className="w-full" disabled={!canSubmit}>
+                  {isSubmitting ? "Creating..." : "Create Admin & Start"}
+                </Button>
+              )}
+            </form.Subscribe>
           </form>
         </CardContent>
       </Card>

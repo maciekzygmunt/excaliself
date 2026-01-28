@@ -1,5 +1,7 @@
+import { useForm } from "@tanstack/react-form"
 import { createFileRoute, useNavigate } from "@tanstack/react-router"
-import { useState } from "react"
+import { toast } from "sonner"
+import { z } from "zod"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -8,8 +10,13 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import {
+  Field,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+} from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { authClient } from "@/lib/auth-client"
 import { setupMiddleware } from "@/middleware/setup"
 
@@ -20,35 +27,30 @@ export const Route = createFileRoute("/login")({
   component: LoginPage,
 })
 
+const formSchema = z.object({
+  email: z.email(),
+  password: z.string(),
+})
+
 function LoginPage() {
   const navigate = useNavigate()
-  const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
-  const [error, setError] = useState("")
-  const [loading, setLoading] = useState(false)
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError("")
-    setLoading(true)
-
-    try {
-      const result = await authClient.signIn.email({
-        email,
-        password,
-      })
-
+  const form = useForm({
+    defaultValues: {
+      email: "",
+      password: "",
+    },
+    validators: {
+      onSubmit: formSchema,
+    },
+    onSubmit: async ({ value }) => {
+      const result = await authClient.signIn.email(value)
       if (result.error) {
-        setError(result.error.message || "Login failed")
+        toast.error(result.error.message)
       } else {
         navigate({ to: "/" })
       }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Login failed")
-    } finally {
-      setLoading(false)
-    }
-  }
+    },
+  })
 
   return (
     <div className="flex min-h-screen items-center justify-center p-4">
@@ -58,33 +60,81 @@ function LoginPage() {
           <CardDescription>Sign in to your Excalidraw account</CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@example.com"
-                required
+          <form
+            onSubmit={(e) => {
+              e.preventDefault()
+              form.handleSubmit()
+            }}
+            className="space-y-4"
+          >
+            <FieldGroup>
+              <form.Field
+                name="email"
+                children={(field) => {
+                  const isInvalid =
+                    field.state.meta.isTouched && !field.state.meta.isValid
+                  return (
+                    <Field data-invalid={isInvalid}>
+                      <FieldLabel htmlFor={field.name}>Email</FieldLabel>
+                      <Input
+                        id={field.name}
+                        name={field.name}
+                        value={field.state.value}
+                        onBlur={field.handleBlur}
+                        onChange={(e) => field.handleChange(e.target.value)}
+                        aria-invalid={isInvalid}
+                        placeholder="you@example.com"
+                        autoComplete="email"
+                        type="email"
+                        required
+                      />
+                      {isInvalid && (
+                        <FieldError errors={field.state.meta.errors} />
+                      )}
+                    </Field>
+                  )
+                }}
               />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••••"
-                required
+              <form.Field
+                name="password"
+                children={(field) => {
+                  const isInvalid =
+                    field.state.meta.isTouched && !field.state.meta.isValid
+                  return (
+                    <Field data-invalid={isInvalid}>
+                      <FieldLabel htmlFor={field.name}>Password</FieldLabel>
+                      <Input
+                        id={field.name}
+                        name={field.name}
+                        value={field.state.value}
+                        onBlur={field.handleBlur}
+                        onChange={(e) => field.handleChange(e.target.value)}
+                        aria-invalid={isInvalid}
+                        placeholder="••••••••••"
+                        autoComplete="password"
+                        type="password"
+                        required
+                      />
+                      {isInvalid && (
+                        <FieldError errors={field.state.meta.errors} />
+                      )}
+                    </Field>
+                  )
+                }}
               />
-            </div>
-            {error && <p className="text-sm text-destructive">{error}</p>}
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Signing in..." : "Sign In"}
-            </Button>
+            </FieldGroup>
+            <form.Subscribe
+              selector={(formState) => [
+                formState.canSubmit,
+                formState.isSubmitting,
+              ]}
+            >
+              {([canSubmit, isSubmitting]) => (
+                <Button type="submit" className="w-full" disabled={!canSubmit}>
+                  {isSubmitting ? "Signing in..." : "Sign In"}
+                </Button>
+              )}
+            </form.Subscribe>
           </form>
         </CardContent>
       </Card>

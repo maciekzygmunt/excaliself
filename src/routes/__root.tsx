@@ -7,6 +7,7 @@ import {
   Scripts,
 } from "@tanstack/react-router"
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools"
+import { Toaster } from "@/components/ui/sonner"
 import appCss from "../styles.css?url"
 
 interface MyRouterContext {
@@ -47,6 +48,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
       </head>
       <body className="min-h-screen bg-background font-sans antialiased">
         {children}
+        <Toaster />
         <TanStackDevtools
           config={{
             position: "bottom-right",
