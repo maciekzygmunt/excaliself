@@ -33,16 +33,14 @@ export const Route = createFileRoute("/draw")({
 
 function DrawLayout() {
   const { drawings, folders, session } = Route.useLoaderData()
-  const params = Route.useParams() as { id?: string }
 
   return (
     <SidebarProvider defaultOpen>
       <DrawLayoutShell
         drawings={drawings}
         folders={folders}
-        currentDrawingId={params.id ?? ""}
-        userEmail={session?.user.email ?? ""}
-        isAdmin={session?.user.role === "admin"}
+        userEmail={session.user?.email ?? ""}
+        isAdmin={session.user.role === "admin"}
       />
     </SidebarProvider>
   )
@@ -51,13 +49,11 @@ function DrawLayout() {
 function DrawLayoutShell({
   drawings,
   folders,
-  currentDrawingId,
   userEmail,
   isAdmin,
 }: {
   drawings: Awaited<ReturnType<typeof getDrawings>>
   folders: Awaited<ReturnType<typeof getFolders>>
-  currentDrawingId: string
   userEmail: string
   isAdmin: boolean
 }) {
@@ -73,7 +69,6 @@ function DrawLayoutShell({
       <DrawSidebar
         drawings={drawings}
         folders={folders}
-        currentDrawingId={currentDrawingId}
         userEmail={userEmail}
         isAdmin={isAdmin}
       />
