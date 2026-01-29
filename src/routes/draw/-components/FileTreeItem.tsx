@@ -29,8 +29,8 @@ import {
   SidebarMenuSub,
 } from "@/components/ui/sidebar"
 import { cn } from "@/lib/utils"
-import { createDrawing } from "@/server/drawings"
-import { createFolder } from "@/server/folders"
+import { createDrawing, updateDrawing } from "@/server/drawings"
+import { createFolder, updateFolder } from "@/server/folders"
 import {
   type Drawing,
   type DropTarget,
@@ -53,8 +53,15 @@ export function FolderItem({ folder, children: childNodes }: FolderItemProps) {
     onDragLeave,
     onDrop,
     onDeleteFolder,
-    onRename,
   } = useSidebarContext()
+
+  const queryClient = useQueryClient()
+  const renameMutation = useMutation({
+    mutationFn: updateFolder,
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["folders"] })
+    },
+  })
 
   const [isExpanded, setIsExpanded] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
@@ -71,7 +78,9 @@ export function FolderItem({ folder, children: childNodes }: FolderItemProps) {
 
   const handleRenameSubmit = () => {
     if (renameValue.trim() && renameValue !== folder.name) {
-      onRename({ type: "folder", id: folder.id }, renameValue)
+      renameMutation.mutate({
+        data: { id: folder.id, name: renameValue.trim() },
+      })
     }
     setIsRenaming(false)
   }
@@ -227,8 +236,15 @@ type DrawingItemProps = {
 
 export function DrawingItem({ drawing }: DrawingItemProps) {
   const { id: currentDrawingId } = useParams({ from: "/draw/$id" })
-  const { onDragStart, onDragEnd, onDeleteDrawing, onRename } =
-    useSidebarContext()
+  const { onDragStart, onDragEnd, onDeleteDrawing } = useSidebarContext()
+
+  const queryClient = useQueryClient()
+  const renameMutation = useMutation({
+    mutationFn: updateDrawing,
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["drawings"] })
+    },
+  })
 
   const [isDragging, setIsDragging] = useState(false)
   const [isRenaming, setIsRenaming] = useState(false)
@@ -240,7 +256,9 @@ export function DrawingItem({ drawing }: DrawingItemProps) {
 
   const handleRenameSubmit = () => {
     if (renameValue.trim() && renameValue !== drawing.name) {
-      onRename({ type: "drawing", id: drawing.id }, renameValue)
+      renameMutation.mutate({
+        data: { id: drawing.id, updateData: { name: renameValue.trim() } },
+      })
     }
     setIsRenaming(false)
   }

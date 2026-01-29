@@ -1,8 +1,6 @@
-import { createFileRoute,redirect } from '@tanstack/react-router'
-import { setupMiddleware } from '@/middleware/setup';
-import { createDrawing,
-getDrawings } from '@/server/drawings';
-
+import { createFileRoute, redirect } from "@tanstack/react-router"
+import { setupMiddleware } from "@/middleware/setup"
+import { createDrawing, getDrawings } from "@/server/drawings"
 
 export const Route = createFileRoute("/")({
   server: {

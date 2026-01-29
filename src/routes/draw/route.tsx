@@ -54,10 +54,7 @@ function DrawLayoutShell({
           <SidebarTrigger className="h-8 w-8 rounded-md border bg-background shadow-sm" />
         </div>
       )}
-      <DrawSidebar
-        userEmail={userEmail}
-        isAdmin={isAdmin}
-      />
+      <DrawSidebar userEmail={userEmail} isAdmin={isAdmin} />
       <SidebarInset className="overflow-clip">
         <Outlet />
       </SidebarInset>

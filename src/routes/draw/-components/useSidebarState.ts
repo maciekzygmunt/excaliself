@@ -75,50 +75,6 @@ export function useSidebarState() {
 
   // --- Mutations ---
 
-  const renameDrawingMutation = useMutation({
-    mutationFn: updateDrawing,
-    onMutate: async (variables) => {
-      await queryClient.cancelQueries({ queryKey: ["drawings"] })
-      const previous = queryClient.getQueryData<Drawing[]>(["drawings"])
-      queryClient.setQueryData<Drawing[]>(["drawings"], (old = []) =>
-        old.map((d) =>
-          d.id === variables.data.id
-            ? { ...d, name: variables.data.updateData.name ?? d.name }
-            : d,
-        ),
-      )
-      return { previous }
-    },
-    onError: (_err, _vars, context) => {
-      queryClient.setQueryData(["drawings"], context?.previous)
-    },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["drawings"] })
-    },
-  })
-
-  const renameFolderMutation = useMutation({
-    mutationFn: updateFolder,
-    onMutate: async (variables) => {
-      await queryClient.cancelQueries({ queryKey: ["folders"] })
-      const previous = queryClient.getQueryData<FolderType[]>(["folders"])
-      queryClient.setQueryData<FolderType[]>(["folders"], (old = []) =>
-        old.map((f) =>
-          f.id === variables.data.id
-            ? { ...f, name: variables.data.name ?? f.name }
-            : f,
-        ),
-      )
-      return { previous }
-    },
-    onError: (_err, _vars, context) => {
-      queryClient.setQueryData(["folders"], context?.previous)
-    },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["folders"] })
-    },
-  })
-
   const moveDrawingMutation = useMutation({
     mutationFn: updateDrawing,
     onMutate: async (variables) => {
@@ -165,22 +121,6 @@ export function useSidebarState() {
       queryClient.invalidateQueries({ queryKey: ["folders"] })
     },
   })
-
-  // Rename
-  const onRename = async (item: DragItem, newName: string) => {
-    const trimmed = newName.trim()
-    if (!trimmed) return
-
-    if (item.type === "drawing") {
-      renameDrawingMutation.mutate({
-        data: { id: item.id, updateData: { name: trimmed } },
-      })
-    } else {
-      renameFolderMutation.mutate({
-        data: { id: item.id, name: trimmed },
-      })
-    }
-  }
 
   // Drag and drop helpers
   const isDescendant = (
@@ -273,8 +213,5 @@ export function useSidebarState() {
     onDragOver,
     onDragLeave,
     onDrop,
-
-    // Actions
-    onRename,
   }
 }

@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Link, useNavigate, useParams } from "@tanstack/react-router"
 import { File, Folder, LogOut, Plus, Settings } from "lucide-react"
-import { useMemo, useState } from "react"
+import { useCallback, useMemo, useState } from "react"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -105,37 +105,51 @@ export function DrawSidebar({ userEmail, isAdmin }: DrawSidebarProps) {
     },
   })
 
-  const onDeleteDrawing = (id: string) => {
-    setConfirmDialog({
-      title: "Delete drawing?",
-      description: "Are you sure you want to delete this drawing?",
-      onConfirm: async () => {
-        await deleteDrawingMutation.mutateAsync({ data: id })
+  const onDeleteDrawing = useCallback(
+    (id: string) => {
+      setConfirmDialog({
+        title: "Delete drawing?",
+        description: "Are you sure you want to delete this drawing?",
+        onConfirm: async () => {
+          await deleteDrawingMutation.mutateAsync({ data: id })
 
-        if (id === currentDrawingId) {
-          const remaining = drawings.filter((d) => d.id !== id)
-          if (remaining.length > 0) {
-            navigate({ to: "/draw/$id", params: { id: remaining[0].id } })
-          } else {
-            const newId = await createDrawingMutation.mutateAsync({ data: {} })
-            navigate({ to: "/draw/$id", params: { id: newId } })
+          if (id === currentDrawingId) {
+            const remaining = drawings.filter((d) => d.id !== id)
+            if (remaining.length > 0) {
+              navigate({ to: "/draw/$id", params: { id: remaining[0].id } })
+            } else {
+              const newId = await createDrawingMutation.mutateAsync({
+                data: {},
+              })
+              navigate({ to: "/draw/$id", params: { id: newId } })
+            }
           }
-        }
-      },
-    })
-  }
+        },
+      })
+    },
+    [
+      deleteDrawingMutation,
+      currentDrawingId,
+      drawings,
+      navigate,
+      createDrawingMutation,
+    ],
+  )
 
-  const onDeleteFolder = (id: string, hasChildren: boolean) => {
-    setConfirmDialog({
-      title: "Delete folder?",
-      description: hasChildren
-        ? "This folder contains items. Delete folder and move items to root?"
-        : "Delete this folder?",
-      onConfirm: async () => {
-        await deleteFolderMutation.mutateAsync({ data: id })
-      },
-    })
-  }
+  const onDeleteFolder = useCallback(
+    (id: string, hasChildren: boolean) => {
+      setConfirmDialog({
+        title: "Delete folder?",
+        description: hasChildren
+          ? "This folder contains items. Delete folder and move items to root?"
+          : "Delete this folder?",
+        onConfirm: async () => {
+          await deleteFolderMutation.mutateAsync({ data: id })
+        },
+      })
+    },
+    [deleteFolderMutation],
+  )
 
   const contextValue = useMemo(
     () => ({
@@ -148,10 +162,8 @@ export function DrawSidebar({ userEmail, isAdmin }: DrawSidebarProps) {
       onDrop: state.onDrop,
       onDeleteDrawing,
       onDeleteFolder,
-      onRename: state.onRename,
     }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [state],
+    [state, onDeleteDrawing, onDeleteFolder],
   )
 
   return (

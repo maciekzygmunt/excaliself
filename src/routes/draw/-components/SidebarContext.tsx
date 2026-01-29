@@ -39,7 +39,6 @@ export type SidebarContextValue = {
   // Actions
   onDeleteDrawing: (id: string) => void
   onDeleteFolder: (id: string, hasChildren: boolean) => void
-  onRename: (item: DragItem, newName: string) => void
 }
 
 const SidebarContext = createContext<SidebarContextValue | null>(null)
