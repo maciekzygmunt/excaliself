@@ -1,4 +1,5 @@
-import { Link, useParams } from "@tanstack/react-router"
+import { useMutation, useQueryClient } from "@tanstack/react-query"
+import { Link, useNavigate, useParams } from "@tanstack/react-router"
 import {
   ChevronRight,
   File,
@@ -28,6 +29,8 @@ import {
   SidebarMenuSub,
 } from "@/components/ui/sidebar"
 import { cn } from "@/lib/utils"
+import { createDrawing } from "@/server/drawings"
+import { createFolder } from "@/server/folders"
 import {
   type Drawing,
   type DropTarget,
@@ -44,7 +47,6 @@ type FolderItemProps = {
 export function FolderItem({ folder, children: childNodes }: FolderItemProps) {
   const {
     dropTarget,
-    dragItem,
     onDragStart,
     onDragEnd,
     onDragOver,
@@ -52,28 +54,20 @@ export function FolderItem({ folder, children: childNodes }: FolderItemProps) {
     onDrop,
     onDeleteFolder,
     onRename,
-    createDraft,
-    createName,
-    setCreateName,
-    createInputRef,
-    finalizeCreate,
-    cancelCreate,
   } = useSidebarContext()
 
   const [isExpanded, setIsExpanded] = useState(false)
+  const [isDragging, setIsDragging] = useState(false)
   const [isRenaming, setIsRenaming] = useState(false)
   const [renameValue, setRenameValue] = useState(folder.name)
   const renameInputRef = useRef<HTMLInputElement | null>(null)
   const pendingRenameFocus = useRef(false)
 
   const hasChildren = childNodes.length > 0
-  const isDropTarget =
+  const showDropHighlight =
     dropTarget?.type === "folder" &&
     dropTarget.id === folder.id &&
     dropTarget.position === "inside"
-  const showDropHighlight = isDropTarget && dragItem?.id !== folder.id
-  const isDragging = dragItem?.type === "folder" && dragItem.id === folder.id
-  const showCreateRow = createDraft?.parentId === folder.id
 
   const handleRenameSubmit = () => {
     if (renameValue.trim() && renameValue !== folder.name) {
@@ -81,13 +75,6 @@ export function FolderItem({ folder, children: childNodes }: FolderItemProps) {
     }
     setIsRenaming(false)
   }
-
-  // Auto-expand when creating inside this folder
-  useEffect(() => {
-    if (createDraft?.parentId === folder.id) {
-      setIsExpanded(true)
-    }
-  }, [createDraft, folder.id])
 
   useEffect(() => {
     if (!isRenaming) return
@@ -98,9 +85,33 @@ export function FolderItem({ folder, children: childNodes }: FolderItemProps) {
     return () => cancelAnimationFrame(frame)
   }, [isRenaming])
 
+  const handleDragStart = (e: DragEvent) => {
+    onDragStart({ type: "folder", id: folder.id })(e)
+    setIsDragging(true)
+  }
+
+  const handleDragEnd = () => {
+    onDragEnd()
+    setIsDragging(false)
+  }
+
   const handleDrop = (target: DropTarget) => (e: DragEvent) => {
     onDrop(target)(e)
     setIsExpanded(true)
+  }
+
+  const dropTargetProps = {
+    onDragOver: onDragOver({
+      type: "folder" as const,
+      id: folder.id,
+      position: "inside" as const,
+    }),
+    onDragLeave,
+    onDrop: handleDrop({
+      type: "folder",
+      id: folder.id,
+      position: "inside",
+    }),
   }
 
   return (
@@ -117,22 +128,12 @@ export function FolderItem({ folder, children: childNodes }: FolderItemProps) {
               "group/folder-row relative flex w-full rounded-md transition-colors",
               isDragging && "opacity-50",
             )}
-            onDragOver={onDragOver({
-              type: "folder",
-              id: folder.id,
-              position: "inside",
-            })}
-            onDragLeave={onDragLeave}
-            onDrop={handleDrop({
-              type: "folder",
-              id: folder.id,
-              position: "inside",
-            })}
+            {...dropTargetProps}
           >
             <SidebarMenuButton
               draggable
-              onDragStart={onDragStart({ type: "folder", id: folder.id })}
-              onDragEnd={onDragEnd}
+              onDragStart={handleDragStart}
+              onDragEnd={handleDragEnd}
               className="cursor-pointer active:cursor-grabbing"
             >
               <ChevronRight
@@ -195,7 +196,7 @@ export function FolderItem({ folder, children: childNodes }: FolderItemProps) {
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
-                  onClick={() => onDeleteFolder(folder.id)}
+                  onClick={() => onDeleteFolder(folder.id, hasChildren)}
                   className="text-destructive focus:text-destructive"
                 >
                   <Trash2 className="mr-2 h-4 w-4" />
@@ -206,30 +207,7 @@ export function FolderItem({ folder, children: childNodes }: FolderItemProps) {
           </div>
         </CollapsibleTrigger>
         <CollapsibleContent>
-          <SidebarMenuSub
-            className="mr-0 pr-0"
-            onDragOver={onDragOver({
-              type: "folder",
-              id: folder.id,
-              position: "inside",
-            })}
-            onDragLeave={onDragLeave}
-            onDrop={handleDrop({
-              type: "folder",
-              id: folder.id,
-              position: "inside",
-            })}
-          >
-            {showCreateRow && (
-              <CreateRow
-                type={createDraft.type}
-                name={createName}
-                onNameChange={setCreateName}
-                inputRef={createInputRef}
-                onSubmit={finalizeCreate}
-                onCancel={cancelCreate}
-              />
-            )}
+          <SidebarMenuSub className="mr-0 pr-0" {...dropTargetProps}>
             {childNodes.map((node) => (
               <TreeNodeItem
                 key={node.type === "folder" ? node.folder.id : node.drawing.id}
@@ -249,16 +227,16 @@ type DrawingItemProps = {
 
 export function DrawingItem({ drawing }: DrawingItemProps) {
   const { id: currentDrawingId } = useParams({ from: "/draw/$id" })
-  const { dragItem, onDragStart, onDragEnd, onDeleteDrawing, onRename } =
+  const { onDragStart, onDragEnd, onDeleteDrawing, onRename } =
     useSidebarContext()
 
+  const [isDragging, setIsDragging] = useState(false)
   const [isRenaming, setIsRenaming] = useState(false)
   const [renameValue, setRenameValue] = useState(drawing.name)
   const renameInputRef = useRef<HTMLInputElement | null>(null)
   const pendingRenameFocus = useRef(false)
 
   const isActive = drawing.id === currentDrawingId
-  const isDragging = dragItem?.type === "drawing" && dragItem.id === drawing.id
 
   const handleRenameSubmit = () => {
     if (renameValue.trim() && renameValue !== drawing.name) {
@@ -302,8 +280,14 @@ export function DrawingItem({ drawing }: DrawingItemProps) {
     <SidebarMenuItem
       className={cn("group/drawing-item", isDragging && "opacity-50")}
       draggable
-      onDragStart={onDragStart({ type: "drawing", id: drawing.id })}
-      onDragEnd={onDragEnd}
+      onDragStart={(e) => {
+        onDragStart({ type: "drawing", id: drawing.id })(e)
+        setIsDragging(true)
+      }}
+      onDragEnd={() => {
+        onDragEnd()
+        setIsDragging(false)
+      }}
     >
       <SidebarMenuButton
         asChild
@@ -359,21 +343,64 @@ export function DrawingItem({ drawing }: DrawingItemProps) {
 
 type CreateRowProps = {
   type: "drawing" | "folder"
-  name: string
-  onNameChange: (name: string) => void
-  inputRef: React.RefObject<HTMLInputElement | null>
-  onSubmit: () => void
-  onCancel: () => void
+  onClose: () => void
 }
 
-export function CreateRow({
-  type,
-  name,
-  onNameChange,
-  inputRef,
-  onSubmit,
-  onCancel,
-}: CreateRowProps) {
+export function CreateRow({ type, onClose }: CreateRowProps) {
+  const navigate = useNavigate()
+  const queryClient = useQueryClient()
+  const [name, setName] = useState(
+    type === "drawing" ? "Untitled" : "New folder",
+  )
+  const inputRef = useRef<HTMLInputElement | null>(null)
+  const submitted = useRef(false)
+
+  const createDrawingMutation = useMutation({
+    mutationFn: createDrawing,
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["drawings"] })
+    },
+  })
+
+  const createFolderMutation = useMutation({
+    mutationFn: createFolder,
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["folders"] })
+    },
+  })
+
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => {
+      inputRef.current?.focus()
+      inputRef.current?.select()
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [])
+
+  const handleSubmit = async () => {
+    if (submitted.current) return
+    submitted.current = true
+
+    const trimmed = name.trim()
+    if (!trimmed) {
+      onClose()
+      return
+    }
+
+    if (type === "drawing") {
+      const newId = await createDrawingMutation.mutateAsync({
+        data: { name: trimmed },
+      })
+      onClose()
+      navigate({ to: "/draw/$id", params: { id: newId } })
+    } else {
+      await createFolderMutation.mutateAsync({
+        data: { name: trimmed, parentId: null },
+      })
+      onClose()
+    }
+  }
+
   return (
     <SidebarMenuItem>
       <div className="flex items-center gap-2 px-2 py-1">
@@ -385,16 +412,16 @@ export function CreateRow({
         <Input
           ref={inputRef}
           value={name}
-          onChange={(e) => onNameChange(e.target.value)}
-          onBlur={onSubmit}
+          onChange={(e) => setName(e.target.value)}
+          onBlur={handleSubmit}
           onKeyDown={(e) => {
             if (e.key === "Enter") {
               e.preventDefault()
-              onSubmit()
+              handleSubmit()
             }
             if (e.key === "Escape") {
               e.preventDefault()
-              onCancel()
+              onClose()
             }
           }}
           className="h-6 flex-1 px-2 text-sm"

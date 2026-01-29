@@ -28,20 +28,6 @@ export type SidebarContextValue = {
 
   // UI state
   dropTarget: DropTarget
-  dragItem: DragItem | null
-
-  // Confirm dialog
-  confirmDialog: ConfirmDialog
-  closeConfirmDialog: () => void
-
-  // Create
-  createDraft: { type: "drawing" | "folder"; parentId: string | null } | null
-  createName: string
-  setCreateName: (name: string) => void
-  createInputRef: React.RefObject<HTMLInputElement | null>
-  finalizeCreate: () => void
-  cancelCreate: () => void
-  startCreate: (type: "drawing" | "folder", parentId?: string | null) => void
 
   // Drag & drop
   onDragStart: (item: DragItem) => (e: DragEvent) => void
@@ -52,7 +38,7 @@ export type SidebarContextValue = {
 
   // Actions
   onDeleteDrawing: (id: string) => void
-  onDeleteFolder: (id: string) => void
+  onDeleteFolder: (id: string, hasChildren: boolean) => void
   onRename: (item: DragItem, newName: string) => void
 }
 

@@ -1,6 +1,7 @@
-import { Link } from "@tanstack/react-router"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { Link, useNavigate, useParams } from "@tanstack/react-router"
 import { File, Folder, LogOut, Plus, Settings } from "lucide-react"
-import { useMemo, useRef } from "react"
+import { useMemo, useState } from "react"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -34,11 +35,11 @@ import {
 } from "@/components/ui/sidebar"
 import { authClient } from "@/lib/auth-client"
 import { cn } from "@/lib/utils"
+import { createDrawing, deleteDrawing, getDrawings } from "@/server/drawings"
+import { deleteFolder } from "@/server/folders"
 import { CreateRow, TreeNodeItem } from "./FileTreeItem"
-import {
-  SidebarContextProvider,
-  useSidebarContext,
-} from "./SidebarContext"
+import type { ConfirmDialog, Drawing, FolderType } from "./SidebarContext"
+import { SidebarContextProvider } from "./SidebarContext"
 import { useSidebarState } from "./useSidebarState"
 
 type DrawSidebarProps = {
@@ -46,14 +47,112 @@ type DrawSidebarProps = {
   isAdmin: boolean
 }
 
-export function DrawSidebar({
-  userEmail,
-  isAdmin,
-}: DrawSidebarProps) {
+export function DrawSidebar({ userEmail, isAdmin }: DrawSidebarProps) {
   const state = useSidebarState()
-  const pendingCreateFocus = useRef(false)
+  const navigate = useNavigate()
+  const queryClient = useQueryClient()
+  const { id: currentDrawingId } = useParams({ from: "/draw/$id" })
+  const { data: drawings = [] } = useQuery({
+    queryKey: ["drawings"],
+    queryFn: () => getDrawings(),
+  })
 
-  const contextValue = useMemo(() => state, [state])
+  const [createType, setCreateType] = useState<"drawing" | "folder" | null>(
+    null,
+  )
+  const [confirmDialog, setConfirmDialog] = useState<ConfirmDialog>(null)
+
+  const deleteDrawingMutation = useMutation({
+    mutationFn: deleteDrawing,
+    onMutate: async (variables) => {
+      await queryClient.cancelQueries({ queryKey: ["drawings"] })
+      const previous = queryClient.getQueryData<Drawing[]>(["drawings"])
+      queryClient.setQueryData<Drawing[]>(["drawings"], (old = []) =>
+        old.filter((d) => d.id !== variables.data),
+      )
+      return { previous }
+    },
+    onError: (_err, _vars, context) => {
+      queryClient.setQueryData(["drawings"], context?.previous)
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["drawings"] })
+    },
+  })
+
+  const createDrawingMutation = useMutation({
+    mutationFn: createDrawing,
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["drawings"] })
+    },
+  })
+
+  const deleteFolderMutation = useMutation({
+    mutationFn: deleteFolder,
+    onMutate: async (variables) => {
+      await queryClient.cancelQueries({ queryKey: ["folders"] })
+      const previous = queryClient.getQueryData<FolderType[]>(["folders"])
+      queryClient.setQueryData<FolderType[]>(["folders"], (old = []) =>
+        old.filter((f) => f.id !== variables.data),
+      )
+      return { previous }
+    },
+    onError: (_err, _vars, context) => {
+      queryClient.setQueryData(["folders"], context?.previous)
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["folders"] })
+    },
+  })
+
+  const onDeleteDrawing = (id: string) => {
+    setConfirmDialog({
+      title: "Delete drawing?",
+      description: "Are you sure you want to delete this drawing?",
+      onConfirm: async () => {
+        await deleteDrawingMutation.mutateAsync({ data: id })
+
+        if (id === currentDrawingId) {
+          const remaining = drawings.filter((d) => d.id !== id)
+          if (remaining.length > 0) {
+            navigate({ to: "/draw/$id", params: { id: remaining[0].id } })
+          } else {
+            const newId = await createDrawingMutation.mutateAsync({ data: {} })
+            navigate({ to: "/draw/$id", params: { id: newId } })
+          }
+        }
+      },
+    })
+  }
+
+  const onDeleteFolder = (id: string, hasChildren: boolean) => {
+    setConfirmDialog({
+      title: "Delete folder?",
+      description: hasChildren
+        ? "This folder contains items. Delete folder and move items to root?"
+        : "Delete this folder?",
+      onConfirm: async () => {
+        await deleteFolderMutation.mutateAsync({ data: id })
+      },
+    })
+  }
+
+  const contextValue = useMemo(
+    () => ({
+      tree: state.tree,
+      dropTarget: state.dropTarget,
+      onDragStart: state.onDragStart,
+      onDragEnd: state.onDragEnd,
+      onDragOver: state.onDragOver,
+      onDragLeave: state.onDragLeave,
+      onDrop: state.onDrop,
+      onDeleteDrawing,
+      onDeleteFolder,
+      onRename: state.onRename,
+    }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [state],
+  )
 
   return (
     <SidebarContextProvider value={contextValue}>
@@ -73,34 +172,12 @@ export function DrawSidebar({
                   </span>
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent
-                align="start"
-                className="w-48"
-                onCloseAutoFocus={(event) => {
-                  if (!pendingCreateFocus.current) return
-                  event.preventDefault()
-                  pendingCreateFocus.current = false
-                  requestAnimationFrame(() => {
-                    state.createInputRef.current?.focus()
-                    state.createInputRef.current?.select()
-                  })
-                }}
-              >
-                <DropdownMenuItem
-                  onClick={() => {
-                    pendingCreateFocus.current = true
-                    state.startCreate("drawing")
-                  }}
-                >
+              <DropdownMenuContent align="start" className="w-48">
+                <DropdownMenuItem onClick={() => setCreateType("drawing")}>
                   <File className="mr-2 h-4 w-4" />
                   New Drawing
                 </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => {
-                    pendingCreateFocus.current = true
-                    state.startCreate("folder")
-                  }}
-                >
+                <DropdownMenuItem onClick={() => setCreateType("folder")}>
                   <Folder className="mr-2 h-4 w-4" />
                   New Folder
                 </DropdownMenuItem>
@@ -125,14 +202,10 @@ export function DrawSidebar({
                 onDrop={state.onDrop({ type: "root" })}
               >
                 <SidebarMenu>
-                  {state.createDraft && state.createDraft.parentId === null && (
+                  {createType && (
                     <CreateRow
-                      type={state.createDraft.type}
-                      name={state.createName}
-                      onNameChange={state.setCreateName}
-                      inputRef={state.createInputRef}
-                      onSubmit={state.finalizeCreate}
-                      onCancel={state.cancelCreate}
+                      type={createType}
+                      onClose={() => setCreateType(null)}
                     />
                   )}
                   {state.tree.map((node) => (
@@ -205,17 +278,24 @@ export function DrawSidebar({
           </SidebarMenu>
         </SidebarFooter>
       </Sidebar>
-      <ConfirmDeleteDialog />
+      <ConfirmDeleteDialog
+        dialog={confirmDialog}
+        onClose={() => setConfirmDialog(null)}
+      />
     </SidebarContextProvider>
   )
 }
 
-function ConfirmDeleteDialog() {
-  const { confirmDialog, closeConfirmDialog } = useSidebarContext()
-
+function ConfirmDeleteDialog({
+  dialog,
+  onClose,
+}: {
+  dialog: ConfirmDialog
+  onClose: () => void
+}) {
   const handleConfirm = async () => {
-    const action = confirmDialog?.onConfirm
-    closeConfirmDialog()
+    const action = dialog?.onConfirm
+    onClose()
     if (action) {
       await action()
     }
@@ -223,17 +303,17 @@ function ConfirmDeleteDialog() {
 
   return (
     <AlertDialog
-      open={!!confirmDialog}
+      open={!!dialog}
       onOpenChange={(open) => {
-        if (!open) closeConfirmDialog()
+        if (!open) onClose()
       }}
     >
-      {confirmDialog && (
+      {dialog && (
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{confirmDialog.title}</AlertDialogTitle>
+            <AlertDialogTitle>{dialog.title}</AlertDialogTitle>
             <AlertDialogDescription>
-              {confirmDialog.description}
+              {dialog.description}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

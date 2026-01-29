@@ -1,21 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { useNavigate, useParams } from "@tanstack/react-router"
 import type { DragEvent } from "react"
-import { useEffect, useMemo, useRef, useState } from "react"
-import {
-  createDrawing,
-  deleteDrawing,
-  getDrawings,
-  updateDrawing,
-} from "@/server/drawings"
-import {
-  createFolder,
-  deleteFolder,
-  getFolders,
-  updateFolder,
-} from "@/server/folders"
+import { useMemo, useState } from "react"
+import { getDrawings, updateDrawing } from "@/server/drawings"
+import { getFolders, updateFolder } from "@/server/folders"
 import type {
-  ConfirmDialog,
   DragItem,
   Drawing,
   DropTarget,
@@ -24,9 +12,7 @@ import type {
 } from "./SidebarContext"
 
 export function useSidebarState() {
-  const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const { id: currentDrawingId } = useParams({ from: "/draw/$id" })
 
   // Data fetching
   const { data: drawings = [] } = useQuery({
@@ -41,15 +27,6 @@ export function useSidebarState() {
   // UI state
   const [dragItem, setDragItem] = useState<DragItem | null>(null)
   const [dropTarget, setDropTarget] = useState<DropTarget>(null)
-  const [confirmDialog, setConfirmDialog] = useState<ConfirmDialog>(null)
-
-  // Create state
-  const [createDraft, setCreateDraft] = useState<{
-    type: "drawing" | "folder"
-    parentId: string | null
-  } | null>(null)
-  const [createName, setCreateName] = useState("")
-  const createInputRef = useRef<HTMLInputElement | null>(null)
 
   // Derived data
   const folderById = useMemo(
@@ -97,97 +74,6 @@ export function useSidebarState() {
   }, [drawings, folders])
 
   // --- Mutations ---
-
-  const createDrawingMutation = useMutation({
-    mutationFn: createDrawing,
-    onMutate: async (variables) => {
-      await queryClient.cancelQueries({ queryKey: ["drawings"] })
-      const previous = queryClient.getQueryData<Drawing[]>(["drawings"])
-      queryClient.setQueryData<Drawing[]>(["drawings"], (old = []) => [
-        {
-          id: "optimistic-drawing",
-          name: variables.data.name ?? "Untitled",
-          data: "",
-          folderId: variables.data.folderId ?? null,
-          ownerId: "",
-          isPublic: false,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-          thumbnail: null,
-        } as Drawing,
-        ...old,
-      ])
-      return { previous }
-    },
-    onError: (_err, _vars, context) => {
-      queryClient.setQueryData(["drawings"], context?.previous)
-    },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["drawings"] })
-    },
-  })
-
-  const createFolderMutation = useMutation({
-    mutationFn: createFolder,
-    onMutate: async (variables) => {
-      await queryClient.cancelQueries({ queryKey: ["folders"] })
-      const previous = queryClient.getQueryData<FolderType[]>(["folders"])
-      queryClient.setQueryData<FolderType[]>(["folders"], (old = []) => [
-        ...old,
-        {
-          id: "optimistic-folder",
-          name: variables.data.name,
-          ownerId: "",
-          parentId: variables.data.parentId ?? null,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        } as FolderType,
-      ])
-      return { previous }
-    },
-    onError: (_err, _vars, context) => {
-      queryClient.setQueryData(["folders"], context?.previous)
-    },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["folders"] })
-    },
-  })
-
-  const deleteDrawingMutation = useMutation({
-    mutationFn: deleteDrawing,
-    onMutate: async (variables) => {
-      await queryClient.cancelQueries({ queryKey: ["drawings"] })
-      const previous = queryClient.getQueryData<Drawing[]>(["drawings"])
-      queryClient.setQueryData<Drawing[]>(["drawings"], (old = []) =>
-        old.filter((d) => d.id !== variables.data),
-      )
-      return { previous }
-    },
-    onError: (_err, _vars, context) => {
-      queryClient.setQueryData(["drawings"], context?.previous)
-    },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["drawings"] })
-    },
-  })
-
-  const deleteFolderMutation = useMutation({
-    mutationFn: deleteFolder,
-    onMutate: async (variables) => {
-      await queryClient.cancelQueries({ queryKey: ["folders"] })
-      const previous = queryClient.getQueryData<FolderType[]>(["folders"])
-      queryClient.setQueryData<FolderType[]>(["folders"], (old = []) =>
-        old.filter((f) => f.id !== variables.data),
-      )
-      return { previous }
-    },
-    onError: (_err, _vars, context) => {
-      queryClient.setQueryData(["folders"], context?.previous)
-    },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["folders"] })
-    },
-  })
 
   const renameDrawingMutation = useMutation({
     mutationFn: updateDrawing,
@@ -279,103 +165,6 @@ export function useSidebarState() {
       queryClient.invalidateQueries({ queryKey: ["folders"] })
     },
   })
-
-  // Create actions
-  const startCreate = (
-    type: "drawing" | "folder",
-    parentId?: string | null,
-  ) => {
-    setCreateDraft({ type, parentId: parentId ?? null })
-    setCreateName(type === "drawing" ? "Untitled" : "New folder")
-  }
-
-  const cancelCreate = () => {
-    setCreateDraft(null)
-    setCreateName("")
-  }
-
-  const finalizeCreate = async () => {
-    if (!createDraft) return
-    const name = createName.trim()
-    if (!name) {
-      cancelCreate()
-      return
-    }
-
-    if (createDraft.type === "drawing") {
-      const newId = await createDrawingMutation.mutateAsync({
-        data: { name, folderId: createDraft.parentId ?? undefined },
-      })
-      cancelCreate()
-      navigate({ to: "/draw/$id", params: { id: newId } })
-    } else {
-      await createFolderMutation.mutateAsync({
-        data: { name, parentId: createDraft.parentId },
-      })
-      cancelCreate()
-    }
-  }
-
-  useEffect(() => {
-    if (!createDraft) return
-    const frame = requestAnimationFrame(() => {
-      createInputRef.current?.focus()
-      createInputRef.current?.select()
-    })
-    return () => cancelAnimationFrame(frame)
-  }, [createDraft])
-
-  const closeConfirmDialog = () => setConfirmDialog(null)
-
-  const openConfirmDialog = (dialog: Exclude<ConfirmDialog, null>) => {
-    setConfirmDialog({
-      ...dialog,
-      onConfirm: async () => {
-        setConfirmDialog(null)
-        await dialog.onConfirm()
-      },
-    })
-  }
-
-  // Delete actions
-  const onDeleteDrawing = async (drawingId: string) => {
-    openConfirmDialog({
-      title: "Delete drawing?",
-      description: "Are you sure you want to delete this drawing?",
-      onConfirm: async () => {
-        await deleteDrawingMutation.mutateAsync({ data: drawingId })
-
-        if (drawingId === currentDrawingId) {
-          const remaining = drawings.filter((d) => d.id !== drawingId)
-          if (remaining.length > 0) {
-            navigate({ to: "/draw/$id", params: { id: remaining[0].id } })
-          } else {
-            const newId = await createDrawingMutation.mutateAsync({
-              data: {},
-            })
-            navigate({ to: "/draw/$id", params: { id: newId } })
-          }
-        }
-      },
-    })
-  }
-
-  const onDeleteFolder = async (folderId: string) => {
-    const folderNode = tree.folderNodes.get(folderId)
-    const hasItems = (folderNode?.children.length ?? 0) > 0
-
-    const message = hasItems
-      ? "This folder contains items. Delete folder and move items to root?"
-      : "Delete this folder?"
-
-    openConfirmDialog({
-      title: "Delete folder?",
-      description: message,
-      onConfirm: async () => {
-        await deleteFolderMutation.mutateAsync({ data: folderId })
-      },
-    })
-  }
 
   // Rename
   const onRename = async (item: DragItem, newName: string) => {
@@ -469,7 +258,6 @@ export function useSidebarState() {
         data: { id: dragItem.id, updateData: { folderId: targetFolderId } },
       })
     }
-
   }
 
   return {
@@ -478,18 +266,6 @@ export function useSidebarState() {
 
     // UI state
     dropTarget,
-    dragItem,
-    confirmDialog,
-    closeConfirmDialog,
-
-    // Create
-    createDraft,
-    createName,
-    setCreateName,
-    createInputRef,
-    startCreate,
-    cancelCreate,
-    finalizeCreate,
 
     // Drag & drop
     onDragStart,
@@ -499,8 +275,6 @@ export function useSidebarState() {
     onDrop,
 
     // Actions
-    onDeleteDrawing,
-    onDeleteFolder,
     onRename,
   }
 }
