@@ -23,7 +23,11 @@
         "noUnusedImports": {
           "level": "error",
           "fix": "safe"
-        }
+        },
+        "noChildrenProp": "off"
+      },
+      "suspicious": {
+        "noArrayIndexKey": "off"
       }
     }
   },

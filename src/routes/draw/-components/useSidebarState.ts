@@ -1,4 +1,4 @@
-import { useNavigate, useRouter } from "@tanstack/react-router"
+import { useNavigate, useParams, useRouter } from "@tanstack/react-router"
 import type { DragEvent } from "react"
 import { useEffect, useMemo, useRef, useState } from "react"
 import { createDrawing, deleteDrawing, updateDrawing } from "@/server/drawings"
@@ -14,16 +14,12 @@ import type {
 type UseSidebarStateProps = {
   drawings: Drawing[]
   folders: FolderType[]
-  currentDrawingId: string
 }
 
-export function useSidebarState({
-  drawings,
-  folders,
-  currentDrawingId,
-}: UseSidebarStateProps) {
+export function useSidebarState({ drawings, folders }: UseSidebarStateProps) {
   const navigate = useNavigate()
   const router = useRouter()
+  const { id: currentDrawingId } = useParams({ from: "/draw/$id" })
 
   // UI state
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(

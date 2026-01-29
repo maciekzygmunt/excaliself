@@ -46,7 +46,6 @@ import { useSidebarState } from "./useSidebarState"
 type DrawSidebarProps = {
   drawings: Drawing[]
   folders: FolderType[]
-  currentDrawingId: string
   userEmail: string
   isAdmin: boolean
 }
@@ -54,14 +53,12 @@ type DrawSidebarProps = {
 export function DrawSidebar({
   drawings,
   folders,
-  currentDrawingId,
   userEmail,
   isAdmin,
 }: DrawSidebarProps) {
   const state = useSidebarState({
     drawings,
     folders,
-    currentDrawingId,
   })
   const pendingCreateFocus = useRef(false)
 
