@@ -1,4 +1,4 @@
-import { Link } from "@tanstack/react-router"
+import { Link, useParams } from "@tanstack/react-router"
 import {
   ChevronRight,
   File,
@@ -7,7 +7,7 @@ import {
   Pencil,
   Trash2,
 } from "lucide-react"
-import { useEffect, useRef, useState } from "react"
+import { type DragEvent, useEffect, useRef, useState } from "react"
 import {
   Collapsible,
   CollapsibleContent,
@@ -30,22 +30,21 @@ import {
 import { cn } from "@/lib/utils"
 import {
   type Drawing,
+  type DropTarget,
   type FolderType,
+  type TreeNode,
   useSidebarContext,
 } from "./SidebarContext"
 
 type FolderItemProps = {
   folder: FolderType
+  children: TreeNode[]
 }
 
-export function FolderItem({ folder }: FolderItemProps) {
+export function FolderItem({ folder, children: childNodes }: FolderItemProps) {
   const {
-    expandedFolders,
     dropTarget,
     dragItem,
-    folderChildren,
-    drawingsByFolder,
-    toggleFolder,
     onDragStart,
     onDragEnd,
     onDragOver,
@@ -61,15 +60,13 @@ export function FolderItem({ folder }: FolderItemProps) {
     cancelCreate,
   } = useSidebarContext()
 
+  const [isExpanded, setIsExpanded] = useState(false)
   const [isRenaming, setIsRenaming] = useState(false)
   const [renameValue, setRenameValue] = useState(folder.name)
   const renameInputRef = useRef<HTMLInputElement | null>(null)
   const pendingRenameFocus = useRef(false)
 
-  const childFolders = folderChildren.get(folder.id) ?? []
-  const folderDrawings = drawingsByFolder.get(folder.id) ?? []
-  const isExpanded = expandedFolders.has(folder.id)
-  const hasChildren = childFolders.length > 0 || folderDrawings.length > 0
+  const hasChildren = childNodes.length > 0
   const isDropTarget =
     dropTarget?.type === "folder" &&
     dropTarget.id === folder.id &&
@@ -85,6 +82,13 @@ export function FolderItem({ folder }: FolderItemProps) {
     setIsRenaming(false)
   }
 
+  // Auto-expand when creating inside this folder
+  useEffect(() => {
+    if (createDraft?.parentId === folder.id) {
+      setIsExpanded(true)
+    }
+  }, [createDraft, folder.id])
+
   useEffect(() => {
     if (!isRenaming) return
     const frame = requestAnimationFrame(() => {
@@ -94,12 +98,13 @@ export function FolderItem({ folder }: FolderItemProps) {
     return () => cancelAnimationFrame(frame)
   }, [isRenaming])
 
+  const handleDrop = (target: DropTarget) => (e: DragEvent) => {
+    onDrop(target)(e)
+    setIsExpanded(true)
+  }
+
   return (
-    <Collapsible
-      open={isExpanded}
-      onOpenChange={() => toggleFolder(folder.id)}
-      asChild
-    >
+    <Collapsible open={isExpanded} onOpenChange={setIsExpanded} asChild>
       <SidebarMenuItem
         className={cn(
           "rounded-md transition-colors",
@@ -118,7 +123,7 @@ export function FolderItem({ folder }: FolderItemProps) {
               position: "inside",
             })}
             onDragLeave={onDragLeave}
-            onDrop={onDrop({
+            onDrop={handleDrop({
               type: "folder",
               id: folder.id,
               position: "inside",
@@ -209,7 +214,7 @@ export function FolderItem({ folder }: FolderItemProps) {
               position: "inside",
             })}
             onDragLeave={onDragLeave}
-            onDrop={onDrop({
+            onDrop={handleDrop({
               type: "folder",
               id: folder.id,
               position: "inside",
@@ -225,11 +230,11 @@ export function FolderItem({ folder }: FolderItemProps) {
                 onCancel={cancelCreate}
               />
             )}
-            {childFolders.map((child) => (
-              <FolderItem key={child.id} folder={child} />
-            ))}
-            {folderDrawings.map((drawing) => (
-              <DrawingItem key={drawing.id} drawing={drawing} isNested />
+            {childNodes.map((node) => (
+              <TreeNodeItem
+                key={node.type === "folder" ? node.folder.id : node.drawing.id}
+                node={node}
+              />
             ))}
           </SidebarMenuSub>
         </CollapsibleContent>
@@ -240,18 +245,12 @@ export function FolderItem({ folder }: FolderItemProps) {
 
 type DrawingItemProps = {
   drawing: Drawing
-  isNested?: boolean
 }
 
-export function DrawingItem({ drawing, isNested }: DrawingItemProps) {
-  const {
-    currentDrawingId,
-    dragItem,
-    onDragStart,
-    onDragEnd,
-    onDeleteDrawing,
-    onRename,
-  } = useSidebarContext()
+export function DrawingItem({ drawing }: DrawingItemProps) {
+  const { id: currentDrawingId } = useParams({ from: "/draw/$id" })
+  const { dragItem, onDragStart, onDragEnd, onDeleteDrawing, onRename } =
+    useSidebarContext()
 
   const [isRenaming, setIsRenaming] = useState(false)
   const [renameValue, setRenameValue] = useState(drawing.name)
@@ -298,66 +297,6 @@ export function DrawingItem({ drawing, isNested }: DrawingItemProps) {
       )}
     </>
   )
-
-  if (isNested) {
-    return (
-      <SidebarMenuItem
-        className={cn("group/drawing-item", isDragging && "opacity-50")}
-        draggable
-        onDragStart={onDragStart({ type: "drawing", id: drawing.id })}
-        onDragEnd={onDragEnd}
-      >
-        <SidebarMenuButton
-          asChild
-          isActive={isActive}
-          className="cursor-pointer active:cursor-grabbing"
-        >
-          <Link to="/draw/$id" params={{ id: drawing.id }} draggable={false}>
-            {ButtonContent}
-          </Link>
-        </SidebarMenuButton>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <SidebarMenuAction className="md:opacity-0 group-hover/drawing-item:opacity-100 group-focus-within/drawing-item:opacity-100 data-[state=open]:opacity-100 peer-data-[active=true]/menu-button:text-sidebar-accent-foreground">
-              <MoreHorizontal className="h-4 w-4" />
-            </SidebarMenuAction>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent
-            side="right"
-            align="start"
-            onCloseAutoFocus={(event) => {
-              if (!pendingRenameFocus.current) return
-              event.preventDefault()
-              pendingRenameFocus.current = false
-              requestAnimationFrame(() => {
-                renameInputRef.current?.focus()
-                renameInputRef.current?.select()
-              })
-            }}
-          >
-            <DropdownMenuItem
-              onClick={() => {
-                pendingRenameFocus.current = true
-                setRenameValue(drawing.name)
-                setIsRenaming(true)
-              }}
-            >
-              <Pencil className="mr-2 h-4 w-4" />
-              Rename
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onClick={() => onDeleteDrawing(drawing.id)}
-              className="text-destructive focus:text-destructive"
-            >
-              <Trash2 className="mr-2 h-4 w-4" />
-              Delete
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </SidebarMenuItem>
-    )
-  }
 
   return (
     <SidebarMenuItem
@@ -463,4 +402,11 @@ export function CreateRow({
       </div>
     </SidebarMenuItem>
   )
+}
+
+export function TreeNodeItem({ node }: { node: TreeNode }) {
+  if (node.type === "folder") {
+    return <FolderItem folder={node.folder} children={node.children} />
+  }
+  return <DrawingItem drawing={node.drawing} />
 }

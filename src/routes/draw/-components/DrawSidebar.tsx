@@ -34,32 +34,23 @@ import {
 } from "@/components/ui/sidebar"
 import { authClient } from "@/lib/auth-client"
 import { cn } from "@/lib/utils"
-import { CreateRow, DrawingItem, FolderItem } from "./FileTreeItem"
+import { CreateRow, TreeNodeItem } from "./FileTreeItem"
 import {
-  type Drawing,
-  type FolderType,
   SidebarContextProvider,
   useSidebarContext,
 } from "./SidebarContext"
 import { useSidebarState } from "./useSidebarState"
 
 type DrawSidebarProps = {
-  drawings: Drawing[]
-  folders: FolderType[]
   userEmail: string
   isAdmin: boolean
 }
 
 export function DrawSidebar({
-  drawings,
-  folders,
   userEmail,
   isAdmin,
 }: DrawSidebarProps) {
-  const state = useSidebarState({
-    drawings,
-    folders,
-  })
+  const state = useSidebarState()
   const pendingCreateFocus = useRef(false)
 
   const contextValue = useMemo(() => state, [state])
@@ -144,11 +135,15 @@ export function DrawSidebar({
                       onCancel={state.cancelCreate}
                     />
                   )}
-                  {state.rootFolders.map((folder) => (
-                    <FolderItem key={folder.id} folder={folder} />
-                  ))}
-                  {state.rootDrawings.map((drawing) => (
-                    <DrawingItem key={drawing.id} drawing={drawing} />
+                  {state.tree.map((node) => (
+                    <TreeNodeItem
+                      key={
+                        node.type === "folder"
+                          ? node.folder.id
+                          : node.drawing.id
+                      }
+                      node={node}
+                    />
                   ))}
                 </SidebarMenu>
               </div>

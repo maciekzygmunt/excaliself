@@ -8,8 +8,6 @@ import {
 } from "@/components/ui/sidebar"
 import { authMiddleware } from "@/middleware/auth"
 import { setupMiddleware } from "@/middleware/setup"
-import { getDrawings } from "@/server/drawings"
-import { getFolders } from "@/server/folders"
 import { DrawSidebar } from "./-components/DrawSidebar"
 
 const getSession = createServerFn({ method: "GET" })
@@ -21,24 +19,18 @@ export const Route = createFileRoute("/draw")({
     middleware: [setupMiddleware, authMiddleware],
   },
   loader: async () => {
-    const [drawings, folders, session] = await Promise.all([
-      getDrawings(),
-      getFolders(),
-      getSession(),
-    ])
-    return { drawings, folders, session }
+    const session = await getSession()
+    return { session }
   },
   component: DrawLayout,
 })
 
 function DrawLayout() {
-  const { drawings, folders, session } = Route.useLoaderData()
+  const { session } = Route.useLoaderData()
 
   return (
     <SidebarProvider defaultOpen>
       <DrawLayoutShell
-        drawings={drawings}
-        folders={folders}
         userEmail={session.user?.email ?? ""}
         isAdmin={session.user.role === "admin"}
       />
@@ -47,13 +39,9 @@ function DrawLayout() {
 }
 
 function DrawLayoutShell({
-  drawings,
-  folders,
   userEmail,
   isAdmin,
 }: {
-  drawings: Awaited<ReturnType<typeof getDrawings>>
-  folders: Awaited<ReturnType<typeof getFolders>>
   userEmail: string
   isAdmin: boolean
 }) {
@@ -67,8 +55,6 @@ function DrawLayoutShell({
         </div>
       )}
       <DrawSidebar
-        drawings={drawings}
-        folders={folders}
         userEmail={userEmail}
         isAdmin={isAdmin}
       />

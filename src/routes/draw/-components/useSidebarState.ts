@@ -1,30 +1,44 @@
-import { useNavigate, useParams, useRouter } from "@tanstack/react-router"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { useNavigate, useParams } from "@tanstack/react-router"
 import type { DragEvent } from "react"
 import { useEffect, useMemo, useRef, useState } from "react"
-import { createDrawing, deleteDrawing, updateDrawing } from "@/server/drawings"
-import { createFolder, deleteFolder, updateFolder } from "@/server/folders"
+import {
+  createDrawing,
+  deleteDrawing,
+  getDrawings,
+  updateDrawing,
+} from "@/server/drawings"
+import {
+  createFolder,
+  deleteFolder,
+  getFolders,
+  updateFolder,
+} from "@/server/folders"
 import type {
   ConfirmDialog,
   DragItem,
   Drawing,
   DropTarget,
   FolderType,
+  TreeNode,
 } from "./SidebarContext"
 
-type UseSidebarStateProps = {
-  drawings: Drawing[]
-  folders: FolderType[]
-}
-
-export function useSidebarState({ drawings, folders }: UseSidebarStateProps) {
+export function useSidebarState() {
   const navigate = useNavigate()
-  const router = useRouter()
+  const queryClient = useQueryClient()
   const { id: currentDrawingId } = useParams({ from: "/draw/$id" })
 
+  // Data fetching
+  const { data: drawings = [] } = useQuery({
+    queryKey: ["drawings"],
+    queryFn: () => getDrawings(),
+  })
+  const { data: folders = [] } = useQuery({
+    queryKey: ["folders"],
+    queryFn: () => getFolders(),
+  })
+
   // UI state
-  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(
-    () => new Set(),
-  )
   const [dragItem, setDragItem] = useState<DragItem | null>(null)
   const [dropTarget, setDropTarget] = useState<DropTarget>(null)
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialog>(null)
@@ -37,57 +51,234 @@ export function useSidebarState({ drawings, folders }: UseSidebarStateProps) {
   const [createName, setCreateName] = useState("")
   const createInputRef = useRef<HTMLInputElement | null>(null)
 
-  // Derived data - group items by parent
+  // Derived data
   const folderById = useMemo(
     () => new Map(folders.map((f) => [f.id, f])),
     [folders],
   )
 
-  const folderChildren = useMemo(() => {
-    const map = new Map<string | null, FolderType[]>()
-    for (const folder of folders) {
-      const pid = folder.parentId ?? null
-      const arr = map.get(pid) ?? []
-      if (!map.has(pid)) map.set(pid, arr)
-      arr.push(folder)
+  const tree = useMemo(() => {
+    const folderNodes = new Map<string, TreeNode & { type: "folder" }>()
+    for (const f of folders) {
+      folderNodes.set(f.id, { type: "folder", folder: f, children: [] })
     }
-    for (const arr of map.values()) {
-      arr.sort((a, b) => a.name.localeCompare(b.name))
-    }
-    return map
-  }, [folders])
 
-  const drawingsByFolder = useMemo(() => {
-    const map = new Map<string | null, Drawing[]>()
-    const folderIds = new Set(folders.map((f) => f.id))
+    const root: TreeNode[] = []
+
+    for (const f of folders) {
+      const node = folderNodes.get(f.id)
+      if (!node) continue
+      const parent = f.parentId ? folderNodes.get(f.parentId) : null
+      if (parent) parent.children.push(node)
+      else root.push(node)
+    }
+
     for (const d of drawings) {
-      const fid = d.folderId && folderIds.has(d.folderId) ? d.folderId : null
-      const arr = map.get(fid) ?? []
-      if (!map.has(fid)) map.set(fid, arr)
-      arr.push(d)
+      const node: TreeNode = { type: "drawing", drawing: d }
+      const parent = d.folderId ? folderNodes.get(d.folderId) : null
+      if (parent) parent.children.push(node)
+      else root.push(node)
     }
-    for (const arr of map.values()) {
-      arr.sort((a, b) => a.name.localeCompare(b.name))
+
+    const sortNodes = (nodes: TreeNode[]) => {
+      nodes.sort((a, b) => {
+        if (a.type !== b.type) return a.type === "folder" ? -1 : 1
+        const nameA = a.type === "folder" ? a.folder.name : a.drawing.name
+        const nameB = b.type === "folder" ? b.folder.name : b.drawing.name
+        return nameA.localeCompare(nameB)
+      })
+      for (const n of nodes) {
+        if (n.type === "folder") sortNodes(n.children)
+      }
     }
-    return map
+    sortNodes(root)
+
+    return { root, folderNodes }
   }, [drawings, folders])
 
-  // Folder expand/collapse
-  const toggleFolder = (folderId: string) => {
-    setExpandedFolders((prev) => {
-      const next = new Set(prev)
-      if (next.has(folderId)) {
-        next.delete(folderId)
-      } else {
-        next.add(folderId)
-      }
-      return next
-    })
-  }
+  // --- Mutations ---
 
-  const expandFolder = (folderId: string) => {
-    setExpandedFolders((prev) => new Set(prev).add(folderId))
-  }
+  const createDrawingMutation = useMutation({
+    mutationFn: createDrawing,
+    onMutate: async (variables) => {
+      await queryClient.cancelQueries({ queryKey: ["drawings"] })
+      const previous = queryClient.getQueryData<Drawing[]>(["drawings"])
+      queryClient.setQueryData<Drawing[]>(["drawings"], (old = []) => [
+        {
+          id: "optimistic-drawing",
+          name: variables.data.name ?? "Untitled",
+          data: "",
+          folderId: variables.data.folderId ?? null,
+          ownerId: "",
+          isPublic: false,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          thumbnail: null,
+        } as Drawing,
+        ...old,
+      ])
+      return { previous }
+    },
+    onError: (_err, _vars, context) => {
+      queryClient.setQueryData(["drawings"], context?.previous)
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["drawings"] })
+    },
+  })
+
+  const createFolderMutation = useMutation({
+    mutationFn: createFolder,
+    onMutate: async (variables) => {
+      await queryClient.cancelQueries({ queryKey: ["folders"] })
+      const previous = queryClient.getQueryData<FolderType[]>(["folders"])
+      queryClient.setQueryData<FolderType[]>(["folders"], (old = []) => [
+        ...old,
+        {
+          id: "optimistic-folder",
+          name: variables.data.name,
+          ownerId: "",
+          parentId: variables.data.parentId ?? null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        } as FolderType,
+      ])
+      return { previous }
+    },
+    onError: (_err, _vars, context) => {
+      queryClient.setQueryData(["folders"], context?.previous)
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["folders"] })
+    },
+  })
+
+  const deleteDrawingMutation = useMutation({
+    mutationFn: deleteDrawing,
+    onMutate: async (variables) => {
+      await queryClient.cancelQueries({ queryKey: ["drawings"] })
+      const previous = queryClient.getQueryData<Drawing[]>(["drawings"])
+      queryClient.setQueryData<Drawing[]>(["drawings"], (old = []) =>
+        old.filter((d) => d.id !== variables.data),
+      )
+      return { previous }
+    },
+    onError: (_err, _vars, context) => {
+      queryClient.setQueryData(["drawings"], context?.previous)
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["drawings"] })
+    },
+  })
+
+  const deleteFolderMutation = useMutation({
+    mutationFn: deleteFolder,
+    onMutate: async (variables) => {
+      await queryClient.cancelQueries({ queryKey: ["folders"] })
+      const previous = queryClient.getQueryData<FolderType[]>(["folders"])
+      queryClient.setQueryData<FolderType[]>(["folders"], (old = []) =>
+        old.filter((f) => f.id !== variables.data),
+      )
+      return { previous }
+    },
+    onError: (_err, _vars, context) => {
+      queryClient.setQueryData(["folders"], context?.previous)
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["folders"] })
+    },
+  })
+
+  const renameDrawingMutation = useMutation({
+    mutationFn: updateDrawing,
+    onMutate: async (variables) => {
+      await queryClient.cancelQueries({ queryKey: ["drawings"] })
+      const previous = queryClient.getQueryData<Drawing[]>(["drawings"])
+      queryClient.setQueryData<Drawing[]>(["drawings"], (old = []) =>
+        old.map((d) =>
+          d.id === variables.data.id
+            ? { ...d, name: variables.data.updateData.name ?? d.name }
+            : d,
+        ),
+      )
+      return { previous }
+    },
+    onError: (_err, _vars, context) => {
+      queryClient.setQueryData(["drawings"], context?.previous)
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["drawings"] })
+    },
+  })
+
+  const renameFolderMutation = useMutation({
+    mutationFn: updateFolder,
+    onMutate: async (variables) => {
+      await queryClient.cancelQueries({ queryKey: ["folders"] })
+      const previous = queryClient.getQueryData<FolderType[]>(["folders"])
+      queryClient.setQueryData<FolderType[]>(["folders"], (old = []) =>
+        old.map((f) =>
+          f.id === variables.data.id
+            ? { ...f, name: variables.data.name ?? f.name }
+            : f,
+        ),
+      )
+      return { previous }
+    },
+    onError: (_err, _vars, context) => {
+      queryClient.setQueryData(["folders"], context?.previous)
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["folders"] })
+    },
+  })
+
+  const moveDrawingMutation = useMutation({
+    mutationFn: updateDrawing,
+    onMutate: async (variables) => {
+      await queryClient.cancelQueries({ queryKey: ["drawings"] })
+      const previous = queryClient.getQueryData<Drawing[]>(["drawings"])
+      queryClient.setQueryData<Drawing[]>(["drawings"], (old = []) =>
+        old.map((d) =>
+          d.id === variables.data.id
+            ? {
+                ...d,
+                folderId: variables.data.updateData.folderId ?? d.folderId,
+              }
+            : d,
+        ),
+      )
+      return { previous }
+    },
+    onError: (_err, _vars, context) => {
+      queryClient.setQueryData(["drawings"], context?.previous)
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["drawings"] })
+    },
+  })
+
+  const moveFolderMutation = useMutation({
+    mutationFn: updateFolder,
+    onMutate: async (variables) => {
+      await queryClient.cancelQueries({ queryKey: ["folders"] })
+      const previous = queryClient.getQueryData<FolderType[]>(["folders"])
+      queryClient.setQueryData<FolderType[]>(["folders"], (old = []) =>
+        old.map((f) =>
+          f.id === variables.data.id
+            ? { ...f, parentId: variables.data.parentId ?? f.parentId }
+            : f,
+        ),
+      )
+      return { previous }
+    },
+    onError: (_err, _vars, context) => {
+      queryClient.setQueryData(["folders"], context?.previous)
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["folders"] })
+    },
+  })
 
   // Create actions
   const startCreate = (
@@ -96,7 +287,6 @@ export function useSidebarState({ drawings, folders }: UseSidebarStateProps) {
   ) => {
     setCreateDraft({ type, parentId: parentId ?? null })
     setCreateName(type === "drawing" ? "Untitled" : "New folder")
-    if (parentId) expandFolder(parentId)
   }
 
   const cancelCreate = () => {
@@ -113,15 +303,16 @@ export function useSidebarState({ drawings, folders }: UseSidebarStateProps) {
     }
 
     if (createDraft.type === "drawing") {
-      const newId = await createDrawing({
+      const newId = await createDrawingMutation.mutateAsync({
         data: { name, folderId: createDraft.parentId ?? undefined },
       })
       cancelCreate()
       navigate({ to: "/draw/$id", params: { id: newId } })
     } else {
-      await createFolder({ data: { name, parentId: createDraft.parentId } })
+      await createFolderMutation.mutateAsync({
+        data: { name, parentId: createDraft.parentId },
+      })
       cancelCreate()
-      router.invalidate()
     }
   }
 
@@ -152,27 +343,26 @@ export function useSidebarState({ drawings, folders }: UseSidebarStateProps) {
       title: "Delete drawing?",
       description: "Are you sure you want to delete this drawing?",
       onConfirm: async () => {
-        await deleteDrawing({ data: drawingId })
+        await deleteDrawingMutation.mutateAsync({ data: drawingId })
 
         if (drawingId === currentDrawingId) {
           const remaining = drawings.filter((d) => d.id !== drawingId)
           if (remaining.length > 0) {
             navigate({ to: "/draw/$id", params: { id: remaining[0].id } })
           } else {
-            const newId = await createDrawing({ data: {} })
+            const newId = await createDrawingMutation.mutateAsync({
+              data: {},
+            })
             navigate({ to: "/draw/$id", params: { id: newId } })
           }
-        } else {
-          router.invalidate()
         }
       },
     })
   }
 
   const onDeleteFolder = async (folderId: string) => {
-    const hasItems =
-      (drawingsByFolder.get(folderId)?.length ?? 0) > 0 ||
-      (folderChildren.get(folderId)?.length ?? 0) > 0
+    const folderNode = tree.folderNodes.get(folderId)
+    const hasItems = (folderNode?.children.length ?? 0) > 0
 
     const message = hasItems
       ? "This folder contains items. Delete folder and move items to root?"
@@ -182,8 +372,7 @@ export function useSidebarState({ drawings, folders }: UseSidebarStateProps) {
       title: "Delete folder?",
       description: message,
       onConfirm: async () => {
-        await deleteFolder({ data: folderId })
-        router.invalidate()
+        await deleteFolderMutation.mutateAsync({ data: folderId })
       },
     })
   }
@@ -194,13 +383,14 @@ export function useSidebarState({ drawings, folders }: UseSidebarStateProps) {
     if (!trimmed) return
 
     if (item.type === "drawing") {
-      await updateDrawing({
+      renameDrawingMutation.mutate({
         data: { id: item.id, updateData: { name: trimmed } },
       })
     } else {
-      await updateFolder({ data: { id: item.id, name: trimmed } })
+      renameFolderMutation.mutate({
+        data: { id: item.id, name: trimmed },
+      })
     }
-    router.invalidate()
   }
 
   // Drag and drop helpers
@@ -269,32 +459,24 @@ export function useSidebarState({ drawings, folders }: UseSidebarStateProps) {
       ) {
         return
       }
-      await updateFolder({
+      moveFolderMutation.mutate({
         data: { id: dragItem.id, parentId: targetFolderId },
       })
     } else {
       const current = drawings.find((d) => d.id === dragItem.id)
       if (current?.folderId === targetFolderId) return
-      await updateDrawing({
+      moveDrawingMutation.mutate({
         data: { id: dragItem.id, updateData: { folderId: targetFolderId } },
       })
     }
 
-    if (targetFolderId) expandFolder(targetFolderId)
-    router.invalidate()
   }
 
   return {
     // Data
-    folderChildren,
-    drawingsByFolder,
-    rootFolders: folderChildren.get(null) ?? [],
-    rootDrawings: drawingsByFolder.get(null) ?? [],
+    tree: tree.root,
 
     // UI state
-    currentDrawingId,
-    expandedFolders,
-    toggleFolder,
     dropTarget,
     dragItem,
     confirmDialog,

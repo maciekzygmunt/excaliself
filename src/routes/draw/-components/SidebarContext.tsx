@@ -6,9 +6,9 @@ import type { getFolders } from "@/server/folders"
 export type Drawing = Awaited<ReturnType<typeof getDrawings>>[number]
 export type FolderType = Awaited<ReturnType<typeof getFolders>>[number]
 
-export type TreeItem =
-  | { type: "drawing"; data: Drawing }
-  | { type: "folder"; data: FolderType }
+export type TreeNode =
+  | { type: "folder"; folder: FolderType; children: TreeNode[] }
+  | { type: "drawing"; drawing: Drawing }
 
 export type DragItem = { type: "drawing" | "folder"; id: string }
 export type DropTarget =
@@ -24,13 +24,9 @@ export type ConfirmDialog = {
 
 export type SidebarContextValue = {
   // Data
-  folderChildren: Map<string | null, FolderType[]>
-  drawingsByFolder: Map<string | null, Drawing[]>
+  tree: TreeNode[]
 
   // UI state
-  currentDrawingId: string
-  expandedFolders: Set<string>
-  toggleFolder: (id: string) => void
   dropTarget: DropTarget
   dragItem: DragItem | null
 
