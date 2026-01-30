@@ -14,4 +14,3 @@ export {
   type TreeNode,
   useSidebarContext,
 } from "./SidebarContext"
-export { useSidebarState } from "./useSidebarState"

@@ -1,7 +1,6 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { Link, useNavigate, useParams } from "@tanstack/react-router"
+import { Link } from "@tanstack/react-router"
 import { File, Folder, LogOut, Plus, Settings } from "lucide-react"
-import { useCallback, useMemo, useState } from "react"
+import { useState } from "react"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -35,12 +34,9 @@ import {
 } from "@/components/ui/sidebar"
 import { authClient } from "@/lib/auth-client"
 import { cn } from "@/lib/utils"
-import { createDrawing, deleteDrawing, getDrawings } from "@/server/drawings"
-import { deleteFolder } from "@/server/folders"
 import { CreateRow, TreeNodeItem } from "./FileTreeItem"
-import type { ConfirmDialog, Drawing, FolderType } from "./SidebarContext"
-import { SidebarContextProvider } from "./SidebarContext"
-import { useSidebarState } from "./useSidebarState"
+import type { ConfirmDialog } from "./SidebarContext"
+import { useSidebarContext } from "./SidebarContext"
 
 type DrawSidebarProps = {
   userEmail: string
@@ -48,126 +44,22 @@ type DrawSidebarProps = {
 }
 
 export function DrawSidebar({ userEmail, isAdmin }: DrawSidebarProps) {
-  const state = useSidebarState()
-  const navigate = useNavigate()
-  const queryClient = useQueryClient()
-  const { id: currentDrawingId } = useParams({ from: "/draw/$id" })
-  const { data: drawings = [] } = useQuery({
-    queryKey: ["drawings"],
-    queryFn: () => getDrawings(),
-  })
+  const {
+    tree,
+    dropTarget,
+    onDragOver,
+    onDragLeave,
+    onDrop,
+    confirmDialog,
+    closeConfirmDialog,
+  } = useSidebarContext()
 
   const [createType, setCreateType] = useState<"drawing" | "folder" | null>(
     null,
   )
-  const [confirmDialog, setConfirmDialog] = useState<ConfirmDialog>(null)
-
-  const deleteDrawingMutation = useMutation({
-    mutationFn: deleteDrawing,
-    onMutate: async (variables) => {
-      await queryClient.cancelQueries({ queryKey: ["drawings"] })
-      const previous = queryClient.getQueryData<Drawing[]>(["drawings"])
-      queryClient.setQueryData<Drawing[]>(["drawings"], (old = []) =>
-        old.filter((d) => d.id !== variables.data),
-      )
-      return { previous }
-    },
-    onError: (_err, _vars, context) => {
-      queryClient.setQueryData(["drawings"], context?.previous)
-    },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["drawings"] })
-    },
-  })
-
-  const createDrawingMutation = useMutation({
-    mutationFn: createDrawing,
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["drawings"] })
-    },
-  })
-
-  const deleteFolderMutation = useMutation({
-    mutationFn: deleteFolder,
-    onMutate: async (variables) => {
-      await queryClient.cancelQueries({ queryKey: ["folders"] })
-      const previous = queryClient.getQueryData<FolderType[]>(["folders"])
-      queryClient.setQueryData<FolderType[]>(["folders"], (old = []) =>
-        old.filter((f) => f.id !== variables.data),
-      )
-      return { previous }
-    },
-    onError: (_err, _vars, context) => {
-      queryClient.setQueryData(["folders"], context?.previous)
-    },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["folders"] })
-    },
-  })
-
-  const onDeleteDrawing = useCallback(
-    (id: string) => {
-      setConfirmDialog({
-        title: "Delete drawing?",
-        description: "Are you sure you want to delete this drawing?",
-        onConfirm: async () => {
-          await deleteDrawingMutation.mutateAsync({ data: id })
-
-          if (id === currentDrawingId) {
-            const remaining = drawings.filter((d) => d.id !== id)
-            if (remaining.length > 0) {
-              navigate({ to: "/draw/$id", params: { id: remaining[0].id } })
-            } else {
-              const newId = await createDrawingMutation.mutateAsync({
-                data: {},
-              })
-              navigate({ to: "/draw/$id", params: { id: newId } })
-            }
-          }
-        },
-      })
-    },
-    [
-      deleteDrawingMutation,
-      currentDrawingId,
-      drawings,
-      navigate,
-      createDrawingMutation,
-    ],
-  )
-
-  const onDeleteFolder = useCallback(
-    (id: string, hasChildren: boolean) => {
-      setConfirmDialog({
-        title: "Delete folder?",
-        description: hasChildren
-          ? "This folder contains items. Delete folder and move items to root?"
-          : "Delete this folder?",
-        onConfirm: async () => {
-          await deleteFolderMutation.mutateAsync({ data: id })
-        },
-      })
-    },
-    [deleteFolderMutation],
-  )
-
-  const contextValue = useMemo(
-    () => ({
-      tree: state.tree,
-      dropTarget: state.dropTarget,
-      onDragStart: state.onDragStart,
-      onDragEnd: state.onDragEnd,
-      onDragOver: state.onDragOver,
-      onDragLeave: state.onDragLeave,
-      onDrop: state.onDrop,
-      onDeleteDrawing,
-      onDeleteFolder,
-    }),
-    [state, onDeleteDrawing, onDeleteFolder],
-  )
 
   return (
-    <SidebarContextProvider value={contextValue}>
+    <>
       <Sidebar collapsible="offcanvas" variant="inset">
         <SidebarHeader className="gap-2">
           <div className="flex gap-2">
@@ -206,12 +98,12 @@ export function DrawSidebar({ userEmail, isAdmin }: DrawSidebarProps) {
               <div
                 className={cn(
                   "min-h-[200px] rounded-md transition-colors pb-8",
-                  state.dropTarget?.type === "root" &&
+                  dropTarget?.type === "root" &&
                     "bg-sidebar-accent ring-2 ring-sidebar-ring",
                 )}
-                onDragOver={state.onDragOver({ type: "root" })}
-                onDragLeave={state.onDragLeave}
-                onDrop={state.onDrop({ type: "root" })}
+                onDragOver={onDragOver({ type: "root" })}
+                onDragLeave={onDragLeave}
+                onDrop={onDrop({ type: "root" })}
               >
                 <SidebarMenu>
                   {createType && (
@@ -220,7 +112,7 @@ export function DrawSidebar({ userEmail, isAdmin }: DrawSidebarProps) {
                       onClose={() => setCreateType(null)}
                     />
                   )}
-                  {state.tree.map((node) => (
+                  {tree.map((node) => (
                     <TreeNodeItem
                       key={
                         node.type === "folder"
@@ -292,9 +184,9 @@ export function DrawSidebar({ userEmail, isAdmin }: DrawSidebarProps) {
       </Sidebar>
       <ConfirmDeleteDialog
         dialog={confirmDialog}
-        onClose={() => setConfirmDialog(null)}
+        onClose={closeConfirmDialog}
       />
-    </SidebarContextProvider>
+    </>
   )
 }
 

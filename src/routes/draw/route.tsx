@@ -9,6 +9,7 @@ import {
 import { authMiddleware } from "@/middleware/auth"
 import { setupMiddleware } from "@/middleware/setup"
 import { DrawSidebar } from "./-components/DrawSidebar"
+import { SidebarContextProvider } from "./-components/SidebarContext"
 
 const getSession = createServerFn({ method: "GET" })
   .middleware([authMiddleware])
@@ -48,7 +49,7 @@ function DrawLayoutShell({
   const { state } = useSidebar()
 
   return (
-    <>
+    <SidebarContextProvider>
       {state === "collapsed" && (
         <div className="fixed left-4 top-4 z-50">
           <SidebarTrigger className="h-8 w-8 rounded-md border bg-background shadow-sm" />
@@ -58,6 +59,6 @@ function DrawLayoutShell({
       <SidebarInset className="overflow-clip">
         <Outlet />
       </SidebarInset>
-    </>
+    </SidebarContextProvider>
   )
 }
