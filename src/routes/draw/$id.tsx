@@ -1,4 +1,5 @@
-import { createFileRoute, redirect, useRouter } from "@tanstack/react-router"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { createFileRoute } from "@tanstack/react-router"
 import { createServerFn } from "@tanstack/react-start"
 import { Cloud, Loader2 } from "lucide-react"
 import { useCallback, useMemo, useState } from "react"
@@ -49,13 +50,11 @@ const saveDrawing = createServerFn({ method: "POST" })
   })
 
 export const Route = createFileRoute("/draw/$id")({
-  loader: async ({ params }) => {
-    const drawing = await getDrawingWithFiles({ data: params.id })
-    if (!drawing) {
-      throw redirect({ to: "/" })
-    }
-
-    return { drawing }
+  loader: async ({ params, context }) => {
+    await context.queryClient.ensureQueryData({
+      queryKey: ["drawing", params.id],
+      queryFn: () => getDrawingWithFiles({ data: params.id }),
+    })
   },
   component: DrawingCanvas,
 })
@@ -67,13 +66,21 @@ type SceneData = {
 }
 
 function DrawingCanvas() {
-  const { drawing } = Route.useLoaderData()
   const { id } = Route.useParams()
-  const router = useRouter()
+  const queryClient = useQueryClient()
+
+  const { data: drawing } = useQuery({
+    queryKey: ["drawing", id],
+    queryFn: () => getDrawingWithFiles({ data: id }),
+  })
+
+  const saveDrawingMutation = useMutation({
+    mutationFn: saveDrawing,
+  })
 
   // Track local edits only - use prop directly for display when not editing
   const [editingName, setEditingName] = useState<string | null>(null)
-  const displayName = editingName ?? drawing.name
+  const displayName = editingName ?? drawing?.name ?? ""
 
   const onSave = useCallback(
     async (scene: SceneData) => {
@@ -109,7 +116,7 @@ function DrawingCanvas() {
   )
 
   const { saving, saved, handleChange } = useAutoSave<SceneData>({
-    initialData: drawing.data,
+    initialData: drawing?.data ?? "{}",
     onSave,
     serialize,
   })
@@ -125,15 +132,24 @@ function DrawingCanvas() {
     [handleChange],
   )
 
-  const handleNameBlur = async (newName: string) => {
+  const handleNameBlur = (newName: string) => {
     setEditingName(null)
-    if (newName !== drawing.name) {
-      await saveDrawing({ data: { id, name: newName } })
-      router.invalidate()
+    if (newName !== drawing?.name) {
+      saveDrawingMutation.mutate(
+        { data: { id, name: newName } },
+        {
+          onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["drawings"] })
+            queryClient.invalidateQueries({ queryKey: ["drawing", id] })
+          },
+        },
+      )
     }
   }
 
   const sceneData = useMemo(() => {
+    if (!drawing)
+      return { elements: [], appState: { collaborators: new Map() }, files: {} }
     try {
       const parsed = JSON.parse(drawing.data)
       const appState =
@@ -167,7 +183,9 @@ function DrawingCanvas() {
         files: {},
       }
     }
-  }, [drawing.data, drawing.files])
+  }, [drawing])
+
+  if (!drawing) return null
 
   return (
     <div className="flex h-full flex-col bg-background">
