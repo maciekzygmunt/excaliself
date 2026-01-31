@@ -104,6 +104,7 @@ export const deleteDrawing = createServerFn({ method: "POST" })
   })
 
 export const updateDrawingFiles = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
   .inputValidator(
     z.object({
       drawingId: z.string(),
@@ -116,7 +117,15 @@ export const updateDrawingFiles = createServerFn({ method: "POST" })
       ),
     }),
   )
-  .handler(async ({ data: { drawingId, files } }) => {
+  .handler(async ({ data: { drawingId, files }, context }) => {
+    const userId = context.session.user.id
+    const [drawing] = await db
+      .select({ id: drawings.id })
+      .from(drawings)
+      .where(and(eq(drawings.id, drawingId), eq(drawings.ownerId, userId)))
+
+    if (!drawing) return
+
     await db.delete(drawingFiles).where(eq(drawingFiles.drawingId, drawingId))
 
     if (files.length > 0) {
