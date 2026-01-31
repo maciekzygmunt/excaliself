@@ -44,7 +44,17 @@ type FolderItemProps = {
   children: TreeNode[]
 }
 
+function hasActiveDrawing(nodes: TreeNode[], activeId: string): boolean {
+  for (const node of nodes) {
+    if (node.type === "drawing" && node.drawing.id === activeId) return true
+    if (node.type === "folder" && hasActiveDrawing(node.children, activeId))
+      return true
+  }
+  return false
+}
+
 export function FolderItem({ folder, children: childNodes }: FolderItemProps) {
+  const { id: currentDrawingId } = useParams({ from: "/draw/$id" })
   const {
     dropTarget,
     onDragStart,
@@ -63,7 +73,8 @@ export function FolderItem({ folder, children: childNodes }: FolderItemProps) {
     },
   })
 
-  const [isExpanded, setIsExpanded] = useState(false)
+  const containsActive = hasActiveDrawing(childNodes, currentDrawingId)
+  const [isExpanded, setIsExpanded] = useState(containsActive)
   const [isDragging, setIsDragging] = useState(false)
   const [isRenaming, setIsRenaming] = useState(false)
   const [renameValue, setRenameValue] = useState(folder.name)
