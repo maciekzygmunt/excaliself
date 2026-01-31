@@ -8,6 +8,8 @@ import {
 } from "@/components/ui/sidebar"
 import { authMiddleware } from "@/middleware/auth"
 import { setupMiddleware } from "@/middleware/setup"
+import { getDrawings } from "@/server/drawings"
+import { getFolders } from "@/server/folders"
 import { DrawSidebar } from "./-components/DrawSidebar"
 import { SidebarContextProvider } from "./-components/SidebarContext"
 
@@ -19,8 +21,18 @@ export const Route = createFileRoute("/draw")({
   server: {
     middleware: [setupMiddleware, authMiddleware],
   },
-  loader: async () => {
+  loader: async ({ context }) => {
     const session = await getSession()
+    await Promise.all([
+      context.queryClient.ensureQueryData({
+        queryKey: ["drawings"],
+        queryFn: getDrawings,
+      }),
+      context.queryClient.ensureQueryData({
+        queryKey: ["folders"],
+        queryFn: getFolders,
+      }),
+    ])
     return { session }
   },
   component: DrawLayout,

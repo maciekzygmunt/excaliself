@@ -76,7 +76,11 @@ export function DrawSidebar({ userEmail, isAdmin }: DrawSidebarProps) {
                   </span>
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-48">
+              <DropdownMenuContent
+                align="start"
+                className="w-48"
+                onCloseAutoFocus={(e) => e.preventDefault()}
+              >
                 <DropdownMenuItem onClick={() => setCreateType("drawing")}>
                   <File className="mr-2 h-4 w-4" />
                   New Drawing

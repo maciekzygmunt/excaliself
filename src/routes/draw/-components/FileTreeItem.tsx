@@ -274,6 +274,7 @@ export function DrawingItem({ drawing }: DrawingItemProps) {
 
   const ButtonContent = (
     <>
+      <span className="h-4 w-4 shrink-0" />
       <File className="h-4 w-4 shrink-0" />
       {isRenaming ? (
         <Input
