@@ -60,6 +60,21 @@ export function FolderItem({ folder, children: childNodes }: FolderItemProps) {
   const queryClient = useQueryClient()
   const renameMutation = useMutation({
     mutationFn: updateFolder,
+    onMutate: async (variables) => {
+      await queryClient.cancelQueries({ queryKey: ["folders"] })
+      const previous = queryClient.getQueryData<FolderType[]>(["folders"])
+      queryClient.setQueryData<FolderType[]>(["folders"], (old = []) =>
+        old.map((f) =>
+          f.id === variables.data.id
+            ? { ...f, name: variables.data.name ?? f.name }
+            : f,
+        ),
+      )
+      return { previous }
+    },
+    onError: (_err, _vars, context) => {
+      queryClient.setQueryData(["folders"], context?.previous)
+    },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["folders"] })
     },
@@ -244,6 +259,21 @@ export function DrawingItem({ drawing }: DrawingItemProps) {
   const queryClient = useQueryClient()
   const renameMutation = useMutation({
     mutationFn: updateDrawing,
+    onMutate: async (variables) => {
+      await queryClient.cancelQueries({ queryKey: ["drawings"] })
+      const previous = queryClient.getQueryData<Drawing[]>(["drawings"])
+      queryClient.setQueryData<Drawing[]>(["drawings"], (old = []) =>
+        old.map((d) =>
+          d.id === variables.data.id
+            ? { ...d, name: variables.data.updateData.name ?? d.name }
+            : d,
+        ),
+      )
+      return { previous }
+    },
+    onError: (_err, _vars, context) => {
+      queryClient.setQueryData(["drawings"], context?.previous)
+    },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["drawings"] })
       queryClient.invalidateQueries({ queryKey: ["drawing", drawing.id] })

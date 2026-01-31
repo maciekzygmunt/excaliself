@@ -29,7 +29,7 @@ export function UsersCard() {
   })
   const { mutate: deleteUserMutation } = useMutation({
     mutationFn: deleteUser,
-    onSuccess: () => {
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["admin", "users"] })
     },
   })

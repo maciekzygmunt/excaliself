@@ -76,6 +76,10 @@ function DrawingCanvas() {
 
   const saveDrawingMutation = useMutation({
     mutationFn: saveDrawing,
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["drawings"] })
+      queryClient.invalidateQueries({ queryKey: ["drawing", id] })
+    },
   })
 
   // Track local edits only - use prop directly for display when not editing
@@ -135,15 +139,7 @@ function DrawingCanvas() {
   const handleNameBlur = (newName: string) => {
     setEditingName(null)
     if (newName !== drawing?.name) {
-      saveDrawingMutation.mutate(
-        { data: { id, name: newName } },
-        {
-          onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ["drawings"] })
-            queryClient.invalidateQueries({ queryKey: ["drawing", id] })
-          },
-        },
-      )
+      saveDrawingMutation.mutate({ data: { id, name: newName } })
     }
   }
 

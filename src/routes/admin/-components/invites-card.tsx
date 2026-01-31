@@ -24,13 +24,15 @@ export function InvitesCard() {
   } = useMutation({
     mutationFn: () => createInvite(),
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["admin", "invites"] })
       copyInviteLink(data.token)
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "invites"] })
     },
   })
   const { mutate: deleteInviteMutation } = useMutation({
     mutationFn: deleteInvite,
-    onSuccess: () => {
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["admin", "invites"] })
     },
   })

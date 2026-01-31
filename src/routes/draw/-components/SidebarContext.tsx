@@ -204,13 +204,15 @@ export function SidebarContextProvider({
     onMutate: () => {
       toast.loading("Deleting folder...", { id: "delete-folder" })
     },
-    onSuccess: () => {
-      toast.success("Folder deleted", { id: "delete-folder" })
-      queryClient.invalidateQueries({ queryKey: ["folders"] })
-      queryClient.invalidateQueries({ queryKey: ["drawings"] })
-    },
     onError: () => {
       toast.error("Failed to delete folder", { id: "delete-folder" })
+    },
+    onSuccess: () => {
+      toast.success("Folder deleted", { id: "delete-folder" })
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["folders"] })
+      queryClient.invalidateQueries({ queryKey: ["drawings"] })
     },
   })
 
