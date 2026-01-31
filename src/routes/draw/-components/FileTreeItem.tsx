@@ -246,6 +246,7 @@ export function DrawingItem({ drawing }: DrawingItemProps) {
     mutationFn: updateDrawing,
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["drawings"] })
+      queryClient.invalidateQueries({ queryKey: ["drawing", drawing.id] })
     },
   })
 
