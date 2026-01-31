@@ -115,7 +115,7 @@ export const drawings = sqliteTable("drawings", {
   data: text("data").notNull().default("{}"),
   thumbnail: text("thumbnail"),
   folderId: text("folderId").references(() => folders.id, {
-    onDelete: "set null",
+    onDelete: "cascade",
   }),
   ownerId: text("ownerId")
     .notNull()

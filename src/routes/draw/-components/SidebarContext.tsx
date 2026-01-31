@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useNavigate, useParams } from "@tanstack/react-router"
 import type { DragEvent } from "react"
 import { createContext, useContext, useMemo, useState } from "react"
+import { toast } from "sonner"
 import {
   createDrawing,
   deleteDrawing,
@@ -200,19 +201,16 @@ export function SidebarContextProvider({
 
   const deleteFolderMutation = useMutation({
     mutationFn: deleteFolder,
-    onMutate: async (variables) => {
-      await queryClient.cancelQueries({ queryKey: ["folders"] })
-      const previous = queryClient.getQueryData<FolderType[]>(["folders"])
-      queryClient.setQueryData<FolderType[]>(["folders"], (old = []) =>
-        old.filter((f) => f.id !== variables.data),
-      )
-      return { previous }
+    onMutate: () => {
+      toast.loading("Deleting folder...", { id: "delete-folder" })
     },
-    onError: (_err, _vars, context) => {
-      queryClient.setQueryData(["folders"], context?.previous)
-    },
-    onSettled: () => {
+    onSuccess: () => {
+      toast.success("Folder deleted", { id: "delete-folder" })
       queryClient.invalidateQueries({ queryKey: ["folders"] })
+      queryClient.invalidateQueries({ queryKey: ["drawings"] })
+    },
+    onError: () => {
+      toast.error("Failed to delete folder", { id: "delete-folder" })
     },
   })
 
@@ -320,10 +318,10 @@ export function SidebarContextProvider({
     setConfirmDialog({
       title: "Delete folder?",
       description: hasChildren
-        ? "This folder contains items. Delete folder and move items to root?"
+        ? "This folder contains items. All files in this folder will be deleted."
         : "Delete this folder?",
-      onConfirm: async () => {
-        await deleteFolderMutation.mutateAsync({ data: id })
+      onConfirm: () => {
+        deleteFolderMutation.mutate({ data: id })
       },
     })
   }
