@@ -31,6 +31,7 @@ import {
 import { cn } from "@/lib/utils"
 import { createDrawing, updateDrawing } from "@/server/drawings"
 import { createFolder, updateFolder } from "@/server/folders"
+import { hasActiveDrawing } from "../-utils/hasActiveDrawing"
 import {
   type Drawing,
   type DropTarget,
@@ -42,15 +43,6 @@ import {
 type FolderItemProps = {
   folder: FolderType
   children: TreeNode[]
-}
-
-function hasActiveDrawing(nodes: TreeNode[], activeId: string): boolean {
-  for (const node of nodes) {
-    if (node.type === "drawing" && node.drawing.id === activeId) return true
-    if (node.type === "folder" && hasActiveDrawing(node.children, activeId))
-      return true
-  }
-  return false
 }
 
 export function FolderItem({ folder, children: childNodes }: FolderItemProps) {
