@@ -1,5 +1,3 @@
-"use client"
-
 import type { ComponentType } from "react"
 import { useCallback, useEffect, useRef, useState } from "react"
 import "@excalidraw/excalidraw/index.css"
