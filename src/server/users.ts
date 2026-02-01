@@ -65,43 +65,41 @@ export const deleteUser = createServerFn({ method: "POST" })
   .inputValidator(z.string())
   .handler(async ({ data: userId }) => {
     try {
-      db.transaction((tx) => {
-        const user = tx
+      await db.transaction(async (tx) => {
+        const [user] = await tx
           .select({ email: users.email })
           .from(users)
           .where(eq(users.id, userId))
-          .get()
 
         if (!user) {
           throw new Error(`User not found: ${userId}`)
         }
 
-        const userDrawings = tx
+        const userDrawings = await tx
           .select({ id: drawings.id })
           .from(drawings)
           .where(eq(drawings.ownerId, userId))
-          .all()
         const drawingIds = userDrawings.map((d) => d.id)
 
         if (drawingIds.length > 0) {
-          tx.delete(drawingFiles)
+          await tx
+            .delete(drawingFiles)
             .where(inArray(drawingFiles.drawingId, drawingIds))
-            .run()
         }
 
-        tx.delete(drawings).where(eq(drawings.ownerId, userId)).run()
-        tx.delete(folders).where(eq(folders.ownerId, userId)).run()
-        tx.delete(sessions).where(eq(sessions.userId, userId)).run()
-        tx.delete(accounts).where(eq(accounts.userId, userId)).run()
-        tx.delete(invites).where(eq(invites.invitedBy, userId)).run()
-        tx.update(invites)
+        await tx.delete(drawings).where(eq(drawings.ownerId, userId))
+        await tx.delete(folders).where(eq(folders.ownerId, userId))
+        await tx.delete(sessions).where(eq(sessions.userId, userId))
+        await tx.delete(accounts).where(eq(accounts.userId, userId))
+        await tx.delete(invites).where(eq(invites.invitedBy, userId))
+        await tx
+          .update(invites)
           .set({ usedBy: null })
           .where(eq(invites.usedBy, userId))
-          .run()
-        tx.delete(verifications)
+        await tx
+          .delete(verifications)
           .where(eq(verifications.identifier, user.email))
-          .run()
-        tx.delete(users).where(eq(users.id, userId)).run()
+        await tx.delete(users).where(eq(users.id, userId))
       })
     } catch (error) {
       console.error("Failed to delete user:", userId, error)

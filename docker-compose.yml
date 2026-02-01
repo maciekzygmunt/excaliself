@@ -1,14 +1,27 @@
-version: '3.8'
-
 services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-excalidraw}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-excalidraw}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+
   excalidraw:
     build: .
     ports:
       - "3000:3000"
-    volumes:
-      - ./data:/app/data
     environment:
-      - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-excalidraw}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@db:5432/${POSTGRES_DB:-excalidraw}
+      - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET:?Set BETTER_AUTH_SECRET in .env}
       - BASE_URL=${BASE_URL:-http://localhost:3000}
-      - DATABASE_PATH=/app/data/excalidraw.db
+    depends_on:
+      - db
     restart: unless-stopped
+
+volumes:
+  pgdata:

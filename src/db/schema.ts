@@ -1,40 +1,46 @@
-import { foreignKey, integer, sqliteTable, text } from "drizzle-orm/sqlite-core"
+import {
+  boolean,
+  foreignKey,
+  pgTable,
+  text,
+  timestamp,
+} from "drizzle-orm/pg-core"
 
-export const users = sqliteTable("users", {
+export const users = pgTable("users", {
   id: text("id").primaryKey(),
   email: text("email").notNull().unique(),
-  emailVerified: integer("emailVerified", { mode: "boolean" }).default(false),
+  emailVerified: boolean("emailVerified").default(false),
   name: text("name"),
   image: text("image"),
   role: text("role", { enum: ["admin", "user"] })
     .notNull()
     .default("user"),
-  createdAt: integer("createdAt", { mode: "timestamp" })
+  createdAt: timestamp("createdAt")
     .notNull()
     .$defaultFn(() => new Date()),
-  updatedAt: integer("updatedAt", { mode: "timestamp" })
+  updatedAt: timestamp("updatedAt")
     .notNull()
     .$defaultFn(() => new Date()),
 })
 
-export const sessions = sqliteTable("sessions", {
+export const sessions = pgTable("sessions", {
   id: text("id").primaryKey(),
   userId: text("userId")
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
-  expiresAt: integer("expiresAt", { mode: "timestamp" }).notNull(),
+  expiresAt: timestamp("expiresAt").notNull(),
   token: text("token").notNull().unique(),
   ipAddress: text("ipAddress"),
   userAgent: text("userAgent"),
-  createdAt: integer("createdAt", { mode: "timestamp" })
+  createdAt: timestamp("createdAt")
     .notNull()
     .$defaultFn(() => new Date()),
-  updatedAt: integer("updatedAt", { mode: "timestamp" })
+  updatedAt: timestamp("updatedAt")
     .notNull()
     .$defaultFn(() => new Date()),
 })
 
-export const accounts = sqliteTable("accounts", {
+export const accounts = pgTable("accounts", {
   id: text("id").primaryKey(),
   userId: text("userId")
     .notNull()
@@ -43,49 +49,47 @@ export const accounts = sqliteTable("accounts", {
   providerId: text("providerId").notNull(),
   accessToken: text("accessToken"),
   refreshToken: text("refreshToken"),
-  accessTokenExpiresAt: integer("accessTokenExpiresAt", { mode: "timestamp" }),
-  refreshTokenExpiresAt: integer("refreshTokenExpiresAt", {
-    mode: "timestamp",
-  }),
+  accessTokenExpiresAt: timestamp("accessTokenExpiresAt"),
+  refreshTokenExpiresAt: timestamp("refreshTokenExpiresAt"),
   scope: text("scope"),
   password: text("password"),
   idToken: text("idToken"),
-  createdAt: integer("createdAt", { mode: "timestamp" })
+  createdAt: timestamp("createdAt")
     .notNull()
     .$defaultFn(() => new Date()),
-  updatedAt: integer("updatedAt", { mode: "timestamp" })
+  updatedAt: timestamp("updatedAt")
     .notNull()
     .$defaultFn(() => new Date()),
 })
 
-export const verifications = sqliteTable("verifications", {
+export const verifications = pgTable("verifications", {
   id: text("id").primaryKey(),
   identifier: text("identifier").notNull(),
   value: text("value").notNull(),
-  expiresAt: integer("expiresAt", { mode: "timestamp" }).notNull(),
-  createdAt: integer("createdAt", { mode: "timestamp" })
+  expiresAt: timestamp("expiresAt").notNull(),
+  createdAt: timestamp("createdAt")
     .notNull()
     .$defaultFn(() => new Date()),
-  updatedAt: integer("updatedAt", { mode: "timestamp" })
+  updatedAt: timestamp("updatedAt")
     .notNull()
     .$defaultFn(() => new Date()),
 })
 
-export const invites = sqliteTable("invites", {
+export const invites = pgTable("invites", {
   id: text("id").primaryKey(),
   token: text("token").notNull().unique(),
   invitedBy: text("invitedBy")
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
   usedBy: text("usedBy"),
-  usedAt: integer("usedAt", { mode: "timestamp" }),
-  expiresAt: integer("expiresAt", { mode: "timestamp" }).notNull(),
-  createdAt: integer("createdAt", { mode: "timestamp" })
+  usedAt: timestamp("usedAt"),
+  expiresAt: timestamp("expiresAt").notNull(),
+  createdAt: timestamp("createdAt")
     .notNull()
     .$defaultFn(() => new Date()),
 })
 
-export const folders = sqliteTable(
+export const folders = pgTable(
   "folders",
   {
     id: text("id").primaryKey(),
@@ -94,10 +98,10 @@ export const folders = sqliteTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     parentId: text("parentId"),
-    createdAt: integer("createdAt", { mode: "timestamp" })
+    createdAt: timestamp("createdAt")
       .notNull()
       .$defaultFn(() => new Date()),
-    updatedAt: integer("updatedAt", { mode: "timestamp" })
+    updatedAt: timestamp("updatedAt")
       .notNull()
       .$defaultFn(() => new Date()),
   },
@@ -109,7 +113,7 @@ export const folders = sqliteTable(
   }),
 )
 
-export const drawings = sqliteTable("drawings", {
+export const drawings = pgTable("drawings", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
   data: text("data").notNull().default("{}"),
@@ -120,16 +124,16 @@ export const drawings = sqliteTable("drawings", {
   ownerId: text("ownerId")
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
-  isPublic: integer("isPublic", { mode: "boolean" }).notNull().default(false),
-  createdAt: integer("createdAt", { mode: "timestamp" })
+  isPublic: boolean("isPublic").notNull().default(false),
+  createdAt: timestamp("createdAt")
     .notNull()
     .$defaultFn(() => new Date()),
-  updatedAt: integer("updatedAt", { mode: "timestamp" })
+  updatedAt: timestamp("updatedAt")
     .notNull()
     .$defaultFn(() => new Date()),
 })
 
-export const drawingFiles = sqliteTable("drawing_files", {
+export const drawingFiles = pgTable("drawing_files", {
   id: text("id").primaryKey(),
   drawingId: text("drawingId")
     .notNull()
@@ -137,7 +141,7 @@ export const drawingFiles = sqliteTable("drawing_files", {
   fileId: text("fileId").notNull(),
   mimeType: text("mimeType").notNull(),
   dataUrl: text("dataUrl").notNull(),
-  createdAt: integer("createdAt", { mode: "timestamp" })
+  createdAt: timestamp("createdAt")
     .notNull()
     .$defaultFn(() => new Date()),
 })
