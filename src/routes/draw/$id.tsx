@@ -1,7 +1,14 @@
+import { restore } from "@excalidraw/excalidraw"
+import type { ExcalidrawElement } from "@excalidraw/excalidraw/element/types"
+import type {
+  AppState,
+  BinaryFiles,
+  ExcalidrawInitialDataState,
+} from "@excalidraw/excalidraw/types"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { createFileRoute } from "@tanstack/react-router"
 import { createServerFn } from "@tanstack/react-start"
-import { Cloud, Loader2 } from "lucide-react"
+import { Cloud, Loader2, Pencil } from "lucide-react"
 import { useCallback, useMemo, useState } from "react"
 import { ExcalidrawCanvas } from "@/components/ExcalidrawCanvas"
 import { Input } from "@/components/ui/input"
@@ -14,9 +21,10 @@ import {
   updateDrawingFiles,
 } from "@/server/drawings"
 
-type ExcalidrawBinaryFile = {
-  mimeType?: string
-  dataURL?: string
+type SceneData = {
+  elements: readonly ExcalidrawElement[]
+  appState: AppState
+  files: BinaryFiles
 }
 
 const saveDrawing = createServerFn({ method: "POST" })
@@ -50,6 +58,7 @@ const saveDrawing = createServerFn({ method: "POST" })
   })
 
 export const Route = createFileRoute("/draw/$id")({
+  ssr: false,
   loader: async ({ params, context }) => {
     await context.queryClient.ensureQueryData({
       queryKey: ["drawing", params.id],
@@ -57,13 +66,13 @@ export const Route = createFileRoute("/draw/$id")({
     })
   },
   component: DrawingCanvas,
+  pendingComponent: () => (
+    <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-background text-muted-foreground">
+      <Pencil className="h-8 w-8 animate-pulse" />
+      <span className="text-sm">Loading drawing...</span>
+    </div>
+  ),
 })
-
-type SceneData = {
-  elements: readonly unknown[]
-  appState: unknown
-  files: Record<string, unknown>
-}
 
 function DrawingCanvas() {
   const { id } = Route.useParams()
@@ -89,14 +98,11 @@ function DrawingCanvas() {
   const onSave = useCallback(
     async (scene: SceneData) => {
       const fileArray = Object.entries(scene.files || {}).map(
-        ([fileId, file]) => {
-          const fileData = file as ExcalidrawBinaryFile
-          return {
-            fileId,
-            mimeType: fileData.mimeType || "image/png",
-            dataUrl: fileData.dataURL || "",
-          }
-        },
+        ([fileId, file]) => ({
+          fileId,
+          mimeType: file.mimeType || "image/png",
+          dataUrl: file.dataURL || "",
+        }),
       )
 
       await saveDrawing({
@@ -127,9 +133,9 @@ function DrawingCanvas() {
 
   const handleSceneChange = useCallback(
     (
-      elements: readonly unknown[],
-      appState: unknown,
-      files: Record<string, unknown>,
+      elements: readonly ExcalidrawElement[],
+      appState: AppState,
+      files: BinaryFiles,
     ) => {
       handleChange({ elements, appState, files })
     },
@@ -143,41 +149,31 @@ function DrawingCanvas() {
     }
   }
 
-  const sceneData = useMemo(() => {
-    if (!drawing)
-      return { elements: [], appState: { collaborators: new Map() }, files: {} }
+  const sceneData: ExcalidrawInitialDataState = useMemo(() => {
+    if (!drawing) return restore(null, null, null)
     try {
       const parsed = JSON.parse(drawing.data)
-      const appState =
-        parsed.appState && typeof parsed.appState === "object"
-          ? parsed.appState
-          : {}
-      const normalizedAppState = {
-        ...appState,
-        collaborators:
-          appState.collaborators instanceof Map
-            ? appState.collaborators
-            : new Map(),
-      }
-      const filesMap: Record<string, unknown> = {}
+      const files = {} as BinaryFiles
       drawing.files?.forEach((file) => {
-        filesMap[file.fileId] = {
+        files[file.fileId] = {
           id: file.fileId,
           mimeType: file.mimeType,
           dataURL: file.dataUrl,
-        }
+        } as BinaryFiles[string]
       })
-      return {
-        elements: parsed.elements || [],
-        appState: normalizedAppState,
-        files: filesMap,
-      }
+      const restored = restore(
+        {
+          elements: parsed.elements,
+          appState: parsed.appState,
+          files,
+        },
+        null,
+        null,
+      )
+      restored.appState.collaborators = new Map()
+      return restored
     } catch {
-      return {
-        elements: [],
-        appState: { collaborators: new Map() },
-        files: {},
-      }
+      return restore(null, null, null)
     }
   }, [drawing])
 

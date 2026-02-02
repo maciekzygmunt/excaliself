@@ -1,24 +1,21 @@
-import type { ComponentType } from "react"
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useRef } from "react"
 import "@excalidraw/excalidraw/index.css"
-
-type ExcalidrawScene = {
-  elements: readonly unknown[]
-  appState: unknown
-  files: Record<string, unknown>
-}
-
-type ExcalidrawApi = {
-  updateScene: (scene: ExcalidrawScene) => void
-}
+import { Excalidraw } from "@excalidraw/excalidraw"
+import type { ExcalidrawElement } from "@excalidraw/excalidraw/element/types"
+import type {
+  AppState,
+  BinaryFiles,
+  ExcalidrawImperativeAPI,
+  ExcalidrawInitialDataState,
+} from "@excalidraw/excalidraw/types"
 
 interface ExcalidrawCanvasProps {
-  initialData: ExcalidrawScene
-  scene?: ExcalidrawScene
+  initialData: ExcalidrawInitialDataState
+  scene?: ExcalidrawInitialDataState
   onChange?: (
-    elements: readonly unknown[],
-    appState: unknown,
-    files: Record<string, unknown>,
+    elements: readonly ExcalidrawElement[],
+    appState: AppState,
+    files: BinaryFiles,
   ) => void
 }
 
@@ -27,40 +24,25 @@ export function ExcalidrawCanvas({
   scene,
   onChange,
 }: ExcalidrawCanvasProps) {
-  const [Excalidraw, setExcalidraw] = useState<ComponentType<
-    Record<string, unknown>
-  > | null>(null)
-  const [loadError, setLoadError] = useState<Error | null>(null)
-  const apiRef = useRef<ExcalidrawApi | null>(null)
-  const sceneRef = useRef<ExcalidrawScene | null>(null)
+  const apiRef = useRef<ExcalidrawImperativeAPI | null>(null)
+  const sceneRef = useRef<ExcalidrawInitialDataState | null>(null)
 
-  useEffect(() => {
-    let isActive = true
-    import("@excalidraw/excalidraw")
-      .then((module) => {
-        if (!isActive) return
-        setExcalidraw(
-          () => module.Excalidraw as ComponentType<Record<string, unknown>>,
-        )
+  const scheduleSceneUpdate = useCallback(
+    (sceneToApply: ExcalidrawInitialDataState) => {
+      // Defer updates until after mount to avoid setState-before-mount warnings.
+      requestAnimationFrame(() => {
+        const api = apiRef.current
+        if (api) {
+          api.updateScene(
+            sceneToApply as Parameters<
+              ExcalidrawImperativeAPI["updateScene"]
+            >[0],
+          )
+        }
       })
-      .catch((err: unknown) => {
-        if (!isActive) return
-        setLoadError(err instanceof Error ? err : new Error(String(err)))
-      })
-    return () => {
-      isActive = false
-    }
-  }, [])
-
-  const scheduleSceneUpdate = useCallback((sceneToApply: ExcalidrawScene) => {
-    // Defer updates until after mount to avoid setState-before-mount warnings.
-    requestAnimationFrame(() => {
-      const api = apiRef.current
-      if (api) {
-        api.updateScene(sceneToApply)
-      }
-    })
-  }, [])
+    },
+    [],
+  )
 
   useEffect(() => {
     if (!scene) return
@@ -71,8 +53,8 @@ export function ExcalidrawCanvas({
   }, [scene, scheduleSceneUpdate])
 
   const handleApi = useCallback(
-    (api: unknown) => {
-      apiRef.current = api as ExcalidrawApi
+    (api: ExcalidrawImperativeAPI) => {
+      apiRef.current = api
       if (sceneRef.current) {
         scheduleSceneUpdate(sceneRef.current)
       }
@@ -80,36 +62,12 @@ export function ExcalidrawCanvas({
     [scheduleSceneUpdate],
   )
 
-  const handleChange = (
-    elements: readonly unknown[],
-    appState: unknown,
-    files: Record<string, unknown>,
-  ) => {
-    onChange?.(elements, appState, files)
-  }
-
-  if (loadError) {
-    return (
-      <div className="flex h-full items-center justify-center">
-        <div className="text-red-600">Failed to load canvas.</div>
-      </div>
-    )
-  }
-
-  if (!Excalidraw) {
-    return (
-      <div className="flex h-full items-center justify-center">
-        <div className="text-muted-foreground">Loading canvas...</div>
-      </div>
-    )
-  }
-
   return (
     <div style={{ height: "100%", width: "100%" }}>
       <Excalidraw
         initialData={initialData}
         excalidrawAPI={handleApi}
-        onChange={handleChange}
+        onChange={onChange}
         UIOptions={{
           canvasActions: {
             loadScene: false,
