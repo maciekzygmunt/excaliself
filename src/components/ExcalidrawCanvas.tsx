@@ -1,4 +1,10 @@
-import { useCallback, useEffect, useRef } from "react"
+import {
+  type ReactElement,
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useRef,
+} from "react"
 import "@excalidraw/excalidraw/index.css"
 import { Excalidraw } from "@excalidraw/excalidraw"
 import type { ExcalidrawElement } from "@excalidraw/excalidraw/element/types"
@@ -7,11 +13,17 @@ import type {
   BinaryFiles,
   ExcalidrawImperativeAPI,
   ExcalidrawInitialDataState,
+  UIAppState,
 } from "@excalidraw/excalidraw/types"
 
 interface ExcalidrawCanvasProps {
   initialData: ExcalidrawInitialDataState
   scene?: ExcalidrawInitialDataState
+  children?: ReactNode
+  renderTopRightUI?: (
+    isMobile: boolean,
+    appState: UIAppState,
+  ) => ReactElement | null
   onChange?: (
     elements: readonly ExcalidrawElement[],
     appState: AppState,
@@ -22,6 +34,8 @@ interface ExcalidrawCanvasProps {
 export function ExcalidrawCanvas({
   initialData,
   scene,
+  children,
+  renderTopRightUI,
   onChange,
 }: ExcalidrawCanvasProps) {
   const apiRef = useRef<ExcalidrawImperativeAPI | null>(null)
@@ -68,13 +82,16 @@ export function ExcalidrawCanvas({
         initialData={initialData}
         excalidrawAPI={handleApi}
         onChange={onChange}
+        renderTopRightUI={renderTopRightUI}
         UIOptions={{
           canvasActions: {
             loadScene: false,
             saveToActiveFile: false,
           },
         }}
-      />
+      >
+        {children}
+      </Excalidraw>
     </div>
   )
 }

@@ -93,12 +93,8 @@
           "name": "accounts_userId_users_id_fk",
           "tableFrom": "accounts",
           "tableTo": "users",
-          "columnsFrom": [
-            "userId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["userId"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -156,12 +152,8 @@
           "name": "drawing_files_drawingId_drawings_id_fk",
           "tableFrom": "drawing_files",
           "tableTo": "drawings",
-          "columnsFrom": [
-            "drawingId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["drawingId"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -239,12 +231,8 @@
           "name": "drawings_folderId_folders_id_fk",
           "tableFrom": "drawings",
           "tableTo": "folders",
-          "columnsFrom": [
-            "folderId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["folderId"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -252,12 +240,8 @@
           "name": "drawings_ownerId_users_id_fk",
           "tableFrom": "drawings",
           "tableTo": "users",
-          "columnsFrom": [
-            "ownerId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["ownerId"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -315,12 +299,8 @@
           "name": "folders_ownerId_users_id_fk",
           "tableFrom": "folders",
           "tableTo": "users",
-          "columnsFrom": [
-            "ownerId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["ownerId"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -328,12 +308,8 @@
           "name": "folders_parentId_folders_id_fk",
           "tableFrom": "folders",
           "tableTo": "folders",
-          "columnsFrom": [
-            "parentId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["parentId"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -397,12 +373,8 @@
           "name": "invites_invitedBy_users_id_fk",
           "tableFrom": "invites",
           "tableTo": "users",
-          "columnsFrom": [
-            "invitedBy"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["invitedBy"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -412,9 +384,7 @@
         "invites_token_unique": {
           "name": "invites_token_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "token"
-          ]
+          "columns": ["token"]
         }
       },
       "policies": {},
@@ -480,12 +450,8 @@
           "name": "sessions_userId_users_id_fk",
           "tableFrom": "sessions",
           "tableTo": "users",
-          "columnsFrom": [
-            "userId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["userId"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -495,9 +461,7 @@
         "sessions_token_unique": {
           "name": "sessions_token_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "token"
-          ]
+          "columns": ["token"]
         }
       },
       "policies": {},
@@ -566,9 +530,7 @@
         "users_email_unique": {
           "name": "users_email_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "email"
-          ]
+          "columns": ["email"]
         }
       },
       "policies": {},
