@@ -31,6 +31,57 @@ interface ExcalidrawCanvasProps {
   ) => void
 }
 
+function useSceneSync(scene?: ExcalidrawInitialDataState) {
+  const apiRef = useRef<ExcalidrawImperativeAPI | null>(null)
+  const sceneRef = useRef<ExcalidrawInitialDataState | null>(null)
+  const rafRef = useRef<number | null>(null)
+
+  const applyScene = useCallback((sceneToApply: ExcalidrawInitialDataState) => {
+    if (rafRef.current !== null) {
+      cancelAnimationFrame(rafRef.current)
+    }
+    // Defer updates until after mount to avoid setState-before-mount warnings.
+    rafRef.current = requestAnimationFrame(() => {
+      const api = apiRef.current
+      if (api) {
+        api.updateScene(
+          sceneToApply as Parameters<
+            ExcalidrawImperativeAPI["updateScene"]
+          >[0],
+        )
+      }
+    })
+  }, [])
+
+  useEffect(() => {
+    if (!scene) return
+    sceneRef.current = scene
+    if (apiRef.current) {
+      applyScene(scene)
+    }
+  }, [scene, applyScene])
+
+  useEffect(() => {
+    return () => {
+      if (rafRef.current !== null) {
+        cancelAnimationFrame(rafRef.current)
+      }
+    }
+  }, [])
+
+  const handleApi = useCallback(
+    (api: ExcalidrawImperativeAPI) => {
+      apiRef.current = api
+      if (sceneRef.current) {
+        applyScene(sceneRef.current)
+      }
+    },
+    [applyScene],
+  )
+
+  return handleApi
+}
+
 export function ExcalidrawCanvas({
   initialData,
   scene,
@@ -38,43 +89,7 @@ export function ExcalidrawCanvas({
   renderTopRightUI,
   onChange,
 }: ExcalidrawCanvasProps) {
-  const apiRef = useRef<ExcalidrawImperativeAPI | null>(null)
-  const sceneRef = useRef<ExcalidrawInitialDataState | null>(null)
-
-  const scheduleSceneUpdate = useCallback(
-    (sceneToApply: ExcalidrawInitialDataState) => {
-      // Defer updates until after mount to avoid setState-before-mount warnings.
-      requestAnimationFrame(() => {
-        const api = apiRef.current
-        if (api) {
-          api.updateScene(
-            sceneToApply as Parameters<
-              ExcalidrawImperativeAPI["updateScene"]
-            >[0],
-          )
-        }
-      })
-    },
-    [],
-  )
-
-  useEffect(() => {
-    if (!scene) return
-    sceneRef.current = scene
-    if (apiRef.current) {
-      scheduleSceneUpdate(scene)
-    }
-  }, [scene, scheduleSceneUpdate])
-
-  const handleApi = useCallback(
-    (api: ExcalidrawImperativeAPI) => {
-      apiRef.current = api
-      if (sceneRef.current) {
-        scheduleSceneUpdate(sceneRef.current)
-      }
-    },
-    [scheduleSceneUpdate],
-  )
+  const handleApi = useSceneSync(scene)
 
   return (
     <div style={{ height: "100%", width: "100%" }}>
