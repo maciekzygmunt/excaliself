@@ -108,7 +108,6 @@ function DrawingCanvas() {
   )
 
   const { saving, saved, handleChange } = useAutoSave<SceneData>({
-    initialData: drawing?.data ?? "{}",
     onSave,
   })
 
