@@ -5,7 +5,6 @@ interface UseAutoSaveOptions<T> {
   debounceMs?: number
   savedIndicatorMs?: number
   onSave: (data: T) => Promise<void>
-  serialize: (data: T) => string
 }
 
 interface UseAutoSaveReturn<T> {
@@ -19,7 +18,6 @@ export function useAutoSave<T>({
   debounceMs = 300,
   savedIndicatorMs = 2000,
   onSave,
-  serialize,
 }: UseAutoSaveOptions<T>): UseAutoSaveReturn<T> {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -29,6 +27,8 @@ export function useAutoSave<T>({
   const lastSavedDataRef = useRef<string>(initialData)
   const latestDataRef = useRef<T | null>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
+  const onSaveRef = useRef(onSave)
+  onSaveRef.current = onSave
 
   // Update lastSavedDataRef when initialData changes (e.g., route change)
   useEffect(() => {
@@ -37,7 +37,7 @@ export function useAutoSave<T>({
 
   const performSave = useCallback(
     async (data: T, updateUi: boolean = true) => {
-      const dataString = serialize(data)
+      const dataString = JSON.stringify(data)
 
       if (dataString === lastSavedDataRef.current) {
         return
@@ -48,7 +48,7 @@ export function useAutoSave<T>({
       }
 
       try {
-        await onSave(data)
+        await onSaveRef.current(data)
         lastSavedDataRef.current = dataString
 
         if (updateUi) {
@@ -68,7 +68,7 @@ export function useAutoSave<T>({
         }
       }
     },
-    [onSave, serialize, savedIndicatorMs],
+    [savedIndicatorMs],
   )
 
   const handleChange = useCallback(

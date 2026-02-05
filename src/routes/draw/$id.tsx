@@ -93,7 +93,7 @@ function DrawingCanvas() {
 
   const onSave = useCallback(
     async (scene: SceneData) => {
-      await saveDrawing({
+      await saveDrawingMutation.mutateAsync({
         data: {
           id,
           data: JSON.stringify({
@@ -104,14 +104,12 @@ function DrawingCanvas() {
         },
       })
     },
-    [id],
+    [id, saveDrawingMutation],
   )
 
   const { saving, saved, handleChange } = useAutoSave<SceneData>({
     initialData: drawing?.data ?? "{}",
     onSave,
-    serialize: (scene) =>
-      JSON.stringify({ elements: scene.elements, appState: scene.appState }),
   })
 
   const handleSceneChange = useCallback(
@@ -164,8 +162,8 @@ function DrawingCanvas() {
   return (
     <div className="h-full">
       <ExcalidrawCanvas
+        key={id}
         initialData={sceneData}
-        scene={sceneData}
         onChange={handleSceneChange}
         renderTopRightUI={renderTopRightUI}
       >
