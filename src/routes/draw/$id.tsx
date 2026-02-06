@@ -74,17 +74,6 @@ export const Route = createFileRoute("/draw/$id")({
   ),
 })
 
-const getScenePersistence = (scene: SceneData) => {
-  const dataForDb = serializeAsJSON(
-    scene.elements,
-    scene.appState,
-    scene.files ?? {},
-    "database",
-  )
-  const signature = String(hashString(dataForDb))
-  return { dataForDb, signature }
-}
-
 const getSceneSignature = (scene: SceneData) => {
   const elementsSignature = hashElementsVersion(scene.elements)
   const appStateSignature = [
@@ -130,19 +119,20 @@ function DrawingCanvas() {
   const [editingName, setEditingName] = useState<string | null>(null)
   const displayName = editingName ?? drawing?.name ?? ""
 
-  const onSave = useCallback(
-    async (scene: SceneData) => {
-      const { dataForDb } = getScenePersistence(scene)
-      await saveDrawingMutation.mutateAsync({
-        data: {
-          id,
-          data: dataForDb,
-          files: toPersistedFiles(scene.files ?? {}),
-        },
-      })
-    },
-    [id, saveDrawingMutation],
-  )
+  const onSave = async (scene: SceneData) => {
+    await saveDrawingMutation.mutateAsync({
+      data: {
+        id,
+        data: serializeAsJSON(
+          scene.elements,
+          scene.appState,
+          scene.files ?? {},
+          "database",
+        ),
+        files: toPersistedFiles(scene.files ?? {}),
+      },
+    })
+  }
 
   const { saving, saved, handleChange } = useAutoSave<SceneData>({
     onSave,
