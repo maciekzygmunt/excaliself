@@ -16,27 +16,6 @@ interface UseAutoSaveReturn<T> {
   handleChange: (data: T) => void
 }
 
-interface AutoSaveRuntime<T> {
-  pendingData: T | null
-  initialized: boolean
-  lastPersistedSignature: string | null
-  lastQueuedSignature: string | null
-  onSave: (data: T) => Promise<void>
-  getSignature?: (data: T) => string
-}
-
-const createInitialRuntime = <T>(
-  onSave: (data: T) => Promise<void>,
-  getSignature?: (data: T) => string,
-): AutoSaveRuntime<T> => ({
-  pendingData: null,
-  initialized: false,
-  lastPersistedSignature: null,
-  lastQueuedSignature: null,
-  onSave,
-  getSignature,
-})
-
 export function useAutoSave<T>({
   onSave,
   debounceMs = 300,
@@ -47,35 +26,42 @@ export function useAutoSave<T>({
 }: UseAutoSaveOptions<T>): UseAutoSaveReturn<T> {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
-  const runtimeRef = useRef<AutoSaveRuntime<T>>(
-    createInitialRuntime(onSave, getSignature),
-  )
 
-  runtimeRef.current.onSave = onSave
-  runtimeRef.current.getSignature = getSignature
+  const onSaveRef = useRef(onSave)
+  onSaveRef.current = onSave
+
+  const getSignatureRef = useRef(getSignature)
+  getSignatureRef.current = getSignature
+
+  const stateRef = useRef({
+    pendingData: null as T | null,
+    initialized: false,
+    lastPersistedSignature: null as string | null,
+    lastQueuedSignature: null as string | null,
+  })
 
   const performSave = useCallback(async (data: T) => {
-    const runtime = runtimeRef.current
-    const signature = runtime.getSignature?.(data) ?? null
+    const state = stateRef.current
+    const signature = getSignatureRef.current?.(data) ?? null
 
-    if (signature && signature === runtime.lastPersistedSignature) {
-      runtime.pendingData = null
-      runtime.lastQueuedSignature = signature
+    if (signature && signature === state.lastPersistedSignature) {
+      state.pendingData = null
+      state.lastQueuedSignature = signature
       return
     }
 
-    runtime.pendingData = null
+    state.pendingData = null
     setSaving(true)
     try {
-      await runtime.onSave(data)
+      await onSaveRef.current(data)
       if (signature) {
-        runtime.lastPersistedSignature = signature
-        runtime.lastQueuedSignature = signature
+        state.lastPersistedSignature = signature
+        state.lastQueuedSignature = signature
       }
       setSaved(true)
     } catch (err) {
       if (signature) {
-        runtime.lastQueuedSignature = runtime.lastPersistedSignature
+        state.lastQueuedSignature = state.lastPersistedSignature
       }
       console.error("Failed to save:", err)
     } finally {
@@ -88,33 +74,33 @@ export function useAutoSave<T>({
 
   const handleChange = useCallback(
     (data: T) => {
-      const runtime = runtimeRef.current
-      const signature = runtime.getSignature?.(data) ?? null
+      const state = stateRef.current
+      const signature = getSignatureRef.current?.(data) ?? null
 
-      if (signature) {
-        if (skipInitialChange && !runtime.initialized) {
-          runtime.initialized = true
-          runtime.lastPersistedSignature = signature
-          runtime.lastQueuedSignature = signature
+      if (!state.initialized) {
+        state.initialized = true
+        if (skipInitialChange) {
+          if (signature) {
+            state.lastPersistedSignature = signature
+            state.lastQueuedSignature = signature
+          }
           return
         }
-        runtime.initialized = true
-
-        if (
-          signature === runtime.lastPersistedSignature ||
-          signature === runtime.lastQueuedSignature
-        ) {
-          return
-        }
-        runtime.lastQueuedSignature = signature
-      } else if (skipInitialChange && !runtime.initialized) {
-        runtime.initialized = true
-        return
-      } else {
-        runtime.initialized = true
       }
 
-      runtime.pendingData = data
+      if (
+        signature &&
+        (signature === state.lastPersistedSignature ||
+          signature === state.lastQueuedSignature)
+      ) {
+        return
+      }
+
+      if (signature) {
+        state.lastQueuedSignature = signature
+      }
+
+      state.pendingData = data
       runDebouncedSave(data)
     },
     [runDebouncedSave, skipInitialChange],
@@ -132,20 +118,22 @@ export function useAutoSave<T>({
     if (resetKey === undefined) return
 
     cancelDebouncedSave()
-    runtimeRef.current.pendingData = null
-    runtimeRef.current.initialized = false
-    runtimeRef.current.lastPersistedSignature = null
-    runtimeRef.current.lastQueuedSignature = null
+    stateRef.current = {
+      pendingData: null,
+      initialized: false,
+      lastPersistedSignature: null,
+      lastQueuedSignature: null,
+    }
     setSaving(false)
     setSaved(false)
   }, [cancelDebouncedSave, resetKey])
 
   useEffect(() => {
     return () => {
-      const pendingData = runtimeRef.current.pendingData
+      const pendingData = stateRef.current.pendingData
       cancelDebouncedSave()
       if (pendingData) {
-        void runtimeRef.current.onSave(pendingData)
+        void onSaveRef.current(pendingData)
       }
     }
   }, [cancelDebouncedSave])
