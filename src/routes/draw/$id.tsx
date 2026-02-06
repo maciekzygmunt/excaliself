@@ -1,3 +1,8 @@
+import {
+  hashElementsVersion,
+  hashString,
+  serializeAsJSON,
+} from "@excalidraw/excalidraw"
 import type { ExcalidrawElement } from "@excalidraw/excalidraw/element/types"
 import type {
   AppState,
@@ -69,6 +74,40 @@ export const Route = createFileRoute("/draw/$id")({
   ),
 })
 
+const getScenePersistence = (scene: SceneData) => {
+  const dataForDb = serializeAsJSON(
+    scene.elements,
+    scene.appState,
+    scene.files ?? {},
+    "database",
+  )
+  const signature = String(hashString(dataForDb))
+  return { dataForDb, signature }
+}
+
+const getSceneSignature = (scene: SceneData) => {
+  const elementsSignature = hashElementsVersion(scene.elements)
+  const appStateSignature = [
+    scene.appState.gridModeEnabled ? "1" : "0",
+    scene.appState.viewBackgroundColor ?? "",
+    String(scene.appState.gridSize ?? ""),
+    String(scene.appState.gridStep ?? ""),
+  ].join("|")
+
+  // Keep per-change signature cheap by hashing file metadata only.
+  let filesSignature = 0
+  for (const [fileId, file] of Object.entries(scene.files ?? {})) {
+    filesSignature =
+      (filesSignature +
+        hashString(
+          `${fileId}:${file.version ?? 0}:${file.mimeType}:${file.dataURL?.length ?? 0}`,
+        )) >>>
+      0
+  }
+
+  return `${elementsSignature}|${appStateSignature}|${filesSignature}`
+}
+
 function DrawingCanvas() {
   const { id } = Route.useParams()
   const queryClient = useQueryClient()
@@ -93,13 +132,11 @@ function DrawingCanvas() {
 
   const onSave = useCallback(
     async (scene: SceneData) => {
+      const { dataForDb } = getScenePersistence(scene)
       await saveDrawingMutation.mutateAsync({
         data: {
           id,
-          data: JSON.stringify({
-            elements: scene.elements,
-            appState: scene.appState,
-          }),
+          data: dataForDb,
           files: toPersistedFiles(scene.files ?? {}),
         },
       })
@@ -109,6 +146,9 @@ function DrawingCanvas() {
 
   const { saving, saved, handleChange } = useAutoSave<SceneData>({
     onSave,
+    getSignature: getSceneSignature,
+    resetKey: id,
+    skipInitialChange: true,
   })
 
   const handleSceneChange = useCallback(

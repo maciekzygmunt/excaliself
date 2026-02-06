@@ -28,9 +28,7 @@ function useTopLeftPortalTarget() {
       if (primary instanceof HTMLElement) {
         nextTarget = primary
       } else {
-        const trigger = document.querySelector(
-          ".excalidraw .main-menu-trigger",
-        )
+        const trigger = document.querySelector(".excalidraw .main-menu-trigger")
         const fallback = trigger?.closest("div")
         if (fallback instanceof HTMLElement) {
           nextTarget = fallback
