@@ -1,4 +1,8 @@
-import { restore } from "@excalidraw/excalidraw"
+import {
+  hashElementsVersion,
+  hashString,
+  restore,
+} from "@excalidraw/excalidraw"
 import type { ExcalidrawElement } from "@excalidraw/excalidraw/element/types"
 import type {
   AppState,
@@ -53,4 +57,27 @@ export const restoreScene = (
   } catch {
     return restore(null, null, null)
   }
+}
+
+export const getSceneSignature = (scene: SceneData) => {
+  const elementsSignature = hashElementsVersion(scene.elements)
+  const appStateSignature = [
+    scene.appState.gridModeEnabled ? "1" : "0",
+    scene.appState.viewBackgroundColor ?? "",
+    String(scene.appState.gridSize ?? ""),
+    String(scene.appState.gridStep ?? ""),
+  ].join("|")
+
+  // Keep per-change signature cheap by hashing file metadata only.
+  let filesSignature = 0
+  for (const [fileId, file] of Object.entries(scene.files ?? {})) {
+    filesSignature =
+      (filesSignature +
+        hashString(
+          `${fileId}:${file.version ?? 0}:${file.mimeType}:${file.dataURL?.length ?? 0}`,
+        )) >>>
+      0
+  }
+
+  return `${elementsSignature}|${appStateSignature}|${filesSignature}`
 }

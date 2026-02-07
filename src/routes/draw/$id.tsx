@@ -1,8 +1,4 @@
-import {
-  hashElementsVersion,
-  hashString,
-  serializeAsJSON,
-} from "@excalidraw/excalidraw"
+import { Excalidraw, serializeAsJSON } from "@excalidraw/excalidraw"
 import type { ExcalidrawElement } from "@excalidraw/excalidraw/element/types"
 import type {
   AppState,
@@ -15,7 +11,6 @@ import { createFileRoute } from "@tanstack/react-router"
 import { createServerFn } from "@tanstack/react-start"
 import { Cloud, Loader2, Pencil } from "lucide-react"
 import { useCallback, useMemo, useState } from "react"
-import { ExcalidrawCanvas } from "@/components/ExcalidrawCanvas"
 import { useSidebar } from "@/components/ui/sidebar"
 import { useAutoSave } from "@/hooks/use-auto-save"
 import { authMiddleware } from "@/middleware/auth"
@@ -25,7 +20,14 @@ import {
   updateDrawingFiles,
 } from "@/server/drawings"
 import { TopLeftControls, TopLeftPortal } from "./-components/TopLeftControls"
-import { restoreScene, type SceneData, toPersistedFiles } from "./-utils/scene"
+import {
+  getSceneSignature,
+  restoreScene,
+  type SceneData,
+  toPersistedFiles,
+} from "./-utils/scene"
+
+import "@excalidraw/excalidraw/index.css"
 
 const saveDrawing = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
@@ -73,29 +75,6 @@ export const Route = createFileRoute("/draw/$id")({
     </div>
   ),
 })
-
-const getSceneSignature = (scene: SceneData) => {
-  const elementsSignature = hashElementsVersion(scene.elements)
-  const appStateSignature = [
-    scene.appState.gridModeEnabled ? "1" : "0",
-    scene.appState.viewBackgroundColor ?? "",
-    String(scene.appState.gridSize ?? ""),
-    String(scene.appState.gridStep ?? ""),
-  ].join("|")
-
-  // Keep per-change signature cheap by hashing file metadata only.
-  let filesSignature = 0
-  for (const [fileId, file] of Object.entries(scene.files ?? {})) {
-    filesSignature =
-      (filesSignature +
-        hashString(
-          `${fileId}:${file.version ?? 0}:${file.mimeType}:${file.dataURL?.length ?? 0}`,
-        )) >>>
-      0
-  }
-
-  return `${elementsSignature}|${appStateSignature}|${filesSignature}`
-}
 
 function DrawingCanvas() {
   const { id } = Route.useParams()
@@ -189,12 +168,18 @@ function DrawingCanvas() {
   if (!drawing) return null
 
   return (
-    <div className="h-full">
-      <ExcalidrawCanvas
+    <div className="size-full">
+      <Excalidraw
         key={id}
         initialData={sceneData}
         onChange={handleSceneChange}
         renderTopRightUI={renderTopRightUI}
+        UIOptions={{
+          canvasActions: {
+            loadScene: false,
+            saveToActiveFile: false,
+          },
+        }}
       >
         <TopLeftPortal>
           <TopLeftControls
@@ -204,7 +189,7 @@ function DrawingCanvas() {
             onNameBlur={handleNameBlur}
           />
         </TopLeftPortal>
-      </ExcalidrawCanvas>
+      </Excalidraw>
     </div>
   )
 }
