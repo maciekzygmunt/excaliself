@@ -1,8 +1,4 @@
-import {
-  hashElementsVersion,
-  hashString,
-  restore,
-} from "@excalidraw/excalidraw"
+import { hashElementsVersion, hashString } from "@excalidraw/excalidraw"
 import type { ExcalidrawElement } from "@excalidraw/excalidraw/element/types"
 import type {
   AppState,
@@ -20,6 +16,7 @@ export type PersistedFile = {
   fileId: string
   mimeType: string
   dataUrl: string
+  createdAt?: Date | string | null
 }
 
 export const toPersistedFiles = (files: BinaryFiles) =>
@@ -29,33 +26,38 @@ export const toPersistedFiles = (files: BinaryFiles) =>
     dataUrl: file.dataURL || "",
   }))
 
-export const restoreScene = (
+export const toBinaryFiles = (
+  persistedFiles: PersistedFile[] | null | undefined,
+): BinaryFiles => {
+  const files = {} as BinaryFiles
+
+  for (const file of persistedFiles ?? []) {
+    const createdMs = file.createdAt ? new Date(file.createdAt).getTime() : 0
+    files[file.fileId] = {
+      id: file.fileId,
+      mimeType: file.mimeType,
+      dataURL: file.dataUrl,
+      created: Number.isFinite(createdMs) ? createdMs : 0,
+    } as BinaryFiles[string]
+  }
+
+  return files
+}
+
+export const buildInitialSceneData = (
   drawing: { data: string; files?: PersistedFile[] | null } | null | undefined,
-): ExcalidrawInitialDataState => {
-  if (!drawing) return restore(null, null, null)
+): ExcalidrawInitialDataState | null => {
+  if (!drawing?.data) return null
+
   try {
-    const parsed = JSON.parse(drawing.data)
-    const files = {} as BinaryFiles
-    drawing.files?.forEach((file) => {
-      files[file.fileId] = {
-        id: file.fileId,
-        mimeType: file.mimeType,
-        dataURL: file.dataUrl,
-      } as BinaryFiles[string]
-    })
-    const restored = restore(
-      {
-        elements: parsed.elements,
-        appState: parsed.appState,
-        files,
-      },
-      null,
-      null,
-    )
-    restored.appState.collaborators = new Map()
-    return restored
+    const parsed = JSON.parse(drawing.data) as ExcalidrawInitialDataState
+    return {
+      elements: parsed.elements,
+      appState: parsed.appState,
+      files: toBinaryFiles(drawing.files),
+    }
   } catch {
-    return restore(null, null, null)
+    return null
   }
 }
 

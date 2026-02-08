@@ -3,61 +3,28 @@ import type { ExcalidrawElement } from "@excalidraw/excalidraw/element/types"
 import type {
   AppState,
   BinaryFiles,
-  ExcalidrawInitialDataState,
   UIAppState,
 } from "@excalidraw/excalidraw/types"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { createFileRoute } from "@tanstack/react-router"
-import { createServerFn } from "@tanstack/react-start"
 import { Cloud, Loader2, Pencil } from "lucide-react"
 import { useCallback, useMemo, useState } from "react"
 import { useSidebar } from "@/components/ui/sidebar"
 import { useAutoSave } from "@/hooks/use-auto-save"
-import { authMiddleware } from "@/middleware/auth"
 import {
   getDrawingWithFiles,
+  saveDrawingScene,
   updateDrawing,
-  updateDrawingFiles,
 } from "@/server/drawings"
 import { TopLeftControls, TopLeftPortal } from "./-components/TopLeftControls"
 import {
+  buildInitialSceneData,
   getSceneSignature,
-  restoreScene,
   type SceneData,
   toPersistedFiles,
 } from "./-utils/scene"
 
 import "@excalidraw/excalidraw/index.css"
-
-const saveDrawing = createServerFn({ method: "POST" })
-  .middleware([authMiddleware])
-  .inputValidator(
-    (data: {
-      id: string
-      name?: string
-      data?: string
-      thumbnail?: string
-      files?: { fileId: string; mimeType: string; dataUrl: string }[]
-    }) => data,
-  )
-  .handler(async ({ data }) => {
-    const { id, files, ...updateData } = data
-    await updateDrawing({
-      data: {
-        id,
-        updateData,
-      },
-    })
-
-    if (files) {
-      await updateDrawingFiles({
-        data: {
-          drawingId: id,
-          files,
-        },
-      })
-    }
-  })
 
 export const Route = createFileRoute("/draw/$id")({
   ssr: false,
@@ -86,12 +53,19 @@ function DrawingCanvas() {
     queryFn: () => getDrawingWithFiles({ data: id }),
   })
 
-  const saveDrawingMutation = useMutation({
-    mutationFn: saveDrawing,
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["drawings"] })
-      queryClient.invalidateQueries({ queryKey: ["drawing", id] })
-    },
+  const invalidateDrawingQueries = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ["drawings"] })
+    queryClient.invalidateQueries({ queryKey: ["drawing", id] })
+  }, [id, queryClient])
+
+  const saveSceneMutation = useMutation({
+    mutationFn: saveDrawingScene,
+    onSettled: invalidateDrawingQueries,
+  })
+
+  const renameDrawingMutation = useMutation({
+    mutationFn: updateDrawing,
+    onSettled: invalidateDrawingQueries,
   })
 
   // Track local edits only - use prop directly for display when not editing
@@ -99,7 +73,7 @@ function DrawingCanvas() {
   const displayName = editingName ?? drawing?.name ?? ""
 
   const onSave = async (scene: SceneData) => {
-    await saveDrawingMutation.mutateAsync({
+    await saveSceneMutation.mutateAsync({
       data: {
         id,
         data: serializeAsJSON(
@@ -134,7 +108,12 @@ function DrawingCanvas() {
   const handleNameBlur = (newName: string) => {
     setEditingName(null)
     if (newName !== drawing?.name) {
-      saveDrawingMutation.mutate({ data: { id, name: newName } })
+      renameDrawingMutation.mutate({
+        data: {
+          id,
+          updateData: { name: newName },
+        },
+      })
     }
   }
 
@@ -160,10 +139,7 @@ function DrawingCanvas() {
     [saving, saved],
   )
 
-  const sceneData: ExcalidrawInitialDataState = useMemo(
-    () => restoreScene(drawing),
-    [drawing],
-  )
+  const sceneData = useMemo(() => buildInitialSceneData(drawing), [drawing])
 
   if (!drawing) return null
 
