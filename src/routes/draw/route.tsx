@@ -1,5 +1,6 @@
 import { createFileRoute, Outlet } from "@tanstack/react-router"
 import { createServerFn } from "@tanstack/react-start"
+import type React from "react"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { authMiddleware } from "@/middleware/auth"
 import { setupMiddleware } from "@/middleware/setup"
@@ -37,7 +38,7 @@ function DrawLayout() {
   const { session } = Route.useLoaderData()
 
   return (
-    <SidebarProvider defaultOpen>
+    <SidebarProvider defaultOpen style={{ "--sidebar-width": "260px" } as React.CSSProperties}>
       <DrawLayoutShell
         userEmail={session.user?.email ?? ""}
         isAdmin={session.user.role === "admin"}
