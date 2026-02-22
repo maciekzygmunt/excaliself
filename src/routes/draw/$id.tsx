@@ -1,4 +1,4 @@
-import { Excalidraw, serializeAsJSON } from "@excalidraw/excalidraw"
+import { Excalidraw, MainMenu, serializeAsJSON } from "@excalidraw/excalidraw"
 import type { ExcalidrawElement } from "@excalidraw/excalidraw/element/types"
 import type {
   AppState,
@@ -7,7 +7,7 @@ import type {
 } from "@excalidraw/excalidraw/types"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { createFileRoute } from "@tanstack/react-router"
-import { Cloud, Loader2, Pencil } from "lucide-react"
+import { Cloud, Loader2, PanelLeftIcon, Pencil } from "lucide-react"
 import { useCallback, useMemo, useState } from "react"
 import { useSidebar } from "@/components/ui/sidebar"
 import { useAutoSave } from "@/hooks/use-auto-save"
@@ -157,6 +157,29 @@ function DrawingCanvas() {
           },
         }}
       >
+        <MainMenu>
+          <MainMenu.Item
+            icon={<PanelLeftIcon className="h-4 w-4" />}
+            onSelect={toggleSidebar}
+          >
+            Drawings
+          </MainMenu.Item>
+          <MainMenu.Separator />
+          <MainMenu.DefaultItems.LoadScene />
+          <MainMenu.DefaultItems.SaveToActiveFile />
+          <MainMenu.DefaultItems.Export />
+          <MainMenu.DefaultItems.SaveAsImage />
+          <MainMenu.DefaultItems.SearchMenu />
+          <MainMenu.DefaultItems.Help />
+          <MainMenu.DefaultItems.ClearCanvas />
+          <MainMenu.Separator />
+          <MainMenu.Group title="Excalidraw links">
+            <MainMenu.DefaultItems.Socials />
+          </MainMenu.Group>
+          <MainMenu.Separator />
+          <MainMenu.DefaultItems.ToggleTheme />
+          <MainMenu.DefaultItems.ChangeCanvasBackground />
+        </MainMenu>
         <TopLeftPortal>
           <TopLeftControls
             displayName={displayName}
