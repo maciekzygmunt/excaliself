@@ -1,4 +1,4 @@
-import { hashElementsVersion, hashString } from "@excalidraw/excalidraw"
+import { hashElementsVersion, hashString, restore } from "@excalidraw/excalidraw"
 import type { ExcalidrawElement } from "@excalidraw/excalidraw/element/types"
 import type {
   AppState,
@@ -46,18 +46,36 @@ export const toBinaryFiles = (
 
 export const buildInitialSceneData = (
   drawing: { data: string; files?: PersistedFile[] | null } | null | undefined,
-): ExcalidrawInitialDataState | null => {
-  if (!drawing?.data) return null
+): ExcalidrawInitialDataState => {
+  const files = toBinaryFiles(drawing?.files)
+
+  const restoreAndNormalize = (scene: ExcalidrawInitialDataState | null) => {
+    const restored = restore(scene, null, null)
+
+    // Excalidraw expects collaborators to be a Map, but JSON persistence turns it into an object.
+    restored.appState.collaborators = new Map()
+
+    return {
+      ...restored,
+      files,
+    }
+  }
 
   try {
-    const parsed = JSON.parse(drawing.data) as ExcalidrawInitialDataState
-    return {
-      elements: parsed.elements,
-      appState: parsed.appState,
-      files: toBinaryFiles(drawing.files),
-    }
+    const parsed = drawing?.data
+      ? (JSON.parse(drawing.data) as ExcalidrawInitialDataState)
+      : null
+    return restoreAndNormalize(
+      parsed
+        ? {
+            elements: parsed.elements,
+            appState: parsed.appState,
+            files,
+          }
+        : null,
+    )
   } catch {
-    return null
+    return restoreAndNormalize(null)
   }
 }
 

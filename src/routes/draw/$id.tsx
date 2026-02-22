@@ -65,6 +65,17 @@ function DrawingCanvas() {
 
   const renameDrawingMutation = useMutation({
     mutationFn: updateDrawing,
+    onMutate: async ({ data: { id: drawingId, updateData } }) => {
+      await queryClient.cancelQueries({ queryKey: ["drawing", drawingId] })
+      const previous = queryClient.getQueryData(["drawing", drawingId])
+      queryClient.setQueryData(["drawing", drawingId], (old: typeof drawing) =>
+        old ? { ...old, ...updateData } : old,
+      )
+      return { previous }
+    },
+    onError: (_err, { data: { id: drawingId } }, context) => {
+      queryClient.setQueryData(["drawing", drawingId], context?.previous)
+    },
     onSettled: invalidateDrawingQueries,
   })
 
