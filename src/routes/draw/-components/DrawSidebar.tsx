@@ -1,16 +1,14 @@
 import { Link } from "@tanstack/react-router"
 import {
-  Clock,
   File,
   Folder,
   LogOut,
   Plus,
   Search,
   Settings,
-  Star,
-  Trash2,
+  X,
 } from "lucide-react"
-import { useState } from "react"
+import { useRef, useState } from "react"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -49,6 +47,9 @@ type DrawSidebarProps = {
 export function DrawSidebar({ userEmail, isAdmin }: DrawSidebarProps) {
   const {
     tree,
+    filteredTree,
+    searchQuery,
+    setSearchQuery,
     dropTarget,
     onDragOver,
     onDragLeave,
@@ -56,6 +57,10 @@ export function DrawSidebar({ userEmail, isAdmin }: DrawSidebarProps) {
     confirmDialog,
     closeConfirmDialog,
   } = useSidebarContext()
+
+  const searchInputRef = useRef<HTMLInputElement>(null)
+  const isSearching = searchQuery.length > 0
+  const displayTree = isSearching ? filteredTree : tree
 
   const [createType, setCreateType] = useState<"drawing" | "folder" | null>(
     null,
@@ -78,29 +83,30 @@ export function DrawSidebar({ userEmail, isAdmin }: DrawSidebarProps) {
           </div>
         </SidebarHeader>
 
-        {/* Search (mocked) */}
+        {/* Search */}
         <div className="px-3 pb-1">
-          <div className="flex items-center gap-2 rounded-md px-2 py-1.5 transition-colors hover:bg-sidebar-accent cursor-pointer">
+          <div className="group/search relative flex items-center gap-2 rounded-md px-2 py-1.5 transition-colors focus-within:bg-sidebar-accent hover:bg-sidebar-accent">
             <Search className="h-[14px] w-[14px] shrink-0 text-muted-foreground/60" />
-            <span className="text-sm text-muted-foreground/60">Search...</span>
+            <input
+              ref={searchInputRef}
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search..."
+              className="h-auto w-full bg-transparent text-sm text-sidebar-foreground placeholder:text-muted-foreground/60 focus:outline-none"
+            />
+            {isSearching && (
+              <button
+                onClick={() => {
+                  setSearchQuery("")
+                  searchInputRef.current?.blur()
+                }}
+                className="shrink-0 rounded p-0.5 text-muted-foreground/40 hover:text-muted-foreground"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            )}
           </div>
-        </div>
-
-        {/* Quick access (mocked) */}
-        <div className="px-3 py-1">
-          {[
-            { icon: Clock, label: "Recent" },
-            { icon: Star, label: "Starred" },
-            { icon: Trash2, label: "Trash" },
-          ].map(({ icon: Icon, label }) => (
-            <div
-              key={label}
-              className="flex items-center gap-2 rounded-md px-2 py-1.5 transition-colors hover:bg-sidebar-accent cursor-pointer"
-            >
-              <Icon className="h-[14px] w-[14px] shrink-0 text-muted-foreground/60" />
-              <span className="text-sm text-muted-foreground">{label}</span>
-            </div>
-          ))}
         </div>
 
         {/* Divider */}
@@ -156,7 +162,7 @@ export function DrawSidebar({ userEmail, isAdmin }: DrawSidebarProps) {
                     onClose={() => setCreateType(null)}
                   />
                 )}
-                {tree.map((node) => (
+                {displayTree.map((node) => (
                   <TreeNodeItem
                     key={
                       node.type === "folder"
