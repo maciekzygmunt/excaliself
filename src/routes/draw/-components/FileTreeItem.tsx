@@ -170,16 +170,16 @@ export function FolderItem({ folder, children: childNodes }: FolderItemProps) {
               draggable
               onDragStart={handleDragStart}
               onDragEnd={handleDragEnd}
-              className="h-auto cursor-pointer gap-1.5 px-2 py-1.5 !pr-2 active:cursor-grabbing [&>svg]:size-auto"
+              className="h-auto cursor-pointer gap-1.5 px-2 py-1.5 pr-2! active:cursor-grabbing [&>svg]:size-auto"
             >
               <ChevronRight
                 className={cn(
-                  "!h-3 !w-3 shrink-0 text-muted-foreground/40 transition-transform duration-150",
+                  "h-3! w-3! shrink-0 text-muted-foreground/40 transition-transform duration-150",
                   isExpanded && "rotate-90",
                   !hasChildren && "opacity-0",
                 )}
               />
-              <Folder className="!h-[14px] !w-[14px] shrink-0 text-notion-gold" />
+              <Folder className="h-[14px]! w-[14px]! shrink-0 text-notion-gold" />
               {isRenaming ? (
                 <Input
                   ref={renameInputRef}
@@ -206,7 +206,7 @@ export function FolderItem({ folder, children: childNodes }: FolderItemProps) {
                   onPointerDown={(e) => e.stopPropagation()}
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <MoreHorizontal className="!h-[14px] !w-[14px]" />
+                  <MoreHorizontal className="h-[14px]! w-[14px]!" />
                 </SidebarMenuAction>
               </DropdownMenuTrigger>
               <DropdownMenuContent
@@ -335,10 +335,10 @@ export function DrawingItem({ drawing }: DrawingItemProps) {
 
   const ButtonContent = (
     <>
-      <span className="!h-3 !w-3 shrink-0" />
+      <span className="h-3! w-3! shrink-0" />
       <File
         className={cn(
-          "!h-[13px] !w-[13px] shrink-0 transition-colors",
+          "h-[13px]! w-[13px]! shrink-0 transition-colors",
           isActive ? "text-notion-terracotta" : "text-muted-foreground/30",
         )}
       />
@@ -386,7 +386,7 @@ export function DrawingItem({ drawing }: DrawingItemProps) {
       <SidebarMenuButton
         asChild
         isActive={isActive}
-        className="h-auto cursor-pointer gap-1.5 px-2 py-1.5 !pr-2 active:cursor-grabbing [&>svg]:size-auto"
+        className="h-auto cursor-pointer gap-1.5 px-2 py-1.5 pr-2! active:cursor-grabbing [&>svg]:size-auto"
       >
         <Link to="/draw/$id" params={{ id: drawing.id }} draggable={false}>
           {ButtonContent}
@@ -395,7 +395,7 @@ export function DrawingItem({ drawing }: DrawingItemProps) {
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <SidebarMenuAction className="text-muted-foreground/30 md:opacity-0 group-hover/drawing-item:opacity-100 group-focus-within/drawing-item:opacity-100 data-[state=open]:opacity-100 [&>svg]:size-auto">
-            <MoreHorizontal className="!h-[14px] !w-[14px]" />
+            <MoreHorizontal className="h-[14px]! w-[14px]!" />
           </SidebarMenuAction>
         </DropdownMenuTrigger>
         <DropdownMenuContent
