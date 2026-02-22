@@ -1,6 +1,14 @@
 import { Link } from "@tanstack/react-router"
-import { File, Folder, LogOut, Plus, Settings } from "lucide-react"
-import { useState } from "react"
+import {
+  File,
+  Folder,
+  LogOut,
+  Plus,
+  Search,
+  Settings,
+  X,
+} from "lucide-react"
+import { useRef, useState } from "react"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -11,8 +19,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -24,13 +30,8 @@ import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
-  SidebarGroup,
-  SidebarGroupContent,
   SidebarHeader,
   SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-  SidebarSeparator,
 } from "@/components/ui/sidebar"
 import { authClient } from "@/lib/auth-client"
 import { cn } from "@/lib/utils"
@@ -46,6 +47,9 @@ type DrawSidebarProps = {
 export function DrawSidebar({ userEmail, isAdmin }: DrawSidebarProps) {
   const {
     tree,
+    filteredTree,
+    searchQuery,
+    setSearchQuery,
     dropTarget,
     onDragOver,
     onDragLeave,
@@ -54,136 +58,169 @@ export function DrawSidebar({ userEmail, isAdmin }: DrawSidebarProps) {
     closeConfirmDialog,
   } = useSidebarContext()
 
+  const searchInputRef = useRef<HTMLInputElement>(null)
+  const isSearching = searchQuery.length > 0
+  const displayTree = isSearching ? filteredTree : tree
+
   const [createType, setCreateType] = useState<"drawing" | "folder" | null>(
     null,
   )
 
   return (
     <>
-      <Sidebar collapsible="offcanvas" variant="inset">
-        <SidebarHeader className="gap-2">
-          <div className="flex gap-2">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-8 flex-1 justify-start gap-2"
-                >
-                  <Plus className="h-4 w-4" />
-                  <span className="group-data-[collapsible=icon]:hidden">
-                    New
-                  </span>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent
-                align="start"
-                className="w-48"
-                onCloseAutoFocus={(e) => e.preventDefault()}
-              >
-                <DropdownMenuItem onClick={() => setCreateType("drawing")}>
-                  <File className="mr-2 h-4 w-4" />
-                  New Drawing
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setCreateType("folder")}>
-                  <Folder className="mr-2 h-4 w-4" />
-                  New Folder
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+      <Sidebar collapsible="offcanvas" variant="sidebar">
+        {/* Workspace header */}
+        <SidebarHeader className="gap-0 px-3 pt-4 pb-2">
+          <div
+            className="flex items-center gap-2 rounded-md px-2 py-1.5 transition-colors hover:bg-sidebar-accent cursor-pointer"
+          >
+            <div className="flex h-5 w-5 items-center justify-center rounded bg-notion-terracotta text-[10px] font-semibold text-white">
+              E
+            </div>
+            <span className="text-sm font-medium tracking-[-0.01em] text-sidebar-foreground">
+              Excalidraw
+            </span>
           </div>
         </SidebarHeader>
 
-        <SidebarSeparator />
-
-        <SidebarContent>
-          <SidebarGroup>
-            <SidebarGroupContent>
-              <div
-                className={cn(
-                  "min-h-[200px] rounded-md transition-colors pb-8",
-                  dropTarget?.type === "root" &&
-                    "bg-sidebar-accent ring-2 ring-sidebar-ring",
-                )}
-                onDragOver={onDragOver({ type: "root" })}
-                onDragLeave={onDragLeave}
-                onDrop={onDrop({ type: "root" })}
+        {/* Search */}
+        <div className="px-3 pb-1">
+          <div className="group/search relative flex items-center gap-2 rounded-md px-2 py-1.5 transition-colors focus-within:bg-sidebar-accent hover:bg-sidebar-accent">
+            <Search className="h-[14px] w-[14px] shrink-0 text-muted-foreground/60" />
+            <input
+              ref={searchInputRef}
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search..."
+              className="h-auto w-full bg-transparent text-sm text-sidebar-foreground placeholder:text-muted-foreground/60 focus:outline-none"
+            />
+            {isSearching && (
+              <button
+                onClick={() => {
+                  setSearchQuery("")
+                  searchInputRef.current?.blur()
+                }}
+                className="shrink-0 rounded p-0.5 text-muted-foreground/40 hover:text-muted-foreground"
               >
-                <SidebarMenu>
-                  {createType && (
-                    <CreateRow
-                      type={createType}
-                      onClose={() => setCreateType(null)}
-                    />
-                  )}
-                  {tree.map((node) => (
-                    <TreeNodeItem
-                      key={
-                        node.type === "folder"
-                          ? node.folder.id
-                          : node.drawing.id
-                      }
-                      node={node}
-                    />
-                  ))}
-                </SidebarMenu>
-              </div>
-            </SidebarGroupContent>
-          </SidebarGroup>
+                <X className="h-3 w-3" />
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Divider */}
+        <div className="mx-4 my-2 h-px bg-sidebar-border" />
+
+        {/* Section label with add button */}
+        <div className="flex items-center justify-between px-5 py-1">
+          <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground/50">
+            Drawings
+          </span>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                className="rounded p-0.5 text-muted-foreground/40 transition-all hover:bg-sidebar-accent hover:text-muted-foreground focus-visible:bg-sidebar-accent focus-visible:text-muted-foreground focus-visible:outline-none"
+              >
+                <Plus className="h-[14px] w-[14px]" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent
+              align="end"
+              className="w-48"
+              onCloseAutoFocus={(e) => e.preventDefault()}
+            >
+              <DropdownMenuItem onClick={() => setCreateType("drawing")}>
+                <File className="mr-2 h-4 w-4" />
+                New Drawing
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setCreateType("folder")}>
+                <Folder className="mr-2 h-4 w-4" />
+                New Folder
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+
+        {/* File tree */}
+        <SidebarContent className="gap-0 pt-1 [scrollbar-width:none]">
+          <div className="px-3">
+            <div
+              className={cn(
+                "min-h-[200px] rounded-md pb-4 transition-colors",
+                dropTarget?.type === "root" &&
+                  "bg-notion-terracotta-muted ring-2 ring-notion-terracotta/20",
+              )}
+              onDragOver={onDragOver({ type: "root" })}
+              onDragLeave={onDragLeave}
+              onDrop={onDrop({ type: "root" })}
+            >
+              <SidebarMenu className="gap-0">
+                {createType && (
+                  <CreateRow
+                    type={createType}
+                    onClose={() => setCreateType(null)}
+                  />
+                )}
+                {displayTree.map((node) => (
+                  <TreeNodeItem
+                    key={
+                      node.type === "folder"
+                        ? node.folder.id
+                        : node.drawing.id
+                    }
+                    node={node}
+                  />
+                ))}
+              </SidebarMenu>
+            </div>
+          </div>
         </SidebarContent>
 
-        <SidebarFooter>
-          <SidebarMenu>
-            <SidebarMenuItem>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <SidebarMenuButton
-                    size="lg"
-                    className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
-                  >
-                    <Avatar className="h-8 w-8 rounded-lg">
-                      <AvatarFallback className="rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-                        {userEmail.charAt(0).toUpperCase()}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="grid flex-1 text-left text-sm leading-tight">
-                      <span className="truncate font-medium">{userEmail}</span>
-                      <span className="truncate text-xs text-muted-foreground">
-                        {isAdmin ? "Admin" : "User"}
-                      </span>
-                    </div>
-                  </SidebarMenuButton>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent
-                  className="w-[--radix-dropdown-menu-trigger-width] min-w-56 rounded-lg"
-                  side="top"
-                  align="start"
-                  sideOffset={4}
-                >
-                  {isAdmin && (
-                    <>
-                      <DropdownMenuItem asChild>
-                        <Link to="/admin">
-                          <Settings className="mr-2 h-4 w-4" />
-                          Admin Settings
-                        </Link>
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                    </>
-                  )}
-                  <DropdownMenuItem
-                    onClick={async () => {
-                      await authClient.signOut()
-                      window.location.href = "/login"
-                    }}
-                  >
-                    <LogOut className="mr-2 h-4 w-4" />
-                    Sign out
+        {/* Footer */}
+        <SidebarFooter className="gap-0 border-t border-sidebar-border px-3 pb-3 pt-1">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="flex w-full items-center gap-2 rounded-md px-2 py-2 transition-colors hover:bg-sidebar-accent focus-visible:bg-sidebar-accent focus-visible:outline-none">
+                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-muted-foreground/20 text-[10px] font-medium text-sidebar-foreground">
+                  {userEmail.charAt(0).toUpperCase()}
+                </div>
+                <div className="flex-1 min-w-0 text-left">
+                  <div className="truncate text-sm text-sidebar-foreground/80">
+                    {userEmail}
+                  </div>
+                </div>
+                <Settings className="h-[13px] w-[13px] shrink-0 text-muted-foreground/30" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent
+              className="w-[--radix-dropdown-menu-trigger-width] min-w-56 rounded-lg"
+              side="top"
+              align="start"
+              sideOffset={4}
+            >
+              {isAdmin && (
+                <>
+                  <DropdownMenuItem asChild>
+                    <Link to="/admin">
+                      <Settings className="mr-2 h-4 w-4" />
+                      Admin Settings
+                    </Link>
                   </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </SidebarMenuItem>
-          </SidebarMenu>
+                  <DropdownMenuSeparator />
+                </>
+              )}
+              <DropdownMenuItem
+                onClick={async () => {
+                  await authClient.signOut()
+                  window.location.href = "/login"
+                }}
+              >
+                <LogOut className="mr-2 h-4 w-4" />
+                Sign out
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </SidebarFooter>
       </Sidebar>
       <ConfirmDeleteDialog

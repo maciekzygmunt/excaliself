@@ -25,18 +25,51 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
         content: "width=device-width, initial-scale=1",
       },
       {
-        title: "TanStack Start Starter",
+        title: "Excalidraw",
       },
     ],
     links: [
+      {
+        rel: "preconnect",
+        href: "https://fonts.googleapis.com",
+      },
+      {
+        rel: "preconnect",
+        href: "https://fonts.gstatic.com",
+        crossOrigin: "anonymous",
+      },
+      {
+        rel: "stylesheet",
+        href: "https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap",
+      },
       {
         rel: "stylesheet",
         href: appCss,
       },
     ],
   }),
-  errorComponent: () => <div>Error</div>,
-  notFoundComponent: () => <div>Not Found</div>,
+  errorComponent: () => (
+    <div className="flex min-h-screen items-center justify-center bg-background p-4">
+      <div className="text-center">
+        <div className="mx-auto mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-destructive/10 text-lg text-destructive">
+          !
+        </div>
+        <p className="text-sm text-foreground">Something went wrong</p>
+        <p className="mt-1 text-xs text-muted-foreground">Please try refreshing the page</p>
+      </div>
+    </div>
+  ),
+  notFoundComponent: () => (
+    <div className="flex min-h-screen items-center justify-center bg-background p-4">
+      <div className="text-center">
+        <div className="mx-auto mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-muted text-lg text-muted-foreground">
+          ?
+        </div>
+        <p className="text-sm text-foreground">Page not found</p>
+        <p className="mt-1 text-xs text-muted-foreground">The page you're looking for doesn't exist</p>
+      </div>
+    </div>
+  ),
   shellComponent: RootDocument,
 })
 

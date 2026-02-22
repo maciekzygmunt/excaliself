@@ -33,6 +33,11 @@ export type ConfirmDialog = {
 export type SidebarContextValue = {
   // Data
   tree: TreeNode[]
+  filteredTree: TreeNode[]
+
+  // Search
+  searchQuery: string
+  setSearchQuery: (query: string) => void
 
   // UI state
   dropTarget: DropTarget
@@ -76,6 +81,7 @@ export function SidebarContextProvider({
   })
 
   // --- UI state ---
+  const [searchQuery, setSearchQuery] = useState("")
   const [dragItem, setDragItem] = useState<DragItem | null>(null)
   const [dropTarget, setDropTarget] = useState<DropTarget>(null)
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialog>(null)
@@ -124,6 +130,20 @@ export function SidebarContextProvider({
 
     return root
   }, [drawings, folders])
+
+  // --- Search filtering ---
+  // Only search drawings (folders aren't navigable destinations).
+  const filteredTree = useMemo(() => {
+    const q = searchQuery.toLowerCase().trim()
+    if (!q) return tree
+
+    const results: TreeNode[] = drawings
+      .filter((d) => d.name.toLowerCase().includes(q))
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .map((d) => ({ type: "drawing" as const, drawing: d }))
+
+    return results
+  }, [searchQuery, tree, drawings])
 
   // --- Move mutations ---
   const moveDrawingMutation = useMutation({
@@ -341,6 +361,9 @@ export function SidebarContextProvider({
     <SidebarContext.Provider
       value={{
         tree,
+        filteredTree,
+        searchQuery,
+        setSearchQuery,
         dropTarget,
         onDragStart,
         onDragEnd,

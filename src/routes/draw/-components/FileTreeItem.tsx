@@ -155,7 +155,7 @@ export function FolderItem({ folder, children: childNodes }: FolderItemProps) {
       <SidebarMenuItem
         className={cn(
           "rounded-md transition-colors",
-          showDropHighlight && "bg-sidebar-accent ring-1 ring-sidebar-ring",
+          showDropHighlight && "bg-notion-terracotta-muted ring-1 ring-notion-terracotta/20",
         )}
       >
         <CollapsibleTrigger asChild>
@@ -170,16 +170,19 @@ export function FolderItem({ folder, children: childNodes }: FolderItemProps) {
               draggable
               onDragStart={handleDragStart}
               onDragEnd={handleDragEnd}
-              className="cursor-pointer active:cursor-grabbing"
+              className={cn(
+                "h-auto cursor-pointer gap-1.5 px-2 py-1.5 pr-2! active:cursor-grabbing [&>svg]:size-auto",
+                isRenaming && "pr-3!",
+              )}
             >
               <ChevronRight
                 className={cn(
-                  "h-4 w-4 shrink-0 transition-transform duration-200",
+                  "h-3! w-3! shrink-0 text-muted-foreground/40 transition-transform duration-150",
                   isExpanded && "rotate-90",
                   !hasChildren && "opacity-0",
                 )}
               />
-              <Folder className="h-4 w-4 shrink-0" />
+              <Folder className="h-[14px]! w-[14px]! shrink-0 text-notion-gold" />
               {isRenaming ? (
                 <Input
                   ref={renameInputRef}
@@ -191,20 +194,25 @@ export function FolderItem({ folder, children: childNodes }: FolderItemProps) {
                     if (e.key === "Escape") setIsRenaming(false)
                   }}
                   onClick={(e) => e.stopPropagation()}
-                  className="h-5 px-1 text-sm"
+                  className="h-5 rounded px-1 text-sm"
                 />
               ) : (
-                <span className="truncate">{folder.name}</span>
+                <span className="truncate text-sidebar-foreground/70">
+                  {folder.name}
+                </span>
               )}
             </SidebarMenuButton>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <SidebarMenuAction
-                  className="md:opacity-0 group-hover/folder-row:opacity-100 group-focus-within/folder-row:opacity-100 data-[state=open]:opacity-100 peer-data-[active=true]/menu-button:text-sidebar-accent-foreground"
+                  className={cn(
+                    "text-muted-foreground/30 md:opacity-0 group-hover/folder-row:opacity-100 group-focus-within/folder-row:opacity-100 data-[state=open]:opacity-100 [&>svg]:size-auto",
+                    isRenaming && "hidden",
+                  )}
                   onPointerDown={(e) => e.stopPropagation()}
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <MoreHorizontal className="h-4 w-4" />
+                  <MoreHorizontal className="h-[14px]! w-[14px]!" />
                 </SidebarMenuAction>
               </DropdownMenuTrigger>
               <DropdownMenuContent
@@ -247,7 +255,10 @@ export function FolderItem({ folder, children: childNodes }: FolderItemProps) {
           </div>
         </CollapsibleTrigger>
         <CollapsibleContent>
-          <SidebarMenuSub className="mr-0 pr-0" {...dropTargetProps}>
+          <SidebarMenuSub
+            className="ml-3 mr-0 gap-0 border-sidebar-border/50 pl-2 pr-0 py-0 translate-x-0"
+            {...dropTargetProps}
+          >
             {childNodes.map((node) => (
               <TreeNodeItem
                 key={node.type === "folder" ? node.folder.id : node.drawing.id}
@@ -330,8 +341,13 @@ export function DrawingItem({ drawing }: DrawingItemProps) {
 
   const ButtonContent = (
     <>
-      <span className="h-4 w-4 shrink-0" />
-      <File className="h-4 w-4 shrink-0" />
+      <span className="h-3! w-3! shrink-0" />
+      <File
+        className={cn(
+          "h-[13px]! w-[13px]! shrink-0 transition-colors",
+          isActive ? "text-notion-terracotta" : "text-muted-foreground/30",
+        )}
+      />
       {isRenaming ? (
         <Input
           ref={renameInputRef}
@@ -343,10 +359,19 @@ export function DrawingItem({ drawing }: DrawingItemProps) {
             if (e.key === "Escape") setIsRenaming(false)
           }}
           onClick={(e) => e.stopPropagation()}
-          className="h-5 px-1 text-sm"
+          className="h-5 rounded px-1 text-sm"
         />
       ) : (
-        <span className="truncate">{drawing.name}</span>
+        <span
+          className={cn(
+            "truncate transition-colors",
+            isActive
+              ? "font-medium text-sidebar-foreground"
+              : "text-sidebar-foreground/60",
+          )}
+        >
+          {drawing.name}
+        </span>
       )}
     </>
   )
@@ -365,18 +390,28 @@ export function DrawingItem({ drawing }: DrawingItemProps) {
       }}
     >
       <SidebarMenuButton
-        asChild
+        asChild={!isRenaming}
         isActive={isActive}
-        className="cursor-pointer active:cursor-grabbing"
+        className={cn(
+          "h-auto cursor-pointer gap-1.5 px-2 py-1.5 pr-2! active:cursor-grabbing [&>svg]:size-auto",
+          isRenaming && "pr-3!",
+        )}
       >
-        <Link to="/draw/$id" params={{ id: drawing.id }} draggable={false}>
-          {ButtonContent}
-        </Link>
+        {isRenaming ? (
+          ButtonContent
+        ) : (
+          <Link to="/draw/$id" params={{ id: drawing.id }} draggable={false}>
+            {ButtonContent}
+          </Link>
+        )}
       </SidebarMenuButton>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <SidebarMenuAction className="md:opacity-0 group-hover/drawing-item:opacity-100 group-focus-within/drawing-item:opacity-100 data-[state=open]:opacity-100 peer-data-[active=true]/menu-button:text-sidebar-accent-foreground">
-            <MoreHorizontal className="h-4 w-4" />
+          <SidebarMenuAction className={cn(
+            "text-muted-foreground/30 md:opacity-0 group-hover/drawing-item:opacity-100 group-focus-within/drawing-item:opacity-100 data-[state=open]:opacity-100 [&>svg]:size-auto",
+            isRenaming && "hidden",
+          )}>
+            <MoreHorizontal className="h-[14px]! w-[14px]!" />
           </SidebarMenuAction>
         </DropdownMenuTrigger>
         <DropdownMenuContent
@@ -484,9 +519,9 @@ export function CreateRow({ type, onClose }: CreateRowProps) {
     <SidebarMenuItem>
       <div className="flex items-center gap-2 px-2 py-1">
         {type === "folder" ? (
-          <Folder className="h-4 w-4 shrink-0 text-muted-foreground" />
+          <Folder className="h-[14px] w-[14px] shrink-0 text-notion-gold" />
         ) : (
-          <File className="h-4 w-4 shrink-0 text-muted-foreground" />
+          <File className="h-[13px] w-[13px] shrink-0 text-muted-foreground/30" />
         )}
         <Input
           ref={inputRef}
@@ -503,7 +538,7 @@ export function CreateRow({ type, onClose }: CreateRowProps) {
               onClose()
             }
           }}
-          className="h-6 flex-1 px-2 text-sm"
+          className="h-6 flex-1 rounded px-2 text-sm"
         />
       </div>
     </SidebarMenuItem>
