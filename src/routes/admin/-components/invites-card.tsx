@@ -1,17 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { Check, Copy, LinkIcon, Plus, Trash2 } from "lucide-react"
+import { Check, Copy, Plus, Trash2 } from "lucide-react"
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
 import { createInvite, deleteInvite, getPendingInvites } from "@/server/invites"
 
-export function InvitesCard() {
+export function InvitesSection() {
   const queryClient = useQueryClient()
   const { data: invites } = useQuery({
     queryKey: ["admin", "invites"],
@@ -47,74 +40,76 @@ export function InvitesCard() {
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <LinkIcon className="h-5 w-5" />
-          Invite Links
-        </CardTitle>
-        <CardDescription>Generate invite links for new users</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="mb-4">
-          <Button
-            onClick={() => {
-              createInviteMutation()
-            }}
-            disabled={isCreatingInvite}
-          >
-            <Plus className="mr-2 h-4 w-4" />
-            {isCreatingInvite ? "Generating..." : "Generate Invite Link"}
-          </Button>
+    <section>
+      {/* Section header */}
+      <div className="mb-4 flex items-center justify-between">
+        <div>
+          <h2 className="text-sm font-medium text-foreground">Invite links</h2>
+          <p className="text-xs text-muted-foreground">
+            Generate links to invite new users
+          </p>
         </div>
-        {createInviteError?.message && (
-          <p className="mb-4 text-sm text-destructive">
-            {createInviteError?.message}
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => createInviteMutation()}
+          disabled={isCreatingInvite}
+          className="h-7 gap-1 px-2.5 text-xs"
+        >
+          <Plus className="h-3.5 w-3.5" />
+          {isCreatingInvite ? "Generating..." : "Generate link"}
+        </Button>
+      </div>
+
+      {createInviteError?.message && (
+        <p className="mb-3 text-sm text-destructive">
+          {createInviteError?.message}
+        </p>
+      )}
+
+      {/* Invites list */}
+      <div>
+        {invites?.map((invite, index) => (
+          <div
+            key={invite.id}
+            className={`group flex items-center justify-between py-2.5 ${
+              index !== 0 ? "border-t border-border/60" : ""
+            }`}
+          >
+            <div className="min-w-0">
+              <p className="font-mono text-xs text-muted-foreground">
+                {invite.token.slice(0, 20)}...
+              </p>
+              <p className="text-[11px] text-muted-foreground/60">
+                Expires {new Date(invite.expiresAt).toLocaleDateString()}
+              </p>
+            </div>
+            <div className="flex items-center gap-1 shrink-0">
+              <button
+                onClick={() => copyInviteLink(invite.token)}
+                className="rounded p-1 text-muted-foreground/40 transition-all hover:bg-muted hover:text-foreground"
+              >
+                {copiedToken === invite.token ? (
+                  <Check className="h-3.5 w-3.5 text-notion-terracotta" />
+                ) : (
+                  <Copy className="h-3.5 w-3.5" />
+                )}
+              </button>
+              <button
+                onClick={() => deleteInviteMutation({ data: invite.id })}
+                className="rounded p-1 text-muted-foreground/40 opacity-0 transition-all hover:bg-muted hover:text-destructive group-hover:opacity-100"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          </div>
+        ))}
+        {invites && invites.length === 0 && (
+          <p className="py-6 text-center text-sm text-muted-foreground/60">
+            No pending invite links
           </p>
         )}
-        <div className="space-y-2">
-          {invites?.map((invite) => (
-            <div
-              key={invite.id}
-              className="flex items-center justify-between rounded-lg border p-3"
-            >
-              <div>
-                <p className="font-mono text-sm text-muted-foreground">
-                  {invite.token.slice(0, 16)}...
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  Expires: {new Date(invite.expiresAt).toLocaleDateString()}
-                </p>
-              </div>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => copyInviteLink(invite.token)}
-                >
-                  {copiedToken === invite.token ? (
-                    <Check className="h-4 w-4" />
-                  ) : (
-                    <Copy className="h-4 w-4" />
-                  )}
-                </Button>
-                <Button
-                  variant="destructive"
-                  size="icon"
-                  onClick={() => deleteInviteMutation({ data: invite.id })}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-          ))}
-          {invites && invites.length === 0 && (
-            <p className="text-center text-sm text-muted-foreground py-4">
-              No pending invite links
-            </p>
-          )}
-        </div>
-      </CardContent>
-    </Card>
+      </div>
+    </section>
   )
 }

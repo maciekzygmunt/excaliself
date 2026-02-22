@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { Trash2, Users } from "lucide-react"
+import { Trash2 } from "lucide-react"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -11,17 +11,9 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
-import { Button } from "@/components/ui/button"
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
 import { deleteUser, getAllUsers } from "@/server/users"
 
-export function UsersCard() {
+export function UsersSection() {
   const queryClient = useQueryClient()
   const { data: users } = useQuery({
     queryKey: ["admin", "users"],
@@ -35,68 +27,81 @@ export function UsersCard() {
   })
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Users className="h-5 w-5" />
-          Users ({users?.length})
-        </CardTitle>
-        <CardDescription>Manage registered users</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-2">
-          {users?.map((user) => (
-            <div
-              key={user.id}
-              className="flex items-center justify-between rounded-lg border p-3"
-            >
-              <div>
-                <p className="font-medium">{user.name || user.email}</p>
-                <p className="text-sm text-muted-foreground">{user.email}</p>
+    <section>
+      {/* Section header */}
+      <div className="mb-4">
+        <h2 className="text-sm font-medium text-foreground">Users</h2>
+        <p className="text-xs text-muted-foreground">
+          {users?.length ?? 0} registered {users?.length === 1 ? "user" : "users"}
+        </p>
+      </div>
+
+      {/* User list */}
+      <div>
+        {users?.map((user, index) => (
+          <div
+            key={user.id}
+            className={`group flex items-center justify-between py-2.5 ${
+              index !== 0 ? "border-t border-border/60" : ""
+            }`}
+          >
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted text-[10px] font-medium text-muted-foreground">
+                {(user.name || user.email).charAt(0).toUpperCase()}
               </div>
-              <div className="flex items-center gap-2">
-                <span
-                  className={`text-xs px-2 py-1 rounded ${
-                    user.role === "admin"
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-secondary text-secondary-foreground"
-                  }`}
-                >
-                  {user.role}
-                </span>
-                {user.role !== "admin" && (
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button variant="destructive" size="icon">
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Delete User</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          Are you sure you want to delete{" "}
-                          <strong>{user.name || user.email}</strong>? All their
-                          drawings and data will be permanently deleted.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction
-                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                          onClick={() => deleteUserMutation({ data: user.id })}
-                        >
-                          Delete
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
+              <div className="min-w-0">
+                <p className="truncate text-sm text-foreground">
+                  {user.name || user.email}
+                </p>
+                {user.name && (
+                  <p className="truncate text-xs text-muted-foreground">
+                    {user.email}
+                  </p>
                 )}
               </div>
             </div>
-          ))}
-        </div>
-      </CardContent>
-    </Card>
+            <div className="flex items-center gap-2 shrink-0">
+              <span
+                className={`text-[11px] px-1.5 py-0.5 rounded ${
+                  user.role === "admin"
+                    ? "bg-notion-terracotta-muted text-notion-terracotta font-medium"
+                    : "bg-muted text-muted-foreground"
+                }`}
+              >
+                {user.role}
+              </span>
+              {user.role !== "admin" && (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <button className="rounded p-1 text-muted-foreground/40 opacity-0 transition-all hover:bg-muted hover:text-destructive group-hover:opacity-100">
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Delete user</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Are you sure you want to delete{" "}
+                        <strong>{user.name || user.email}</strong>? All their
+                        drawings and data will be permanently deleted.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction
+                        className="bg-destructive text-white hover:bg-destructive/90"
+                        onClick={() => deleteUserMutation({ data: user.id })}
+                      >
+                        Delete
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
   )
 }

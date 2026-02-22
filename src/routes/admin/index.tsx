@@ -1,12 +1,11 @@
 import { createFileRoute, Link } from "@tanstack/react-router"
 import { ArrowLeft } from "lucide-react"
-import { Button } from "@/components/ui/button"
 import { adminMiddleware } from "@/middleware/admin"
 import { setupMiddleware } from "@/middleware/setup"
 import { getPendingInvites } from "@/server/invites"
 import { getAllUsers } from "@/server/users"
-import { InvitesCard } from "./-components/invites-card"
-import { UsersCard } from "./-components/users-card"
+import { InvitesSection } from "./-components/invites-card"
+import { UsersSection } from "./-components/users-card"
 
 export const Route = createFileRoute("/admin/")({
   server: {
@@ -30,24 +29,40 @@ export const Route = createFileRoute("/admin/")({
 function AdminPage() {
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b">
-        <div className="container mx-auto flex h-16 items-center justify-between px-4">
-          <div className="flex items-center gap-4">
-            <Link to="/">
-              <Button variant="ghost" size="icon">
-                <ArrowLeft className="h-4 w-4" />
-              </Button>
-            </Link>
-            <h1 className="text-xl font-bold">Admin Panel</h1>
+      <div className="mx-auto max-w-2xl px-6 py-10">
+        {/* Header */}
+        <div className="mb-8">
+          <Link
+            to="/"
+            className="mb-4 inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" />
+            Back to drawings
+          </Link>
+          <div className="flex items-center gap-3">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-notion-terracotta text-sm font-semibold text-white">
+              E
+            </div>
+            <div>
+              <h1 className="text-lg font-medium tracking-[-0.01em] text-foreground">
+                Admin settings
+              </h1>
+              <p className="text-sm text-muted-foreground">
+                Manage users and invite links
+              </p>
+            </div>
           </div>
         </div>
-      </header>
-      <main className="container mx-auto px-4 py-8">
-        <div className="grid gap-6 md:grid-cols-2">
-          <UsersCard />
-          <InvitesCard />
-        </div>
-      </main>
+
+        {/* Users */}
+        <UsersSection />
+
+        {/* Divider */}
+        <div className="my-8 h-px bg-border" />
+
+        {/* Invites */}
+        <InvitesSection />
+      </div>
     </div>
   )
 }
