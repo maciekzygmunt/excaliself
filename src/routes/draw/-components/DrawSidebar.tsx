@@ -137,7 +137,7 @@ export function DrawSidebar({ userEmail, isAdmin }: DrawSidebarProps) {
         </div>
 
         {/* File tree */}
-        <SidebarContent className="gap-0 [scrollbar-width:none]">
+        <SidebarContent className="gap-0 pt-1 [scrollbar-width:none]">
           <div className="px-3">
             <div
               className={cn(
