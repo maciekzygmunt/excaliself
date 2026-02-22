@@ -1,61 +1,30 @@
-import { restore } from "@excalidraw/excalidraw"
+import { Excalidraw, MainMenu, serializeAsJSON } from "@excalidraw/excalidraw"
 import type { ExcalidrawElement } from "@excalidraw/excalidraw/element/types"
 import type {
   AppState,
   BinaryFiles,
-  ExcalidrawInitialDataState,
+  UIAppState,
 } from "@excalidraw/excalidraw/types"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { createFileRoute } from "@tanstack/react-router"
-import { createServerFn } from "@tanstack/react-start"
-import { Cloud, Loader2, Pencil } from "lucide-react"
+import { Cloud, Loader2, PanelLeftIcon, Pencil } from "lucide-react"
 import { useCallback, useMemo, useState } from "react"
-import { ExcalidrawCanvas } from "@/components/ExcalidrawCanvas"
-import { Input } from "@/components/ui/input"
-import { SidebarTrigger } from "@/components/ui/sidebar"
+import { useSidebar } from "@/components/ui/sidebar"
 import { useAutoSave } from "@/hooks/use-auto-save"
-import { authMiddleware } from "@/middleware/auth"
 import {
   getDrawingWithFiles,
+  saveDrawingScene,
   updateDrawing,
-  updateDrawingFiles,
 } from "@/server/drawings"
+import { TopLeftControls, TopLeftPortal } from "./-components/TopLeftControls"
+import {
+  buildInitialSceneData,
+  getSceneSignature,
+  type SceneData,
+  toPersistedFiles,
+} from "./-utils/scene"
 
-type SceneData = {
-  elements: readonly ExcalidrawElement[]
-  appState: AppState
-  files: BinaryFiles
-}
-
-const saveDrawing = createServerFn({ method: "POST" })
-  .middleware([authMiddleware])
-  .inputValidator(
-    (data: {
-      id: string
-      name?: string
-      data?: string
-      thumbnail?: string
-      files?: { fileId: string; mimeType: string; dataUrl: string }[]
-    }) => data,
-  )
-  .handler(async ({ data }) => {
-    const { id, files, ...updateData } = data
-    await updateDrawing({
-      data: {
-        id,
-        updateData,
-      },
-    })
-
-    if (files) {
-      await updateDrawingFiles({
-        data: {
-          drawingId: id,
-          files,
-        },
-      })
-    }
-  })
+import "@excalidraw/excalidraw/index.css"
 
 export const Route = createFileRoute("/draw/$id")({
   ssr: false,
@@ -77,58 +46,63 @@ export const Route = createFileRoute("/draw/$id")({
 function DrawingCanvas() {
   const { id } = Route.useParams()
   const queryClient = useQueryClient()
+  const { toggleSidebar } = useSidebar()
 
   const { data: drawing } = useQuery({
     queryKey: ["drawing", id],
     queryFn: () => getDrawingWithFiles({ data: id }),
   })
 
-  const saveDrawingMutation = useMutation({
-    mutationFn: saveDrawing,
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["drawings"] })
-      queryClient.invalidateQueries({ queryKey: ["drawing", id] })
+  const invalidateDrawingQueries = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ["drawings"] })
+    queryClient.invalidateQueries({ queryKey: ["drawing", id] })
+  }, [id, queryClient])
+
+  const saveSceneMutation = useMutation({
+    mutationFn: saveDrawingScene,
+    onSettled: invalidateDrawingQueries,
+  })
+
+  const renameDrawingMutation = useMutation({
+    mutationFn: updateDrawing,
+    onMutate: async ({ data: { id: drawingId, updateData } }) => {
+      await queryClient.cancelQueries({ queryKey: ["drawing", drawingId] })
+      const previous = queryClient.getQueryData(["drawing", drawingId])
+      queryClient.setQueryData(["drawing", drawingId], (old: typeof drawing) =>
+        old ? { ...old, ...updateData } : old,
+      )
+      return { previous }
     },
+    onError: (_err, { data: { id: drawingId } }, context) => {
+      queryClient.setQueryData(["drawing", drawingId], context?.previous)
+    },
+    onSettled: invalidateDrawingQueries,
   })
 
   // Track local edits only - use prop directly for display when not editing
   const [editingName, setEditingName] = useState<string | null>(null)
   const displayName = editingName ?? drawing?.name ?? ""
 
-  const onSave = useCallback(
-    async (scene: SceneData) => {
-      const fileArray = Object.entries(scene.files || {}).map(
-        ([fileId, file]) => ({
-          fileId,
-          mimeType: file.mimeType || "image/png",
-          dataUrl: file.dataURL || "",
-        }),
-      )
-
-      await saveDrawing({
-        data: {
-          id,
-          data: JSON.stringify({
-            elements: scene.elements,
-            appState: scene.appState,
-          }),
-          files: fileArray,
-        },
-      })
-    },
-    [id],
-  )
-
-  const serialize = useCallback(
-    (scene: SceneData) =>
-      JSON.stringify({ elements: scene.elements, appState: scene.appState }),
-    [],
-  )
+  const onSave = async (scene: SceneData) => {
+    await saveSceneMutation.mutateAsync({
+      data: {
+        id,
+        data: serializeAsJSON(
+          scene.elements,
+          scene.appState,
+          scene.files ?? {},
+          "database",
+        ),
+        files: toPersistedFiles(scene.files ?? {}),
+      },
+    })
+  }
 
   const { saving, saved, handleChange } = useAutoSave<SceneData>({
-    initialData: drawing?.data ?? "{}",
     onSave,
-    serialize,
+    getSignature: getSceneSignature,
+    resetKey: id,
+    skipInitialChange: true,
   })
 
   const handleSceneChange = useCallback(
@@ -145,79 +119,87 @@ function DrawingCanvas() {
   const handleNameBlur = (newName: string) => {
     setEditingName(null)
     if (newName !== drawing?.name) {
-      saveDrawingMutation.mutate({ data: { id, name: newName } })
+      renameDrawingMutation.mutate({
+        data: {
+          id,
+          updateData: { name: newName },
+        },
+      })
     }
   }
 
-  const sceneData: ExcalidrawInitialDataState = useMemo(() => {
-    if (!drawing) return restore(null, null, null)
-    try {
-      const parsed = JSON.parse(drawing.data)
-      const files = {} as BinaryFiles
-      drawing.files?.forEach((file) => {
-        files[file.fileId] = {
-          id: file.fileId,
-          mimeType: file.mimeType,
-          dataURL: file.dataUrl,
-        } as BinaryFiles[string]
-      })
-      const restored = restore(
-        {
-          elements: parsed.elements,
-          appState: parsed.appState,
-          files,
-        },
-        null,
-        null,
+  const renderTopRightUI = useCallback(
+    (_isMobile: boolean, _appState: UIAppState) => {
+      if (!saving && !saved) return null
+      return (
+        <div className="pointer-events-auto absolute bottom-(--editor-container-padding) right-(--editor-container-padding) z-(--zIndex-layerUI) flex items-center gap-1.5 rounded-(--border-radius-lg) bg-(--island-bg-color) px-2 py-1 text-xs font-(--ui-font) text-(--text-primary-color) shadow-(--shadow-island)">
+          {saving ? (
+            <>
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              <span>Saving...</span>
+            </>
+          ) : (
+            <>
+              <Cloud className="h-3.5 w-3.5" />
+              <span>Saved</span>
+            </>
+          )}
+        </div>
       )
-      restored.appState.collaborators = new Map()
-      return restored
-    } catch {
-      return restore(null, null, null)
-    }
-  }, [drawing])
+    },
+    [saving, saved],
+  )
+
+  const sceneData = useMemo(() => buildInitialSceneData(drawing), [drawing])
 
   if (!drawing) return null
 
   return (
-    <div className="flex h-full flex-col bg-background">
-      <header className="flex h-14 items-center justify-between gap-4 border-b border-border/40 bg-background px-4">
-        <div className="flex items-center gap-4">
-          <SidebarTrigger className="-ml-2 h-9 w-9 text-muted-foreground hover:text-foreground" />
-          <div className="h-4 w-px bg-border/60" />
-          <Input
-            value={displayName}
-            onChange={(event) => setEditingName(event.target.value)}
-            onBlur={(event) => handleNameBlur(event.target.value)}
-            className="h-9 w-[300px] border-none bg-transparent px-0 text-lg font-semibold shadow-none focus-visible:ring-0 placeholder:text-muted-foreground/50"
-            placeholder="Untitled Drawing"
+    <div className="size-full">
+      <Excalidraw
+        key={id}
+        initialData={sceneData}
+        onChange={handleSceneChange}
+        renderTopRightUI={renderTopRightUI}
+        UIOptions={{
+          canvasActions: {
+            loadScene: false,
+            saveToActiveFile: false,
+          },
+        }}
+      >
+        <MainMenu>
+          <MainMenu.Item
+            icon={<PanelLeftIcon className="h-4 w-4" />}
+            onSelect={toggleSidebar}
+          >
+            Drawings
+          </MainMenu.Item>
+          <MainMenu.Separator />
+          <MainMenu.DefaultItems.LoadScene />
+          <MainMenu.DefaultItems.SaveToActiveFile />
+          <MainMenu.DefaultItems.Export />
+          <MainMenu.DefaultItems.SaveAsImage />
+          <MainMenu.DefaultItems.SearchMenu />
+          <MainMenu.DefaultItems.Help />
+          <MainMenu.DefaultItems.ClearCanvas />
+          <MainMenu.Separator />
+          <MainMenu.Group title="Excalidraw links">
+            <MainMenu.DefaultItems.Socials />
+          </MainMenu.Group>
+          <MainMenu.Separator />
+          <MainMenu.DefaultItems.ToggleTheme />
+          <MainMenu.DefaultItems.ChangeCanvasBackground />
+        </MainMenu>
+        <TopLeftPortal>
+          <TopLeftControls
+            displayName={displayName}
+            onToggleSidebar={toggleSidebar}
+            onNameChange={setEditingName}
+            onNameBlur={handleNameBlur}
           />
-        </div>
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 px-2 text-muted-foreground">
-            {saving && (
-              <div className="flex items-center gap-1.5 text-xs">
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                <span>Saving...</span>
-              </div>
-            )}
-            {saved && !saving && (
-              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <Cloud className="h-3.5 w-3.5" />
-                <span>Saved</span>
-              </div>
-            )}
-          </div>
-        </div>
-      </header>
-
-      <div className="min-h-0 flex-1">
-        <ExcalidrawCanvas
-          initialData={sceneData}
-          scene={sceneData}
-          onChange={handleSceneChange}
-        />
-      </div>
+        </TopLeftPortal>
+      </Excalidraw>
     </div>
   )
 }

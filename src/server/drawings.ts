@@ -8,6 +8,12 @@ import { db } from "@/db"
 import { drawingFiles, drawings } from "@/db/schema"
 import { authMiddleware } from "@/middleware/auth"
 
+const persistedFileSchema = z.object({
+  fileId: z.string(),
+  mimeType: z.string(),
+  dataUrl: z.string(),
+})
+
 export const getDrawings = createServerFn({ method: "GET" })
   .middleware([authMiddleware])
   .handler(async ({ context }) => {
@@ -92,6 +98,46 @@ export const updateDrawing = createServerFn({ method: "POST" })
       .where(and(eq(drawings.id, id), eq(drawings.ownerId, userId)))
   })
 
+export const saveDrawingScene = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .inputValidator(
+    z.object({
+      id: z.string(),
+      data: z.string(),
+      files: z.array(persistedFileSchema),
+    }),
+  )
+  .handler(async ({ data: { id, data: sceneData, files }, context }) => {
+    const userId = context.session.user.id
+
+    await db.transaction(async (tx) => {
+      const [drawing] = await tx
+        .select({ id: drawings.id })
+        .from(drawings)
+        .where(and(eq(drawings.id, id), eq(drawings.ownerId, userId)))
+
+      if (!drawing) return
+
+      const now = new Date()
+
+      await tx.update(drawings).set({ data: sceneData, updatedAt: now }).where(eq(drawings.id, id))
+      await tx.delete(drawingFiles).where(eq(drawingFiles.drawingId, id))
+
+      if (files.length > 0) {
+        await tx.insert(drawingFiles).values(
+          files.map((file) => ({
+            id: randomUUID(),
+            drawingId: id,
+            fileId: file.fileId,
+            mimeType: file.mimeType,
+            dataUrl: file.dataUrl,
+            createdAt: now,
+          })),
+        )
+      }
+    })
+  })
+
 export const deleteDrawing = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
   .inputValidator(z.string())
@@ -108,13 +154,7 @@ export const updateDrawingFiles = createServerFn({ method: "POST" })
   .inputValidator(
     z.object({
       drawingId: z.string(),
-      files: z.array(
-        z.object({
-          fileId: z.string(),
-          mimeType: z.string(),
-          dataUrl: z.string(),
-        }),
-      ),
+      files: z.array(persistedFileSchema),
     }),
   )
   .handler(async ({ data: { drawingId, files }, context }) => {

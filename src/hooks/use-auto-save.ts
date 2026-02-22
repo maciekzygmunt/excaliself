@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react"
+import { useDebounceCallback } from "./use-debounce-callback"
 
 interface UseAutoSaveOptions<T> {
-  initialData: string
+  onSave: (data: T) => Promise<void>
   debounceMs?: number
   savedIndicatorMs?: number
-  onSave: (data: T) => Promise<void>
-  serialize: (data: T) => string
+  getSignature?: (data: T) => string
+  resetKey?: string
+  skipInitialChange?: boolean
 }
 
 interface UseAutoSaveReturn<T> {
@@ -15,100 +17,126 @@ interface UseAutoSaveReturn<T> {
 }
 
 export function useAutoSave<T>({
-  initialData,
+  onSave,
   debounceMs = 300,
   savedIndicatorMs = 2000,
-  onSave,
-  serialize,
+  getSignature,
+  resetKey,
+  skipInitialChange = false,
 }: UseAutoSaveOptions<T>): UseAutoSaveReturn<T> {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
 
-  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const savedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const lastSavedDataRef = useRef<string>(initialData)
-  const latestDataRef = useRef<T | null>(null)
-  const abortControllerRef = useRef<AbortController | null>(null)
+  const onSaveRef = useRef(onSave)
+  onSaveRef.current = onSave
 
-  // Update lastSavedDataRef when initialData changes (e.g., route change)
-  useEffect(() => {
-    lastSavedDataRef.current = initialData
-  }, [initialData])
+  const getSignatureRef = useRef(getSignature)
+  getSignatureRef.current = getSignature
 
-  const performSave = useCallback(
-    async (data: T, updateUi: boolean = true) => {
-      const dataString = serialize(data)
+  const stateRef = useRef({
+    pendingData: null as T | null,
+    initialized: false,
+    lastPersistedSignature: null as string | null,
+    lastQueuedSignature: null as string | null,
+  })
 
-      if (dataString === lastSavedDataRef.current) {
-        return
+  const performSave = useCallback(async (data: T) => {
+    const state = stateRef.current
+    const signature = getSignatureRef.current?.(data) ?? null
+
+    if (signature && signature === state.lastPersistedSignature) {
+      state.pendingData = null
+      state.lastQueuedSignature = signature
+      return
+    }
+
+    state.pendingData = null
+    setSaving(true)
+    try {
+      await onSaveRef.current(data)
+      if (signature) {
+        state.lastPersistedSignature = signature
+        state.lastQueuedSignature = signature
       }
-
-      if (updateUi) {
-        setSaving(true)
+      setSaved(true)
+    } catch (err) {
+      if (signature) {
+        state.lastQueuedSignature = state.lastPersistedSignature
       }
+      console.error("Failed to save:", err)
+    } finally {
+      setSaving(false)
+    }
+  }, [])
 
-      try {
-        await onSave(data)
-        lastSavedDataRef.current = dataString
-
-        if (updateUi) {
-          setSaved(true)
-          if (savedTimeoutRef.current) {
-            clearTimeout(savedTimeoutRef.current)
-          }
-          savedTimeoutRef.current = setTimeout(() => {
-            setSaved(false)
-          }, savedIndicatorMs)
-        }
-      } catch (err) {
-        console.error("Failed to save:", err)
-      } finally {
-        if (updateUi) {
-          setSaving(false)
-        }
-      }
-    },
-    [onSave, serialize, savedIndicatorMs],
-  )
+  const { run: runDebouncedSave, cancel: cancelDebouncedSave } =
+    useDebounceCallback(performSave, debounceMs)
 
   const handleChange = useCallback(
     (data: T) => {
-      latestDataRef.current = data
+      const state = stateRef.current
+      const signature = getSignatureRef.current?.(data) ?? null
 
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current)
+      if (!state.initialized) {
+        state.initialized = true
+        if (skipInitialChange) {
+          if (signature) {
+            state.lastPersistedSignature = signature
+            state.lastQueuedSignature = signature
+          }
+          return
+        }
       }
 
-      saveTimeoutRef.current = setTimeout(() => {
-        void performSave(data)
-      }, debounceMs)
+      if (
+        signature &&
+        (signature === state.lastPersistedSignature ||
+          signature === state.lastQueuedSignature)
+      ) {
+        return
+      }
+
+      if (signature) {
+        state.lastQueuedSignature = signature
+      }
+
+      state.pendingData = data
+      runDebouncedSave(data)
     },
-    [performSave, debounceMs],
+    [runDebouncedSave, skipInitialChange],
   )
 
-  // Cleanup: flush pending save on unmount
   useEffect(() => {
-    abortControllerRef.current = new AbortController()
+    if (!saved) return
+    const timeoutId = setTimeout(() => {
+      setSaved(false)
+    }, savedIndicatorMs)
+    return () => clearTimeout(timeoutId)
+  }, [saved, savedIndicatorMs])
 
+  useEffect(() => {
+    if (resetKey === undefined) return
+
+    cancelDebouncedSave()
+    stateRef.current = {
+      pendingData: null,
+      initialized: false,
+      lastPersistedSignature: null,
+      lastQueuedSignature: null,
+    }
+    setSaving(false)
+    setSaved(false)
+  }, [cancelDebouncedSave, resetKey])
+
+  useEffect(() => {
     return () => {
-      abortControllerRef.current?.abort()
-
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current)
-        saveTimeoutRef.current = null
-      }
-      if (savedTimeoutRef.current) {
-        clearTimeout(savedTimeoutRef.current)
-        savedTimeoutRef.current = null
-      }
-
-      // Flush any pending changes without UI updates
-      const latest = latestDataRef.current
-      if (latest) {
-        void performSave(latest, false)
+      const pendingData = stateRef.current.pendingData
+      cancelDebouncedSave()
+      if (pendingData) {
+        void onSaveRef.current(pendingData)
       }
     }
-  }, [performSave])
+  }, [cancelDebouncedSave])
 
   return { saving, saved, handleChange }
 }

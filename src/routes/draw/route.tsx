@@ -1,11 +1,6 @@
 import { createFileRoute, Outlet } from "@tanstack/react-router"
 import { createServerFn } from "@tanstack/react-start"
-import {
-  SidebarInset,
-  SidebarProvider,
-  SidebarTrigger,
-  useSidebar,
-} from "@/components/ui/sidebar"
+import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { authMiddleware } from "@/middleware/auth"
 import { setupMiddleware } from "@/middleware/setup"
 import { getDrawings } from "@/server/drawings"
@@ -58,15 +53,8 @@ function DrawLayoutShell({
   userEmail: string
   isAdmin: boolean
 }) {
-  const { state } = useSidebar()
-
   return (
     <SidebarContextProvider>
-      {state === "collapsed" && (
-        <div className="fixed left-4 top-4 z-50">
-          <SidebarTrigger className="h-8 w-8 rounded-md border bg-background shadow-sm" />
-        </div>
-      )}
       <DrawSidebar userEmail={userEmail} isAdmin={isAdmin} />
       <SidebarInset className="overflow-clip">
         <Outlet />

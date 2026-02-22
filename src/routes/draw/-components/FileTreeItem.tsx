@@ -8,7 +8,7 @@ import {
   Pencil,
   Trash2,
 } from "lucide-react"
-import { type DragEvent, useEffect, useRef, useState } from "react"
+import { type DragEvent, useCallback, useEffect, useRef, useState } from "react"
 import {
   Collapsible,
   CollapsibleContent,
@@ -87,6 +87,7 @@ export function FolderItem({ folder, children: childNodes }: FolderItemProps) {
   const [renameValue, setRenameValue] = useState(folder.name)
   const renameInputRef = useRef<HTMLInputElement | null>(null)
   const pendingRenameFocus = useRef(false)
+  const suppressBlurRef = useRef(false)
 
   const hasChildren = childNodes.length > 0
   const showDropHighlight =
@@ -94,14 +95,22 @@ export function FolderItem({ folder, children: childNodes }: FolderItemProps) {
     dropTarget.id === folder.id &&
     dropTarget.position === "inside"
 
-  const handleRenameSubmit = () => {
+  const handleRenameSubmit = useCallback(() => {
     if (renameValue.trim() && renameValue !== folder.name) {
       renameMutation.mutate({
         data: { id: folder.id, name: renameValue.trim() },
       })
     }
     setIsRenaming(false)
-  }
+  }, [renameValue, folder.name, folder.id, renameMutation])
+
+  const handleRenameBlur = useCallback(() => {
+    if (suppressBlurRef.current) {
+      renameInputRef.current?.focus()
+      return
+    }
+    handleRenameSubmit()
+  }, [handleRenameSubmit])
 
   useEffect(() => {
     if (!isRenaming) return
@@ -176,7 +185,7 @@ export function FolderItem({ folder, children: childNodes }: FolderItemProps) {
                   ref={renameInputRef}
                   value={renameValue}
                   onChange={(e) => setRenameValue(e.target.value)}
-                  onBlur={handleRenameSubmit}
+                  onBlur={handleRenameBlur}
                   onKeyDown={(e) => {
                     if (e.key === "Enter") handleRenameSubmit()
                     if (e.key === "Escape") setIsRenaming(false)
@@ -213,6 +222,10 @@ export function FolderItem({ folder, children: childNodes }: FolderItemProps) {
               >
                 <DropdownMenuItem
                   onClick={() => {
+                    suppressBlurRef.current = true
+                    setTimeout(() => {
+                      suppressBlurRef.current = false
+                    }, 300)
                     pendingRenameFocus.current = true
                     setRenameValue(folder.name)
                     setIsRenaming(true)
@@ -285,17 +298,26 @@ export function DrawingItem({ drawing }: DrawingItemProps) {
   const [renameValue, setRenameValue] = useState(drawing.name)
   const renameInputRef = useRef<HTMLInputElement | null>(null)
   const pendingRenameFocus = useRef(false)
+  const suppressBlurRef = useRef(false)
 
   const isActive = drawing.id === currentDrawingId
 
-  const handleRenameSubmit = () => {
+  const handleRenameSubmit = useCallback(() => {
     if (renameValue.trim() && renameValue !== drawing.name) {
       renameMutation.mutate({
         data: { id: drawing.id, updateData: { name: renameValue.trim() } },
       })
     }
     setIsRenaming(false)
-  }
+  }, [renameValue, drawing.name, drawing.id, renameMutation])
+
+  const handleRenameBlur = useCallback(() => {
+    if (suppressBlurRef.current) {
+      renameInputRef.current?.focus()
+      return
+    }
+    handleRenameSubmit()
+  }, [handleRenameSubmit])
 
   useEffect(() => {
     if (!isRenaming) return
@@ -315,7 +337,7 @@ export function DrawingItem({ drawing }: DrawingItemProps) {
           ref={renameInputRef}
           value={renameValue}
           onChange={(e) => setRenameValue(e.target.value)}
-          onBlur={handleRenameSubmit}
+          onBlur={handleRenameBlur}
           onKeyDown={(e) => {
             if (e.key === "Enter") handleRenameSubmit()
             if (e.key === "Escape") setIsRenaming(false)
@@ -372,6 +394,10 @@ export function DrawingItem({ drawing }: DrawingItemProps) {
         >
           <DropdownMenuItem
             onClick={() => {
+              suppressBlurRef.current = true
+              setTimeout(() => {
+                suppressBlurRef.current = false
+              }, 300)
               pendingRenameFocus.current = true
               setRenameValue(drawing.name)
               setIsRenaming(true)
