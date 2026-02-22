@@ -170,7 +170,10 @@ export function FolderItem({ folder, children: childNodes }: FolderItemProps) {
               draggable
               onDragStart={handleDragStart}
               onDragEnd={handleDragEnd}
-              className="h-auto cursor-pointer gap-1.5 px-2 py-1.5 pr-2! active:cursor-grabbing [&>svg]:size-auto"
+              className={cn(
+                "h-auto cursor-pointer gap-1.5 px-2 py-1.5 pr-2! active:cursor-grabbing [&>svg]:size-auto",
+                isRenaming && "pr-3!",
+              )}
             >
               <ChevronRight
                 className={cn(
@@ -191,7 +194,7 @@ export function FolderItem({ folder, children: childNodes }: FolderItemProps) {
                     if (e.key === "Escape") setIsRenaming(false)
                   }}
                   onClick={(e) => e.stopPropagation()}
-                  className="h-5 px-1 text-sm"
+                  className="h-5 rounded px-1 text-sm"
                 />
               ) : (
                 <span className="truncate text-sidebar-foreground/70">
@@ -202,7 +205,10 @@ export function FolderItem({ folder, children: childNodes }: FolderItemProps) {
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <SidebarMenuAction
-                  className="text-muted-foreground/30 md:opacity-0 group-hover/folder-row:opacity-100 group-focus-within/folder-row:opacity-100 data-[state=open]:opacity-100 [&>svg]:size-auto"
+                  className={cn(
+                    "text-muted-foreground/30 md:opacity-0 group-hover/folder-row:opacity-100 group-focus-within/folder-row:opacity-100 data-[state=open]:opacity-100 [&>svg]:size-auto",
+                    isRenaming && "hidden",
+                  )}
                   onPointerDown={(e) => e.stopPropagation()}
                   onClick={(e) => e.stopPropagation()}
                 >
@@ -353,7 +359,7 @@ export function DrawingItem({ drawing }: DrawingItemProps) {
             if (e.key === "Escape") setIsRenaming(false)
           }}
           onClick={(e) => e.stopPropagation()}
-          className="h-5 px-1 text-sm"
+          className="h-5 rounded px-1 text-sm"
         />
       ) : (
         <span
@@ -384,17 +390,27 @@ export function DrawingItem({ drawing }: DrawingItemProps) {
       }}
     >
       <SidebarMenuButton
-        asChild
+        asChild={!isRenaming}
         isActive={isActive}
-        className="h-auto cursor-pointer gap-1.5 px-2 py-1.5 pr-2! active:cursor-grabbing [&>svg]:size-auto"
+        className={cn(
+          "h-auto cursor-pointer gap-1.5 px-2 py-1.5 pr-2! active:cursor-grabbing [&>svg]:size-auto",
+          isRenaming && "pr-3!",
+        )}
       >
-        <Link to="/draw/$id" params={{ id: drawing.id }} draggable={false}>
-          {ButtonContent}
-        </Link>
+        {isRenaming ? (
+          ButtonContent
+        ) : (
+          <Link to="/draw/$id" params={{ id: drawing.id }} draggable={false}>
+            {ButtonContent}
+          </Link>
+        )}
       </SidebarMenuButton>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <SidebarMenuAction className="text-muted-foreground/30 md:opacity-0 group-hover/drawing-item:opacity-100 group-focus-within/drawing-item:opacity-100 data-[state=open]:opacity-100 [&>svg]:size-auto">
+          <SidebarMenuAction className={cn(
+            "text-muted-foreground/30 md:opacity-0 group-hover/drawing-item:opacity-100 group-focus-within/drawing-item:opacity-100 data-[state=open]:opacity-100 [&>svg]:size-auto",
+            isRenaming && "hidden",
+          )}>
             <MoreHorizontal className="h-[14px]! w-[14px]!" />
           </SidebarMenuAction>
         </DropdownMenuTrigger>
@@ -522,7 +538,7 @@ export function CreateRow({ type, onClose }: CreateRowProps) {
               onClose()
             }
           }}
-          className="h-6 flex-1 px-2 text-sm"
+          className="h-6 flex-1 rounded px-2 text-sm"
         />
       </div>
     </SidebarMenuItem>
