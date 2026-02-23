@@ -2,12 +2,13 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Check, Copy, Plus, Trash2 } from "lucide-react"
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
+import { queryKeys } from "@/lib/query-keys"
 import { createInvite, deleteInvite, getPendingInvites } from "@/server/invites"
 
 export function InvitesSection() {
   const queryClient = useQueryClient()
   const { data: invites } = useQuery({
-    queryKey: ["admin", "invites"],
+    queryKey: queryKeys.admin.invites(),
     queryFn: getPendingInvites,
   })
   const {
@@ -20,13 +21,13 @@ export function InvitesSection() {
       copyInviteLink(data.token)
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin", "invites"] })
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.invites() })
     },
   })
   const { mutate: deleteInviteMutation } = useMutation({
     mutationFn: deleteInvite,
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin", "invites"] })
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.invites() })
     },
   })
 

@@ -1,39 +1,17 @@
+import { useForm } from "@tanstack/react-form"
+import { useMutation } from "@tanstack/react-query"
 import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router"
-import { createServerFn } from "@tanstack/react-start"
-import { useState } from "react"
+import { z } from "zod"
+import { BrandLogo } from "@/components/brand-logo"
 import { Button } from "@/components/ui/button"
+import {
+  Field,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+} from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { auth } from "@/lib/auth"
-import { consumeInvite, validateInvite } from "@/server/invites"
-
-const registerWithInvite = createServerFn({ method: "POST" })
-  .inputValidator(
-    (data: { token: string; email: string; password: string; name: string }) =>
-      data,
-  )
-  .handler(async ({ data }) => {
-    const invite = await validateInvite({ data: data.token })
-    if (!invite) {
-      throw new Error("Invalid or expired invite link")
-    }
-
-    const result = await auth.api.signUpEmail({
-      body: {
-        email: data.email,
-        password: data.password,
-        name: data.name,
-      },
-    })
-
-    if (!result.user) {
-      throw new Error("Failed to create account")
-    }
-
-    await consumeInvite({ data: { token: data.token, userId: result.user.id } })
-
-    return { success: true }
-  })
+import { registerWithInvite, validateInvite } from "@/server/invites"
 
 export const Route = createFileRoute("/invite")({
   validateSearch: (search: Record<string, unknown>) => {
@@ -56,50 +34,54 @@ export const Route = createFileRoute("/invite")({
   component: InvitePage,
 })
 
+const formSchema = z
+  .object({
+    name: z.string().min(1),
+    email: z.email(),
+    password: z.string().min(8),
+    confirmPassword: z.string().min(8),
+  })
+  .superRefine(({ password, confirmPassword }, ctx) => {
+    if (password !== confirmPassword) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["confirmPassword"],
+        message: "Passwords do not match",
+      })
+    }
+  })
+
 function InvitePage() {
   const { token } = Route.useSearch()
   const navigate = useNavigate()
+  const form = useForm({
+    defaultValues: {
+      name: "",
+      email: "",
+      password: "",
+      confirmPassword: "",
+    },
+    validators: {
+      onSubmit: formSchema,
+    },
+    onSubmit: async ({ value }) => {
+      registerMutation({ data: { ...value, token } })
+    },
+  })
 
-  const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
-  const [confirmPassword, setConfirmPassword] = useState("")
-  const [name, setName] = useState("")
-  const [error, setError] = useState("")
-  const [loading, setLoading] = useState(false)
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError("")
-
-    if (password !== confirmPassword) {
-      setError("Passwords do not match")
-      return
-    }
-
-    if (password.length < 8) {
-      setError("Password must be at least 8 characters")
-      return
-    }
-
-    setLoading(true)
-    try {
-      await registerWithInvite({ data: { token, email, password, name } })
+  const { mutate: registerMutation } = useMutation({
+    mutationFn: registerWithInvite,
+    onSuccess: () => {
       navigate({ to: "/login" })
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Registration failed")
-    } finally {
-      setLoading(false)
-    }
-  }
+    },
+  })
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
       <div className="w-full max-w-sm">
         {/* Branding */}
         <div className="mb-8 flex flex-col items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-notion-terracotta text-lg font-semibold text-white">
-            E
-          </div>
+          <BrandLogo />
           <div className="text-center">
             <h1 className="text-lg font-medium tracking-[-0.01em] text-foreground">
               You're invited
@@ -111,69 +93,157 @@ function InvitePage() {
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-1.5">
-            <Label htmlFor="name" className="text-sm text-muted-foreground">
-              Name
-            </Label>
-            <Input
-              id="name"
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Your name"
-              required
+        <form
+          onSubmit={(e) => {
+            e.preventDefault()
+            form.handleSubmit()
+          }}
+          className="space-y-4"
+        >
+          <FieldGroup>
+            <form.Field
+              name="name"
+              children={(field) => {
+                const isInvalid =
+                  field.state.meta.isTouched && !field.state.meta.isValid
+                return (
+                  <Field data-invalid={isInvalid}>
+                    <FieldLabel
+                      htmlFor={field.name}
+                      className="text-sm text-muted-foreground"
+                    >
+                      Name
+                    </FieldLabel>
+                    <Input
+                      id={field.name}
+                      name={field.name}
+                      value={field.state.value}
+                      onBlur={field.handleBlur}
+                      onChange={(e) => field.handleChange(e.target.value)}
+                      aria-invalid={isInvalid}
+                      placeholder="Your name"
+                      autoComplete="off"
+                      required
+                    />
+                    {isInvalid && (
+                      <FieldError errors={field.state.meta.errors} />
+                    )}
+                  </Field>
+                )
+              }}
             />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="email" className="text-sm text-muted-foreground">
-              Email
-            </Label>
-            <Input
-              id="email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@example.com"
-              required
+            <form.Field
+              name="email"
+              children={(field) => {
+                const isInvalid =
+                  field.state.meta.isTouched && !field.state.meta.isValid
+                return (
+                  <Field data-invalid={isInvalid}>
+                    <FieldLabel
+                      htmlFor={field.name}
+                      className="text-sm text-muted-foreground"
+                    >
+                      Email
+                    </FieldLabel>
+                    <Input
+                      id={field.name}
+                      name={field.name}
+                      value={field.state.value}
+                      onBlur={field.handleBlur}
+                      onChange={(e) => field.handleChange(e.target.value)}
+                      aria-invalid={isInvalid}
+                      placeholder="you@example.com"
+                      autoComplete="email"
+                      required
+                    />
+                    {isInvalid && (
+                      <FieldError errors={field.state.meta.errors} />
+                    )}
+                  </Field>
+                )
+              }}
             />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="password" className="text-sm text-muted-foreground">
-              Password
-            </Label>
-            <Input
-              id="password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••••"
-              required
+            <form.Field
+              name="password"
+              children={(field) => {
+                const isInvalid =
+                  field.state.meta.isTouched && !field.state.meta.isValid
+                return (
+                  <Field data-invalid={isInvalid}>
+                    <FieldLabel
+                      htmlFor={field.name}
+                      className="text-sm text-muted-foreground"
+                    >
+                      Password
+                    </FieldLabel>
+                    <Input
+                      id={field.name}
+                      name={field.name}
+                      value={field.state.value}
+                      onBlur={field.handleBlur}
+                      onChange={(e) => field.handleChange(e.target.value)}
+                      aria-invalid={isInvalid}
+                      placeholder="••••••••••"
+                      autoComplete="new-password"
+                      type="password"
+                      required
+                    />
+                    {isInvalid && (
+                      <FieldError errors={field.state.meta.errors} />
+                    )}
+                  </Field>
+                )
+              }}
             />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="confirmPassword" className="text-sm text-muted-foreground">
-              Confirm password
-            </Label>
-            <Input
-              id="confirmPassword"
-              type="password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              placeholder="••••••••••"
-              required
+            <form.Field
+              name="confirmPassword"
+              children={(field) => {
+                const isInvalid =
+                  field.state.meta.isTouched && !field.state.meta.isValid
+                return (
+                  <Field data-invalid={isInvalid}>
+                    <FieldLabel
+                      htmlFor={field.name}
+                      className="text-sm text-muted-foreground"
+                    >
+                      Confirm password
+                    </FieldLabel>
+                    <Input
+                      id={field.name}
+                      name={field.name}
+                      value={field.state.value}
+                      onBlur={field.handleBlur}
+                      onChange={(e) => field.handleChange(e.target.value)}
+                      aria-invalid={isInvalid}
+                      placeholder="••••••••••"
+                      autoComplete="confirm-password"
+                      type="password"
+                      required
+                    />
+                    {isInvalid && (
+                      <FieldError errors={field.state.meta.errors} />
+                    )}
+                  </Field>
+                )
+              }}
             />
-          </div>
-          {error && (
-            <p className="text-sm text-destructive">{error}</p>
-          )}
-          <Button
-            type="submit"
-            className="w-full bg-foreground text-background hover:bg-foreground/90"
-            disabled={loading}
+          </FieldGroup>
+          <form.Subscribe
+            selector={(formState) => [
+              formState.canSubmit,
+              formState.isSubmitting,
+            ]}
           >
-            {loading ? "Creating account..." : "Create account"}
-          </Button>
+            {([canSubmit, isSubmitting]) => (
+              <Button
+                type="submit"
+                className="w-full bg-foreground text-background hover:bg-foreground/90"
+                disabled={!canSubmit}
+              >
+                {isSubmitting ? "Creating account..." : "Create account"}
+              </Button>
+            )}
+          </form.Subscribe>
         </form>
       </div>
     </div>

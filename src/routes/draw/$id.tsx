@@ -11,6 +11,7 @@ import { Cloud, Loader2, PanelLeftIcon, Pencil } from "lucide-react"
 import { useCallback, useMemo, useState } from "react"
 import { useSidebar } from "@/components/ui/sidebar"
 import { useAutoSave } from "@/hooks/use-auto-save"
+import { queryKeys } from "@/lib/query-keys"
 import {
   getDrawingWithFiles,
   saveDrawingScene,
@@ -30,7 +31,7 @@ export const Route = createFileRoute("/draw/$id")({
   ssr: false,
   loader: async ({ params, context }) => {
     await context.queryClient.ensureQueryData({
-      queryKey: ["drawing", params.id],
+      queryKey: queryKeys.drawing(params.id),
       queryFn: () => getDrawingWithFiles({ data: params.id }),
     })
   },
@@ -49,13 +50,13 @@ function DrawingCanvas() {
   const { toggleSidebar } = useSidebar()
 
   const { data: drawing } = useQuery({
-    queryKey: ["drawing", id],
+    queryKey: queryKeys.drawing(id),
     queryFn: () => getDrawingWithFiles({ data: id }),
   })
 
   const invalidateDrawingQueries = useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: ["drawings"] })
-    queryClient.invalidateQueries({ queryKey: ["drawing", id] })
+    queryClient.invalidateQueries({ queryKey: queryKeys.drawings() })
+    queryClient.invalidateQueries({ queryKey: queryKeys.drawing(id) })
   }, [id, queryClient])
 
   const saveSceneMutation = useMutation({
@@ -66,15 +67,18 @@ function DrawingCanvas() {
   const renameDrawingMutation = useMutation({
     mutationFn: updateDrawing,
     onMutate: async ({ data: { id: drawingId, updateData } }) => {
-      await queryClient.cancelQueries({ queryKey: ["drawing", drawingId] })
-      const previous = queryClient.getQueryData(["drawing", drawingId])
-      queryClient.setQueryData(["drawing", drawingId], (old: typeof drawing) =>
-        old ? { ...old, ...updateData } : old,
+      await queryClient.cancelQueries({
+        queryKey: queryKeys.drawing(drawingId),
+      })
+      const previous = queryClient.getQueryData(queryKeys.drawing(drawingId))
+      queryClient.setQueryData(
+        queryKeys.drawing(drawingId),
+        (old: typeof drawing) => (old ? { ...old, ...updateData } : old),
       )
       return { previous }
     },
     onError: (_err, { data: { id: drawingId } }, context) => {
-      queryClient.setQueryData(["drawing", drawingId], context?.previous)
+      queryClient.setQueryData(queryKeys.drawing(drawingId), context?.previous)
     },
     onSettled: invalidateDrawingQueries,
   })

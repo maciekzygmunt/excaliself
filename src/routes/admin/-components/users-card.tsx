@@ -11,18 +11,19 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
+import { queryKeys } from "@/lib/query-keys"
 import { deleteUser, getAllUsers } from "@/server/users"
 
 export function UsersSection() {
   const queryClient = useQueryClient()
   const { data: users } = useQuery({
-    queryKey: ["admin", "users"],
+    queryKey: queryKeys.admin.users(),
     queryFn: getAllUsers,
   })
   const { mutate: deleteUserMutation } = useMutation({
     mutationFn: deleteUser,
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin", "users"] })
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.users() })
     },
   })
 
@@ -32,7 +33,8 @@ export function UsersSection() {
       <div className="mb-4">
         <h2 className="text-sm font-medium text-foreground">Users</h2>
         <p className="text-xs text-muted-foreground">
-          {users?.length ?? 0} registered {users?.length === 1 ? "user" : "users"}
+          {users?.length ?? 0} registered{" "}
+          {users?.length === 1 ? "user" : "users"}
         </p>
       </div>
 

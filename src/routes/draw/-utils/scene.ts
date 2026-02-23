@@ -1,4 +1,8 @@
-import { hashElementsVersion, hashString, restore } from "@excalidraw/excalidraw"
+import {
+  hashElementsVersion,
+  hashString,
+  restore,
+} from "@excalidraw/excalidraw"
 import type { ExcalidrawElement } from "@excalidraw/excalidraw/element/types"
 import type {
   AppState,

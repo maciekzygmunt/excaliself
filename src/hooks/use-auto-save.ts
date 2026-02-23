@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react"
+import { toast } from "sonner"
 import { useDebounceCallback } from "./use-debounce-callback"
 
 interface UseAutoSaveOptions<T> {
@@ -24,6 +25,18 @@ export function useAutoSave<T>({
   resetKey,
   skipInitialChange = false,
 }: UseAutoSaveOptions<T>): UseAutoSaveReturn<T> {
+  // State machine lifecycle:
+  //
+  // 1. handleChange is called with new data
+  // 2. If not yet initialized and skipInitialChange is true, record signatures and skip
+  // 3. If the signature matches savedSignature or pendingSignature, skip (no-op)
+  // 4. Otherwise, store the pendingSignature and queue unsavedData for debounced save
+  // 5. After debounce, performSave fires:
+  //    - If signature matches savedSignature, clear unsavedData and skip
+  //    - Otherwise, call onSave and update savedSignature on success
+  //    - On failure, roll pendingSignature back to savedSignature
+  // 6. On unmount, any remaining unsavedData is flushed immediately
+
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
 
@@ -34,36 +47,36 @@ export function useAutoSave<T>({
   getSignatureRef.current = getSignature
 
   const stateRef = useRef({
-    pendingData: null as T | null,
+    unsavedData: null as T | null,
     initialized: false,
-    lastPersistedSignature: null as string | null,
-    lastQueuedSignature: null as string | null,
+    savedSignature: null as string | null,
+    pendingSignature: null as string | null,
   })
 
   const performSave = useCallback(async (data: T) => {
     const state = stateRef.current
     const signature = getSignatureRef.current?.(data) ?? null
 
-    if (signature && signature === state.lastPersistedSignature) {
-      state.pendingData = null
-      state.lastQueuedSignature = signature
+    if (signature && signature === state.savedSignature) {
+      state.unsavedData = null
+      state.pendingSignature = signature
       return
     }
 
-    state.pendingData = null
+    state.unsavedData = null
     setSaving(true)
     try {
       await onSaveRef.current(data)
       if (signature) {
-        state.lastPersistedSignature = signature
-        state.lastQueuedSignature = signature
+        state.savedSignature = signature
+        state.pendingSignature = signature
       }
       setSaved(true)
-    } catch (err) {
+    } catch {
       if (signature) {
-        state.lastQueuedSignature = state.lastPersistedSignature
+        state.pendingSignature = state.savedSignature
       }
-      console.error("Failed to save:", err)
+      toast.error("Failed to save drawing")
     } finally {
       setSaving(false)
     }
@@ -81,8 +94,8 @@ export function useAutoSave<T>({
         state.initialized = true
         if (skipInitialChange) {
           if (signature) {
-            state.lastPersistedSignature = signature
-            state.lastQueuedSignature = signature
+            state.savedSignature = signature
+            state.pendingSignature = signature
           }
           return
         }
@@ -90,17 +103,17 @@ export function useAutoSave<T>({
 
       if (
         signature &&
-        (signature === state.lastPersistedSignature ||
-          signature === state.lastQueuedSignature)
+        (signature === state.savedSignature ||
+          signature === state.pendingSignature)
       ) {
         return
       }
 
       if (signature) {
-        state.lastQueuedSignature = signature
+        state.pendingSignature = signature
       }
 
-      state.pendingData = data
+      state.unsavedData = data
       runDebouncedSave(data)
     },
     [runDebouncedSave, skipInitialChange],
@@ -119,10 +132,10 @@ export function useAutoSave<T>({
 
     cancelDebouncedSave()
     stateRef.current = {
-      pendingData: null,
+      unsavedData: null,
       initialized: false,
-      lastPersistedSignature: null,
-      lastQueuedSignature: null,
+      savedSignature: null,
+      pendingSignature: null,
     }
     setSaving(false)
     setSaved(false)
@@ -130,10 +143,10 @@ export function useAutoSave<T>({
 
   useEffect(() => {
     return () => {
-      const pendingData = stateRef.current.pendingData
+      const unsavedData = stateRef.current.unsavedData
       cancelDebouncedSave()
-      if (pendingData) {
-        void onSaveRef.current(pendingData)
+      if (unsavedData) {
+        void onSaveRef.current(unsavedData)
       }
     }
   }, [cancelDebouncedSave])

@@ -6,6 +6,8 @@ import { and, eq, gt, isNull } from "drizzle-orm"
 import z from "zod"
 import { db } from "@/db"
 import { invites } from "@/db/schema"
+import { auth } from "@/lib/auth"
+import { INVITE_EXPIRY_MS } from "@/lib/constants"
 import { adminMiddleware } from "@/middleware/admin"
 
 export const validateInvite = createServerFn({ method: "GET" })
@@ -33,13 +35,45 @@ export const consumeInvite = createServerFn({ method: "POST" })
       .where(eq(invites.token, data.token))
   })
 
+export const registerWithInvite = createServerFn({ method: "POST" })
+  .inputValidator(
+    z.object({
+      token: z.string().min(1),
+      email: z.string().email(),
+      password: z.string().min(8),
+      name: z.string().min(1),
+    }),
+  )
+  .handler(async ({ data }) => {
+    const invite = await validateInvite({ data: data.token })
+    if (!invite) {
+      throw new Error("Invalid or expired invite link")
+    }
+
+    const result = await auth.api.signUpEmail({
+      body: {
+        email: data.email,
+        password: data.password,
+        name: data.name,
+      },
+    })
+
+    if (!result.user) {
+      throw new Error("Failed to create account")
+    }
+
+    await consumeInvite({ data: { token: data.token, userId: result.user.id } })
+
+    return { success: true }
+  })
+
 // ADMIN
 export const createInvite = createServerFn({ method: "POST" })
   .middleware([adminMiddleware])
   .handler(async ({ context }) => {
     const id = randomUUID()
     const token = randomBytes(32).toString("hex")
-    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days
+    const expiresAt = new Date(Date.now() + INVITE_EXPIRY_MS)
     const adminId = context.session.user.id
 
     await db.insert(invites).values({

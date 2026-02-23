@@ -2,6 +2,7 @@ import { createFileRoute, Outlet } from "@tanstack/react-router"
 import { createServerFn } from "@tanstack/react-start"
 import type React from "react"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
+import { queryKeys } from "@/lib/query-keys"
 import { authMiddleware } from "@/middleware/auth"
 import { setupMiddleware } from "@/middleware/setup"
 import { getDrawings } from "@/server/drawings"
@@ -21,11 +22,11 @@ export const Route = createFileRoute("/draw")({
     const session = await getSession()
     await Promise.all([
       context.queryClient.ensureQueryData({
-        queryKey: ["drawings"],
+        queryKey: queryKeys.drawings(),
         queryFn: getDrawings,
       }),
       context.queryClient.ensureQueryData({
-        queryKey: ["folders"],
+        queryKey: queryKeys.folders(),
         queryFn: getFolders,
       }),
     ])
@@ -38,7 +39,10 @@ function DrawLayout() {
   const { session } = Route.useLoaderData()
 
   return (
-    <SidebarProvider defaultOpen style={{ "--sidebar-width": "260px" } as React.CSSProperties}>
+    <SidebarProvider
+      defaultOpen
+      style={{ "--sidebar-width": "260px" } as React.CSSProperties}
+    >
       <DrawLayoutShell
         userEmail={session.user?.email ?? ""}
         isAdmin={session.user.role === "admin"}

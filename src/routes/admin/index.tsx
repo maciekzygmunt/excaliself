@@ -1,5 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router"
 import { ArrowLeft } from "lucide-react"
+import { BrandLogo } from "@/components/brand-logo"
+import { queryKeys } from "@/lib/query-keys"
 import { adminMiddleware } from "@/middleware/admin"
 import { setupMiddleware } from "@/middleware/setup"
 import { getPendingInvites } from "@/server/invites"
@@ -14,11 +16,11 @@ export const Route = createFileRoute("/admin/")({
   loader: async ({ context }) => {
     await Promise.all([
       context.queryClient.ensureQueryData({
-        queryKey: ["admin", "invites"],
+        queryKey: queryKeys.admin.invites(),
         queryFn: getPendingInvites,
       }),
       context.queryClient.ensureQueryData({
-        queryKey: ["admin", "users"],
+        queryKey: queryKeys.admin.users(),
         queryFn: getAllUsers,
       }),
     ])
@@ -40,9 +42,7 @@ function AdminPage() {
             Back to drawings
           </Link>
           <div className="flex items-center gap-3">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-notion-terracotta text-sm font-semibold text-white">
-              E
-            </div>
+            <BrandLogo size="md" />
             <div>
               <h1 className="text-lg font-medium tracking-[-0.01em] text-foreground">
                 Admin settings

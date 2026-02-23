@@ -27,7 +27,11 @@ export const getUserCount = createServerFn({ method: "GET" }).handler(
 
 export const setupAdmin = createServerFn({ method: "POST" })
   .inputValidator(
-    (data: { email: string; password: string; name: string }) => data,
+    z.object({
+      email: z.string().email(),
+      password: z.string().min(8),
+      name: z.string().min(1),
+    }),
   )
   .handler(async ({ data }) => {
     const userCount = await getUserCount()
@@ -64,45 +68,40 @@ export const deleteUser = createServerFn({ method: "POST" })
   .middleware([adminMiddleware])
   .inputValidator(z.string())
   .handler(async ({ data: userId }) => {
-    try {
-      await db.transaction(async (tx) => {
-        const [user] = await tx
-          .select({ email: users.email })
-          .from(users)
-          .where(eq(users.id, userId))
+    await db.transaction(async (tx) => {
+      const [user] = await tx
+        .select({ email: users.email })
+        .from(users)
+        .where(eq(users.id, userId))
 
-        if (!user) {
-          throw new Error(`User not found: ${userId}`)
-        }
+      if (!user) {
+        throw new Error(`User not found: ${userId}`)
+      }
 
-        const userDrawings = await tx
-          .select({ id: drawings.id })
-          .from(drawings)
-          .where(eq(drawings.ownerId, userId))
-        const drawingIds = userDrawings.map((d) => d.id)
+      const userDrawings = await tx
+        .select({ id: drawings.id })
+        .from(drawings)
+        .where(eq(drawings.ownerId, userId))
+      const drawingIds = userDrawings.map((d) => d.id)
 
-        if (drawingIds.length > 0) {
-          await tx
-            .delete(drawingFiles)
-            .where(inArray(drawingFiles.drawingId, drawingIds))
-        }
-
-        await tx.delete(drawings).where(eq(drawings.ownerId, userId))
-        await tx.delete(folders).where(eq(folders.ownerId, userId))
-        await tx.delete(sessions).where(eq(sessions.userId, userId))
-        await tx.delete(accounts).where(eq(accounts.userId, userId))
-        await tx.delete(invites).where(eq(invites.invitedBy, userId))
+      if (drawingIds.length > 0) {
         await tx
-          .update(invites)
-          .set({ usedBy: null })
-          .where(eq(invites.usedBy, userId))
-        await tx
-          .delete(verifications)
-          .where(eq(verifications.identifier, user.email))
-        await tx.delete(users).where(eq(users.id, userId))
-      })
-    } catch (error) {
-      console.error("Failed to delete user:", userId, error)
-      throw error
-    }
+          .delete(drawingFiles)
+          .where(inArray(drawingFiles.drawingId, drawingIds))
+      }
+
+      await tx.delete(drawings).where(eq(drawings.ownerId, userId))
+      await tx.delete(folders).where(eq(folders.ownerId, userId))
+      await tx.delete(sessions).where(eq(sessions.userId, userId))
+      await tx.delete(accounts).where(eq(accounts.userId, userId))
+      await tx.delete(invites).where(eq(invites.invitedBy, userId))
+      await tx
+        .update(invites)
+        .set({ usedBy: null })
+        .where(eq(invites.usedBy, userId))
+      await tx
+        .delete(verifications)
+        .where(eq(verifications.identifier, user.email))
+      await tx.delete(users).where(eq(users.id, userId))
+    })
   })

@@ -1,14 +1,7 @@
 import { Link } from "@tanstack/react-router"
-import {
-  File,
-  Folder,
-  LogOut,
-  Plus,
-  Search,
-  Settings,
-  X,
-} from "lucide-react"
+import { File, Folder, LogOut, Plus, Search, Settings, X } from "lucide-react"
 import { useRef, useState } from "react"
+import { BrandLogo } from "@/components/brand-logo"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -71,12 +64,8 @@ export function DrawSidebar({ userEmail, isAdmin }: DrawSidebarProps) {
       <Sidebar collapsible="offcanvas" variant="sidebar">
         {/* Workspace header */}
         <SidebarHeader className="gap-0 px-3 pt-4 pb-2">
-          <div
-            className="flex items-center gap-2 rounded-md px-2 py-1.5 transition-colors hover:bg-sidebar-accent cursor-pointer"
-          >
-            <div className="flex h-5 w-5 items-center justify-center rounded bg-notion-terracotta text-[10px] font-semibold text-white">
-              E
-            </div>
+          <div className="flex items-center gap-2 rounded-md px-2 py-1.5 transition-colors hover:bg-sidebar-accent cursor-pointer">
+            <BrandLogo size="sm" />
             <span className="text-sm font-medium tracking-[-0.01em] text-sidebar-foreground">
               Excalidraw
             </span>
@@ -119,9 +108,7 @@ export function DrawSidebar({ userEmail, isAdmin }: DrawSidebarProps) {
           </span>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button
-                className="rounded p-0.5 text-muted-foreground/40 transition-all hover:bg-sidebar-accent hover:text-muted-foreground focus-visible:bg-sidebar-accent focus-visible:text-muted-foreground focus-visible:outline-none"
-              >
+              <button className="rounded p-0.5 text-muted-foreground/40 transition-all hover:bg-sidebar-accent hover:text-muted-foreground focus-visible:bg-sidebar-accent focus-visible:text-muted-foreground focus-visible:outline-none">
                 <Plus className="h-[14px] w-[14px]" />
               </button>
             </DropdownMenuTrigger>
@@ -165,9 +152,7 @@ export function DrawSidebar({ userEmail, isAdmin }: DrawSidebarProps) {
                 {displayTree.map((node) => (
                   <TreeNodeItem
                     key={
-                      node.type === "folder"
-                        ? node.folder.id
-                        : node.drawing.id
+                      node.type === "folder" ? node.folder.id : node.drawing.id
                     }
                     node={node}
                   />

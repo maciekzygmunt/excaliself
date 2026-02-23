@@ -2,6 +2,7 @@ import { useForm } from "@tanstack/react-form"
 import { useMutation } from "@tanstack/react-query"
 import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router"
 import { z } from "zod"
+import { BrandLogo } from "@/components/brand-logo"
 import { Button } from "@/components/ui/button"
 import {
   Field,
@@ -68,9 +69,7 @@ function SetupPage() {
       <div className="w-full max-w-sm">
         {/* Branding */}
         <div className="mb-8 flex flex-col items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-notion-terracotta text-lg font-semibold text-white">
-            E
-          </div>
+          <BrandLogo />
           <div className="text-center">
             <h1 className="text-lg font-medium tracking-[-0.01em] text-foreground">
               Setup your instance
@@ -97,7 +96,10 @@ function SetupPage() {
                   field.state.meta.isTouched && !field.state.meta.isValid
                 return (
                   <Field data-invalid={isInvalid}>
-                    <FieldLabel htmlFor={field.name} className="text-sm text-muted-foreground">
+                    <FieldLabel
+                      htmlFor={field.name}
+                      className="text-sm text-muted-foreground"
+                    >
                       Name
                     </FieldLabel>
                     <Input
@@ -125,7 +127,10 @@ function SetupPage() {
                   field.state.meta.isTouched && !field.state.meta.isValid
                 return (
                   <Field data-invalid={isInvalid}>
-                    <FieldLabel htmlFor={field.name} className="text-sm text-muted-foreground">
+                    <FieldLabel
+                      htmlFor={field.name}
+                      className="text-sm text-muted-foreground"
+                    >
                       Email
                     </FieldLabel>
                     <Input
@@ -153,7 +158,10 @@ function SetupPage() {
                   field.state.meta.isTouched && !field.state.meta.isValid
                 return (
                   <Field data-invalid={isInvalid}>
-                    <FieldLabel htmlFor={field.name} className="text-sm text-muted-foreground">
+                    <FieldLabel
+                      htmlFor={field.name}
+                      className="text-sm text-muted-foreground"
+                    >
                       Password
                     </FieldLabel>
                     <Input
@@ -182,7 +190,10 @@ function SetupPage() {
                   field.state.meta.isTouched && !field.state.meta.isValid
                 return (
                   <Field data-invalid={isInvalid}>
-                    <FieldLabel htmlFor={field.name} className="text-sm text-muted-foreground">
+                    <FieldLabel
+                      htmlFor={field.name}
+                      className="text-sm text-muted-foreground"
+                    >
                       Confirm password
                     </FieldLabel>
                     <Input

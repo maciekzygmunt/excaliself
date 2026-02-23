@@ -1,16 +1,15 @@
 import { QueryClient } from "@tanstack/react-query"
 import { createRouter } from "@tanstack/react-router"
 import { setupRouterSsrQueryIntegration } from "@tanstack/react-router-ssr-query"
-// Import the generated route tree
+import { QUERY_GC_TIME_MS, QUERY_STALE_TIME_MS } from "./lib/constants"
 import { routeTree } from "./routeTree.gen"
 
-// Create a new router instance
 export const getRouter = () => {
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: {
-        staleTime: 1000 * 60 * 5, // 5 min
-        gcTime: 1000 * 60 * 60, // 1 hour
+        staleTime: QUERY_STALE_TIME_MS,
+        gcTime: QUERY_GC_TIME_MS,
         refetchOnWindowFocus: false,
       },
     },
