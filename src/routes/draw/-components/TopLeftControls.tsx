@@ -1,65 +1,57 @@
 import { PanelLeftIcon } from "lucide-react"
-import {
-  type ReactNode,
-  useCallback,
-  useLayoutEffect,
-  useRef,
-  useState,
-} from "react"
+import { type ReactNode, useLayoutEffect, useRef, useState } from "react"
 import { createPortal } from "react-dom"
-
-const TOP_LEFT_TARGET_RETRY_FRAMES = 240
 
 function useTopLeftPortalTarget() {
   const [target, setTarget] = useState<HTMLElement | null>(null)
-  const rafRef = useRef<number | null>(null)
   const targetRef = useRef<HTMLElement | null>(null)
-  const retryRef = useRef(0)
 
-  const resolveTarget = useCallback(() => {
-    if (rafRef.current !== null) {
-      cancelAnimationFrame(rafRef.current)
-    }
-    rafRef.current = requestAnimationFrame(() => {
+  useLayoutEffect(() => {
+    const findTarget = (): HTMLElement | null => {
       const primary = document.querySelector(
         ".excalidraw .App-menu_top__left > div:first-child",
       )
-      let nextTarget: HTMLElement | null = null
       if (primary instanceof HTMLElement) {
-        nextTarget = primary
-      } else {
-        const trigger = document.querySelector(".excalidraw .main-menu-trigger")
-        const fallback = trigger?.closest("div")
-        if (fallback instanceof HTMLElement) {
-          nextTarget = fallback
-        }
+        return primary
       }
-      if (targetRef.current !== nextTarget) {
-        targetRef.current = nextTarget
-        setTarget(nextTarget)
+      const trigger = document.querySelector(".excalidraw .main-menu-trigger")
+      const fallback = trigger?.closest("div")
+      if (fallback instanceof HTMLElement) {
+        return fallback
       }
-      if (!nextTarget && retryRef.current < TOP_LEFT_TARGET_RETRY_FRAMES) {
-        retryRef.current += 1
-        resolveTarget()
-      }
-    })
-  }, [])
-
-  useLayoutEffect(() => {
-    retryRef.current = 0
-    resolveTarget()
-    const handleResize = () => {
-      retryRef.current = 0
-      resolveTarget()
+      return null
     }
-    window.addEventListener("resize", handleResize)
-    return () => {
-      if (rafRef.current !== null) {
-        cancelAnimationFrame(rafRef.current)
+
+    const updateTarget = () => {
+      const next = findTarget()
+      if (targetRef.current !== next) {
+        targetRef.current = next
+        setTarget(next)
       }
+    }
+
+    // Initial check
+    updateTarget()
+
+    // Watch for DOM changes until target is found
+    const observer = new MutationObserver(() => {
+      updateTarget()
+      if (targetRef.current) observer.disconnect()
+    })
+
+    if (!targetRef.current) {
+      observer.observe(document.body, { childList: true, subtree: true })
+    }
+
+    // Re-resolve on resize (layout may change which container to use)
+    const handleResize = () => updateTarget()
+    window.addEventListener("resize", handleResize)
+
+    return () => {
+      observer.disconnect()
       window.removeEventListener("resize", handleResize)
     }
-  }, [resolveTarget])
+  }, [])
 
   return target
 }
