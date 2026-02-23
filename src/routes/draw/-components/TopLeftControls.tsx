@@ -73,7 +73,7 @@ export function TopLeftControls({
   onNameBlur: (value: string) => void
 }) {
   return (
-    <div className="pointer-events-auto flex flex-nowrap items-center gap-[10px]">
+    <div className="pointer-events-auto flex flex-nowrap items-center gap-[10px] order-1">
       <button
         type="button"
         onClick={onToggleSidebar}
