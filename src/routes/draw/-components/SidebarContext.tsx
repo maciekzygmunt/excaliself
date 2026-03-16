@@ -1,27 +1,27 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { useNavigate, useParams } from "@tanstack/react-router"
-import type { DragEvent } from "react"
-import { createContext, useContext, useMemo, useState } from "react"
-import { toast } from "sonner"
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useNavigate, useParams } from '@tanstack/react-router'
+import type { DragEvent } from 'react'
+import { createContext, useContext, useMemo, useState } from 'react'
+import { toast } from 'sonner'
 import {
   createDrawing,
   deleteDrawing,
   getDrawings,
   updateDrawing,
-} from "@/server/drawings"
-import { deleteFolder, getFolders, updateFolder } from "@/server/folders"
+} from '@/server/drawings'
+import { deleteFolder, getFolders, updateFolder } from '@/server/folders'
 
 export type Drawing = Awaited<ReturnType<typeof getDrawings>>[number]
 export type FolderType = Awaited<ReturnType<typeof getFolders>>[number]
 
 export type TreeNode =
-  | { type: "folder"; folder: FolderType; children: TreeNode[] }
-  | { type: "drawing"; drawing: Drawing }
+  | { type: 'folder'; folder: FolderType; children: TreeNode[] }
+  | { type: 'drawing'; drawing: Drawing }
 
-export type DragItem = { type: "drawing" | "folder"; id: string }
+export type DragItem = { type: 'drawing' | 'folder'; id: string }
 export type DropTarget =
-  | { type: "root" }
-  | { type: "folder"; id: string; position: "inside" | "above" | "below" }
+  | { type: 'root' }
+  | { type: 'folder'; id: string; position: 'inside' | 'above' | 'below' }
   | null
 
 export type ConfirmDialog = {
@@ -68,20 +68,20 @@ export function SidebarContextProvider({
 }) {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
-  const { id: currentDrawingId } = useParams({ from: "/draw/$id" })
+  const { id: currentDrawingId } = useParams({ from: '/draw/$id' })
 
   // --- Data fetching ---
   const { data: drawings = [] } = useQuery({
-    queryKey: ["drawings"],
+    queryKey: ['drawings'],
     queryFn: () => getDrawings(),
   })
   const { data: folders = [] } = useQuery({
-    queryKey: ["folders"],
+    queryKey: ['folders'],
     queryFn: () => getFolders(),
   })
 
   // --- UI state ---
-  const [searchQuery, setSearchQuery] = useState("")
+  const [searchQuery, setSearchQuery] = useState('')
   const [dragItem, setDragItem] = useState<DragItem | null>(null)
   const [dropTarget, setDropTarget] = useState<DropTarget>(null)
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialog>(null)
@@ -93,9 +93,9 @@ export function SidebarContextProvider({
   )
 
   const tree = useMemo(() => {
-    const folderNodes = new Map<string, TreeNode & { type: "folder" }>()
+    const folderNodes = new Map<string, TreeNode & { type: 'folder' }>()
     for (const f of folders) {
-      folderNodes.set(f.id, { type: "folder", folder: f, children: [] })
+      folderNodes.set(f.id, { type: 'folder', folder: f, children: [] })
     }
 
     const root: TreeNode[] = []
@@ -109,7 +109,7 @@ export function SidebarContextProvider({
     }
 
     for (const d of drawings) {
-      const node: TreeNode = { type: "drawing", drawing: d }
+      const node: TreeNode = { type: 'drawing', drawing: d }
       const parent = d.folderId ? folderNodes.get(d.folderId) : null
       if (parent) parent.children.push(node)
       else root.push(node)
@@ -117,13 +117,13 @@ export function SidebarContextProvider({
 
     const sortNodes = (nodes: TreeNode[]) => {
       nodes.sort((a, b) => {
-        if (a.type !== b.type) return a.type === "folder" ? -1 : 1
-        const nameA = a.type === "folder" ? a.folder.name : a.drawing.name
-        const nameB = b.type === "folder" ? b.folder.name : b.drawing.name
+        if (a.type !== b.type) return a.type === 'folder' ? -1 : 1
+        const nameA = a.type === 'folder' ? a.folder.name : a.drawing.name
+        const nameB = b.type === 'folder' ? b.folder.name : b.drawing.name
         return nameA.localeCompare(nameB)
       })
       for (const n of nodes) {
-        if (n.type === "folder") sortNodes(n.children)
+        if (n.type === 'folder') sortNodes(n.children)
       }
     }
     sortNodes(root)
@@ -140,7 +140,7 @@ export function SidebarContextProvider({
     const results: TreeNode[] = drawings
       .filter((d) => d.name.toLowerCase().includes(q))
       .sort((a, b) => a.name.localeCompare(b.name))
-      .map((d) => ({ type: "drawing" as const, drawing: d }))
+      .map((d) => ({ type: 'drawing' as const, drawing: d }))
 
     return results
   }, [searchQuery, tree, drawings])
@@ -149,9 +149,9 @@ export function SidebarContextProvider({
   const moveDrawingMutation = useMutation({
     mutationFn: updateDrawing,
     onMutate: async (variables) => {
-      await queryClient.cancelQueries({ queryKey: ["drawings"] })
-      const previous = queryClient.getQueryData<Drawing[]>(["drawings"])
-      queryClient.setQueryData<Drawing[]>(["drawings"], (old = []) =>
+      await queryClient.cancelQueries({ queryKey: ['drawings'] })
+      const previous = queryClient.getQueryData<Drawing[]>(['drawings'])
+      queryClient.setQueryData<Drawing[]>(['drawings'], (old = []) =>
         old.map((d) =>
           d.id === variables.data.id
             ? {
@@ -164,19 +164,19 @@ export function SidebarContextProvider({
       return { previous }
     },
     onError: (_err, _vars, context) => {
-      queryClient.setQueryData(["drawings"], context?.previous)
+      queryClient.setQueryData(['drawings'], context?.previous)
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["drawings"] })
+      queryClient.invalidateQueries({ queryKey: ['drawings'] })
     },
   })
 
   const moveFolderMutation = useMutation({
     mutationFn: updateFolder,
     onMutate: async (variables) => {
-      await queryClient.cancelQueries({ queryKey: ["folders"] })
-      const previous = queryClient.getQueryData<FolderType[]>(["folders"])
-      queryClient.setQueryData<FolderType[]>(["folders"], (old = []) =>
+      await queryClient.cancelQueries({ queryKey: ['folders'] })
+      const previous = queryClient.getQueryData<FolderType[]>(['folders'])
+      queryClient.setQueryData<FolderType[]>(['folders'], (old = []) =>
         old.map((f) =>
           f.id === variables.data.id
             ? { ...f, parentId: variables.data.parentId ?? f.parentId }
@@ -186,10 +186,10 @@ export function SidebarContextProvider({
       return { previous }
     },
     onError: (_err, _vars, context) => {
-      queryClient.setQueryData(["folders"], context?.previous)
+      queryClient.setQueryData(['folders'], context?.previous)
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["folders"] })
+      queryClient.invalidateQueries({ queryKey: ['folders'] })
     },
   })
 
@@ -197,42 +197,42 @@ export function SidebarContextProvider({
   const deleteDrawingMutation = useMutation({
     mutationFn: deleteDrawing,
     onMutate: async (variables) => {
-      await queryClient.cancelQueries({ queryKey: ["drawings"] })
-      const previous = queryClient.getQueryData<Drawing[]>(["drawings"])
-      queryClient.setQueryData<Drawing[]>(["drawings"], (old = []) =>
+      await queryClient.cancelQueries({ queryKey: ['drawings'] })
+      const previous = queryClient.getQueryData<Drawing[]>(['drawings'])
+      queryClient.setQueryData<Drawing[]>(['drawings'], (old = []) =>
         old.filter((d) => d.id !== variables.data),
       )
       return { previous }
     },
     onError: (_err, _vars, context) => {
-      queryClient.setQueryData(["drawings"], context?.previous)
+      queryClient.setQueryData(['drawings'], context?.previous)
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["drawings"] })
+      queryClient.invalidateQueries({ queryKey: ['drawings'] })
     },
   })
 
   const createDrawingMutation = useMutation({
     mutationFn: createDrawing,
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["drawings"] })
+      queryClient.invalidateQueries({ queryKey: ['drawings'] })
     },
   })
 
   const deleteFolderMutation = useMutation({
     mutationFn: deleteFolder,
     onMutate: () => {
-      toast.loading("Deleting folder...", { id: "delete-folder" })
+      toast.loading('Deleting folder...', { id: 'delete-folder' })
     },
     onError: () => {
-      toast.error("Failed to delete folder", { id: "delete-folder" })
+      toast.error('Failed to delete folder', { id: 'delete-folder' })
     },
     onSuccess: () => {
-      toast.success("Folder deleted", { id: "delete-folder" })
+      toast.success('Folder deleted', { id: 'delete-folder' })
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["folders"] })
-      queryClient.invalidateQueries({ queryKey: ["drawings"] })
+      queryClient.invalidateQueries({ queryKey: ['folders'] })
+      queryClient.invalidateQueries({ queryKey: ['drawings'] })
     },
   })
 
@@ -251,9 +251,9 @@ export function SidebarContextProvider({
 
   const onDragStart = (item: DragItem) => (e: DragEvent) => {
     setDragItem(item)
-    e.dataTransfer.effectAllowed = "move"
-    e.dataTransfer.setData("text/plain", item.id)
-    e.dataTransfer.setData("application/x-sidebar-item", JSON.stringify(item))
+    e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setData('text/plain', item.id)
+    e.dataTransfer.setData('application/x-sidebar-item', JSON.stringify(item))
   }
 
   const onDragEnd = () => {
@@ -265,8 +265,8 @@ export function SidebarContextProvider({
     if (!dragItem) return
 
     if (
-      dragItem.type === "folder" &&
-      target?.type === "folder" &&
+      dragItem.type === 'folder' &&
+      target?.type === 'folder' &&
       (dragItem.id === target.id || isDescendant(dragItem.id, target.id))
     ) {
       return
@@ -274,7 +274,7 @@ export function SidebarContextProvider({
 
     e.preventDefault()
     e.stopPropagation()
-    e.dataTransfer.dropEffect = "move"
+    e.dataTransfer.dropEffect = 'move'
     setDropTarget(target)
   }
 
@@ -287,14 +287,14 @@ export function SidebarContextProvider({
     if (!dragItem) return
 
     const targetFolderId =
-      target?.type === "folder" && target.position === "inside"
+      target?.type === 'folder' && target.position === 'inside'
         ? target.id
         : null
 
     setDropTarget(null)
     setDragItem(null)
 
-    if (dragItem.type === "folder") {
+    if (dragItem.type === 'folder') {
       if (
         targetFolderId === dragItem.id ||
         isDescendant(dragItem.id, targetFolderId)
@@ -316,20 +316,20 @@ export function SidebarContextProvider({
   // --- Delete handlers ---
   const onDeleteDrawing = (id: string) => {
     setConfirmDialog({
-      title: "Delete drawing?",
-      description: "Are you sure you want to delete this drawing?",
+      title: 'Delete drawing?',
+      description: 'Are you sure you want to delete this drawing?',
       onConfirm: async () => {
         await deleteDrawingMutation.mutateAsync({ data: id })
 
         if (id === currentDrawingId) {
           const remaining = drawings.filter((d) => d.id !== id)
           if (remaining.length > 0) {
-            navigate({ to: "/draw/$id", params: { id: remaining[0].id } })
+            navigate({ to: '/draw/$id', params: { id: remaining[0].id } })
           } else {
             const newId = await createDrawingMutation.mutateAsync({
               data: {},
             })
-            navigate({ to: "/draw/$id", params: { id: newId } })
+            navigate({ to: '/draw/$id', params: { id: newId } })
           }
         }
       },
@@ -338,10 +338,10 @@ export function SidebarContextProvider({
 
   const onDeleteFolder = (id: string, hasChildren: boolean) => {
     setConfirmDialog({
-      title: "Delete folder?",
+      title: 'Delete folder?',
       description: hasChildren
-        ? "This folder contains items. All files in this folder will be deleted."
-        : "Delete this folder?",
+        ? 'This folder contains items. All files in this folder will be deleted.'
+        : 'Delete this folder?',
       onConfirm: () => {
         deleteFolderMutation.mutate({ data: id })
       },
@@ -386,7 +386,7 @@ export function useSidebarContext() {
   const context = useContext(SidebarContext)
   if (!context) {
     throw new Error(
-      "useSidebarContext must be used within SidebarContextProvider",
+      'useSidebarContext must be used within SidebarContextProvider',
     )
   }
   return context

@@ -1,12 +1,12 @@
-import { PanelLeftIcon } from "lucide-react"
+import { PanelLeftIcon } from 'lucide-react'
 import {
   type ReactNode,
   useCallback,
   useLayoutEffect,
   useRef,
   useState,
-} from "react"
-import { createPortal } from "react-dom"
+} from 'react'
+import { createPortal } from 'react-dom'
 
 const TOP_LEFT_TARGET_RETRY_FRAMES = 240
 
@@ -22,14 +22,14 @@ function useTopLeftPortalTarget() {
     }
     rafRef.current = requestAnimationFrame(() => {
       const primary = document.querySelector(
-        ".excalidraw .App-menu_top__left > div:first-child",
+        '.excalidraw .App-menu_top__left > div:first-child',
       )
       let nextTarget: HTMLElement | null = null
       if (primary instanceof HTMLElement) {
         nextTarget = primary
       } else {
-        const trigger = document.querySelector(".excalidraw .main-menu-trigger")
-        const fallback = trigger?.closest("div")
+        const trigger = document.querySelector('.excalidraw .main-menu-trigger')
+        const fallback = trigger?.closest('div')
         if (fallback instanceof HTMLElement) {
           nextTarget = fallback
         }
@@ -52,12 +52,12 @@ function useTopLeftPortalTarget() {
       retryRef.current = 0
       resolveTarget()
     }
-    window.addEventListener("resize", handleResize)
+    window.addEventListener('resize', handleResize)
     return () => {
       if (rafRef.current !== null) {
         cancelAnimationFrame(rafRef.current)
       }
-      window.removeEventListener("resize", handleResize)
+      window.removeEventListener('resize', handleResize)
     }
   }, [resolveTarget])
 
@@ -94,7 +94,7 @@ export function TopLeftControls({
       <div className="relative max-w-[180px] min-w-0 overflow-hidden hidden lg:block">
         <div
           className="relative h-(--lg-button-size) border-b border-transparent bg-transparent font-semibold after:block after:w-full after:min-w-16 after:whitespace-pre after:invisible after:content-[attr(data-value)] focus-within:border-(--color-primary)"
-          data-value={displayName || "Untitled Drawing"}
+          data-value={displayName || 'Untitled Drawing'}
         >
           <input
             value={displayName}

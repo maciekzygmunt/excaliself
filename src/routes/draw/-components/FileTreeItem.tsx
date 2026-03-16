@@ -1,5 +1,5 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query"
-import { Link, useNavigate, useParams } from "@tanstack/react-router"
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { Link, useNavigate, useParams } from '@tanstack/react-router'
 import {
   ChevronRight,
   File,
@@ -7,38 +7,39 @@ import {
   MoreHorizontal,
   Pencil,
   Trash2,
-} from "lucide-react"
-import { type DragEvent, useCallback, useEffect, useRef, useState } from "react"
+} from 'lucide-react'
+import { type DragEvent, useCallback, useEffect, useRef, useState } from 'react'
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-} from "@/components/ui/collapsible"
+} from '@/components/ui/collapsible'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { Input } from "@/components/ui/input"
+} from '@/components/ui/dropdown-menu'
 import {
   SidebarMenuAction,
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarMenuSub,
-} from "@/components/ui/sidebar"
-import { cn } from "@/lib/utils"
-import { createDrawing, updateDrawing } from "@/server/drawings"
-import { createFolder, updateFolder } from "@/server/folders"
-import { hasActiveDrawing } from "../-utils/hasActiveDrawing"
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
+} from '@/components/ui/sidebar'
+import { cn } from '@/lib/utils'
+import { createDrawing, updateDrawing } from '@/server/drawings'
+import { createFolder, updateFolder } from '@/server/folders'
+import { hasActiveDrawing } from '../-utils/hasActiveDrawing'
 import {
   type Drawing,
   type DropTarget,
   type FolderType,
   type TreeNode,
   useSidebarContext,
-} from "./SidebarContext"
+} from './SidebarContext'
 
 type FolderItemProps = {
   folder: FolderType
@@ -46,7 +47,7 @@ type FolderItemProps = {
 }
 
 export function FolderItem({ folder, children: childNodes }: FolderItemProps) {
-  const { id: currentDrawingId } = useParams({ from: "/draw/$id" })
+  const { id: currentDrawingId } = useParams({ from: '/draw/$id' })
   const {
     dropTarget,
     onDragStart,
@@ -61,9 +62,9 @@ export function FolderItem({ folder, children: childNodes }: FolderItemProps) {
   const renameMutation = useMutation({
     mutationFn: updateFolder,
     onMutate: async (variables) => {
-      await queryClient.cancelQueries({ queryKey: ["folders"] })
-      const previous = queryClient.getQueryData<FolderType[]>(["folders"])
-      queryClient.setQueryData<FolderType[]>(["folders"], (old = []) =>
+      await queryClient.cancelQueries({ queryKey: ['folders'] })
+      const previous = queryClient.getQueryData<FolderType[]>(['folders'])
+      queryClient.setQueryData<FolderType[]>(['folders'], (old = []) =>
         old.map((f) =>
           f.id === variables.data.id
             ? { ...f, name: variables.data.name ?? f.name }
@@ -73,10 +74,10 @@ export function FolderItem({ folder, children: childNodes }: FolderItemProps) {
       return { previous }
     },
     onError: (_err, _vars, context) => {
-      queryClient.setQueryData(["folders"], context?.previous)
+      queryClient.setQueryData(['folders'], context?.previous)
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["folders"] })
+      queryClient.invalidateQueries({ queryKey: ['folders'] })
     },
   })
 
@@ -91,9 +92,9 @@ export function FolderItem({ folder, children: childNodes }: FolderItemProps) {
 
   const hasChildren = childNodes.length > 0
   const showDropHighlight =
-    dropTarget?.type === "folder" &&
+    dropTarget?.type === 'folder' &&
     dropTarget.id === folder.id &&
-    dropTarget.position === "inside"
+    dropTarget.position === 'inside'
 
   const handleRenameSubmit = useCallback(() => {
     if (renameValue.trim() && renameValue !== folder.name) {
@@ -122,7 +123,7 @@ export function FolderItem({ folder, children: childNodes }: FolderItemProps) {
   }, [isRenaming])
 
   const handleDragStart = (e: DragEvent) => {
-    onDragStart({ type: "folder", id: folder.id })(e)
+    onDragStart({ type: 'folder', id: folder.id })(e)
     setIsDragging(true)
   }
 
@@ -138,15 +139,15 @@ export function FolderItem({ folder, children: childNodes }: FolderItemProps) {
 
   const dropTargetProps = {
     onDragOver: onDragOver({
-      type: "folder" as const,
+      type: 'folder' as const,
       id: folder.id,
-      position: "inside" as const,
+      position: 'inside' as const,
     }),
     onDragLeave,
     onDrop: handleDrop({
-      type: "folder",
+      type: 'folder',
       id: folder.id,
-      position: "inside",
+      position: 'inside',
     }),
   }
 
@@ -154,15 +155,16 @@ export function FolderItem({ folder, children: childNodes }: FolderItemProps) {
     <Collapsible open={isExpanded} onOpenChange={setIsExpanded} asChild>
       <SidebarMenuItem
         className={cn(
-          "rounded-md transition-colors",
-          showDropHighlight && "bg-notion-terracotta-muted ring-1 ring-notion-terracotta/20",
+          'rounded-[6px] transition-colors',
+          showDropHighlight &&
+            'bg-sidebar-accent/50 ring-1 ring-sidebar-border',
         )}
       >
         <CollapsibleTrigger asChild>
           <div
             className={cn(
-              "group/folder-row relative flex w-full rounded-md transition-colors",
-              isDragging && "opacity-50",
+              'group/folder-row relative flex w-full rounded-[6px] transition-colors',
+              isDragging && 'opacity-50',
             )}
             {...dropTargetProps}
           >
@@ -171,53 +173,51 @@ export function FolderItem({ folder, children: childNodes }: FolderItemProps) {
               onDragStart={handleDragStart}
               onDragEnd={handleDragEnd}
               className={cn(
-                "h-auto cursor-pointer gap-1.5 px-2 py-1.5 pr-2! active:cursor-grabbing [&>svg]:size-auto",
-                isRenaming && "pr-3!",
+                'cursor-pointer active:cursor-grabbing px-2.5 py-1.5 h-auto text-[13px] text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors',
               )}
             >
               <ChevronRight
                 className={cn(
-                  "h-3! w-3! shrink-0 text-muted-foreground/40 transition-transform duration-150",
-                  isExpanded && "rotate-90",
-                  !hasChildren && "opacity-0",
+                  'transition-transform duration-150 w-3.5 h-3.5 opacity-50',
+                  isExpanded && 'rotate-90',
+                  !hasChildren && 'opacity-0',
                 )}
               />
-              <Folder className="h-[14px]! w-[14px]! shrink-0 text-notion-gold" />
+              <Folder className="w-4 h-4 opacity-70" strokeWidth={2} />
               {isRenaming ? (
-                <Input
+                <input
                   ref={renameInputRef}
                   value={renameValue}
                   onChange={(e) => setRenameValue(e.target.value)}
                   onBlur={handleRenameBlur}
                   onKeyDown={(e) => {
-                    if (e.key === "Enter") handleRenameSubmit()
-                    if (e.key === "Escape") setIsRenaming(false)
+                    if (e.key === 'Enter') handleRenameSubmit()
+                    if (e.key === 'Escape') setIsRenaming(false)
                   }}
                   onClick={(e) => e.stopPropagation()}
-                  className="h-5 rounded px-1 text-sm"
+                  className="h-6 w-full bg-background border border-input rounded-[4px] px-1.5 text-[13px] text-foreground focus:outline-none focus:border-ring focus:ring-[2px] focus:ring-ring/50"
                 />
               ) : (
-                <span className="truncate text-sidebar-foreground/70">
-                  {folder.name}
-                </span>
+                <span className="truncate">{folder.name}</span>
               )}
             </SidebarMenuButton>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <SidebarMenuAction
                   className={cn(
-                    "text-muted-foreground/30 md:opacity-0 group-hover/folder-row:opacity-100 group-focus-within/folder-row:opacity-100 data-[state=open]:opacity-100 [&>svg]:size-auto",
-                    isRenaming && "hidden",
+                    'md:opacity-0 group-hover/folder-row:opacity-100 group-focus-within/folder-row:opacity-100 data-[state=open]:opacity-100 text-muted-foreground hover:text-sidebar-accent-foreground hover:bg-sidebar-accent rounded-[4px] mr-1',
+                    isRenaming && 'hidden',
                   )}
                   onPointerDown={(e) => e.stopPropagation()}
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <MoreHorizontal className="h-[14px]! w-[14px]!" />
+                  <MoreHorizontal className="w-4 h-4" strokeWidth={2} />
                 </SidebarMenuAction>
               </DropdownMenuTrigger>
               <DropdownMenuContent
                 side="right"
                 align="start"
+                className="w-48 rounded-xl border-border shadow-sm p-1"
                 onCloseAutoFocus={(event) => {
                   if (!pendingRenameFocus.current) return
                   event.preventDefault()
@@ -238,16 +238,20 @@ export function FolderItem({ folder, children: childNodes }: FolderItemProps) {
                     setRenameValue(folder.name)
                     setIsRenaming(true)
                   }}
+                  className="text-[13px] rounded-lg py-2 cursor-pointer focus:bg-accent"
                 >
-                  <Pencil className="mr-2 h-4 w-4" />
+                  <Pencil
+                    className="mr-2 h-4 w-4 text-muted-foreground"
+                    strokeWidth={2}
+                  />
                   Rename
                 </DropdownMenuItem>
-                <DropdownMenuSeparator />
+                <DropdownMenuSeparator className="bg-border my-1" />
                 <DropdownMenuItem
                   onClick={() => onDeleteFolder(folder.id, hasChildren)}
-                  className="text-destructive focus:text-destructive"
+                  className="text-[13px] text-destructive rounded-lg py-2 cursor-pointer focus:bg-destructive/10 focus:text-destructive"
                 >
-                  <Trash2 className="mr-2 h-4 w-4" />
+                  <Trash2 className="mr-2 h-4 w-4" strokeWidth={2} />
                   Delete
                 </DropdownMenuItem>
               </DropdownMenuContent>
@@ -256,13 +260,14 @@ export function FolderItem({ folder, children: childNodes }: FolderItemProps) {
         </CollapsibleTrigger>
         <CollapsibleContent>
           <SidebarMenuSub
-            className="ml-3 mr-0 gap-0 border-sidebar-border/50 pl-2 pr-0 py-0 translate-x-0"
+            className="ml-5 pl-2 border-l border-sidebar-border mr-0 pr-0 my-0.5"
             {...dropTargetProps}
           >
             {childNodes.map((node) => (
               <TreeNodeItem
-                key={node.type === "folder" ? node.folder.id : node.drawing.id}
+                key={node.type === 'folder' ? node.folder.id : node.drawing.id}
                 node={node}
+                isSubItem={true}
               />
             ))}
           </SidebarMenuSub>
@@ -274,19 +279,20 @@ export function FolderItem({ folder, children: childNodes }: FolderItemProps) {
 
 type DrawingItemProps = {
   drawing: Drawing
+  isSubItem?: boolean
 }
 
-export function DrawingItem({ drawing }: DrawingItemProps) {
-  const { id: currentDrawingId } = useParams({ from: "/draw/$id" })
+export function DrawingItem({ drawing, isSubItem }: DrawingItemProps) {
+  const { id: currentDrawingId } = useParams({ from: '/draw/$id' })
   const { onDragStart, onDragEnd, onDeleteDrawing } = useSidebarContext()
 
   const queryClient = useQueryClient()
   const renameMutation = useMutation({
     mutationFn: updateDrawing,
     onMutate: async (variables) => {
-      await queryClient.cancelQueries({ queryKey: ["drawings"] })
-      const previous = queryClient.getQueryData<Drawing[]>(["drawings"])
-      queryClient.setQueryData<Drawing[]>(["drawings"], (old = []) =>
+      await queryClient.cancelQueries({ queryKey: ['drawings'] })
+      const previous = queryClient.getQueryData<Drawing[]>(['drawings'])
+      queryClient.setQueryData<Drawing[]>(['drawings'], (old = []) =>
         old.map((d) =>
           d.id === variables.data.id
             ? { ...d, name: variables.data.updateData.name ?? d.name }
@@ -296,11 +302,11 @@ export function DrawingItem({ drawing }: DrawingItemProps) {
       return { previous }
     },
     onError: (_err, _vars, context) => {
-      queryClient.setQueryData(["drawings"], context?.previous)
+      queryClient.setQueryData(['drawings'], context?.previous)
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["drawings"] })
-      queryClient.invalidateQueries({ queryKey: ["drawing", drawing.id] })
+      queryClient.invalidateQueries({ queryKey: ['drawings'] })
+      queryClient.invalidateQueries({ queryKey: ['drawing', drawing.id] })
     },
   })
 
@@ -341,60 +347,150 @@ export function DrawingItem({ drawing }: DrawingItemProps) {
 
   const ButtonContent = (
     <>
-      <span className="h-3! w-3! shrink-0" />
       <File
         className={cn(
-          "h-[13px]! w-[13px]! shrink-0 transition-colors",
-          isActive ? "text-notion-terracotta" : "text-muted-foreground/30",
+          'w-4 h-4',
+          isActive ? 'text-sidebar-accent-foreground' : 'opacity-70',
         )}
+        strokeWidth={2}
       />
       {isRenaming ? (
-        <Input
+        <input
           ref={renameInputRef}
           value={renameValue}
           onChange={(e) => setRenameValue(e.target.value)}
           onBlur={handleRenameBlur}
           onKeyDown={(e) => {
-            if (e.key === "Enter") handleRenameSubmit()
-            if (e.key === "Escape") setIsRenaming(false)
+            if (e.key === 'Enter') handleRenameSubmit()
+            if (e.key === 'Escape') setIsRenaming(false)
           }}
           onClick={(e) => e.stopPropagation()}
-          className="h-5 rounded px-1 text-sm"
+          className="h-6 w-full bg-background border border-input rounded-[4px] px-1.5 text-[13px] text-foreground focus:outline-none focus:border-ring focus:ring-[2px] focus:ring-ring/50"
         />
       ) : (
-        <span
-          className={cn(
-            "truncate transition-colors",
-            isActive
-              ? "font-medium text-sidebar-foreground"
-              : "text-sidebar-foreground/60",
-          )}
-        >
-          {drawing.name}
-        </span>
+        <span className="truncate">{drawing.name}</span>
       )}
     </>
   )
 
+  const dragProps = {
+    draggable: true,
+    onDragStart: (e: DragEvent) => {
+      onDragStart({ type: 'drawing', id: drawing.id })(e)
+      setIsDragging(true)
+    },
+    onDragEnd: () => {
+      onDragEnd()
+      setIsDragging(false)
+    },
+  }
+
+  const actions = (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <SidebarMenuAction
+          className={cn(
+            'md:opacity-0 group-hover/drawing-item:opacity-100 group-focus-within/drawing-item:opacity-100 data-[state=open]:opacity-100 text-muted-foreground hover:text-sidebar-accent-foreground hover:bg-sidebar-accent rounded-[4px] mr-1',
+            isRenaming && 'hidden',
+          )}
+        >
+          <MoreHorizontal className="w-4 h-4" strokeWidth={2} />
+        </SidebarMenuAction>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent
+        side="right"
+        align="start"
+        className="w-48 rounded-xl border-border shadow-sm p-1"
+        onCloseAutoFocus={(event) => {
+          if (!pendingRenameFocus.current) return
+          event.preventDefault()
+          pendingRenameFocus.current = false
+          requestAnimationFrame(() => {
+            renameInputRef.current?.focus()
+            renameInputRef.current?.select()
+          })
+        }}
+      >
+        <DropdownMenuItem
+          onClick={() => {
+            suppressBlurRef.current = true
+            setTimeout(() => {
+              suppressBlurRef.current = false
+            }, 300)
+            pendingRenameFocus.current = true
+            setRenameValue(drawing.name)
+            setIsRenaming(true)
+          }}
+          className="text-[13px] rounded-lg py-2 cursor-pointer focus:bg-accent"
+        >
+          <Pencil
+            className="mr-2 h-4 w-4 text-muted-foreground"
+            strokeWidth={2}
+          />
+          Rename
+        </DropdownMenuItem>
+        <DropdownMenuSeparator className="bg-border my-1" />
+        <DropdownMenuItem
+          onClick={() => onDeleteDrawing(drawing.id)}
+          className="text-[13px] text-destructive rounded-lg py-2 cursor-pointer focus:bg-destructive/10 focus:text-destructive"
+        >
+          <Trash2 className="mr-2 h-4 w-4" strokeWidth={2} />
+          Delete
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+
+  const activeClasses = isActive
+    ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
+    : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+
+  if (isSubItem) {
+    return (
+      <SidebarMenuSubItem
+        className={cn(
+          'group/drawing-item relative rounded-[6px]',
+          isDragging && 'opacity-50',
+        )}
+        {...dragProps}
+      >
+        <SidebarMenuSubButton
+          asChild={!isRenaming}
+          isActive={isActive}
+          className={cn(
+            'cursor-pointer active:cursor-grabbing px-2.5 py-1.5 h-auto text-[13px] transition-colors pr-8',
+            activeClasses,
+            isActive && 'bg-sidebar-accent text-sidebar-accent-foreground', // Ensure Shadcn's internal styling doesn't override
+          )}
+        >
+          {isRenaming ? (
+            ButtonContent
+          ) : (
+            <Link to="/draw/$id" params={{ id: drawing.id }} draggable={false}>
+              {ButtonContent}
+            </Link>
+          )}
+        </SidebarMenuSubButton>
+        {actions}
+      </SidebarMenuSubItem>
+    )
+  }
+
   return (
     <SidebarMenuItem
-      className={cn("group/drawing-item", isDragging && "opacity-50")}
-      draggable
-      onDragStart={(e) => {
-        onDragStart({ type: "drawing", id: drawing.id })(e)
-        setIsDragging(true)
-      }}
-      onDragEnd={() => {
-        onDragEnd()
-        setIsDragging(false)
-      }}
+      className={cn(
+        'group/drawing-item relative rounded-[6px]',
+        isDragging && 'opacity-50',
+      )}
+      {...dragProps}
     >
       <SidebarMenuButton
         asChild={!isRenaming}
         isActive={isActive}
         className={cn(
-          "h-auto cursor-pointer gap-1.5 px-2 py-1.5 pr-2! active:cursor-grabbing [&>svg]:size-auto",
-          isRenaming && "pr-3!",
+          'cursor-pointer active:cursor-grabbing px-2.5 py-1.5 h-auto text-[13px] transition-colors',
+          activeClasses,
+          isActive && 'bg-sidebar-accent text-sidebar-accent-foreground', // Ensure Shadcn's internal styling doesn't override
         )}
       >
         {isRenaming ? (
@@ -405,58 +501,13 @@ export function DrawingItem({ drawing }: DrawingItemProps) {
           </Link>
         )}
       </SidebarMenuButton>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <SidebarMenuAction className={cn(
-            "text-muted-foreground/30 md:opacity-0 group-hover/drawing-item:opacity-100 group-focus-within/drawing-item:opacity-100 data-[state=open]:opacity-100 [&>svg]:size-auto",
-            isRenaming && "hidden",
-          )}>
-            <MoreHorizontal className="h-[14px]! w-[14px]!" />
-          </SidebarMenuAction>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent
-          side="right"
-          align="start"
-          onCloseAutoFocus={(event) => {
-            if (!pendingRenameFocus.current) return
-            event.preventDefault()
-            pendingRenameFocus.current = false
-            requestAnimationFrame(() => {
-              renameInputRef.current?.focus()
-              renameInputRef.current?.select()
-            })
-          }}
-        >
-          <DropdownMenuItem
-            onClick={() => {
-              suppressBlurRef.current = true
-              setTimeout(() => {
-                suppressBlurRef.current = false
-              }, 300)
-              pendingRenameFocus.current = true
-              setRenameValue(drawing.name)
-              setIsRenaming(true)
-            }}
-          >
-            <Pencil className="mr-2 h-4 w-4" />
-            Rename
-          </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem
-            onClick={() => onDeleteDrawing(drawing.id)}
-            className="text-destructive focus:text-destructive"
-          >
-            <Trash2 className="mr-2 h-4 w-4" />
-            Delete
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+      {actions}
     </SidebarMenuItem>
   )
 }
 
 type CreateRowProps = {
-  type: "drawing" | "folder"
+  type: 'drawing' | 'folder'
   onClose: () => void
 }
 
@@ -464,7 +515,7 @@ export function CreateRow({ type, onClose }: CreateRowProps) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [name, setName] = useState(
-    type === "drawing" ? "Untitled" : "New folder",
+    type === 'drawing' ? 'Untitled' : 'New folder',
   )
   const inputRef = useRef<HTMLInputElement | null>(null)
   const submitted = useRef(false)
@@ -472,14 +523,14 @@ export function CreateRow({ type, onClose }: CreateRowProps) {
   const createDrawingMutation = useMutation({
     mutationFn: createDrawing,
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["drawings"] })
+      queryClient.invalidateQueries({ queryKey: ['drawings'] })
     },
   })
 
   const createFolderMutation = useMutation({
     mutationFn: createFolder,
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["folders"] })
+      queryClient.invalidateQueries({ queryKey: ['folders'] })
     },
   })
 
@@ -501,12 +552,12 @@ export function CreateRow({ type, onClose }: CreateRowProps) {
       return
     }
 
-    if (type === "drawing") {
+    if (type === 'drawing') {
       const newId = await createDrawingMutation.mutateAsync({
         data: { name: trimmed },
       })
       onClose()
-      navigate({ to: "/draw/$id", params: { id: newId } })
+      navigate({ to: '/draw/$id', params: { id: newId } })
     } else {
       await createFolderMutation.mutateAsync({
         data: { name: trimmed, parentId: null },
@@ -516,38 +567,45 @@ export function CreateRow({ type, onClose }: CreateRowProps) {
   }
 
   return (
-    <SidebarMenuItem>
-      <div className="flex items-center gap-2 px-2 py-1">
-        {type === "folder" ? (
-          <Folder className="h-[14px] w-[14px] shrink-0 text-notion-gold" />
+    <SidebarMenuItem className="rounded-[6px]">
+      <SidebarMenuButton className="px-2.5 py-1.5 h-auto hover:bg-sidebar-accent text-sidebar-foreground text-[13px]">
+        {type === 'folder' ? (
+          <Folder className="w-4 h-4 opacity-70" strokeWidth={2} />
         ) : (
-          <File className="h-[13px] w-[13px] shrink-0 text-muted-foreground/30" />
+          <File className="w-4 h-4 opacity-70" strokeWidth={2} />
         )}
-        <Input
+        <input
           ref={inputRef}
           value={name}
           onChange={(e) => setName(e.target.value)}
           onBlur={handleSubmit}
           onKeyDown={(e) => {
-            if (e.key === "Enter") {
+            if (e.key === 'Enter') {
               e.preventDefault()
               handleSubmit()
             }
-            if (e.key === "Escape") {
+            if (e.key === 'Escape') {
               e.preventDefault()
               onClose()
             }
           }}
-          className="h-6 flex-1 rounded px-2 text-sm"
+          className="h-6 w-full bg-background border border-input rounded-[4px] px-1.5 text-[13px] text-foreground focus:outline-none focus:border-ring focus:ring-[2px] focus:ring-ring/50"
         />
-      </div>
+      </SidebarMenuButton>
     </SidebarMenuItem>
   )
 }
 
-export function TreeNodeItem({ node }: { node: TreeNode }) {
-  if (node.type === "folder") {
+export function TreeNodeItem({
+  node,
+  isSubItem,
+}: {
+  node: TreeNode
+  isSubItem?: boolean
+}) {
+  if (node.type === 'folder') {
+    // Note: Folders are top-level constructs in this simple tree for now
     return <FolderItem folder={node.folder} children={node.children} />
   }
-  return <DrawingItem drawing={node.drawing} />
+  return <DrawingItem drawing={node.drawing} isSubItem={isSubItem} />
 }
