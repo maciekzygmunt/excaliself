@@ -40,7 +40,7 @@ function AdminPage() {
             Back to drawings
           </Link>
           <div className="flex items-center gap-3">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-notion-terracotta text-sm font-semibold text-primary-foreground">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand text-sm font-semibold text-primary-foreground">
               E
             </div>
             <div>

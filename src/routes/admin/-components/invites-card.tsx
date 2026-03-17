@@ -90,7 +90,7 @@ export function InvitesSection() {
                 className="rounded p-1 text-muted-foreground/40 transition-all hover:bg-muted hover:text-foreground"
               >
                 {copiedToken === invite.token ? (
-                  <Check className="h-3.5 w-3.5 text-notion-terracotta" />
+                  <Check className="h-3.5 w-3.5 text-brand" />
                 ) : (
                   <Copy className="h-3.5 w-3.5" />
                 )}

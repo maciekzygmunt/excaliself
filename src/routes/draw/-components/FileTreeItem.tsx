@@ -155,7 +155,7 @@ export function FolderItem({ folder, children: childNodes }: FolderItemProps) {
     <Collapsible open={isExpanded} onOpenChange={setIsExpanded} asChild>
       <SidebarMenuItem
         className={cn(
-          'rounded-[6px] transition-colors',
+          'rounded-[6px] transition-all duration-200',
           showDropHighlight &&
             'bg-sidebar-accent/50 ring-1 ring-sidebar-border',
         )}
@@ -163,8 +163,8 @@ export function FolderItem({ folder, children: childNodes }: FolderItemProps) {
         <CollapsibleTrigger asChild>
           <div
             className={cn(
-              'group/folder-row relative flex w-full rounded-[6px] transition-colors',
-              isDragging && 'opacity-50',
+              'group/folder-row relative flex w-full rounded-[6px] transition-all duration-200',
+              isDragging && 'opacity-40 scale-[0.98]',
             )}
             {...dropTargetProps}
           >
@@ -173,7 +173,7 @@ export function FolderItem({ folder, children: childNodes }: FolderItemProps) {
               onDragStart={handleDragStart}
               onDragEnd={handleDragEnd}
               className={cn(
-                'cursor-pointer active:cursor-grabbing px-2.5 py-1.5 h-auto text-[13px] text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors',
+                'cursor-pointer active:cursor-grabbing px-2.5 py-1.5 h-auto text-[13px] text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors',
               )}
             >
               <ChevronRight
@@ -188,6 +188,7 @@ export function FolderItem({ folder, children: childNodes }: FolderItemProps) {
                 <input
                   ref={renameInputRef}
                   value={renameValue}
+                  aria-label="Rename folder"
                   onChange={(e) => setRenameValue(e.target.value)}
                   onBlur={handleRenameBlur}
                   onKeyDown={(e) => {
@@ -205,13 +206,14 @@ export function FolderItem({ folder, children: childNodes }: FolderItemProps) {
               <DropdownMenuTrigger asChild>
                 <SidebarMenuAction
                   className={cn(
-                    'md:opacity-0 group-hover/folder-row:opacity-100 group-focus-within/folder-row:opacity-100 data-[state=open]:opacity-100 text-muted-foreground hover:text-sidebar-accent-foreground hover:bg-sidebar-accent rounded-[4px] mr-1',
+                    'transition-all duration-150 md:opacity-0 group-hover/folder-row:opacity-100 group-focus-within/folder-row:opacity-100 data-[state=open]:opacity-100 text-muted-foreground hover:text-sidebar-accent-foreground hover:bg-sidebar-accent rounded-[4px] mr-1',
                     isRenaming && 'hidden',
                   )}
                   onPointerDown={(e) => e.stopPropagation()}
                   onClick={(e) => e.stopPropagation()}
                 >
                   <MoreHorizontal className="w-4 h-4" strokeWidth={2} />
+                  <span className="sr-only">More options</span>
                 </SidebarMenuAction>
               </DropdownMenuTrigger>
               <DropdownMenuContent
@@ -350,7 +352,7 @@ export function DrawingItem({ drawing, isSubItem }: DrawingItemProps) {
       <File
         className={cn(
           'w-4 h-4',
-          isActive ? 'text-sidebar-accent-foreground' : 'opacity-70',
+          isActive ? 'text-brand' : 'opacity-70',
         )}
         strokeWidth={2}
       />
@@ -358,6 +360,7 @@ export function DrawingItem({ drawing, isSubItem }: DrawingItemProps) {
         <input
           ref={renameInputRef}
           value={renameValue}
+          aria-label="Rename drawing"
           onChange={(e) => setRenameValue(e.target.value)}
           onBlur={handleRenameBlur}
           onKeyDown={(e) => {
@@ -390,11 +393,12 @@ export function DrawingItem({ drawing, isSubItem }: DrawingItemProps) {
       <DropdownMenuTrigger asChild>
         <SidebarMenuAction
           className={cn(
-            'md:opacity-0 group-hover/drawing-item:opacity-100 group-focus-within/drawing-item:opacity-100 data-[state=open]:opacity-100 text-muted-foreground hover:text-sidebar-accent-foreground hover:bg-sidebar-accent rounded-[4px] mr-1',
+            'transition-all duration-150 md:opacity-0 group-hover/drawing-item:opacity-100 group-focus-within/drawing-item:opacity-100 data-[state=open]:opacity-100 text-muted-foreground hover:text-sidebar-accent-foreground hover:bg-sidebar-accent rounded-[4px] mr-1',
             isRenaming && 'hidden',
           )}
         >
           <MoreHorizontal className="w-4 h-4" strokeWidth={2} />
+          <span className="sr-only">More options</span>
         </SidebarMenuAction>
       </DropdownMenuTrigger>
       <DropdownMenuContent
@@ -442,15 +446,15 @@ export function DrawingItem({ drawing, isSubItem }: DrawingItemProps) {
   )
 
   const activeClasses = isActive
-    ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
-    : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+    ? 'relative bg-sidebar-accent text-sidebar-accent-foreground font-semibold before:absolute before:left-0.5 before:top-1/2 before:-translate-y-1/2 before:h-3.5 before:w-[3px] before:rounded-full before:bg-brand'
+    : 'text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
 
   if (isSubItem) {
     return (
       <SidebarMenuSubItem
         className={cn(
-          'group/drawing-item relative rounded-[6px]',
-          isDragging && 'opacity-50',
+          'group/drawing-item relative rounded-[6px] transition-all duration-200',
+          isDragging && 'opacity-40 scale-[0.98]',
         )}
         {...dragProps}
       >
@@ -479,8 +483,8 @@ export function DrawingItem({ drawing, isSubItem }: DrawingItemProps) {
   return (
     <SidebarMenuItem
       className={cn(
-        'group/drawing-item relative rounded-[6px]',
-        isDragging && 'opacity-50',
+        'group/drawing-item relative rounded-[6px] transition-all duration-200',
+        isDragging && 'opacity-40 scale-[0.98]',
       )}
       {...dragProps}
     >
@@ -577,6 +581,7 @@ export function CreateRow({ type, onClose }: CreateRowProps) {
         <input
           ref={inputRef}
           value={name}
+          aria-label={type === 'drawing' ? 'New drawing name' : 'New folder name'}
           onChange={(e) => setName(e.target.value)}
           onBlur={handleSubmit}
           onKeyDown={(e) => {

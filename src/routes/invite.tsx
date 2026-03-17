@@ -115,7 +115,7 @@ function InvitePage() {
       <div className="w-full max-w-sm">
         {/* Branding */}
         <div className="mb-8 flex flex-col items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-notion-terracotta text-lg font-semibold text-primary-foreground">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-brand text-lg font-semibold text-primary-foreground">
             E
           </div>
           <div className="text-center">

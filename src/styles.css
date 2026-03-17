@@ -53,9 +53,8 @@ code {
   --sidebar-accent-foreground: oklch(0.16 0.01 60);
   --sidebar-border: oklch(0.935 0.005 75);
   --sidebar-ring: oklch(0.88 0.005 75);
-  --notion-terracotta: oklch(0.62 0.16 30);
-  --notion-terracotta-muted: oklch(0.62 0.16 30 / 0.1);
-  --notion-gold: oklch(0.78 0.12 80);
+  --brand: oklch(0.55 0.18 230);
+  --brand-muted: oklch(0.55 0.18 230 / 0.1);
 }
 
 .dark {
@@ -85,15 +84,14 @@ code {
   --chart-5: oklch(0.645 0.246 16.439);
   --sidebar: oklch(0.18 0.008 60);
   --sidebar-foreground: oklch(0.93 0.005 75);
-  --sidebar-primary: oklch(0.62 0.16 30);
+  --sidebar-primary: oklch(0.55 0.18 230);
   --sidebar-primary-foreground: oklch(0.93 0.005 75);
   --sidebar-accent: oklch(0.24 0.008 60);
   --sidebar-accent-foreground: oklch(0.93 0.005 75);
   --sidebar-border: oklch(0.26 0.008 60);
   --sidebar-ring: oklch(0.40 0.01 60);
-  --notion-terracotta: oklch(0.68 0.15 30);
-  --notion-terracotta-muted: oklch(0.68 0.15 30 / 0.12);
-  --notion-gold: oklch(0.75 0.1 80);
+  --brand: oklch(0.68 0.14 230);
+  --brand-muted: oklch(0.68 0.14 230 / 0.12);
 }
 
 @theme inline {
@@ -133,9 +131,8 @@ code {
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
-  --color-notion-terracotta: var(--notion-terracotta);
-  --color-notion-terracotta-muted: var(--notion-terracotta-muted);
-  --color-notion-gold: var(--notion-gold);
+  --color-brand: var(--brand);
+  --color-brand-muted: var(--brand-muted);
 }
 
 @layer components {

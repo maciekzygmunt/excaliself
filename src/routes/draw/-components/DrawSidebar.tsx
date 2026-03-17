@@ -68,8 +68,8 @@ export function DrawSidebar({ userEmail, isAdmin }: DrawSidebarProps) {
         {/* Header */}
         <SidebarHeader className="h-14 flex flex-row items-center px-4 border-b border-sidebar-border m-0 p-0 rounded-none bg-transparent">
           <div className="flex items-center gap-2.5 text-sidebar-foreground transition-colors w-full px-4 h-full">
-            <Hexagon className="w-4 h-4" strokeWidth={2} />
-            <span className="font-medium text-[13px]">Excalidraw</span>
+            <Hexagon className="w-[18px] h-[18px] text-brand" strokeWidth={2.5} />
+            <span className="font-semibold text-sm tracking-[-0.02em]">Excalidraw</span>
           </div>
         </SidebarHeader>
 
@@ -84,6 +84,7 @@ export function DrawSidebar({ userEmail, isAdmin }: DrawSidebarProps) {
               <input
                 type="text"
                 placeholder="Search..."
+                aria-label="Search drawings"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full bg-transparent text-[13px] placeholder:text-muted-foreground focus:outline-none text-sidebar-foreground"
@@ -95,8 +96,8 @@ export function DrawSidebar({ userEmail, isAdmin }: DrawSidebarProps) {
             </div>
           </div>
 
-          <SidebarGroup className="pt-0 px-2">
-            <SidebarGroupContent>
+          <SidebarGroup className="pt-0 px-2 flex-1">
+            <SidebarGroupContent className="flex flex-1 flex-col">
               {/* Global Add Button */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -104,7 +105,7 @@ export function DrawSidebar({ userEmail, isAdmin }: DrawSidebarProps) {
                     type="button"
                     className="flex w-full items-center gap-2.5 px-2.5 py-1.5 rounded-[6px] text-[13px] text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
                   >
-                    <Plus className="w-4 h-4" strokeWidth={2} />
+                    <Plus className="w-4 h-4 text-brand" strokeWidth={2} />
                     <span className="font-medium">New item...</span>
                   </button>
                 </DropdownMenuTrigger>
@@ -142,7 +143,7 @@ export function DrawSidebar({ userEmail, isAdmin }: DrawSidebarProps) {
 
               <div
                 className={cn(
-                  'min-h-[200px] rounded-md transition-colors',
+                  'flex-1 rounded-md transition-all duration-200',
                   dropTarget?.type === 'root' &&
                     'bg-sidebar-accent/50 ring-1 ring-sidebar-border',
                 )}
@@ -168,6 +169,11 @@ export function DrawSidebar({ userEmail, isAdmin }: DrawSidebarProps) {
                     />
                   ))}
                 </SidebarMenu>
+                {isSearching && displayTree.length === 0 && (
+                  <p className="px-2.5 py-6 text-center text-[13px] text-muted-foreground">
+                    No results
+                  </p>
+                )}
               </div>
             </SidebarGroupContent>
           </SidebarGroup>
@@ -181,7 +187,7 @@ export function DrawSidebar({ userEmail, isAdmin }: DrawSidebarProps) {
                 type="button"
                 className="flex items-center gap-2.5 p-1.5 w-full rounded-[6px] hover:bg-sidebar-accent cursor-pointer transition-colors text-[13px] text-sidebar-foreground/70"
               >
-                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-muted text-[10px] font-medium text-muted-foreground">
+                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-brand-muted text-[10px] font-semibold text-brand">
                   {userEmail.charAt(0).toUpperCase()}
                 </div>
                 <div className="flex flex-col text-left leading-tight flex-1 truncate">

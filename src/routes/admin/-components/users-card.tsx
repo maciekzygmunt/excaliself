@@ -64,7 +64,7 @@ export function UsersSection() {
               <span
                 className={`text-[11px] px-1.5 py-0.5 rounded ${
                   user.role === "admin"
-                    ? "bg-notion-terracotta-muted text-notion-terracotta font-medium"
+                    ? "bg-brand-muted text-brand font-medium"
                     : "bg-muted text-muted-foreground"
                 }`}
               >
