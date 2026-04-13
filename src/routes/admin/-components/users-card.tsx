@@ -1,5 +1,5 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { Trash2 } from "lucide-react"
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Trash2 } from 'lucide-react'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -10,19 +10,19 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"
-import { deleteUser, getAllUsers } from "@/server/users"
+} from '@/components/ui/alert-dialog'
+import { deleteUser, getAllUsers } from '@/server/users'
 
 export function UsersSection() {
   const queryClient = useQueryClient()
   const { data: users } = useQuery({
-    queryKey: ["admin", "users"],
+    queryKey: ['admin', 'users'],
     queryFn: getAllUsers,
   })
   const { mutate: deleteUserMutation } = useMutation({
     mutationFn: deleteUser,
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin", "users"] })
+      queryClient.invalidateQueries({ queryKey: ['admin', 'users'] })
     },
   })
 
@@ -30,9 +30,10 @@ export function UsersSection() {
     <section>
       {/* Section header */}
       <div className="mb-4">
-        <h2 className="text-sm font-medium text-foreground">Users</h2>
+        <h2 className="text-[13px] font-medium text-foreground">Users</h2>
         <p className="text-xs text-muted-foreground">
-          {users?.length ?? 0} registered {users?.length === 1 ? "user" : "users"}
+          {users?.length ?? 0} registered{' '}
+          {users?.length === 1 ? 'user' : 'users'}
         </p>
       </div>
 
@@ -42,15 +43,15 @@ export function UsersSection() {
           <div
             key={user.id}
             className={`group flex items-center justify-between py-2.5 ${
-              index !== 0 ? "border-t border-border/60" : ""
+              index !== 0 ? 'border-t border-border/40' : ''
             }`}
           >
             <div className="flex items-center gap-3 min-w-0">
-              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted text-[10px] font-medium text-muted-foreground">
+              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand-muted text-[10px] font-semibold text-brand">
                 {(user.name || user.email).charAt(0).toUpperCase()}
               </div>
               <div className="min-w-0">
-                <p className="truncate text-sm text-foreground">
+                <p className="truncate text-[13px] text-foreground">
                   {user.name || user.email}
                 </p>
                 {user.name && (
@@ -62,18 +63,21 @@ export function UsersSection() {
             </div>
             <div className="flex items-center gap-2 shrink-0">
               <span
-                className={`text-[11px] px-1.5 py-0.5 rounded ${
-                  user.role === "admin"
-                    ? "bg-brand-muted text-brand font-medium"
-                    : "bg-muted text-muted-foreground"
+                className={`text-[11px] px-1.5 py-0.5 rounded-md ${
+                  user.role === 'admin'
+                    ? 'bg-brand-muted text-brand font-medium'
+                    : 'bg-muted text-muted-foreground'
                 }`}
               >
                 {user.role}
               </span>
-              {user.role !== "admin" && (
+              {user.role !== 'admin' && (
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
-                    <button className="rounded p-1 text-muted-foreground/40 opacity-0 transition-all hover:bg-muted hover:text-destructive group-hover:opacity-100">
+                    <button
+                      type="button"
+                      className="rounded p-1 text-muted-foreground/40 opacity-0 transition-all hover:bg-muted hover:text-destructive group-hover:opacity-100"
+                    >
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>
                   </AlertDialogTrigger>
@@ -81,7 +85,7 @@ export function UsersSection() {
                     <AlertDialogHeader>
                       <AlertDialogTitle>Delete user</AlertDialogTitle>
                       <AlertDialogDescription>
-                        Are you sure you want to delete{" "}
+                        Are you sure you want to delete{' '}
                         <strong>{user.name || user.email}</strong>? All their
                         drawings and data will be permanently deleted.
                       </AlertDialogDescription>

@@ -66,7 +66,7 @@ export function DrawSidebar({ userEmail, isAdmin }: DrawSidebarProps) {
         className="border-r border-sidebar-border"
       >
         {/* Header */}
-        <SidebarHeader className="h-14 flex flex-row items-center px-4 border-b border-sidebar-border m-0 p-0 rounded-none bg-transparent">
+        <SidebarHeader className="h-14 flex flex-row items-center px-4 m-0 p-0 rounded-none bg-transparent">
           <div className="flex items-center gap-2.5 text-sidebar-foreground transition-colors w-full px-4 h-full">
             <Hexagon className="w-[18px] h-[18px] text-brand" strokeWidth={2.5} />
             <span className="font-semibold text-sm tracking-[-0.02em]">Excalidraw</span>
@@ -180,7 +180,7 @@ export function DrawSidebar({ userEmail, isAdmin }: DrawSidebarProps) {
         </SidebarContent>
 
         {/* Footer */}
-        <SidebarFooter className="p-3 border-t border-sidebar-border bg-transparent">
+        <SidebarFooter className="p-3 bg-transparent">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button

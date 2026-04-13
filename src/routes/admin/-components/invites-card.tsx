@@ -1,13 +1,13 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { Check, Copy, Plus, Trash2 } from "lucide-react"
-import { useState } from "react"
-import { Button } from "@/components/ui/button"
-import { createInvite, deleteInvite, getPendingInvites } from "@/server/invites"
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Check, Copy, Plus, Trash2 } from 'lucide-react'
+import { useState } from 'react'
+import { Button } from '@/components/ui/button'
+import { createInvite, deleteInvite, getPendingInvites } from '@/server/invites'
 
 export function InvitesSection() {
   const queryClient = useQueryClient()
   const { data: invites } = useQuery({
-    queryKey: ["admin", "invites"],
+    queryKey: ['admin', 'invites'],
     queryFn: getPendingInvites,
   })
   const {
@@ -20,13 +20,13 @@ export function InvitesSection() {
       copyInviteLink(data.token)
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin", "invites"] })
+      queryClient.invalidateQueries({ queryKey: ['admin', 'invites'] })
     },
   })
   const { mutate: deleteInviteMutation } = useMutation({
     mutationFn: deleteInvite,
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin", "invites"] })
+      queryClient.invalidateQueries({ queryKey: ['admin', 'invites'] })
     },
   })
 
@@ -44,8 +44,10 @@ export function InvitesSection() {
       {/* Section header */}
       <div className="mb-4 flex items-center justify-between">
         <div>
-          <h2 className="text-sm font-medium text-foreground">Invite links</h2>
-          <p className="text-xs text-muted-foreground">
+          <h2 className="text-[13px] font-medium text-foreground">
+            Invite links
+          </h2>
+          <p className="text-xs text-muted-foreground/80">
             Generate links to invite new users
           </p>
         </div>
@@ -57,7 +59,7 @@ export function InvitesSection() {
           className="h-7 gap-1 px-2.5 text-xs"
         >
           <Plus className="h-3.5 w-3.5" />
-          {isCreatingInvite ? "Generating..." : "Generate link"}
+          {isCreatingInvite ? 'Generating...' : 'Generate link'}
         </Button>
       </div>
 
@@ -73,7 +75,7 @@ export function InvitesSection() {
           <div
             key={invite.id}
             className={`group flex items-center justify-between py-2.5 ${
-              index !== 0 ? "border-t border-border/60" : ""
+              index !== 0 ? 'border-t border-border/40' : ''
             }`}
           >
             <div className="min-w-0">
@@ -86,6 +88,7 @@ export function InvitesSection() {
             </div>
             <div className="flex items-center gap-1 shrink-0">
               <button
+                type="button"
                 onClick={() => copyInviteLink(invite.token)}
                 className="rounded p-1 text-muted-foreground/40 transition-all hover:bg-muted hover:text-foreground"
               >
@@ -96,6 +99,7 @@ export function InvitesSection() {
                 )}
               </button>
               <button
+                type="button"
                 onClick={() => deleteInviteMutation({ data: invite.id })}
                 className="rounded p-1 text-muted-foreground/40 opacity-0 transition-all hover:bg-muted hover:text-destructive group-hover:opacity-100"
               >

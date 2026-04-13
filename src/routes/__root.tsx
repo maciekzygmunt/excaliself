@@ -39,8 +39,17 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
         crossOrigin: "anonymous",
       },
       {
+        rel: "preconnect",
+        href: "https://cdn.jsdelivr.net",
+        crossOrigin: "anonymous",
+      },
+      {
         rel: "stylesheet",
-        href: "https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap",
+        href: "https://cdn.jsdelivr.net/npm/geist@1/dist/fonts/geist-sans/style.css",
+      },
+      {
+        rel: "stylesheet",
+        href: "https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&display=swap",
       },
       {
         rel: "stylesheet",
@@ -51,10 +60,10 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
   errorComponent: () => (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
       <div className="text-center">
-        <div className="mx-auto mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-destructive/10 text-lg text-destructive">
+        <div className="mx-auto mb-4 flex h-10 w-10 items-center justify-center rounded-xl bg-destructive/10 text-lg text-destructive">
           !
         </div>
-        <p className="text-sm text-foreground">Something went wrong</p>
+        <p className="text-[13px] text-foreground">Something went wrong</p>
         <p className="mt-1 text-xs text-muted-foreground">Please try refreshing the page</p>
       </div>
     </div>
@@ -62,10 +71,10 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
   notFoundComponent: () => (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
       <div className="text-center">
-        <div className="mx-auto mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-muted text-lg text-muted-foreground">
+        <div className="mx-auto mb-4 flex h-10 w-10 items-center justify-center rounded-xl bg-muted text-lg text-muted-foreground">
           ?
         </div>
-        <p className="text-sm text-foreground">Page not found</p>
+        <p className="text-[13px] text-foreground">Page not found</p>
         <p className="mt-1 text-xs text-muted-foreground">The page you're looking for doesn't exist</p>
       </div>
     </div>

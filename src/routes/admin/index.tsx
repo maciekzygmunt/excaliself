@@ -40,14 +40,14 @@ function AdminPage() {
             Back to drawings
           </Link>
           <div className="flex items-center gap-3">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand text-sm font-semibold text-primary-foreground">
+            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-brand text-sm font-semibold text-primary-foreground">
               E
             </div>
             <div>
               <h1 className="text-lg font-medium tracking-[-0.01em] text-foreground">
                 Admin settings
               </h1>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-[13px] text-muted-foreground">
                 Manage users and invite links
               </p>
             </div>
@@ -57,8 +57,8 @@ function AdminPage() {
         {/* Users */}
         <UsersSection />
 
-        {/* Divider */}
-        <div className="my-8 h-px bg-border" />
+        {/* Spacer */}
+        <div className="my-10" />
 
         {/* Invites */}
         <InvitesSection />

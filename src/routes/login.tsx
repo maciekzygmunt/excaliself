@@ -50,14 +50,14 @@ function LoginPage() {
       <div className="w-full max-w-sm">
         {/* Branding */}
         <div className="mb-8 flex flex-col items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-brand text-lg font-semibold text-primary-foreground">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand text-lg font-semibold text-primary-foreground">
             E
           </div>
           <div className="text-center">
             <h1 className="text-lg font-medium tracking-[-0.01em] text-foreground">
               Welcome back
             </h1>
-            <p className="mt-1 text-sm text-muted-foreground">
+            <p className="mt-1 text-[13px] text-muted-foreground">
               Sign in to your Excalidraw account
             </p>
           </div>
@@ -140,7 +140,7 @@ function LoginPage() {
             {([canSubmit, isSubmitting]) => (
               <Button
                 type="submit"
-                className="w-full bg-foreground text-background hover:bg-foreground/90"
+                className="w-full bg-brand text-primary-foreground hover:bg-brand/90"
                 disabled={!canSubmit}
               >
                 {isSubmitting ? "Signing in..." : "Sign in"}
