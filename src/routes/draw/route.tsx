@@ -38,7 +38,10 @@ function DrawLayout() {
   const { session } = Route.useLoaderData()
 
   return (
-    <SidebarProvider defaultOpen style={{ "--sidebar-width": "260px" } as React.CSSProperties}>
+    <SidebarProvider
+      defaultOpen
+      style={{ "--sidebar-width": "248px" } as React.CSSProperties}
+    >
       <DrawLayoutShell
         userEmail={session.user?.email ?? ""}
         isAdmin={session.user.role === "admin"}
@@ -56,7 +59,7 @@ function DrawLayoutShell({
 }) {
   return (
     <SidebarContextProvider>
-      <DrawSidebar userEmail={userEmail} isAdmin={isAdmin} />
+      <DrawSidebar userEmail={userEmail} isAdmin={isAdmin} variant="inset" />
       <SidebarInset className="overflow-clip">
         <Outlet />
       </SidebarInset>

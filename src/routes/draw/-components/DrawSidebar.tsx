@@ -36,9 +36,10 @@ import { useSidebarContext } from './SidebarContext'
 type DrawSidebarProps = {
   userEmail: string
   isAdmin: boolean
+  variant?: 'sidebar' | 'floating' | 'inset'
 }
 
-export function DrawSidebar({ userEmail, isAdmin }: DrawSidebarProps) {
+export function DrawSidebar({ userEmail, isAdmin, variant = 'inset' }: DrawSidebarProps) {
   const {
     tree,
     filteredTree,
@@ -61,57 +62,57 @@ export function DrawSidebar({ userEmail, isAdmin }: DrawSidebarProps) {
 
   return (
     <>
-      <Sidebar
-        collapsible="offcanvas"
-        className="border-r border-sidebar-border"
-      >
-        {/* Header */}
-        <SidebarHeader className="h-14 flex flex-row items-center px-4 m-0 p-0 rounded-none bg-transparent">
-          <div className="flex items-center gap-2.5 text-sidebar-foreground transition-colors w-full px-4 h-full">
-            <Hexagon className="w-[18px] h-[18px] text-brand" strokeWidth={2.5} />
-            <span className="font-semibold text-sm tracking-[-0.02em]">Excalidraw</span>
+      <Sidebar variant={variant} collapsible="offcanvas" className="border-0">
+        {/* Workspace header — Arc-style compact identity */}
+        <SidebarHeader className="px-3 pt-3 pb-2 gap-0">
+          <div className="flex items-center gap-2 h-8 px-1.5 text-sidebar-foreground/80">
+            <div className="flex h-5 w-5 items-center justify-center rounded-[5px] bg-brand-muted">
+              <Hexagon className="w-3 h-3 text-brand" strokeWidth={2.75} />
+            </div>
+            <span className="font-medium text-[13px] tracking-[-0.01em]">
+              Excalidraw
+            </span>
           </div>
         </SidebarHeader>
 
-        <SidebarContent className="bg-transparent">
-          {/* Search */}
-          <div className="px-3 py-3">
-            <div className="relative group flex items-center bg-background border border-input rounded-[6px] px-2.5 py-1.5 focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/50 transition-all">
+        <SidebarContent className="bg-transparent gap-0">
+          {/* Command-style search — Arc's signature pill */}
+          <div className="px-3 pt-1 pb-2">
+            <div className="relative group flex items-center h-8 bg-sidebar-accent/60 hover:bg-sidebar-accent rounded-lg px-2.5 focus-within:bg-background focus-within:ring-1 focus-within:ring-sidebar-border focus-within:shadow-sm transition-all">
               <Search
-                className="w-4 h-4 text-muted-foreground mr-2"
-                strokeWidth={2}
+                className="w-3.5 h-3.5 text-sidebar-foreground/50 mr-2 shrink-0"
+                strokeWidth={2.25}
               />
               <input
                 type="text"
-                placeholder="Search..."
+                placeholder="Search"
                 aria-label="Search drawings"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-transparent text-[13px] placeholder:text-muted-foreground focus:outline-none text-sidebar-foreground"
+                className="w-full bg-transparent text-[13px] placeholder:text-sidebar-foreground/45 focus:outline-none text-sidebar-foreground"
               />
-              <div className="flex items-center gap-1 bg-muted rounded-[4px] px-1.5 py-0.5 text-[10px] text-muted-foreground font-medium border border-border">
-                <span>⌘</span>
-                <span>K</span>
-              </div>
+              <kbd className="ml-1 hidden group-focus-within:hidden items-center gap-0.5 text-[10px] text-sidebar-foreground/45 font-medium leading-none [input:placeholder-shown~&]:flex">
+                <span>⌘K</span>
+              </kbd>
             </div>
           </div>
 
-          <SidebarGroup className="pt-0 px-2 flex-1">
+          <SidebarGroup className="px-2 py-0 flex-1">
             <SidebarGroupContent className="flex flex-1 flex-col">
-              {/* Global Add Button */}
+              {/* New item — softened Arc-style command row */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button
                     type="button"
-                    className="flex w-full items-center gap-2.5 px-2.5 py-1.5 rounded-[6px] text-[13px] text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
+                    className="flex w-full items-center gap-2 h-7 px-2 rounded-md text-[13px] text-sidebar-foreground/65 hover:bg-sidebar-accent/70 hover:text-sidebar-foreground transition-colors"
                   >
-                    <Plus className="w-4 h-4 text-brand" strokeWidth={2} />
-                    <span className="font-medium">New item...</span>
+                    <Plus className="w-3.5 h-3.5" strokeWidth={2.25} />
+                    <span>New</span>
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent
                   align="start"
-                  className="w-56 rounded-xl border-border shadow-sm p-1"
+                  className="w-56 rounded-xl border-border shadow-md p-1"
                   onCloseAutoFocus={(e) => e.preventDefault()}
                 >
                   <DropdownMenuItem
@@ -137,7 +138,8 @@ export function DrawSidebar({ userEmail, isAdmin }: DrawSidebarProps) {
                 </DropdownMenuContent>
               </DropdownMenu>
 
-              <div className="mt-6 mb-2 px-2.5 text-[11px] font-semibold text-muted-foreground tracking-wider uppercase">
+              {/* Section divider — Arc uses muted tiny labels */}
+              <div className="mt-4 mb-1 px-2 text-[11px] font-medium text-sidebar-foreground/40 tracking-tight">
                 Drawings
               </div>
 
@@ -145,13 +147,13 @@ export function DrawSidebar({ userEmail, isAdmin }: DrawSidebarProps) {
                 className={cn(
                   'flex-1 rounded-md transition-all duration-200',
                   dropTarget?.type === 'root' &&
-                    'bg-sidebar-accent/50 ring-1 ring-sidebar-border',
+                    'bg-sidebar-accent/60 ring-1 ring-sidebar-border',
                 )}
                 onDragOver={onDragOver({ type: 'root' })}
                 onDragLeave={onDragLeave}
                 onDrop={onDrop({ type: 'root' })}
               >
-                <SidebarMenu className="gap-0.5">
+                <SidebarMenu className="gap-px">
                   {createType && (
                     <CreateRow
                       type={createType}
@@ -170,7 +172,7 @@ export function DrawSidebar({ userEmail, isAdmin }: DrawSidebarProps) {
                   ))}
                 </SidebarMenu>
                 {isSearching && displayTree.length === 0 && (
-                  <p className="px-2.5 py-6 text-center text-[13px] text-muted-foreground">
+                  <p className="px-2 py-6 text-center text-[13px] text-sidebar-foreground/45">
                     No results
                   </p>
                 )}
@@ -179,29 +181,29 @@ export function DrawSidebar({ userEmail, isAdmin }: DrawSidebarProps) {
           </SidebarGroup>
         </SidebarContent>
 
-        {/* Footer */}
-        <SidebarFooter className="p-3 bg-transparent">
+        {/* Footer — compact Arc-style profile */}
+        <SidebarFooter className="p-2 bg-transparent">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button
                 type="button"
-                className="flex items-center gap-2.5 p-1.5 w-full rounded-[6px] hover:bg-sidebar-accent cursor-pointer transition-colors text-[13px] text-sidebar-foreground/70"
+                className="flex items-center gap-2 h-9 w-full rounded-lg px-1.5 hover:bg-sidebar-accent/70 cursor-pointer transition-colors text-[13px] text-sidebar-foreground"
               >
-                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-brand-muted text-[10px] font-semibold text-brand">
+                <div className="flex h-6 w-6 items-center justify-center rounded-md bg-brand text-[10px] font-semibold text-primary-foreground shrink-0">
                   {userEmail.charAt(0).toUpperCase()}
                 </div>
                 <div className="flex flex-col text-left leading-tight flex-1 truncate">
-                  <span className="font-medium truncate text-sidebar-foreground">
+                  <span className="truncate text-[12.5px] text-sidebar-foreground/85">
                     {userEmail}
                   </span>
                 </div>
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent
-              className="w-[--radix-dropdown-menu-trigger-width] min-w-56 rounded-xl border-border shadow-sm p-1"
-              side="bottom"
-              align="end"
-              sideOffset={4}
+              className="w-[--radix-dropdown-menu-trigger-width] min-w-56 rounded-xl border-border shadow-md p-1"
+              side="top"
+              align="start"
+              sideOffset={6}
             >
               {isAdmin && (
                 <>
