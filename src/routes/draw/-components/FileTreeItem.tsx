@@ -155,7 +155,7 @@ export function FolderItem({ folder, children: childNodes }: FolderItemProps) {
     <Collapsible open={isExpanded} onOpenChange={setIsExpanded} asChild>
       <SidebarMenuItem
         className={cn(
-          'rounded-md transition-all duration-200',
+          'rounded-lg transition-all duration-200',
           showDropHighlight &&
             'bg-sidebar-accent/60 ring-1 ring-sidebar-border',
         )}
@@ -163,7 +163,7 @@ export function FolderItem({ folder, children: childNodes }: FolderItemProps) {
         <CollapsibleTrigger asChild>
           <div
             className={cn(
-              'group/folder-row relative flex w-full rounded-md transition-all duration-200',
+              'group/folder-row relative flex w-full rounded-lg transition-all duration-200',
               isDragging && 'opacity-40 scale-[0.98]',
             )}
             {...dropTargetProps}
@@ -173,17 +173,17 @@ export function FolderItem({ folder, children: childNodes }: FolderItemProps) {
               onDragStart={handleDragStart}
               onDragEnd={handleDragEnd}
               className={cn(
-                'cursor-pointer active:cursor-grabbing px-2 py-1 h-7 text-[13px] rounded-md text-sidebar-foreground/70 hover:bg-sidebar-accent/70 hover:text-sidebar-foreground transition-colors',
+                'cursor-pointer active:cursor-grabbing px-2.5 h-9 text-[13.5px] gap-2.5 rounded-lg text-sidebar-foreground/80 hover:bg-sidebar-accent/70 hover:text-sidebar-foreground transition-colors',
               )}
             >
               <ChevronRight
                 className={cn(
-                  'transition-transform duration-150 w-3 h-3 opacity-45',
+                  'transition-transform duration-150 w-3.5 h-3.5 opacity-50 shrink-0',
                   isExpanded && 'rotate-90',
                   !hasChildren && 'opacity-0',
                 )}
               />
-              <Folder className="w-3.5 h-3.5 opacity-65" strokeWidth={2} />
+              <Folder className="w-4 h-4 opacity-75 shrink-0" strokeWidth={2} />
               {isRenaming ? (
                 <input
                   ref={renameInputRef}
@@ -206,7 +206,7 @@ export function FolderItem({ folder, children: childNodes }: FolderItemProps) {
               <DropdownMenuTrigger asChild>
                 <SidebarMenuAction
                   className={cn(
-                    'top-1 transition-all duration-150 md:opacity-0 group-hover/folder-row:opacity-100 group-focus-within/folder-row:opacity-100 data-[state=open]:opacity-100 text-sidebar-foreground/50 hover:text-sidebar-foreground hover:bg-sidebar-accent rounded-[4px] mr-1 h-5 w-5',
+                    'top-2 transition-all duration-150 md:opacity-0 group-hover/folder-row:opacity-100 group-focus-within/folder-row:opacity-100 data-[state=open]:opacity-100 text-sidebar-foreground/50 hover:text-sidebar-foreground hover:bg-sidebar-accent rounded-md mr-1.5 h-5 w-5',
                     isRenaming && 'hidden',
                   )}
                   onPointerDown={(e) => e.stopPropagation()}
@@ -262,7 +262,7 @@ export function FolderItem({ folder, children: childNodes }: FolderItemProps) {
         </CollapsibleTrigger>
         <CollapsibleContent>
           <SidebarMenuSub
-            className="ml-[14px] pl-2 border-l border-sidebar-border/70 mr-0 pr-0 my-0.5 gap-px"
+            className="ml-4 pl-2 border-l border-sidebar-border/70 mr-0 pr-0 my-1 gap-0.5"
             {...dropTargetProps}
           >
             {childNodes.map((node) => (
@@ -351,8 +351,8 @@ export function DrawingItem({ drawing, isSubItem }: DrawingItemProps) {
     <>
       <File
         className={cn(
-          'w-3.5 h-3.5 shrink-0',
-          isActive ? 'text-brand' : 'opacity-65',
+          'w-4 h-4 shrink-0',
+          isActive ? 'text-brand' : 'opacity-70',
         )}
         strokeWidth={2}
       />
@@ -393,7 +393,7 @@ export function DrawingItem({ drawing, isSubItem }: DrawingItemProps) {
       <DropdownMenuTrigger asChild>
         <SidebarMenuAction
           className={cn(
-            'top-1 transition-all duration-150 md:opacity-0 group-hover/drawing-item:opacity-100 group-focus-within/drawing-item:opacity-100 data-[state=open]:opacity-100 text-sidebar-foreground/50 hover:text-sidebar-foreground hover:bg-sidebar-accent rounded-[4px] mr-1 h-5 w-5',
+            'top-2 transition-all duration-150 md:opacity-0 group-hover/drawing-item:opacity-100 group-focus-within/drawing-item:opacity-100 data-[state=open]:opacity-100 text-sidebar-foreground/50 hover:text-sidebar-foreground hover:bg-sidebar-accent rounded-md mr-1.5 h-5 w-5',
             isRenaming && 'hidden',
           )}
         >
@@ -446,14 +446,14 @@ export function DrawingItem({ drawing, isSubItem }: DrawingItemProps) {
   )
 
   const activeClasses = isActive
-    ? 'bg-background text-sidebar-foreground shadow-[0_1px_2px_rgba(0,0,0,0.05),0_0_0_1px_var(--sidebar-border)] font-medium'
-    : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/70 hover:text-sidebar-foreground'
+    ? 'bg-background text-sidebar-foreground shadow-[0_1px_3px_rgba(0,0,0,0.06),0_0_0_0.5px_var(--sidebar-border)] font-medium'
+    : 'text-sidebar-foreground/80 hover:bg-sidebar-accent/70 hover:text-sidebar-foreground'
 
   if (isSubItem) {
     return (
       <SidebarMenuSubItem
         className={cn(
-          'group/drawing-item relative rounded-md transition-all duration-200',
+          'group/drawing-item relative rounded-lg transition-all duration-200',
           isDragging && 'opacity-40 scale-[0.98]',
         )}
         {...dragProps}
@@ -462,9 +462,9 @@ export function DrawingItem({ drawing, isSubItem }: DrawingItemProps) {
           asChild={!isRenaming}
           isActive={isActive}
           className={cn(
-            'cursor-pointer active:cursor-grabbing px-2 py-1 h-7 text-[13px] rounded-md transition-colors pr-8',
+            'cursor-pointer active:cursor-grabbing px-2.5 h-9 gap-2.5 text-[13.5px] rounded-lg transition-colors pr-8',
             activeClasses,
-            isActive && 'bg-background text-sidebar-foreground shadow-[0_1px_2px_rgba(0,0,0,0.05),0_0_0_1px_var(--sidebar-border)]',
+            isActive && 'bg-background text-sidebar-foreground shadow-[0_1px_3px_rgba(0,0,0,0.06),0_0_0_0.5px_var(--sidebar-border)]',
           )}
         >
           {isRenaming ? (
@@ -483,7 +483,7 @@ export function DrawingItem({ drawing, isSubItem }: DrawingItemProps) {
   return (
     <SidebarMenuItem
       className={cn(
-        'group/drawing-item relative rounded-md transition-all duration-200',
+        'group/drawing-item relative rounded-lg transition-all duration-200',
         isDragging && 'opacity-40 scale-[0.98]',
       )}
       {...dragProps}
@@ -492,9 +492,9 @@ export function DrawingItem({ drawing, isSubItem }: DrawingItemProps) {
         asChild={!isRenaming}
         isActive={isActive}
         className={cn(
-          'cursor-pointer active:cursor-grabbing px-2 py-1 h-7 text-[13px] rounded-md transition-colors',
+          'cursor-pointer active:cursor-grabbing px-2.5 h-9 gap-2.5 text-[13.5px] rounded-lg transition-colors',
           activeClasses,
-          isActive && 'bg-background text-sidebar-foreground shadow-[0_1px_2px_rgba(0,0,0,0.05),0_0_0_1px_var(--sidebar-border)]',
+          isActive && 'bg-background text-sidebar-foreground shadow-[0_1px_3px_rgba(0,0,0,0.06),0_0_0_0.5px_var(--sidebar-border)]',
         )}
       >
         {isRenaming ? (
@@ -571,12 +571,12 @@ export function CreateRow({ type, onClose }: CreateRowProps) {
   }
 
   return (
-    <SidebarMenuItem className="rounded-md">
-      <SidebarMenuButton className="px-2 py-1 h-7 rounded-md hover:bg-sidebar-accent/70 text-sidebar-foreground text-[13px]">
+    <SidebarMenuItem className="rounded-lg">
+      <SidebarMenuButton className="px-2.5 h-9 gap-2.5 rounded-lg hover:bg-sidebar-accent/70 text-sidebar-foreground text-[13.5px]">
         {type === 'folder' ? (
-          <Folder className="w-3.5 h-3.5 opacity-65" strokeWidth={2} />
+          <Folder className="w-4 h-4 opacity-70 shrink-0" strokeWidth={2} />
         ) : (
-          <File className="w-3.5 h-3.5 opacity-65" strokeWidth={2} />
+          <File className="w-4 h-4 opacity-70 shrink-0" strokeWidth={2} />
         )}
         <input
           ref={inputRef}

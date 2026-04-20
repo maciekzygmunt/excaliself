@@ -40,7 +40,7 @@ function DrawLayout() {
   return (
     <SidebarProvider
       defaultOpen
-      style={{ "--sidebar-width": "248px" } as React.CSSProperties}
+      style={{ "--sidebar-width": "256px" } as React.CSSProperties}
     >
       <DrawLayoutShell
         userEmail={session.user?.email ?? ""}
