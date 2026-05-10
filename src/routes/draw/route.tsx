@@ -6,8 +6,7 @@ import { authMiddleware } from "@/middleware/auth"
 import { setupMiddleware } from "@/middleware/setup"
 import { getDrawings } from "@/server/drawings"
 import { getFolders } from "@/server/folders"
-import { DrawSidebar } from "./-components/DrawSidebar"
-import { SidebarContextProvider } from "./-components/SidebarContext"
+import { DrawSidebar, SidebarContextProvider } from "./-components/sidebar"
 
 const getSession = createServerFn({ method: "GET" })
   .middleware([authMiddleware])
@@ -38,7 +37,10 @@ function DrawLayout() {
   const { session } = Route.useLoaderData()
 
   return (
-    <SidebarProvider defaultOpen style={{ "--sidebar-width": "260px" } as React.CSSProperties}>
+    <SidebarProvider
+      defaultOpen
+      style={{ "--sidebar-width": "260px" } as React.CSSProperties}
+    >
       <DrawLayoutShell
         userEmail={session.user?.email ?? ""}
         isAdmin={session.user.role === "admin"}

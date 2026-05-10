@@ -8,7 +8,23 @@ import {
 } from "react"
 import { createPortal } from "react-dom"
 
-const TOP_LEFT_TARGET_RETRY_FRAMES = 240
+// Excalidraw mounts its top-left UI slot asynchronously; we retry for ~4s
+// (240 frames at 60fps) before giving up so the portal target can be found
+// without flashing the absence of our controls.
+const TARGET_RESOLVE_RETRY_FRAMES = 240
+
+const PRIMARY_TARGET_SELECTOR =
+  ".excalidraw .App-menu_top__left > div:first-child"
+const FALLBACK_TRIGGER_SELECTOR = ".excalidraw .main-menu-trigger"
+
+function findPortalTarget(): HTMLElement | null {
+  const primary = document.querySelector(PRIMARY_TARGET_SELECTOR)
+  if (primary instanceof HTMLElement) return primary
+
+  const trigger = document.querySelector(FALLBACK_TRIGGER_SELECTOR)
+  const fallback = trigger?.closest("div")
+  return fallback instanceof HTMLElement ? fallback : null
+}
 
 function useTopLeftPortalTarget() {
   const [target, setTarget] = useState<HTMLElement | null>(null)
@@ -17,28 +33,14 @@ function useTopLeftPortalTarget() {
   const retryRef = useRef(0)
 
   const resolveTarget = useCallback(() => {
-    if (rafRef.current !== null) {
-      cancelAnimationFrame(rafRef.current)
-    }
+    if (rafRef.current !== null) cancelAnimationFrame(rafRef.current)
     rafRef.current = requestAnimationFrame(() => {
-      const primary = document.querySelector(
-        ".excalidraw .App-menu_top__left > div:first-child",
-      )
-      let nextTarget: HTMLElement | null = null
-      if (primary instanceof HTMLElement) {
-        nextTarget = primary
-      } else {
-        const trigger = document.querySelector(".excalidraw .main-menu-trigger")
-        const fallback = trigger?.closest("div")
-        if (fallback instanceof HTMLElement) {
-          nextTarget = fallback
-        }
+      const next = findPortalTarget()
+      if (targetRef.current !== next) {
+        targetRef.current = next
+        setTarget(next)
       }
-      if (targetRef.current !== nextTarget) {
-        targetRef.current = nextTarget
-        setTarget(nextTarget)
-      }
-      if (!nextTarget && retryRef.current < TOP_LEFT_TARGET_RETRY_FRAMES) {
+      if (!next && retryRef.current < TARGET_RESOLVE_RETRY_FRAMES) {
         retryRef.current += 1
         resolveTarget()
       }
@@ -48,16 +50,14 @@ function useTopLeftPortalTarget() {
   useLayoutEffect(() => {
     retryRef.current = 0
     resolveTarget()
-    const handleResize = () => {
+    const onResize = () => {
       retryRef.current = 0
       resolveTarget()
     }
-    window.addEventListener("resize", handleResize)
+    window.addEventListener("resize", onResize)
     return () => {
-      if (rafRef.current !== null) {
-        cancelAnimationFrame(rafRef.current)
-      }
-      window.removeEventListener("resize", handleResize)
+      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current)
+      window.removeEventListener("resize", onResize)
     }
   }, [resolveTarget])
 

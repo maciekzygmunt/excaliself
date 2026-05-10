@@ -1,16 +1,20 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { useDebounceCallback } from "./use-debounce-callback"
 
-interface UseAutoSaveOptions<T> {
+type Options<T> = {
   onSave: (data: T) => Promise<void>
+  /** Optional fingerprint used to skip redundant saves. */
+  getSignature?: (data: T) => string
+  /** Changing this resets internal state — useful when switching documents. */
+  resetKey?: string
+  /** When true, the very first change is treated as initial state and skipped. */
+  skipInitialChange?: boolean
+  onError?: (error: unknown) => void
   debounceMs?: number
   savedIndicatorMs?: number
-  getSignature?: (data: T) => string
-  resetKey?: string
-  skipInitialChange?: boolean
 }
 
-interface UseAutoSaveReturn<T> {
+type Result<T> = {
   saving: boolean
   saved: boolean
   handleChange: (data: T) => void
@@ -18,12 +22,13 @@ interface UseAutoSaveReturn<T> {
 
 export function useAutoSave<T>({
   onSave,
-  debounceMs = 300,
-  savedIndicatorMs = 2000,
   getSignature,
   resetKey,
   skipInitialChange = false,
-}: UseAutoSaveOptions<T>): UseAutoSaveReturn<T> {
+  onError,
+  debounceMs = 300,
+  savedIndicatorMs = 2000,
+}: Options<T>): Result<T> {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
 
@@ -32,6 +37,9 @@ export function useAutoSave<T>({
 
   const getSignatureRef = useRef(getSignature)
   getSignatureRef.current = getSignature
+
+  const onErrorRef = useRef(onError)
+  onErrorRef.current = onError
 
   const stateRef = useRef({
     pendingData: null as T | null,
@@ -63,7 +71,7 @@ export function useAutoSave<T>({
       if (signature) {
         state.lastQueuedSignature = state.lastPersistedSignature
       }
-      console.error("Failed to save:", err)
+      onErrorRef.current?.(err)
     } finally {
       setSaving(false)
     }

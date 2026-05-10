@@ -1,4 +1,4 @@
-import type { TreeNode } from "../-components/SidebarContext"
+import type { TreeNode } from "../-components/sidebar"
 
 export function hasActiveDrawing(nodes: TreeNode[], activeId: string): boolean {
   for (const node of nodes) {

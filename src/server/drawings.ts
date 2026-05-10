@@ -120,7 +120,10 @@ export const saveDrawingScene = createServerFn({ method: "POST" })
 
       const now = new Date()
 
-      await tx.update(drawings).set({ data: sceneData, updatedAt: now }).where(eq(drawings.id, id))
+      await tx
+        .update(drawings)
+        .set({ data: sceneData, updatedAt: now })
+        .where(eq(drawings.id, id))
       await tx.delete(drawingFiles).where(eq(drawingFiles.drawingId, id))
 
       if (files.length > 0) {

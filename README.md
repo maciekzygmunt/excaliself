@@ -7,7 +7,7 @@ A self-hosted Excalidraw alternative with persistent storage, user accounts, and
 - 🎨 Full Excalidraw canvas with auto-save
 - 👤 User authentication with invite-only registration
 - 👑 Admin panel for user and invite management
-- 💾 SQLite database for easy self-hosting
+- 💾 PostgreSQL database with Drizzle migrations
 - 🐳 Docker support for simple deployment
 
 ## Quick Start
@@ -38,8 +38,8 @@ pnpm install
 # Copy environment file
 cp .env.example .env
 
-# Push database schema
-pnpm db:push
+# Start the local Postgres container
+docker-compose up -d db
 
 # Start development server
 pnpm dev
@@ -61,14 +61,18 @@ Access at `http://localhost:3000`
 |----------|----------|---------|-------------|
 | `BETTER_AUTH_SECRET` | Yes | - | Secret key for auth (min 32 chars) |
 | `BASE_URL` | No | `http://localhost:3000` | Public URL of your instance |
-| `DATABASE_PATH` | No | `./data/excalidraw.db` | SQLite database file path |
+| `DATABASE_URL` | Yes | - | PostgreSQL connection string used by local dev |
+| `POSTGRES_USER` | No | `excalidraw` | PostgreSQL user used by Docker Compose |
+| `POSTGRES_PASSWORD` | Yes | - | PostgreSQL password used by Docker Compose |
+| `POSTGRES_DB` | No | `excalidraw` | PostgreSQL database name used by Docker Compose |
+| `POSTGRES_PORT` | No | `5432` | Host port exposed for local dev outside Docker |
 
 ## Tech Stack
 
 - **Frontend**: TanStack Start + React 19
 - **UI**: shadcn/ui + Tailwind CSS
 - **Authentication**: Better Auth
-- **Database**: SQLite + Drizzle ORM
+- **Database**: PostgreSQL + Drizzle ORM
 - **Canvas**: @excalidraw/excalidraw
 
 ## Scripts

@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Trash2 } from "lucide-react"
+import { toast } from "sonner"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -21,6 +22,10 @@ export function UsersSection() {
   })
   const { mutate: deleteUserMutation } = useMutation({
     mutationFn: deleteUser,
+    onSuccess: () => toast.success("User deleted"),
+    onError: (err) => {
+      toast.error(err instanceof Error ? err.message : "Failed to delete user")
+    },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["admin", "users"] })
     },
@@ -32,7 +37,8 @@ export function UsersSection() {
       <div className="mb-4">
         <h2 className="text-sm font-medium text-foreground">Users</h2>
         <p className="text-xs text-muted-foreground">
-          {users?.length ?? 0} registered {users?.length === 1 ? "user" : "users"}
+          {users?.length ?? 0} registered{" "}
+          {users?.length === 1 ? "user" : "users"}
         </p>
       </div>
 

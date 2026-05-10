@@ -55,7 +55,9 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
           !
         </div>
         <p className="text-sm text-foreground">Something went wrong</p>
-        <p className="mt-1 text-xs text-muted-foreground">Please try refreshing the page</p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Please try refreshing the page
+        </p>
       </div>
     </div>
   ),
@@ -66,7 +68,9 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
           ?
         </div>
         <p className="text-sm text-foreground">Page not found</p>
-        <p className="mt-1 text-xs text-muted-foreground">The page you're looking for doesn't exist</p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          The page you're looking for doesn't exist
+        </p>
       </div>
     </div>
   ),
