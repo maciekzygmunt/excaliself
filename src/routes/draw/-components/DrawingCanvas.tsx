@@ -87,7 +87,6 @@ export function DrawingCanvas({ drawingId }: Props) {
   const { saving, saved, handleChange } = useAutoSave<SceneData>({
     onSave,
     getSignature: getSceneSignature,
-    resetKey: drawingId,
     skipInitialChange: true,
     onError: () => {
       toast.error("Failed to save drawing", { id: "drawing-save-error" })
@@ -143,7 +142,6 @@ export function DrawingCanvas({ drawingId }: Props) {
   return (
     <div className="size-full">
       <Excalidraw
-        key={drawingId}
         initialData={sceneData}
         onChange={handleSceneChange}
         renderTopRightUI={renderTopRightUI}

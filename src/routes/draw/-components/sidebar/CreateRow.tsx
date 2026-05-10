@@ -21,8 +21,8 @@ export function CreateRow({ type, onClose }: Props) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [name, setName] = useState<string>(DEFAULT_NAMES[type])
-  const inputRef = useRef<HTMLInputElement | null>(null)
   const submittedRef = useRef(false)
+  const inputRef = useRef<HTMLInputElement | null>(null)
 
   const createDrawingMutation = useMutation({
     mutationFn: createDrawing,
@@ -34,6 +34,8 @@ export function CreateRow({ type, onClose }: Props) {
     onSettled: () => queryClient.invalidateQueries({ queryKey: ["folders"] }),
   })
 
+  // Focus + select on mount, deferred a frame so the parent dropdown's
+  // closing focus management runs first and doesn't steal it back.
   useEffect(() => {
     const frame = requestAnimationFrame(() => {
       inputRef.current?.focus()

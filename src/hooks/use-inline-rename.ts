@@ -1,16 +1,16 @@
 import {
+  type ChangeEvent,
   type KeyboardEvent,
   type MouseEvent,
-  useCallback,
   useEffect,
   useRef,
   useState,
 } from "react"
 
-// While a Radix dropdown is closing, its menu items briefly steal focus from
-// the rename input via blur. We suppress blur for this window so the rename
-// input stays focused after the user clicks "Rename".
-const DROPDOWN_BLUR_SUPPRESSION_MS = 300
+// When a rename is triggered from a closing dropdown, the menu briefly steals
+// focus from our input. Blurs within this window are ignored so the rename
+// stays open instead of submitting prematurely.
+const FOCUS_GRACE_MS = 300
 
 type Options = {
   onSubmit: (newValue: string) => void
@@ -19,61 +19,19 @@ type Options = {
 /**
  * Inline rename UI shared by folder and drawing rows in the sidebar tree.
  *
- * Returns props to spread on the input + a `start` function for the menu
- * trigger and `onMenuCloseAutoFocus` for the dropdown's close handler. The
- * dropdown handlers coordinate so focus moves cleanly into the input on open.
+ * Spread `inputProps` on the rename `<input>` and call `start(name)` from the
+ * menu trigger. Pass `onMenuCloseAutoFocus` to the dropdown's
+ * `onCloseAutoFocus` to avoid focus flicker when transitioning to the input.
  */
 export function useInlineRename({ onSubmit }: Options) {
   const [isRenaming, setIsRenaming] = useState(false)
   const [value, setValue] = useState("")
-
   const inputRef = useRef<HTMLInputElement | null>(null)
-  const suppressBlurRef = useRef(false)
-  const pendingFocusRef = useRef(false)
+  const startedAtRef = useRef(0)
 
-  const submit = useCallback(() => {
-    onSubmit(value)
-    setIsRenaming(false)
-  }, [onSubmit, value])
-
-  const handleBlur = useCallback(() => {
-    if (suppressBlurRef.current) {
-      inputRef.current?.focus()
-      return
-    }
-    submit()
-  }, [submit])
-
-  const handleKeyDown = useCallback(
-    (e: KeyboardEvent<HTMLInputElement>) => {
-      if (e.key === "Enter") submit()
-      if (e.key === "Escape") setIsRenaming(false)
-    },
-    [submit],
-  )
-
-  // When the user clicks "Rename", suppress the imminent blur and focus the
-  // input on the next frame after the dropdown finishes closing.
-  const start = useCallback((initialValue: string) => {
-    suppressBlurRef.current = true
-    setTimeout(() => {
-      suppressBlurRef.current = false
-    }, DROPDOWN_BLUR_SUPPRESSION_MS)
-    pendingFocusRef.current = true
-    setValue(initialValue)
-    setIsRenaming(true)
-  }, [])
-
-  const onMenuCloseAutoFocus = useCallback((event: Event) => {
-    if (!pendingFocusRef.current) return
-    event.preventDefault()
-    pendingFocusRef.current = false
-    requestAnimationFrame(() => {
-      inputRef.current?.focus()
-      inputRef.current?.select()
-    })
-  }, [])
-
+  // Sync DOM focus with `isRenaming`. We wait one frame so that the closing
+  // dropdown's focus management has run before we claim focus — otherwise it
+  // would steal focus right after we set it.
   useEffect(() => {
     if (!isRenaming) return
     const frame = requestAnimationFrame(() => {
@@ -83,18 +41,37 @@ export function useInlineRename({ onSubmit }: Options) {
     return () => cancelAnimationFrame(frame)
   }, [isRenaming])
 
+  const submit = () => {
+    onSubmit(value)
+    setIsRenaming(false)
+  }
+
   return {
     isRenaming,
+    start(initialValue: string) {
+      startedAtRef.current = Date.now()
+      setValue(initialValue)
+      setIsRenaming(true)
+    },
     inputProps: {
       ref: inputRef,
       value,
-      onChange: (e: React.ChangeEvent<HTMLInputElement>) =>
-        setValue(e.target.value),
-      onBlur: handleBlur,
-      onKeyDown: handleKeyDown,
+      onChange: (e: ChangeEvent<HTMLInputElement>) => setValue(e.target.value),
+      onBlur: () => {
+        if (Date.now() - startedAtRef.current < FOCUS_GRACE_MS) {
+          inputRef.current?.focus()
+          return
+        }
+        submit()
+      },
+      onKeyDown: (e: KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === "Enter") submit()
+        else if (e.key === "Escape") setIsRenaming(false)
+      },
       onClick: (e: MouseEvent) => e.stopPropagation(),
     },
-    start,
-    onMenuCloseAutoFocus,
+    onMenuCloseAutoFocus(e: Event) {
+      if (isRenaming) e.preventDefault()
+    },
   }
 }

@@ -153,7 +153,10 @@ export function FolderItem({ folder, childNodes }: FolderItemProps) {
                 <SidebarMenuAction
                   className={cn(
                     "text-muted-foreground/30 md:opacity-0 group-hover/folder-row:opacity-100 group-focus-within/folder-row:opacity-100 data-[state=open]:opacity-100 [&>svg]:size-auto",
-                    rename.isRenaming && "hidden",
+                    // Use `invisible` (not `hidden`) so the trigger stays in
+                    // layout while renaming — otherwise Radix's closing popper
+                    // loses its anchor and flashes at viewport (0, 0).
+                    rename.isRenaming && "invisible pointer-events-none",
                   )}
                   onPointerDown={(e) => e.stopPropagation()}
                   onClick={(e) => e.stopPropagation()}

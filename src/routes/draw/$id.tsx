@@ -26,9 +26,11 @@ export const Route = createFileRoute("/draw/$id")({
 
 function DrawingPage() {
   const { id } = Route.useParams()
+  // Remount on id change so per-document state (auto-save dedup, edits in
+  // progress, Excalidraw scene) is fully reset without manual cleanup.
   return (
     <Suspense fallback={<LoadingState />}>
-      <DrawingCanvas drawingId={id} />
+      <DrawingCanvas key={id} drawingId={id} />
     </Suspense>
   )
 }

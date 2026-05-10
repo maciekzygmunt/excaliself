@@ -5,8 +5,6 @@ type Options<T> = {
   onSave: (data: T) => Promise<void>
   /** Optional fingerprint used to skip redundant saves. */
   getSignature?: (data: T) => string
-  /** Changing this resets internal state — useful when switching documents. */
-  resetKey?: string
   /** When true, the very first change is treated as initial state and skipped. */
   skipInitialChange?: boolean
   onError?: (error: unknown) => void
@@ -20,10 +18,15 @@ type Result<T> = {
   handleChange: (data: T) => void
 }
 
+type SaveState = {
+  initialized: boolean
+  lastPersistedSignature: string | null
+  lastQueuedSignature: string | null
+}
+
 export function useAutoSave<T>({
   onSave,
   getSignature,
-  resetKey,
   skipInitialChange = false,
   onError,
   debounceMs = 300,
@@ -32,58 +35,50 @@ export function useAutoSave<T>({
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
 
-  const onSaveRef = useRef(onSave)
-  onSaveRef.current = onSave
+  // Hold the latest callbacks so the debounced save closure can stay stable
+  // without going stale on consumer re-renders.
+  const handlersRef = useRef({ onSave, getSignature, onError })
+  handlersRef.current = { onSave, getSignature, onError }
 
-  const getSignatureRef = useRef(getSignature)
-  getSignatureRef.current = getSignature
-
-  const onErrorRef = useRef(onError)
-  onErrorRef.current = onError
-
-  const stateRef = useRef({
-    pendingData: null as T | null,
+  const stateRef = useRef<SaveState>({
     initialized: false,
-    lastPersistedSignature: null as string | null,
-    lastQueuedSignature: null as string | null,
+    lastPersistedSignature: null,
+    lastQueuedSignature: null,
   })
 
   const performSave = useCallback(async (data: T) => {
     const state = stateRef.current
-    const signature = getSignatureRef.current?.(data) ?? null
+    const handlers = handlersRef.current
+    const signature = handlers.getSignature?.(data) ?? null
 
     if (signature && signature === state.lastPersistedSignature) {
-      state.pendingData = null
       state.lastQueuedSignature = signature
       return
     }
 
-    state.pendingData = null
     setSaving(true)
     try {
-      await onSaveRef.current(data)
+      await handlers.onSave(data)
       if (signature) {
         state.lastPersistedSignature = signature
         state.lastQueuedSignature = signature
       }
       setSaved(true)
     } catch (err) {
-      if (signature) {
-        state.lastQueuedSignature = state.lastPersistedSignature
-      }
-      onErrorRef.current?.(err)
+      if (signature) state.lastQueuedSignature = state.lastPersistedSignature
+      handlers.onError?.(err)
     } finally {
       setSaving(false)
     }
   }, [])
 
-  const { run: runDebouncedSave, cancel: cancelDebouncedSave } =
+  const { run: runDebouncedSave, flush: flushDebouncedSave } =
     useDebounceCallback(performSave, debounceMs)
 
   const handleChange = useCallback(
     (data: T) => {
       const state = stateRef.current
-      const signature = getSignatureRef.current?.(data) ?? null
+      const signature = handlersRef.current.getSignature?.(data) ?? null
 
       if (!state.initialized) {
         state.initialized = true
@@ -96,55 +91,27 @@ export function useAutoSave<T>({
         }
       }
 
-      if (
-        signature &&
+      const isDuplicate =
+        signature !== null &&
         (signature === state.lastPersistedSignature ||
           signature === state.lastQueuedSignature)
-      ) {
-        return
-      }
+      if (isDuplicate) return
 
-      if (signature) {
-        state.lastQueuedSignature = signature
-      }
-
-      state.pendingData = data
+      if (signature) state.lastQueuedSignature = signature
       runDebouncedSave(data)
     },
     [runDebouncedSave, skipInitialChange],
   )
 
+  // Auto-clear the "Saved" indicator after a moment.
   useEffect(() => {
     if (!saved) return
-    const timeoutId = setTimeout(() => {
-      setSaved(false)
-    }, savedIndicatorMs)
-    return () => clearTimeout(timeoutId)
+    const id = setTimeout(() => setSaved(false), savedIndicatorMs)
+    return () => clearTimeout(id)
   }, [saved, savedIndicatorMs])
 
-  useEffect(() => {
-    if (resetKey === undefined) return
-
-    cancelDebouncedSave()
-    stateRef.current = {
-      pendingData: null,
-      initialized: false,
-      lastPersistedSignature: null,
-      lastQueuedSignature: null,
-    }
-    setSaving(false)
-    setSaved(false)
-  }, [cancelDebouncedSave, resetKey])
-
-  useEffect(() => {
-    return () => {
-      const pendingData = stateRef.current.pendingData
-      cancelDebouncedSave()
-      if (pendingData) {
-        void onSaveRef.current(pendingData)
-      }
-    }
-  }, [cancelDebouncedSave])
+  // Flush any pending save on unmount so the user doesn't lose work.
+  useEffect(() => () => flushDebouncedSave(), [flushDebouncedSave])
 
   return { saving, saved, handleChange }
 }
