@@ -24,6 +24,10 @@ export function CreateRow({ type, onClose }: Props) {
   const queryClient = useQueryClient()
   const [name, setName] = useState<string>(DEFAULT_NAMES[type])
   const inputRef = useRef<HTMLInputElement | null>(null)
+  // Synchronous guard: Enter often blurs the input on the same tick, so
+  // onKeyDown + onBlur can race before isPending updates. A ref lets us
+  // short-circuit the second call without waiting for a re-render.
+  const submittedRef = useRef(false)
 
   const createDrawingMutation = useMutation({
     mutationFn: createDrawing,
@@ -34,9 +38,6 @@ export function CreateRow({ type, onClose }: Props) {
     mutationFn: createFolder,
     onSettled: () => queryClient.invalidateQueries(foldersQueryOptions()),
   })
-
-  const isPending =
-    createDrawingMutation.isPending || createFolderMutation.isPending
 
   // Focus + select on mount, deferred a frame so the parent dropdown's
   // closing focus management runs first and doesn't steal it back.
@@ -49,7 +50,8 @@ export function CreateRow({ type, onClose }: Props) {
   }, [])
 
   const submit = async () => {
-    if (isPending) return
+    if (submittedRef.current) return
+    submittedRef.current = true
 
     const trimmed = name.trim()
     if (!trimmed) {
