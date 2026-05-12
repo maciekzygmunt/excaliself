@@ -8,7 +8,3 @@ export function TreeNodeItem({ node }: { node: TreeNode }) {
   }
   return <DrawingItem drawing={node.drawing} />
 }
-
-export function treeNodeKey(node: TreeNode): string {
-  return node.type === "folder" ? node.folder.id : node.drawing.id
-}

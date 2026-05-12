@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router"
 import { Pencil } from "lucide-react"
 import { lazy, Suspense } from "react"
-import { getDrawingWithFiles } from "@/server/drawings"
+import { drawingQueryOptions } from "@/features/drawings/queries"
 
 const DrawingCanvas = lazy(() => import("./-components/DrawingCanvas"))
 
@@ -15,10 +15,7 @@ const LoadingState = () => (
 export const Route = createFileRoute("/draw/$id")({
   ssr: false,
   loader: async ({ params, context }) => {
-    await context.queryClient.ensureQueryData({
-      queryKey: ["drawing", params.id],
-      queryFn: () => getDrawingWithFiles({ data: params.id }),
-    })
+    await context.queryClient.ensureQueryData(drawingQueryOptions(params.id))
   },
   component: DrawingPage,
   pendingComponent: LoadingState,

@@ -14,6 +14,21 @@ const persistedFileSchema = z.object({
   dataUrl: z.string(),
 })
 
+type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0]
+
+async function requireOwnedDrawing(
+  tx: typeof db | Tx,
+  id: string,
+  userId: string,
+): Promise<{ id: string }> {
+  const [row] = await tx
+    .select({ id: drawings.id })
+    .from(drawings)
+    .where(and(eq(drawings.id, id), eq(drawings.ownerId, userId)))
+  if (!row) throw new Error("Drawing not found")
+  return row
+}
+
 export const getDrawings = createServerFn({ method: "GET" })
   .middleware([authMiddleware])
   .handler(async ({ context }) => {
@@ -28,14 +43,12 @@ export const getDrawings = createServerFn({ method: "GET" })
 export const getDrawingWithFiles = createServerFn({ method: "GET" })
   .middleware([authMiddleware])
   .inputValidator((id: string) => id)
-  .handler(async ({ data, context }) => {
-    const id = data
+  .handler(async ({ data: id, context }) => {
     const userId = context.session.user.id
-    const result = await db
+    const [drawing] = await db
       .select()
       .from(drawings)
       .where(and(eq(drawings.id, id), eq(drawings.ownerId, userId)))
-    const drawing = result[0]
     if (!drawing) return null
 
     const files = await db
@@ -58,11 +71,10 @@ export const createDrawing = createServerFn({ method: "POST" })
     const userId = context.session.user.id
     const id = randomUUID()
     const now = new Date()
-    const name = data.name ?? "Untitled"
 
     await db.insert(drawings).values({
       id,
-      name,
+      name: data.name ?? "Untitled",
       data: JSON.stringify({ elements: [], appState: {} }),
       folderId: data.folderId ?? null,
       ownerId: userId,
@@ -87,15 +99,13 @@ export const updateDrawing = createServerFn({ method: "POST" })
       }),
     }),
   )
-  .handler(async ({ data: { updateData, id }, context }) => {
+  .handler(async ({ data: { id, updateData }, context }) => {
     const userId = context.session.user.id
-    const cleanedUpdateData = Object.fromEntries(
-      Object.entries(updateData).filter(([, value]) => value !== undefined),
-    )
+    await requireOwnedDrawing(db, id, userId)
     await db
       .update(drawings)
-      .set({ ...cleanedUpdateData, updatedAt: new Date() })
-      .where(and(eq(drawings.id, id), eq(drawings.ownerId, userId)))
+      .set({ ...updateData, updatedAt: new Date() })
+      .where(eq(drawings.id, id))
   })
 
 export const saveDrawingScene = createServerFn({ method: "POST" })
@@ -111,13 +121,7 @@ export const saveDrawingScene = createServerFn({ method: "POST" })
     const userId = context.session.user.id
 
     await db.transaction(async (tx) => {
-      const [drawing] = await tx
-        .select({ id: drawings.id })
-        .from(drawings)
-        .where(and(eq(drawings.id, id), eq(drawings.ownerId, userId)))
-
-      if (!drawing) return
-
+      await requireOwnedDrawing(tx, id, userId)
       const now = new Date()
 
       await tx
@@ -144,43 +148,8 @@ export const saveDrawingScene = createServerFn({ method: "POST" })
 export const deleteDrawing = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
   .inputValidator(z.string())
-  .handler(async ({ data, context }) => {
-    const id = data
+  .handler(async ({ data: id, context }) => {
     const userId = context.session.user.id
-    await db
-      .delete(drawings)
-      .where(and(eq(drawings.id, id), eq(drawings.ownerId, userId)))
-  })
-
-export const updateDrawingFiles = createServerFn({ method: "POST" })
-  .middleware([authMiddleware])
-  .inputValidator(
-    z.object({
-      drawingId: z.string(),
-      files: z.array(persistedFileSchema),
-    }),
-  )
-  .handler(async ({ data: { drawingId, files }, context }) => {
-    const userId = context.session.user.id
-    const [drawing] = await db
-      .select({ id: drawings.id })
-      .from(drawings)
-      .where(and(eq(drawings.id, drawingId), eq(drawings.ownerId, userId)))
-
-    if (!drawing) return
-
-    await db.delete(drawingFiles).where(eq(drawingFiles.drawingId, drawingId))
-
-    if (files.length > 0) {
-      await db.insert(drawingFiles).values(
-        files.map((file) => ({
-          id: randomUUID(),
-          drawingId,
-          fileId: file.fileId,
-          mimeType: file.mimeType,
-          dataUrl: file.dataUrl,
-          createdAt: new Date(),
-        })),
-      )
-    }
+    await requireOwnedDrawing(db, id, userId)
+    await db.delete(drawings).where(eq(drawings.id, id))
   })

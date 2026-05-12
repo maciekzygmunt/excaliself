@@ -2,11 +2,11 @@ import { createFileRoute, Outlet } from "@tanstack/react-router"
 import { createServerFn } from "@tanstack/react-start"
 import type React from "react"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
+import { drawingsQueryOptions } from "@/features/drawings/queries"
+import { foldersQueryOptions } from "@/features/folders/queries"
 import { authMiddleware } from "@/middleware/auth"
 import { setupMiddleware } from "@/middleware/setup"
-import { getDrawings } from "@/server/drawings"
-import { getFolders } from "@/server/folders"
-import { DrawSidebar, SidebarContextProvider } from "./-components/sidebar"
+import { DrawSidebar } from "./-components/sidebar"
 
 const getSession = createServerFn({ method: "GET" })
   .middleware([authMiddleware])
@@ -19,14 +19,8 @@ export const Route = createFileRoute("/draw")({
   loader: async ({ context }) => {
     const session = await getSession()
     await Promise.all([
-      context.queryClient.ensureQueryData({
-        queryKey: ["drawings"],
-        queryFn: getDrawings,
-      }),
-      context.queryClient.ensureQueryData({
-        queryKey: ["folders"],
-        queryFn: getFolders,
-      }),
+      context.queryClient.ensureQueryData(drawingsQueryOptions()),
+      context.queryClient.ensureQueryData(foldersQueryOptions()),
     ])
     return { session }
   },
@@ -41,27 +35,13 @@ function DrawLayout() {
       defaultOpen
       style={{ "--sidebar-width": "260px" } as React.CSSProperties}
     >
-      <DrawLayoutShell
+      <DrawSidebar
         userEmail={session.user?.email ?? ""}
         isAdmin={session.user.role === "admin"}
       />
-    </SidebarProvider>
-  )
-}
-
-function DrawLayoutShell({
-  userEmail,
-  isAdmin,
-}: {
-  userEmail: string
-  isAdmin: boolean
-}) {
-  return (
-    <SidebarContextProvider>
-      <DrawSidebar userEmail={userEmail} isAdmin={isAdmin} />
       <SidebarInset className="overflow-clip">
         <Outlet />
       </SidebarInset>
-    </SidebarContextProvider>
+    </SidebarProvider>
   )
 }

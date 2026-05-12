@@ -1,114 +1,100 @@
-# Excalidraw Self-Hosted
+# Excaliself
 
-A self-hosted Excalidraw alternative with persistent storage, user accounts, and admin panel.
+A self-hostable whiteboard app built on top of [Excalidraw](https://excalidraw.com),
+with persistent storage, user accounts, and an admin panel.
+
+> Not affiliated with Excalidraw, Inc. "Excalidraw" is a trademark of its
+> respective owner; this project uses the open-source `@excalidraw/excalidraw`
+> React component.
 
 ## Features
 
-- 🎨 Full Excalidraw canvas with auto-save
-- 👤 User authentication with invite-only registration
-- 👑 Admin panel for user and invite management
-- 💾 PostgreSQL database with Drizzle migrations
-- 🐳 Docker support for simple deployment
+- Full Excalidraw canvas with auto-save
+- User authentication with invite-only registration
+- Admin panel for user and invite management
+- PostgreSQL storage with Drizzle migrations
+- Docker Compose deployment
 
-## Quick Start
+## Quick start
 
-### Using Docker (Recommended)
+### Docker (recommended)
 
 ```bash
-# Clone the repository
-git clone https://github.com/your-repo/excalidraw-selfhosted.git
-cd excalidraw-selfhosted
-
-# Copy environment file
+git clone https://github.com/maciekzygmunt/excaliself.git
+cd excaliself
 cp .env.example .env
-
-# Generate a secret key and update .env
-# BETTER_AUTH_SECRET should be at least 32 characters
-
-# Run with Docker
-docker-compose up -d
+# fill in BETTER_AUTH_SECRET and POSTGRES_PASSWORD (see .env.example)
+docker compose up -d
 ```
 
-### Local Development
+Open <http://localhost:3000> and create your admin account at `/setup`.
+
+### Local development
 
 ```bash
-# Install dependencies
 pnpm install
-
-# Copy environment file
 cp .env.example .env
-
-# Start the local Postgres container
-docker-compose up -d db
-
-# Start development server
+docker compose up -d db
 pnpm dev
 ```
 
-Access at `http://localhost:3000`
-
-## First-Run Setup
+## First-run setup
 
 1. Visit `http://localhost:3000`
 2. You'll be redirected to `/setup` to create the admin account
-3. Enter your email, name, and password
-4. After setup, you'll be redirected to login
-5. Use the admin panel at `/admin` to invite new users
+3. After setup, sign in and visit `/admin` to invite new users
 
-## Environment Variables
+## Environment variables
 
 | Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `BETTER_AUTH_SECRET` | Yes | - | Secret key for auth (min 32 chars) |
+|---|---|---|---|
+| `BETTER_AUTH_SECRET` | Yes | — | Auth signing secret (min 32 chars) |
 | `BASE_URL` | No | `http://localhost:3000` | Public URL of your instance |
-| `DATABASE_URL` | Yes | - | PostgreSQL connection string used by local dev |
-| `POSTGRES_USER` | No | `excalidraw` | PostgreSQL user used by Docker Compose |
-| `POSTGRES_PASSWORD` | Yes | - | PostgreSQL password used by Docker Compose |
-| `POSTGRES_DB` | No | `excalidraw` | PostgreSQL database name used by Docker Compose |
-| `POSTGRES_PORT` | No | `5432` | Host port exposed for local dev outside Docker |
+| `DATABASE_URL` | Yes | — | PostgreSQL connection string (local dev) |
+| `POSTGRES_USER` | No | `excaliself` | Postgres user (Docker Compose) |
+| `POSTGRES_PASSWORD` | Yes | — | Postgres password (Docker Compose) |
+| `POSTGRES_DB` | No | `excaliself` | Postgres database name (Docker Compose) |
+| `POSTGRES_PORT` | No | `5432` | Host port for local dev outside Docker |
 
-## Tech Stack
+## Stack
 
-- **Frontend**: TanStack Start + React 19
-- **UI**: shadcn/ui + Tailwind CSS
-- **Authentication**: Better Auth
-- **Database**: PostgreSQL + Drizzle ORM
-- **Canvas**: @excalidraw/excalidraw
+- **Frontend** — TanStack Start (React 19, file-based router, server functions)
+- **UI** — shadcn/ui + Tailwind CSS 4
+- **Auth** — Better Auth
+- **Database** — PostgreSQL + Drizzle ORM
+- **Canvas** — `@excalidraw/excalidraw`
 
 ## Scripts
 
 | Command | Description |
-|---------|-------------|
+|---|---|
 | `pnpm dev` | Start development server |
 | `pnpm build` | Build for production |
 | `pnpm preview` | Preview production build |
+| `pnpm typecheck` | Run TypeScript type-check |
+| `pnpm lint` | Run Biome linter |
 | `pnpm db:push` | Push schema to database |
 | `pnpm db:studio` | Open Drizzle Studio |
 
-## Architecture
+## Project layout
 
 ```
 src/
-├── routes/           # TanStack Router pages
-│   ├── index.tsx     # Dashboard
-│   ├── login.tsx     # Login page
-│   ├── setup.tsx     # First-run setup
-│   ├── invite.tsx    # Invite acceptance
-│   ├── draw/$id.tsx  # Drawing editor
+├── routes/           # TanStack file-based router
+│   ├── draw/         # Drawing editor
 │   └── admin/        # Admin panel
-├── components/       # React components
-│   ├── ui/           # shadcn/ui components
-│   └── ExcalidrawCanvas.tsx
-├── lib/
-│   ├── db/           # Database schema & connection
-│   ├── auth.ts       # Better Auth config
-│   └── auth-client.ts
-└── server/           # Server functions
-    ├── users.ts
-    ├── drawings.ts
-    └── invites.ts
+├── features/         # Domain features: drawings, folders, auth, admin
+├── components/ui/    # shadcn/ui primitives
+├── hooks/            # Shared generic hooks
+├── lib/              # Shared utilities
+└── db/               # Drizzle client + schema
 ```
+
+## Status
+
+It's MIT-licensed and self-hostable, but
+no contribution support is promised — feel free to fork and adapt.
 
 ## License
 
-MIT
+[MIT](./LICENSE)

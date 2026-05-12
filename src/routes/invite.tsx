@@ -8,8 +8,8 @@ import { AuthPage } from "@/components/auth-page"
 import { FormTextField } from "@/components/form-text-field"
 import { Button } from "@/components/ui/button"
 import { FieldGroup } from "@/components/ui/field"
+import { consumeInvite, validateInvite } from "@/features/auth/server"
 import { auth } from "@/lib/auth"
-import { consumeInvite, validateInvite } from "@/server/invites"
 
 const registerWithInvite = createServerFn({ method: "POST" })
   .inputValidator(
@@ -96,7 +96,7 @@ function InvitePage() {
   return (
     <AuthPage
       title="You're invited"
-      subtitle="Create your account to start using Excalidraw"
+      subtitle="Create your account to start using Excaliself"
     >
       <form
         onSubmit={(e) => {

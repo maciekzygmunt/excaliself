@@ -20,8 +20,8 @@ import { adminMiddleware } from "@/middleware/admin"
 
 export const getUserCount = createServerFn({ method: "GET" }).handler(
   async () => {
-    const result = await db.select({ count: count() }).from(users)
-    return result[0].count
+    const [result] = await db.select({ count: count() }).from(users)
+    return result.count
   },
 )
 
@@ -53,12 +53,9 @@ export const setupAdmin = createServerFn({ method: "POST" })
       .where(eq(users.id, result.user.id))
   })
 
-// ADMIN
 export const getAllUsers = createServerFn({ method: "GET" })
   .middleware([adminMiddleware])
-  .handler(async () => {
-    return db.select().from(users)
-  })
+  .handler(async () => db.select().from(users))
 
 export const deleteUser = createServerFn({ method: "POST" })
   .middleware([adminMiddleware])

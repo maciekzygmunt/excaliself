@@ -1,21 +1,30 @@
-import { type DragEvent, useCallback, useState } from "react"
-import { useOptimisticListMutation } from "@/hooks/use-optimistic-list-mutation"
-import { updateDrawing } from "@/server/drawings"
-import { updateFolder } from "@/server/folders"
 import {
-  type DragItem,
-  type Drawing,
-  type DropTarget,
-  type FolderType,
-  isDescendantFolder,
-} from "./tree"
+  createContext,
+  type DragEvent,
+  type ReactNode,
+  useCallback,
+  useContext,
+  useState,
+} from "react"
+import type { Drawing } from "@/features/drawings/queries"
+import { updateDrawing } from "@/features/drawings/server"
+import type { Folder } from "@/features/folders/queries"
+import { updateFolder } from "@/features/folders/server"
+import { useOptimisticListMutation } from "@/hooks/use-optimistic-list-mutation"
+import { isDescendantFolder } from "./tree"
+
+export type DragItem = { type: "drawing" | "folder"; id: string }
+export type DropTarget =
+  | { type: "root" }
+  | { type: "folder"; id: string; position: "inside" | "above" | "below" }
+  | null
 
 type Options = {
   drawings: Drawing[]
-  foldersById: Map<string, FolderType>
+  foldersById: Map<string, Folder>
 }
 
-export function useSidebarDragDrop({ drawings, foldersById }: Options) {
+function useSidebarDnDValue({ drawings, foldersById }: Options) {
   const [dragItem, setDragItem] = useState<DragItem | null>(null)
   const [dropTarget, setDropTarget] = useState<DropTarget>(null)
 
@@ -25,8 +34,8 @@ export function useSidebarDragDrop({ drawings, foldersById }: Options) {
   >({
     queryKey: ["drawings"],
     mutationFn: updateDrawing,
-    optimisticUpdate: (drawings, { data }) =>
-      drawings.map((d) =>
+    optimisticUpdate: (list, { data }) =>
+      list.map((d) =>
         d.id === data.id
           ? { ...d, folderId: data.updateData.folderId ?? d.folderId }
           : d,
@@ -34,13 +43,13 @@ export function useSidebarDragDrop({ drawings, foldersById }: Options) {
   })
 
   const moveFolder = useOptimisticListMutation<
-    FolderType,
+    Folder,
     Parameters<typeof updateFolder>[0]
   >({
     queryKey: ["folders"],
     mutationFn: updateFolder,
-    optimisticUpdate: (folders, { data }) =>
-      folders.map((f) =>
+    optimisticUpdate: (list, { data }) =>
+      list.map((f) =>
         f.id === data.id ? { ...f, parentId: data.parentId ?? f.parentId } : f,
       ),
   })
@@ -59,7 +68,6 @@ export function useSidebarDragDrop({ drawings, foldersById }: Options) {
       setDragItem(item)
       e.dataTransfer.effectAllowed = "move"
       e.dataTransfer.setData("text/plain", item.id)
-      e.dataTransfer.setData("application/x-sidebar-item", JSON.stringify(item))
     },
     [],
   )
@@ -86,7 +94,6 @@ export function useSidebarDragDrop({ drawings, foldersById }: Options) {
     (target: DropTarget) => (e: DragEvent) => {
       e.preventDefault()
       e.stopPropagation()
-
       if (!dragItem) return
 
       const targetFolderId =
@@ -120,6 +127,7 @@ export function useSidebarDragDrop({ drawings, foldersById }: Options) {
   )
 
   return {
+    dragItem,
     dropTarget,
     onDragStart,
     onDragEnd,
@@ -127,4 +135,28 @@ export function useSidebarDragDrop({ drawings, foldersById }: Options) {
     onDragLeave,
     onDrop,
   }
+}
+
+export type SidebarDnD = ReturnType<typeof useSidebarDnDValue>
+
+const SidebarDnDContext = createContext<SidebarDnD | null>(null)
+
+export function SidebarDnDProvider({
+  drawings,
+  foldersById,
+  children,
+}: Options & { children: ReactNode }) {
+  const value = useSidebarDnDValue({ drawings, foldersById })
+  return (
+    <SidebarDnDContext.Provider value={value}>
+      {children}
+    </SidebarDnDContext.Provider>
+  )
+}
+
+export function useSidebarDnD() {
+  const ctx = useContext(SidebarDnDContext)
+  if (!ctx)
+    throw new Error("useSidebarDnD must be used inside SidebarDnDProvider")
+  return ctx
 }

@@ -1,27 +1,17 @@
+import { useMutation } from "@tanstack/react-query"
 import { useCallback, useEffect, useRef, useState } from "react"
 import { useDebounceCallback } from "./use-debounce-callback"
 
+const DEBOUNCE_MS = 300
+const SAVED_INDICATOR_MS = 2000
+
 type Options<T> = {
   onSave: (data: T) => Promise<void>
-  /** Optional fingerprint used to skip redundant saves. */
-  getSignature?: (data: T) => string
+  /** Fingerprint used to skip redundant saves. */
+  getSignature: (data: T) => string
   /** When true, the very first change is treated as initial state and skipped. */
   skipInitialChange?: boolean
   onError?: (error: unknown) => void
-  debounceMs?: number
-  savedIndicatorMs?: number
-}
-
-type Result<T> = {
-  saving: boolean
-  saved: boolean
-  handleChange: (data: T) => void
-}
-
-type SaveState = {
-  initialized: boolean
-  lastPersistedSignature: string | null
-  lastQueuedSignature: string | null
 }
 
 export function useAutoSave<T>({
@@ -29,75 +19,47 @@ export function useAutoSave<T>({
   getSignature,
   skipInitialChange = false,
   onError,
-  debounceMs = 300,
-  savedIndicatorMs = 2000,
-}: Options<T>): Result<T> {
-  const [saving, setSaving] = useState(false)
-  const [saved, setSaved] = useState(false)
-
-  // Hold the latest callbacks so the debounced save closure can stay stable
-  // without going stale on consumer re-renders.
+}: Options<T>) {
+  // Hold all consumer callbacks in a single ref so the debounced closure stays
+  // stable across renders without going stale on consumer re-renders.
   const handlersRef = useRef({ onSave, getSignature, onError })
   handlersRef.current = { onSave, getSignature, onError }
 
-  const stateRef = useRef<SaveState>({
-    initialized: false,
-    lastPersistedSignature: null,
-    lastQueuedSignature: null,
+  const { mutate, isPending } = useMutation({
+    mutationFn: (data: T) => handlersRef.current.onSave(data),
+    onError: (err) => handlersRef.current.onError?.(err),
   })
 
-  const performSave = useCallback(async (data: T) => {
-    const state = stateRef.current
-    const handlers = handlersRef.current
-    const signature = handlers.getSignature?.(data) ?? null
+  const [saved, setSaved] = useState(false)
+  const initializedRef = useRef(false)
+  const lastSavedSigRef = useRef<string | null>(null)
 
-    if (signature && signature === state.lastPersistedSignature) {
-      state.lastQueuedSignature = signature
-      return
-    }
-
-    setSaving(true)
-    try {
-      await handlers.onSave(data)
-      if (signature) {
-        state.lastPersistedSignature = signature
-        state.lastQueuedSignature = signature
-      }
-      setSaved(true)
-    } catch (err) {
-      if (signature) state.lastQueuedSignature = state.lastPersistedSignature
-      handlers.onError?.(err)
-    } finally {
-      setSaving(false)
-    }
-  }, [])
+  const performSave = useCallback(
+    (data: T) => {
+      const sig = handlersRef.current.getSignature(data)
+      if (sig === lastSavedSigRef.current) return
+      mutate(data, {
+        onSuccess: () => {
+          lastSavedSigRef.current = sig
+          setSaved(true)
+        },
+      })
+    },
+    [mutate],
+  )
 
   const { run: runDebouncedSave, flush: flushDebouncedSave } =
-    useDebounceCallback(performSave, debounceMs)
+    useDebounceCallback(performSave, DEBOUNCE_MS)
 
   const handleChange = useCallback(
     (data: T) => {
-      const state = stateRef.current
-      const signature = handlersRef.current.getSignature?.(data) ?? null
-
-      if (!state.initialized) {
-        state.initialized = true
+      if (!initializedRef.current) {
+        initializedRef.current = true
         if (skipInitialChange) {
-          if (signature) {
-            state.lastPersistedSignature = signature
-            state.lastQueuedSignature = signature
-          }
+          lastSavedSigRef.current = handlersRef.current.getSignature(data)
           return
         }
       }
-
-      const isDuplicate =
-        signature !== null &&
-        (signature === state.lastPersistedSignature ||
-          signature === state.lastQueuedSignature)
-      if (isDuplicate) return
-
-      if (signature) state.lastQueuedSignature = signature
       runDebouncedSave(data)
     },
     [runDebouncedSave, skipInitialChange],
@@ -106,12 +68,16 @@ export function useAutoSave<T>({
   // Auto-clear the "Saved" indicator after a moment.
   useEffect(() => {
     if (!saved) return
-    const id = setTimeout(() => setSaved(false), savedIndicatorMs)
+    const id = setTimeout(() => setSaved(false), SAVED_INDICATOR_MS)
     return () => clearTimeout(id)
-  }, [saved, savedIndicatorMs])
+  }, [saved])
 
   // Flush any pending save on unmount so the user doesn't lose work.
   useEffect(() => () => flushDebouncedSave(), [flushDebouncedSave])
 
-  return { saving, saved, handleChange }
+  return {
+    saving: isPending,
+    saved,
+    handleChange,
+  }
 }

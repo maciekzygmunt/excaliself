@@ -12,14 +12,12 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
-import { deleteUser, getAllUsers } from "@/server/users"
+import { usersQueryOptions } from "@/features/admin/queries"
+import { deleteUser } from "@/features/admin/server"
 
 export function UsersSection() {
   const queryClient = useQueryClient()
-  const { data: users } = useQuery({
-    queryKey: ["admin", "users"],
-    queryFn: getAllUsers,
-  })
+  const { data: users } = useQuery(usersQueryOptions())
   const { mutate: deleteUserMutation } = useMutation({
     mutationFn: deleteUser,
     onSuccess: () => toast.success("User deleted"),
@@ -27,7 +25,9 @@ export function UsersSection() {
       toast.error(err instanceof Error ? err.message : "Failed to delete user")
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin", "users"] })
+      queryClient.invalidateQueries({
+        queryKey: usersQueryOptions().queryKey,
+      })
     },
   })
 

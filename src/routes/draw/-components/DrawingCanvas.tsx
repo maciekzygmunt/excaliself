@@ -7,15 +7,16 @@ import type {
 } from "@excalidraw/excalidraw/types"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Cloud, Loader2, PanelLeftIcon } from "lucide-react"
-import { useCallback, useMemo, useState } from "react"
+import { useCallback, useMemo } from "react"
 import { toast } from "sonner"
 import { useSidebar } from "@/components/ui/sidebar"
-import { useAutoSave } from "@/hooks/use-auto-save"
+import { useRenameDrawing } from "@/features/drawings/mutations"
 import {
-  getDrawingWithFiles,
-  saveDrawingScene,
-  updateDrawing,
-} from "@/server/drawings"
+  drawingQueryOptions,
+  drawingsQueryOptions,
+} from "@/features/drawings/queries"
+import { saveDrawingScene } from "@/features/drawings/server"
+import { useAutoSave } from "@/hooks/use-auto-save"
 import {
   buildInitialSceneData,
   getSceneSignature,
@@ -34,14 +35,11 @@ export function DrawingCanvas({ drawingId }: Props) {
   const queryClient = useQueryClient()
   const { toggleSidebar } = useSidebar()
 
-  const { data: drawing } = useQuery({
-    queryKey: ["drawing", drawingId],
-    queryFn: () => getDrawingWithFiles({ data: drawingId }),
-  })
+  const { data: drawing } = useQuery(drawingQueryOptions(drawingId))
 
   const invalidate = useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: ["drawings"] })
-    queryClient.invalidateQueries({ queryKey: ["drawing", drawingId] })
+    queryClient.invalidateQueries(drawingsQueryOptions())
+    queryClient.invalidateQueries(drawingQueryOptions(drawingId))
   }, [drawingId, queryClient])
 
   const saveSceneMutation = useMutation({
@@ -49,40 +47,25 @@ export function DrawingCanvas({ drawingId }: Props) {
     onSettled: invalidate,
   })
 
-  const renameDrawingMutation = useMutation({
-    mutationFn: updateDrawing,
-    onMutate: async ({ data: { id, updateData } }) => {
-      await queryClient.cancelQueries({ queryKey: ["drawing", id] })
-      const previous = queryClient.getQueryData(["drawing", id])
-      queryClient.setQueryData(["drawing", id], (old: typeof drawing) =>
-        old ? { ...old, ...updateData } : old,
-      )
-      return { previous }
-    },
-    onError: (_err, { data: { id } }, context) => {
-      queryClient.setQueryData(["drawing", id], context?.previous)
-    },
-    onSettled: invalidate,
-  })
+  const renameMutation = useRenameDrawing()
 
-  // Track local edits only - use prop directly for display when not editing
-  const [editingName, setEditingName] = useState<string | null>(null)
-  const displayName = editingName ?? drawing?.name ?? ""
-
-  const onSave = async (scene: SceneData) => {
-    await saveSceneMutation.mutateAsync({
-      data: {
-        id: drawingId,
-        data: serializeAsJSON(
-          scene.elements,
-          scene.appState,
-          scene.files ?? {},
-          "database",
-        ),
-        files: toPersistedFiles(scene.files ?? {}),
-      },
-    })
-  }
+  const onSave = useCallback(
+    async (scene: SceneData) => {
+      await saveSceneMutation.mutateAsync({
+        data: {
+          id: drawingId,
+          data: serializeAsJSON(
+            scene.elements,
+            scene.appState,
+            scene.files ?? {},
+            "database",
+          ),
+          files: toPersistedFiles(scene.files ?? {}),
+        },
+      })
+    },
+    [drawingId, saveSceneMutation],
+  )
 
   const { saving, saved, handleChange } = useAutoSave<SceneData>({
     onSave,
@@ -104,13 +87,12 @@ export function DrawingCanvas({ drawingId }: Props) {
     [handleChange],
   )
 
-  const handleNameBlur = (newName: string) => {
-    setEditingName(null)
-    if (newName !== drawing?.name) {
-      renameDrawingMutation.mutate({
-        data: { id: drawingId, updateData: { name: newName } },
-      })
-    }
+  const handleNameSubmit = (newName: string) => {
+    const trimmed = newName.trim()
+    if (!trimmed || trimmed === drawing?.name) return
+    renameMutation.mutate({
+      data: { id: drawingId, updateData: { name: trimmed } },
+    })
   }
 
   const renderTopRightUI = useCallback(
@@ -177,10 +159,12 @@ export function DrawingCanvas({ drawingId }: Props) {
         </MainMenu>
         <TopLeftPortal>
           <TopLeftControls
-            displayName={displayName}
+            // `key` resets the uncontrolled input when the cached drawing name
+            // changes from outside (e.g., rename triggered in the sidebar).
+            key={drawing.name}
+            initialName={drawing.name}
             onToggleSidebar={toggleSidebar}
-            onNameChange={setEditingName}
-            onNameBlur={handleNameBlur}
+            onSubmit={handleNameSubmit}
           />
         </TopLeftPortal>
       </Excalidraw>

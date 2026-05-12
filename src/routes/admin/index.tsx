@@ -1,9 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router"
 import { ArrowLeft } from "lucide-react"
+import { usersQueryOptions } from "@/features/admin/queries"
+import { pendingInvitesQueryOptions } from "@/features/auth/queries"
 import { adminMiddleware } from "@/middleware/admin"
 import { setupMiddleware } from "@/middleware/setup"
-import { getPendingInvites } from "@/server/invites"
-import { getAllUsers } from "@/server/users"
 import { InvitesSection } from "./-components/invites-card"
 import { UsersSection } from "./-components/users-card"
 
@@ -13,14 +13,8 @@ export const Route = createFileRoute("/admin/")({
   },
   loader: async ({ context }) => {
     await Promise.all([
-      context.queryClient.ensureQueryData({
-        queryKey: ["admin", "invites"],
-        queryFn: getPendingInvites,
-      }),
-      context.queryClient.ensureQueryData({
-        queryKey: ["admin", "users"],
-        queryFn: getAllUsers,
-      }),
+      context.queryClient.ensureQueryData(pendingInvitesQueryOptions()),
+      context.queryClient.ensureQueryData(usersQueryOptions()),
     ])
   },
   component: AdminPage,

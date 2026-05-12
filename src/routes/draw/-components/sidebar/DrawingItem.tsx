@@ -1,7 +1,17 @@
-import { useQueryClient } from "@tanstack/react-query"
-import { Link, useParams } from "@tanstack/react-router"
+import { useMutation, useQueryClient } from "@tanstack/react-query"
+import { Link, useNavigate, useParams } from "@tanstack/react-router"
 import { File, MoreHorizontal, Pencil, Trash2 } from "lucide-react"
-import { useState } from "react"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,34 +25,32 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
+import { useRenameDrawing } from "@/features/drawings/mutations"
+import {
+  drawingQueryOptions,
+  drawingsQueryOptions,
+} from "@/features/drawings/queries"
+import { createDrawing, deleteDrawing } from "@/features/drawings/server"
 import { useInlineRename } from "@/hooks/use-inline-rename"
 import { useOptimisticListMutation } from "@/hooks/use-optimistic-list-mutation"
 import { cn } from "@/lib/utils"
-import { updateDrawing } from "@/server/drawings"
-import { useSidebarContext } from "./SidebarProvider"
 import type { Drawing } from "./tree"
+import { useSidebarDnD } from "./use-sidebar-dnd"
 
 type DrawingItemProps = {
   drawing: Drawing
 }
 
 export function DrawingItem({ drawing }: DrawingItemProps) {
-  const { id: currentDrawingId } = useParams({ from: "/draw/$id" })
-  const { onDragStart, onDragEnd, onDeleteDrawing } = useSidebarContext()
   const queryClient = useQueryClient()
+  const navigate = useNavigate()
+  const { id: currentDrawingId } = useParams({ from: "/draw/$id" })
+  const { dragItem, onDragStart, onDragEnd } = useSidebarDnD()
 
-  const renameMutation = useOptimisticListMutation<
-    Drawing,
-    Parameters<typeof updateDrawing>[0]
-  >({
-    queryKey: ["drawings"],
-    mutationFn: updateDrawing,
-    optimisticUpdate: (drawings, { data }) =>
-      drawings.map((d) =>
-        d.id === data.id ? { ...d, name: data.updateData.name ?? d.name } : d,
-      ),
-  })
+  const isDragging = dragItem?.id === drawing.id
+  const isActive = drawing.id === currentDrawingId
 
+  const renameMutation = useRenameDrawing()
   const rename = useInlineRename({
     onSubmit: (newName) => {
       const trimmed = newName.trim()
@@ -51,22 +59,47 @@ export function DrawingItem({ drawing }: DrawingItemProps) {
         { data: { id: drawing.id, updateData: { name: trimmed } } },
         {
           onSettled: () => {
-            queryClient.invalidateQueries({ queryKey: ["drawing", drawing.id] })
+            queryClient.invalidateQueries(drawingQueryOptions(drawing.id))
           },
         },
       )
     },
   })
 
-  const [isDragging, setIsDragging] = useState(false)
-  const isActive = drawing.id === currentDrawingId
+  const deleteMutation = useOptimisticListMutation<
+    Drawing,
+    Parameters<typeof deleteDrawing>[0]
+  >({
+    queryKey: drawingsQueryOptions().queryKey,
+    mutationFn: deleteDrawing,
+    optimisticUpdate: (list, { data: id }) => list.filter((d) => d.id !== id),
+  })
 
-  const buttonContent = (
+  const createMutation = useMutation({
+    mutationFn: createDrawing,
+    onSettled: () => queryClient.invalidateQueries(drawingsQueryOptions()),
+  })
+
+  const handleDelete = async () => {
+    await deleteMutation.mutateAsync({ data: drawing.id })
+    if (drawing.id !== currentDrawingId) return
+
+    const remaining = queryClient.getQueryData(drawingsQueryOptions().queryKey)
+    const next = remaining?.find((d) => d.id !== drawing.id)
+    if (next) {
+      navigate({ to: "/draw/$id", params: { id: next.id } })
+      return
+    }
+    const newId = await createMutation.mutateAsync({ data: {} })
+    navigate({ to: "/draw/$id", params: { id: newId } })
+  }
+
+  const content = (
     <>
       <span className="h-3! w-3! shrink-0" />
       <File
         className={cn(
-          "h-[13px]! w-[13px]! shrink-0 transition-colors",
+          "h-3.25! w-3.25! shrink-0 transition-colors",
           isActive ? "text-notion-terracotta" : "text-muted-foreground/30",
         )}
       />
@@ -91,14 +124,8 @@ export function DrawingItem({ drawing }: DrawingItemProps) {
     <SidebarMenuItem
       className={cn("group/drawing-item", isDragging && "opacity-50")}
       draggable
-      onDragStart={(e) => {
-        onDragStart({ type: "drawing", id: drawing.id })(e)
-        setIsDragging(true)
-      }}
-      onDragEnd={() => {
-        onDragEnd()
-        setIsDragging(false)
-      }}
+      onDragStart={onDragStart({ type: "drawing", id: drawing.id })}
+      onDragEnd={onDragEnd}
     >
       <SidebarMenuButton
         asChild={!rename.isRenaming}
@@ -109,46 +136,68 @@ export function DrawingItem({ drawing }: DrawingItemProps) {
         )}
       >
         {rename.isRenaming ? (
-          buttonContent
+          content
         ) : (
           <Link to="/draw/$id" params={{ id: drawing.id }} draggable={false}>
-            {buttonContent}
+            {content}
           </Link>
         )}
       </SidebarMenuButton>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <SidebarMenuAction
-            className={cn(
-              "text-muted-foreground/30 md:opacity-0 group-hover/drawing-item:opacity-100 group-focus-within/drawing-item:opacity-100 data-[state=open]:opacity-100 [&>svg]:size-auto",
-              // Use `invisible` (not `hidden`) so the trigger stays in
-              // layout while renaming — otherwise Radix's closing popper
-              // loses its anchor and flashes at viewport (0, 0).
-              rename.isRenaming && "invisible pointer-events-none",
-            )}
+
+      <AlertDialog>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <SidebarMenuAction
+              className={cn(
+                "text-muted-foreground/30 md:opacity-0 group-hover/drawing-item:opacity-100 group-focus-within/drawing-item:opacity-100 data-[state=open]:opacity-100 [&>svg]:size-auto",
+                // Use `invisible` (not `hidden`) so the trigger stays in
+                // layout while renaming — otherwise Radix's closing popper
+                // loses its anchor and flashes at viewport (0, 0).
+                rename.isRenaming && "invisible pointer-events-none",
+              )}
+            >
+              <MoreHorizontal className="h-3.5! w-3.5!" />
+            </SidebarMenuAction>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent
+            side="right"
+            align="start"
+            onCloseAutoFocus={rename.onMenuCloseAutoFocus}
           >
-            <MoreHorizontal className="h-[14px]! w-[14px]!" />
-          </SidebarMenuAction>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent
-          side="right"
-          align="start"
-          onCloseAutoFocus={rename.onMenuCloseAutoFocus}
-        >
-          <DropdownMenuItem onClick={() => rename.start(drawing.name)}>
-            <Pencil className="mr-2 h-4 w-4" />
-            Rename
-          </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem
-            onClick={() => onDeleteDrawing(drawing.id)}
-            className="text-destructive focus:text-destructive"
-          >
-            <Trash2 className="mr-2 h-4 w-4" />
-            Delete
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+            <DropdownMenuItem onClick={() => rename.start(drawing.name)}>
+              <Pencil className="mr-2 h-4 w-4" />
+              Rename
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <AlertDialogTrigger asChild>
+              <DropdownMenuItem
+                onSelect={(e) => e.preventDefault()}
+                className="text-destructive focus:text-destructive"
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                Delete
+              </DropdownMenuItem>
+            </AlertDialogTrigger>
+          </DropdownMenuContent>
+        </DropdownMenu>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete drawing?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete "{drawing.name}"?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-white hover:bg-destructive/90"
+              onClick={handleDelete}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </SidebarMenuItem>
   )
 }

@@ -37,7 +37,7 @@ function LoginPage() {
   return (
     <AuthPage
       title="Welcome back"
-      subtitle="Sign in to your Excalidraw account"
+      subtitle="Sign in to your Excaliself account"
     >
       <form
         onSubmit={(e) => {

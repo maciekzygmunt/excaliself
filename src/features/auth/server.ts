@@ -11,7 +11,7 @@ import { adminMiddleware } from "@/middleware/admin"
 export const validateInvite = createServerFn({ method: "GET" })
   .inputValidator(z.string())
   .handler(async ({ data: token }) => {
-    const result = await db
+    const [invite] = await db
       .select()
       .from(invites)
       .where(
@@ -21,7 +21,7 @@ export const validateInvite = createServerFn({ method: "GET" })
           gt(invites.expiresAt, new Date()),
         ),
       )
-    return result[0] || null
+    return invite ?? null
   })
 
 export const consumeInvite = createServerFn({ method: "POST" })
@@ -33,19 +33,17 @@ export const consumeInvite = createServerFn({ method: "POST" })
       .where(eq(invites.token, data.token))
   })
 
-// ADMIN
 export const createInvite = createServerFn({ method: "POST" })
   .middleware([adminMiddleware])
   .handler(async ({ context }) => {
     const id = randomUUID()
     const token = randomBytes(32).toString("hex")
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days
-    const adminId = context.session.user.id
 
     await db.insert(invites).values({
       id,
       token,
-      invitedBy: adminId,
+      invitedBy: context.session.user.id,
       expiresAt,
       createdAt: new Date(),
     })
@@ -55,18 +53,16 @@ export const createInvite = createServerFn({ method: "POST" })
 
 export const getPendingInvites = createServerFn({ method: "GET" })
   .middleware([adminMiddleware])
-  .handler(async () => {
-    return db
+  .handler(async () =>
+    db
       .select()
       .from(invites)
-      .where(and(isNull(invites.usedAt), gt(invites.expiresAt, new Date())))
-  })
+      .where(and(isNull(invites.usedAt), gt(invites.expiresAt, new Date()))),
+  )
 
 export const getAllInvites = createServerFn({ method: "GET" })
   .middleware([adminMiddleware])
-  .handler(async () => {
-    return db.select().from(invites)
-  })
+  .handler(async () => db.select().from(invites))
 
 export const deleteInvite = createServerFn({ method: "POST" })
   .middleware([adminMiddleware])

@@ -8,6 +8,18 @@ import { db } from "@/db"
 import { folders } from "@/db/schema"
 import { authMiddleware } from "@/middleware/auth"
 
+async function requireOwnedFolder(
+  id: string,
+  userId: string,
+): Promise<{ id: string }> {
+  const [row] = await db
+    .select({ id: folders.id })
+    .from(folders)
+    .where(and(eq(folders.id, id), eq(folders.ownerId, userId)))
+  if (!row) throw new Error("Folder not found")
+  return row
+}
+
 export const getFolders = createServerFn({ method: "GET" })
   .middleware([authMiddleware])
   .handler(async ({ context }) => {
@@ -31,12 +43,13 @@ export const createFolder = createServerFn({ method: "POST" })
     const userId = context.session.user.id
     const id = randomUUID()
     const now = new Date()
+    const parentId = data.parentId ?? null
 
     await db.insert(folders).values({
       id,
       name: data.name,
       ownerId: userId,
-      parentId: data.parentId ?? null,
+      parentId,
       createdAt: now,
       updatedAt: now,
     })
@@ -45,7 +58,7 @@ export const createFolder = createServerFn({ method: "POST" })
       id,
       name: data.name,
       ownerId: userId,
-      parentId: data.parentId ?? null,
+      parentId,
       createdAt: now,
       updatedAt: now,
     }
@@ -62,25 +75,23 @@ export const updateFolder = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const userId = context.session.user.id
-    const cleanedUpdateData = Object.fromEntries(
-      Object.entries({
-        name: data.name,
-        parentId: data.parentId,
-      }).filter(([, value]) => value !== undefined),
-    )
+    await requireOwnedFolder(data.id, userId)
+
+    const updateFields: { name?: string; parentId?: string | null } = {}
+    if (data.name !== undefined) updateFields.name = data.name
+    if (data.parentId !== undefined) updateFields.parentId = data.parentId
 
     await db
       .update(folders)
-      .set({ ...cleanedUpdateData, updatedAt: new Date() })
-      .where(and(eq(folders.id, data.id), eq(folders.ownerId, userId)))
+      .set({ ...updateFields, updatedAt: new Date() })
+      .where(eq(folders.id, data.id))
   })
 
 export const deleteFolder = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
   .inputValidator(z.string())
-  .handler(async ({ data: folderId, context }) => {
+  .handler(async ({ data: id, context }) => {
     const userId = context.session.user.id
-    await db
-      .delete(folders)
-      .where(and(eq(folders.id, folderId), eq(folders.ownerId, userId)))
+    await requireOwnedFolder(id, userId)
+    await db.delete(folders).where(eq(folders.id, id))
   })

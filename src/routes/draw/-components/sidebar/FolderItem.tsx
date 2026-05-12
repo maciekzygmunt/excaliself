@@ -1,3 +1,4 @@
+import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { useParams } from "@tanstack/react-router"
 import {
   ChevronRight,
@@ -7,6 +8,18 @@ import {
   Trash2,
 } from "lucide-react"
 import { type DragEvent, useState } from "react"
+import { toast } from "sonner"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 import {
   Collapsible,
   CollapsibleContent,
@@ -26,44 +39,44 @@ import {
   SidebarMenuItem,
   SidebarMenuSub,
 } from "@/components/ui/sidebar"
+import { drawingsQueryOptions } from "@/features/drawings/queries"
+import { useRenameFolder } from "@/features/folders/mutations"
+import { foldersQueryOptions } from "@/features/folders/queries"
+import { deleteFolder } from "@/features/folders/server"
 import { useInlineRename } from "@/hooks/use-inline-rename"
-import { useOptimisticListMutation } from "@/hooks/use-optimistic-list-mutation"
 import { cn } from "@/lib/utils"
-import { updateFolder } from "@/server/folders"
-import { hasActiveDrawing } from "../../-utils/hasActiveDrawing"
-import { useSidebarContext } from "./SidebarProvider"
 import { TreeNodeItem } from "./TreeNodeItem"
-import type { DropTarget, FolderType, TreeNode } from "./tree"
+import {
+  type Folder as FolderModel,
+  hasActiveDrawing,
+  type TreeNode,
+  treeNodeKey,
+} from "./tree"
+import { type DropTarget, useSidebarDnD } from "./use-sidebar-dnd"
 
 type FolderItemProps = {
-  folder: FolderType
+  folder: FolderModel
   childNodes: TreeNode[]
 }
 
+const TOAST_ID = "delete-folder"
+
 export function FolderItem({ folder, childNodes }: FolderItemProps) {
+  const queryClient = useQueryClient()
   const { id: currentDrawingId } = useParams({ from: "/draw/$id" })
   const {
+    dragItem,
     dropTarget,
     onDragStart,
     onDragEnd,
     onDragOver,
     onDragLeave,
     onDrop,
-    onDeleteFolder,
-  } = useSidebarContext()
+  } = useSidebarDnD()
 
-  const renameMutation = useOptimisticListMutation<
-    FolderType,
-    Parameters<typeof updateFolder>[0]
-  >({
-    queryKey: ["folders"],
-    mutationFn: updateFolder,
-    optimisticUpdate: (folders, { data }) =>
-      folders.map((f) =>
-        f.id === data.id ? { ...f, name: data.name ?? f.name } : f,
-      ),
-  })
+  const isDragging = dragItem?.id === folder.id
 
+  const renameMutation = useRenameFolder()
   const rename = useInlineRename({
     onSubmit: (newName) => {
       const trimmed = newName.trim()
@@ -72,9 +85,19 @@ export function FolderItem({ folder, childNodes }: FolderItemProps) {
     },
   })
 
+  const deleteMutation = useMutation({
+    mutationFn: deleteFolder,
+    onMutate: () => toast.loading("Deleting folder...", { id: TOAST_ID }),
+    onError: () => toast.error("Failed to delete folder", { id: TOAST_ID }),
+    onSuccess: () => toast.success("Folder deleted", { id: TOAST_ID }),
+    onSettled: () => {
+      queryClient.invalidateQueries(foldersQueryOptions())
+      queryClient.invalidateQueries(drawingsQueryOptions())
+    },
+  })
+
   const containsActive = hasActiveDrawing(childNodes, currentDrawingId)
   const [isExpanded, setIsExpanded] = useState(containsActive)
-  const [isDragging, setIsDragging] = useState(false)
 
   const hasChildren = childNodes.length > 0
   const showDropHighlight =
@@ -116,14 +139,8 @@ export function FolderItem({ folder, childNodes }: FolderItemProps) {
           >
             <SidebarMenuButton
               draggable
-              onDragStart={(e) => {
-                onDragStart({ type: "folder", id: folder.id })(e)
-                setIsDragging(true)
-              }}
-              onDragEnd={() => {
-                onDragEnd()
-                setIsDragging(false)
-              }}
+              onDragStart={onDragStart({ type: "folder", id: folder.id })}
+              onDragEnd={onDragEnd}
               className={cn(
                 "h-auto cursor-pointer gap-1.5 px-2 py-1.5 pr-2! active:cursor-grabbing [&>svg]:size-auto",
                 rename.isRenaming && "pr-3!",
@@ -136,7 +153,7 @@ export function FolderItem({ folder, childNodes }: FolderItemProps) {
                   !hasChildren && "opacity-0",
                 )}
               />
-              <Folder className="h-[14px]! w-[14px]! shrink-0 text-notion-gold" />
+              <Folder className="h-3.5! w-3.5! shrink-0 text-notion-gold" />
               {rename.isRenaming ? (
                 <Input
                   {...rename.inputProps}
@@ -148,41 +165,65 @@ export function FolderItem({ folder, childNodes }: FolderItemProps) {
                 </span>
               )}
             </SidebarMenuButton>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <SidebarMenuAction
-                  className={cn(
-                    "text-muted-foreground/30 md:opacity-0 group-hover/folder-row:opacity-100 group-focus-within/folder-row:opacity-100 data-[state=open]:opacity-100 [&>svg]:size-auto",
-                    // Use `invisible` (not `hidden`) so the trigger stays in
-                    // layout while renaming — otherwise Radix's closing popper
-                    // loses its anchor and flashes at viewport (0, 0).
-                    rename.isRenaming && "invisible pointer-events-none",
-                  )}
-                  onPointerDown={(e) => e.stopPropagation()}
-                  onClick={(e) => e.stopPropagation()}
+
+            <AlertDialog>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <SidebarMenuAction
+                    className={cn(
+                      "text-muted-foreground/30 md:opacity-0 group-hover/folder-row:opacity-100 group-focus-within/folder-row:opacity-100 data-[state=open]:opacity-100 [&>svg]:size-auto",
+                      // Use `invisible` (not `hidden`) so the trigger stays
+                      // in layout while renaming — otherwise Radix's closing
+                      // popper loses its anchor and flashes at (0, 0).
+                      rename.isRenaming && "invisible pointer-events-none",
+                    )}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <MoreHorizontal className="h-3.5! w-3.5!" />
+                  </SidebarMenuAction>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent
+                  side="right"
+                  align="start"
+                  onCloseAutoFocus={rename.onMenuCloseAutoFocus}
                 >
-                  <MoreHorizontal className="h-[14px]! w-[14px]!" />
-                </SidebarMenuAction>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent
-                side="right"
-                align="start"
-                onCloseAutoFocus={rename.onMenuCloseAutoFocus}
-              >
-                <DropdownMenuItem onClick={() => rename.start(folder.name)}>
-                  <Pencil className="mr-2 h-4 w-4" />
-                  Rename
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onClick={() => onDeleteFolder(folder.id, hasChildren)}
-                  className="text-destructive focus:text-destructive"
-                >
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  Delete
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+                  <DropdownMenuItem onClick={() => rename.start(folder.name)}>
+                    <Pencil className="mr-2 h-4 w-4" />
+                    Rename
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <AlertDialogTrigger asChild>
+                    <DropdownMenuItem
+                      onSelect={(e) => e.preventDefault()}
+                      className="text-destructive focus:text-destructive"
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Delete
+                    </DropdownMenuItem>
+                  </AlertDialogTrigger>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete folder?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    {hasChildren
+                      ? "This folder contains items. All files in this folder will be deleted."
+                      : `Delete "${folder.name}"?`}
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    className="bg-destructive text-white hover:bg-destructive/90"
+                    onClick={() => deleteMutation.mutate({ data: folder.id })}
+                  >
+                    Delete
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </div>
         </CollapsibleTrigger>
         <CollapsibleContent>
@@ -191,10 +232,7 @@ export function FolderItem({ folder, childNodes }: FolderItemProps) {
             {...dropTargetProps}
           >
             {childNodes.map((node) => (
-              <TreeNodeItem
-                key={node.type === "folder" ? node.folder.id : node.drawing.id}
-                node={node}
-              />
+              <TreeNodeItem key={treeNodeKey(node)} node={node} />
             ))}
           </SidebarMenuSub>
         </CollapsibleContent>

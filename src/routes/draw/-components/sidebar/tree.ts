@@ -1,18 +1,11 @@
-import type { getDrawings } from "@/server/drawings"
-import type { getFolders } from "@/server/folders"
+import type { Drawing } from "@/features/drawings/queries"
+import type { Folder } from "@/features/folders/queries"
 
-export type Drawing = Awaited<ReturnType<typeof getDrawings>>[number]
-export type FolderType = Awaited<ReturnType<typeof getFolders>>[number]
+export type { Drawing, Folder }
 
 export type TreeNode =
-  | { type: "folder"; folder: FolderType; children: TreeNode[] }
+  | { type: "folder"; folder: Folder; children: TreeNode[] }
   | { type: "drawing"; drawing: Drawing }
-
-export type DragItem = { type: "drawing" | "folder"; id: string }
-export type DropTarget =
-  | { type: "root" }
-  | { type: "folder"; id: string; position: "inside" | "above" | "below" }
-  | null
 
 const compareNodes = (a: TreeNode, b: TreeNode) => {
   if (a.type !== b.type) return a.type === "folder" ? -1 : 1
@@ -21,10 +14,7 @@ const compareNodes = (a: TreeNode, b: TreeNode) => {
   return nameA.localeCompare(nameB)
 }
 
-export function buildTree(
-  folders: FolderType[],
-  drawings: Drawing[],
-): TreeNode[] {
+export function buildTree(folders: Folder[], drawings: Drawing[]): TreeNode[] {
   const nodesById = new Map<string, TreeNode & { type: "folder" }>()
   for (const folder of folders) {
     nodesById.set(folder.id, { type: "folder", folder, children: [] })
@@ -74,12 +64,25 @@ export function filterTreeBySearch(
 export function isDescendantFolder(
   folderId: string,
   candidateAncestorId: string | null,
-  foldersById: Map<string, FolderType>,
+  foldersById: Map<string, Folder>,
 ): boolean {
   let id = candidateAncestorId
   while (id) {
     if (id === folderId) return true
     id = foldersById.get(id)?.parentId ?? null
+  }
+  return false
+}
+
+export function treeNodeKey(node: TreeNode): string {
+  return node.type === "folder" ? node.folder.id : node.drawing.id
+}
+
+export function hasActiveDrawing(nodes: TreeNode[], activeId: string): boolean {
+  for (const node of nodes) {
+    if (node.type === "drawing" && node.drawing.id === activeId) return true
+    if (node.type === "folder" && hasActiveDrawing(node.children, activeId))
+      return true
   }
   return false
 }

@@ -7,7 +7,7 @@ import { AuthPage } from "@/components/auth-page"
 import { FormTextField } from "@/components/form-text-field"
 import { Button } from "@/components/ui/button"
 import { FieldGroup } from "@/components/ui/field"
-import { getUserCount, setupAdmin } from "@/server/users"
+import { getUserCount, setupAdmin } from "@/features/admin/server"
 
 export const Route = createFileRoute("/setup")({
   beforeLoad: async () => {

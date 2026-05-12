@@ -69,19 +69,23 @@ export function TopLeftPortal({ children }: { children: ReactNode }) {
   return target ? createPortal(children, target) : null
 }
 
-export function TopLeftControls({
-  displayName,
-  onToggleSidebar,
-  onNameChange,
-  onNameBlur,
-}: {
-  displayName: string
+type Props = {
+  initialName: string
   onToggleSidebar: () => void
-  onNameChange: (value: string) => void
-  onNameBlur: (value: string) => void
-}) {
+  onSubmit: (value: string) => void
+}
+
+export function TopLeftControls({
+  initialName,
+  onToggleSidebar,
+  onSubmit,
+}: Props) {
+  // Uncontrolled — the parent resets it via the `key` prop when the cached
+  // name changes. Local typing state stays here without re-rendering parents.
+  const [value, setValue] = useState(initialName)
+
   return (
-    <div className="pointer-events-auto flex flex-nowrap items-center gap-[10px]">
+    <div className="pointer-events-auto flex flex-nowrap items-center gap-2.5">
       <button
         type="button"
         onClick={onToggleSidebar}
@@ -91,15 +95,15 @@ export function TopLeftControls({
       >
         <PanelLeftIcon className="h-(--lg-icon-size) w-(--lg-icon-size)" />
       </button>
-      <div className="relative max-w-[180px] min-w-0 overflow-hidden hidden lg:block">
+      <div className="relative max-w-45 min-w-0 overflow-hidden hidden lg:block">
         <div
           className="relative h-(--lg-button-size) border-b border-transparent bg-transparent font-semibold after:block after:w-full after:min-w-16 after:whitespace-pre after:invisible after:content-[attr(data-value)] focus-within:border-(--color-primary)"
-          data-value={displayName || "Untitled Drawing"}
+          data-value={value || "Untitled Drawing"}
         >
           <input
-            value={displayName}
-            onChange={(event) => onNameChange(event.target.value)}
-            onBlur={(event) => onNameBlur(event.target.value)}
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            onBlur={(e) => onSubmit(e.target.value)}
             className="absolute inset-0 h-full w-full truncate bg-transparent p-0 text-[0.95rem] font-semibold text-(--text-primary-color) shadow-none outline-none focus:cursor-text focus:ring-0 hover:text-(--color-primary)"
             placeholder="Untitled Drawing"
             title="Click to rename scene"
