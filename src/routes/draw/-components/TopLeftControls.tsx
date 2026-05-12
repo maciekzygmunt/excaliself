@@ -103,7 +103,14 @@ export function TopLeftControls({
           <input
             value={value}
             onChange={(e) => setValue(e.target.value)}
-            onBlur={(e) => onSubmit(e.target.value)}
+            onBlur={(e) => {
+              const trimmed = e.target.value.trim()
+              if (!trimmed || trimmed === initialName) {
+                setValue(initialName)
+                return
+              }
+              onSubmit(trimmed)
+            }}
             className="absolute inset-0 h-full w-full truncate bg-transparent p-0 text-[0.95rem] font-semibold text-(--text-primary-color) shadow-none outline-none focus:cursor-text focus:ring-0 hover:text-(--color-primary)"
             placeholder="Untitled Drawing"
             title="Click to rename scene"
