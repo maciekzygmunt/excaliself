@@ -11,10 +11,7 @@ import { useCallback, useMemo } from "react"
 import { toast } from "sonner"
 import { useSidebar } from "@/components/ui/sidebar"
 import { useRenameDrawing } from "@/features/drawings/mutations"
-import {
-  drawingQueryOptions,
-  drawingsQueryOptions,
-} from "@/features/drawings/queries"
+import { drawingQueryOptions } from "@/features/drawings/queries"
 import { saveDrawingScene } from "@/features/drawings/server"
 import { useAutoSave } from "@/hooks/use-auto-save"
 import {
@@ -37,14 +34,12 @@ export function DrawingCanvas({ drawingId }: Props) {
 
   const { data: drawing } = useQuery(drawingQueryOptions(drawingId))
 
-  const invalidate = useCallback(() => {
-    queryClient.invalidateQueries(drawingsQueryOptions())
-    queryClient.invalidateQueries(drawingQueryOptions(drawingId))
-  }, [drawingId, queryClient])
-
+  // Invalidate only the specific drawing — the list sorts by name, so a stale
+  // `updatedAt` is invisible in the UI and not worth a refetch.
   const saveSceneMutation = useMutation({
     mutationFn: saveDrawingScene,
-    onSettled: invalidate,
+    onSettled: () =>
+      queryClient.invalidateQueries(drawingQueryOptions(drawingId)),
   })
 
   const renameMutation = useRenameDrawing()
