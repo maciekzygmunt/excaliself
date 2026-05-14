@@ -1,4 +1,7 @@
-import { useOptimisticListMutation } from "@/hooks/use-optimistic-list-mutation"
+import {
+  patchById,
+  useOptimisticListMutation,
+} from "@/hooks/use-optimistic-list-mutation"
 import { type Drawing, drawingsQueryOptions } from "./queries"
 import { updateDrawing } from "./server"
 
@@ -9,8 +12,6 @@ export function useRenameDrawing() {
     queryKey: drawingsQueryOptions().queryKey,
     mutationFn: updateDrawing,
     optimisticUpdate: (drawings, { data }) =>
-      drawings.map((d) =>
-        d.id === data.id ? { ...d, name: data.updateData.name ?? d.name } : d,
-      ),
+      patchById(drawings, data.id, { name: data.updateData.name }),
   })
 }

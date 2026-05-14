@@ -32,7 +32,10 @@ import {
 } from "@/features/drawings/queries"
 import { createDrawing, deleteDrawing } from "@/features/drawings/server"
 import { useInlineRename } from "@/hooks/use-inline-rename"
-import { useOptimisticListMutation } from "@/hooks/use-optimistic-list-mutation"
+import {
+  removeById,
+  useOptimisticListMutation,
+} from "@/hooks/use-optimistic-list-mutation"
 import { cn } from "@/lib/utils"
 import type { Drawing } from "./tree"
 import { useSidebarDnD } from "./use-sidebar-dnd"
@@ -72,7 +75,7 @@ export function DrawingItem({ drawing }: DrawingItemProps) {
   >({
     queryKey: drawingsQueryOptions().queryKey,
     mutationFn: deleteDrawing,
-    optimisticUpdate: (list, { data: id }) => list.filter((d) => d.id !== id),
+    optimisticUpdate: (list, { data: id }) => removeById(list, id),
   })
 
   const createMutation = useMutation({

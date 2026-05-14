@@ -10,7 +10,10 @@ import type { Drawing } from "@/features/drawings/queries"
 import { updateDrawing } from "@/features/drawings/server"
 import type { Folder } from "@/features/folders/queries"
 import { updateFolder } from "@/features/folders/server"
-import { useOptimisticListMutation } from "@/hooks/use-optimistic-list-mutation"
+import {
+  patchById,
+  useOptimisticListMutation,
+} from "@/hooks/use-optimistic-list-mutation"
 import { isDescendantFolder } from "./tree"
 
 export type DragItem = { type: "drawing" | "folder"; id: string }
@@ -35,11 +38,7 @@ function useSidebarDnDValue({ drawings, foldersById }: Options) {
     queryKey: ["drawings"],
     mutationFn: updateDrawing,
     optimisticUpdate: (list, { data }) =>
-      list.map((d) =>
-        d.id === data.id
-          ? { ...d, folderId: data.updateData.folderId ?? d.folderId }
-          : d,
-      ),
+      patchById(list, data.id, { folderId: data.updateData.folderId }),
   })
 
   const moveFolder = useOptimisticListMutation<
@@ -49,9 +48,7 @@ function useSidebarDnDValue({ drawings, foldersById }: Options) {
     queryKey: ["folders"],
     mutationFn: updateFolder,
     optimisticUpdate: (list, { data }) =>
-      list.map((f) =>
-        f.id === data.id ? { ...f, parentId: data.parentId ?? f.parentId } : f,
-      ),
+      patchById(list, data.id, { parentId: data.parentId }),
   })
 
   const isInvalidFolderTarget = useCallback(

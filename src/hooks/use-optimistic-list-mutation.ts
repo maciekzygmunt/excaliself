@@ -5,6 +5,21 @@ import {
   useQueryClient,
 } from "@tanstack/react-query"
 
+export function patchById<T extends { id: string }>(
+  list: T[],
+  id: string,
+  patch: Partial<T>,
+): T[] {
+  return list.map((item) => (item.id === id ? { ...item, ...patch } : item))
+}
+
+export function removeById<T extends { id: string }>(
+  list: T[],
+  id: string,
+): T[] {
+  return list.filter((item) => item.id !== id)
+}
+
 type Options<TItem, TVariables, TData> = {
   queryKey: QueryKey
   mutationFn: MutationFunction<TData, TVariables>

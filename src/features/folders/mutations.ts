@@ -1,4 +1,7 @@
-import { useOptimisticListMutation } from "@/hooks/use-optimistic-list-mutation"
+import {
+  patchById,
+  useOptimisticListMutation,
+} from "@/hooks/use-optimistic-list-mutation"
 import { type Folder, foldersQueryOptions } from "./queries"
 import { updateFolder } from "./server"
 
@@ -9,8 +12,6 @@ export function useRenameFolder() {
     queryKey: foldersQueryOptions().queryKey,
     mutationFn: updateFolder,
     optimisticUpdate: (folders, { data }) =>
-      folders.map((f) =>
-        f.id === data.id ? { ...f, name: data.name ?? f.name } : f,
-      ),
+      patchById(folders, data.id, { name: data.name }),
   })
 }
