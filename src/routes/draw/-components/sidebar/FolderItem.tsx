@@ -1,40 +1,15 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { useParams } from "@tanstack/react-router"
-import {
-  ChevronRight,
-  Folder,
-  MoreHorizontal,
-  Pencil,
-  Trash2,
-} from "lucide-react"
+import { ChevronRight, Folder } from "lucide-react"
 import { type DragEvent, useState } from "react"
 import { toast } from "sonner"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import {
-  SidebarMenuAction,
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarMenuSub,
@@ -46,6 +21,7 @@ import { deleteFolder } from "@/features/folders/server"
 import { useInlineRename } from "@/hooks/use-inline-rename"
 import { cn } from "@/lib/utils"
 import { TreeNodeItem } from "./TreeNodeItem"
+import { TreeRowActions } from "./TreeRowActions"
 import {
   type Folder as FolderModel,
   hasActiveDrawing,
@@ -132,7 +108,7 @@ export function FolderItem({ folder, childNodes }: FolderItemProps) {
         <CollapsibleTrigger asChild>
           <div
             className={cn(
-              "group/folder-row relative flex w-full rounded-md transition-colors",
+              "group/tree-row relative flex w-full rounded-md transition-colors",
               isDragging && "opacity-50",
             )}
             {...dropTargetProps}
@@ -166,64 +142,18 @@ export function FolderItem({ folder, childNodes }: FolderItemProps) {
               )}
             </SidebarMenuButton>
 
-            <AlertDialog>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <SidebarMenuAction
-                    className={cn(
-                      "text-muted-foreground/30 md:opacity-0 group-hover/folder-row:opacity-100 group-focus-within/folder-row:opacity-100 data-[state=open]:opacity-100 [&>svg]:size-auto",
-                      // Use `invisible` (not `hidden`) so the trigger stays
-                      // in layout while renaming — otherwise Radix's closing
-                      // popper loses its anchor and flashes at (0, 0).
-                      rename.isRenaming && "invisible pointer-events-none",
-                    )}
-                    onPointerDown={(e) => e.stopPropagation()}
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <MoreHorizontal className="h-3.5! w-3.5!" />
-                  </SidebarMenuAction>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent
-                  side="right"
-                  align="start"
-                  onCloseAutoFocus={rename.onMenuCloseAutoFocus}
-                >
-                  <DropdownMenuItem onClick={() => rename.start(folder.name)}>
-                    <Pencil className="mr-2 h-4 w-4" />
-                    Rename
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <AlertDialogTrigger asChild>
-                    <DropdownMenuItem
-                      onSelect={(e) => e.preventDefault()}
-                      className="text-destructive focus:text-destructive"
-                    >
-                      <Trash2 className="mr-2 h-4 w-4" />
-                      Delete
-                    </DropdownMenuItem>
-                  </AlertDialogTrigger>
-                </DropdownMenuContent>
-              </DropdownMenu>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Delete folder?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    {hasChildren
-                      ? "This folder contains items. All files in this folder will be deleted."
-                      : `Delete "${folder.name}"?`}
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction
-                    className="bg-destructive text-white hover:bg-destructive/90"
-                    onClick={() => deleteMutation.mutate({ data: folder.id })}
-                  >
-                    Delete
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
+            <TreeRowActions
+              isRenaming={rename.isRenaming}
+              onStartRename={() => rename.start(folder.name)}
+              onMenuCloseAutoFocus={rename.onMenuCloseAutoFocus}
+              onDelete={() => deleteMutation.mutate({ data: folder.id })}
+              deleteTitle="Delete folder?"
+              deleteDescription={
+                hasChildren
+                  ? "This folder contains items. All files in this folder will be deleted."
+                  : `Delete "${folder.name}"?`
+              }
+            />
           </div>
         </CollapsibleTrigger>
         <CollapsibleContent>
