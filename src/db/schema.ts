@@ -81,7 +81,7 @@ export const invites = pgTable("invites", {
   invitedBy: text("invitedBy")
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
-  usedBy: text("usedBy"),
+  usedBy: text("usedBy").references(() => users.id, { onDelete: "set null" }),
   usedAt: timestamp("usedAt"),
   expiresAt: timestamp("expiresAt").notNull(),
   createdAt: timestamp("createdAt")

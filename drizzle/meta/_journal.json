@@ -8,6 +8,13 @@
       "when": 1769954473965,
       "tag": "0000_tense_golden_guardian",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1778831264945,
+      "tag": "0001_elite_terror",
+      "breakpoints": true
     }
   ]
 }

@@ -1,0 +1,1 @@
+ALTER TABLE "invites" ADD CONSTRAINT "invites_usedBy_users_id_fk" FOREIGN KEY ("usedBy") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;
