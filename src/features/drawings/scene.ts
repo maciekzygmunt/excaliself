@@ -2,6 +2,7 @@ import {
   hashElementsVersion,
   hashString,
   restore,
+  serializeAsJSON,
 } from "@excalidraw/excalidraw"
 import type { ExcalidrawElement } from "@excalidraw/excalidraw/element/types"
 import type {
@@ -9,6 +10,10 @@ import type {
   BinaryFiles,
   ExcalidrawInitialDataState,
 } from "@excalidraw/excalidraw/types"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { useMemo } from "react"
+import { drawingQueryOptions } from "./queries"
+import { saveDrawingScene } from "./server"
 
 export type SceneData = {
   elements: readonly ExcalidrawElement[]
@@ -23,7 +28,7 @@ export type PersistedFile = {
   createdAt?: Date | string | null
 }
 
-export function toPersistedFiles(files: BinaryFiles): PersistedFile[] {
+function toPersistedFiles(files: BinaryFiles): PersistedFile[] {
   return Object.entries(files ?? {}).map(([fileId, file]) => ({
     fileId,
     mimeType: file.mimeType || "image/png",
@@ -31,7 +36,7 @@ export function toPersistedFiles(files: BinaryFiles): PersistedFile[] {
   }))
 }
 
-export function toBinaryFiles(
+function toBinaryFiles(
   persistedFiles: PersistedFile[] | null | undefined,
 ): BinaryFiles {
   const files: BinaryFiles = {}
@@ -56,7 +61,7 @@ function parseSceneData(raw: string | undefined | null) {
   }
 }
 
-export function buildInitialSceneData(
+function buildInitialSceneData(
   drawing: { data: string; files?: PersistedFile[] | null } | null | undefined,
 ): ExcalidrawInitialDataState {
   const files = toBinaryFiles(drawing?.files)
@@ -74,7 +79,7 @@ export function buildInitialSceneData(
   return { ...restored, files }
 }
 
-export const getSceneSignature = (scene: SceneData) => {
+export function getSceneSignature(scene: SceneData) {
   const elementsSignature = hashElementsVersion(scene.elements)
   const appStateSignature = [
     scene.appState.gridModeEnabled ? "1" : "0",
@@ -95,4 +100,33 @@ export const getSceneSignature = (scene: SceneData) => {
   }
 
   return `${elementsSignature}|${appStateSignature}|${filesSignature}`
+}
+
+export function useDrawingScene(id: string) {
+  const { data: drawing } = useQuery(drawingQueryOptions(id))
+  const initialData = useMemo(
+    () => (drawing ? buildInitialSceneData(drawing) : null),
+    [drawing],
+  )
+  return { drawing, initialData }
+}
+
+export function useSaveScene(id: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (scene: SceneData) =>
+      saveDrawingScene({
+        data: {
+          id,
+          data: serializeAsJSON(
+            scene.elements,
+            scene.appState,
+            scene.files ?? {},
+            "database",
+          ),
+          files: toPersistedFiles(scene.files ?? {}),
+        },
+      }),
+    onSettled: () => queryClient.invalidateQueries(drawingQueryOptions(id)),
+  })
 }

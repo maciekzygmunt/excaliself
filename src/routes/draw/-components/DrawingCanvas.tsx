@@ -1,25 +1,22 @@
-import { Excalidraw, MainMenu, serializeAsJSON } from "@excalidraw/excalidraw"
+import { Excalidraw, MainMenu } from "@excalidraw/excalidraw"
 import type { ExcalidrawElement } from "@excalidraw/excalidraw/element/types"
 import type {
   AppState,
   BinaryFiles,
   UIAppState,
 } from "@excalidraw/excalidraw/types"
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Cloud, Loader2, PanelLeftIcon } from "lucide-react"
-import { useCallback, useMemo } from "react"
+import { useCallback } from "react"
 import { toast } from "sonner"
 import { useSidebar } from "@/components/ui/sidebar"
 import { useRenameDrawing } from "@/features/drawings/mutations"
-import { drawingQueryOptions } from "@/features/drawings/queries"
-import { saveDrawingScene } from "@/features/drawings/server"
-import { useAutoSave } from "@/hooks/use-auto-save"
 import {
-  buildInitialSceneData,
   getSceneSignature,
   type SceneData,
-  toPersistedFiles,
-} from "../-utils/scene"
+  useDrawingScene,
+  useSaveScene,
+} from "@/features/drawings/scene"
+import { useAutoSave } from "@/hooks/use-auto-save"
 import { TopLeftControls, TopLeftPortal } from "./TopLeftControls"
 
 import "@excalidraw/excalidraw/index.css"
@@ -29,37 +26,15 @@ type Props = {
 }
 
 export function DrawingCanvas({ drawingId }: Props) {
-  const queryClient = useQueryClient()
   const { toggleSidebar } = useSidebar()
 
-  const { data: drawing } = useQuery(drawingQueryOptions(drawingId))
-
-  // Invalidate only the specific drawing — the list sorts by name, so a stale
-  // `updatedAt` is invisible in the UI and not worth a refetch.
-  const saveSceneMutation = useMutation({
-    mutationFn: saveDrawingScene,
-    onSettled: () =>
-      queryClient.invalidateQueries(drawingQueryOptions(drawingId)),
-  })
-
+  const { drawing, initialData } = useDrawingScene(drawingId)
+  const saveSceneMutation = useSaveScene(drawingId)
   const renameMutation = useRenameDrawing()
 
   const onSave = useCallback(
-    async (scene: SceneData) => {
-      await saveSceneMutation.mutateAsync({
-        data: {
-          id: drawingId,
-          data: serializeAsJSON(
-            scene.elements,
-            scene.appState,
-            scene.files ?? {},
-            "database",
-          ),
-          files: toPersistedFiles(scene.files ?? {}),
-        },
-      })
-    },
-    [drawingId, saveSceneMutation],
+    (scene: SceneData) => saveSceneMutation.mutateAsync(scene),
+    [saveSceneMutation],
   )
 
   const { saving, saved, handleChange } = useAutoSave<SceneData>({
@@ -112,14 +87,12 @@ export function DrawingCanvas({ drawingId }: Props) {
     [saving, saved],
   )
 
-  const sceneData = useMemo(() => buildInitialSceneData(drawing), [drawing])
-
-  if (!drawing) return null
+  if (!drawing || !initialData) return null
 
   return (
     <div className="size-full">
       <Excalidraw
-        initialData={sceneData}
+        initialData={initialData}
         onChange={handleSceneChange}
         renderTopRightUI={renderTopRightUI}
         UIOptions={{
