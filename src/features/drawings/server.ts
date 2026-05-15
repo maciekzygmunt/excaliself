@@ -5,6 +5,7 @@ import { createServerFn } from "@tanstack/react-start"
 import { and, desc, eq } from "drizzle-orm"
 import { z } from "zod"
 import { db } from "@/db"
+import { requireOwned } from "@/db/require-owned"
 import { drawingFiles, drawings } from "@/db/schema"
 import { authMiddleware } from "@/middleware/auth"
 
@@ -13,21 +14,6 @@ const persistedFileSchema = z.object({
   mimeType: z.string(),
   dataUrl: z.string(),
 })
-
-type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0]
-
-async function requireOwnedDrawing(
-  tx: typeof db | Tx,
-  id: string,
-  userId: string,
-): Promise<{ id: string }> {
-  const [row] = await tx
-    .select({ id: drawings.id })
-    .from(drawings)
-    .where(and(eq(drawings.id, id), eq(drawings.ownerId, userId)))
-  if (!row) throw new Error("Drawing not found")
-  return row
-}
 
 export const getDrawings = createServerFn({ method: "GET" })
   .middleware([authMiddleware])
@@ -101,7 +87,7 @@ export const updateDrawing = createServerFn({ method: "POST" })
   )
   .handler(async ({ data: { id, updateData }, context }) => {
     const userId = context.session.user.id
-    await requireOwnedDrawing(db, id, userId)
+    await requireOwned(db, drawings, id, userId, "Drawing")
     await db
       .update(drawings)
       .set({ ...updateData, updatedAt: new Date() })
@@ -121,7 +107,7 @@ export const saveDrawingScene = createServerFn({ method: "POST" })
     const userId = context.session.user.id
 
     await db.transaction(async (tx) => {
-      await requireOwnedDrawing(tx, id, userId)
+      await requireOwned(tx, drawings, id, userId, "Drawing")
       const now = new Date()
 
       await tx
@@ -150,6 +136,6 @@ export const deleteDrawing = createServerFn({ method: "POST" })
   .inputValidator(z.string())
   .handler(async ({ data: id, context }) => {
     const userId = context.session.user.id
-    await requireOwnedDrawing(db, id, userId)
+    await requireOwned(db, drawings, id, userId, "Drawing")
     await db.delete(drawings).where(eq(drawings.id, id))
   })

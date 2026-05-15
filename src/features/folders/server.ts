@@ -2,23 +2,12 @@
 
 import { randomUUID } from "node:crypto"
 import { createServerFn } from "@tanstack/react-start"
-import { and, asc, eq } from "drizzle-orm"
+import { asc, eq } from "drizzle-orm"
 import { z } from "zod"
 import { db } from "@/db"
+import { requireOwned } from "@/db/require-owned"
 import { folders } from "@/db/schema"
 import { authMiddleware } from "@/middleware/auth"
-
-async function requireOwnedFolder(
-  id: string,
-  userId: string,
-): Promise<{ id: string }> {
-  const [row] = await db
-    .select({ id: folders.id })
-    .from(folders)
-    .where(and(eq(folders.id, id), eq(folders.ownerId, userId)))
-  if (!row) throw new Error("Folder not found")
-  return row
-}
 
 export const getFolders = createServerFn({ method: "GET" })
   .middleware([authMiddleware])
@@ -75,7 +64,7 @@ export const updateFolder = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const userId = context.session.user.id
-    await requireOwnedFolder(data.id, userId)
+    await requireOwned(db, folders, data.id, userId, "Folder")
 
     const updateFields: { name?: string; parentId?: string | null } = {}
     if (data.name !== undefined) updateFields.name = data.name
@@ -92,6 +81,6 @@ export const deleteFolder = createServerFn({ method: "POST" })
   .inputValidator(z.string())
   .handler(async ({ data: id, context }) => {
     const userId = context.session.user.id
-    await requireOwnedFolder(id, userId)
+    await requireOwned(db, folders, id, userId, "Folder")
     await db.delete(folders).where(eq(folders.id, id))
   })
