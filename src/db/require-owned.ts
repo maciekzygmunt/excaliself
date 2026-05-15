@@ -21,5 +21,6 @@ export async function requireOwned(
     .select({ id: table.id })
     .from(table)
     .where(and(eq(table.id, id), eq(table.ownerId, userId)))
+  // Treat "not owned" as "not found" to avoid leaking resource existence to non-owners.
   if (!row) throw new Error(`${resourceLabel} not found`)
 }
