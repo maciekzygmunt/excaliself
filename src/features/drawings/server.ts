@@ -79,8 +79,6 @@ export const updateDrawing = createServerFn({ method: "POST" })
       id: z.string(),
       updateData: z.object({
         name: z.string().optional(),
-        data: z.string().optional(),
-        thumbnail: z.string().optional(),
         folderId: z.string().nullable().optional(),
       }),
     }),
