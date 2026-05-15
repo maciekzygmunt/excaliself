@@ -2,7 +2,7 @@
 
 import { randomUUID } from "node:crypto"
 import { createServerFn } from "@tanstack/react-start"
-import { and, desc, eq } from "drizzle-orm"
+import { and, desc, eq, inArray } from "drizzle-orm"
 import { z } from "zod"
 import { db } from "@/db"
 import { requireOwned } from "@/db/require-owned"
@@ -114,11 +114,35 @@ export const saveDrawingScene = createServerFn({ method: "POST" })
         .update(drawings)
         .set({ data: sceneData, updatedAt: now })
         .where(eq(drawings.id, id))
-      await tx.delete(drawingFiles).where(eq(drawingFiles.drawingId, id))
 
-      if (files.length > 0) {
+      const existing = await tx
+        .select({ fileId: drawingFiles.fileId })
+        .from(drawingFiles)
+        .where(eq(drawingFiles.drawingId, id))
+      const existingFileIds = new Set(existing.map((row) => row.fileId))
+      const incomingFileIds = new Set(files.map((file) => file.fileId))
+
+      const fileIdsToRemove = [...existingFileIds].filter(
+        (fileId) => !incomingFileIds.has(fileId),
+      )
+      const filesToInsert = files.filter(
+        (file) => !existingFileIds.has(file.fileId),
+      )
+
+      if (fileIdsToRemove.length > 0) {
+        await tx
+          .delete(drawingFiles)
+          .where(
+            and(
+              eq(drawingFiles.drawingId, id),
+              inArray(drawingFiles.fileId, fileIdsToRemove),
+            ),
+          )
+      }
+
+      if (filesToInsert.length > 0) {
         await tx.insert(drawingFiles).values(
-          files.map((file) => ({
+          filesToInsert.map((file) => ({
             id: randomUUID(),
             drawingId: id,
             fileId: file.fileId,

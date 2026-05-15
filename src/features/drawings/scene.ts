@@ -28,12 +28,26 @@ export type PersistedFile = {
   createdAt?: Date | string | null
 }
 
-function toPersistedFiles(files: BinaryFiles): PersistedFile[] {
-  return Object.entries(files ?? {}).map(([fileId, file]) => ({
-    fileId,
-    mimeType: file.mimeType || "image/png",
-    dataUrl: file.dataURL || "",
-  }))
+function toPersistedFiles(
+  elements: readonly ExcalidrawElement[],
+  files: BinaryFiles,
+): PersistedFile[] {
+  // Excalidraw keeps file bytes in `files` even after the referencing image
+  // element is deleted (for undo). Persist only files still referenced by a
+  // live image element so removals on the canvas actually drop the row.
+  const referenced = new Set<string>()
+  for (const element of elements) {
+    if (element.type === "image" && !element.isDeleted && element.fileId) {
+      referenced.add(element.fileId)
+    }
+  }
+  return Object.entries(files ?? {})
+    .filter(([fileId]) => referenced.has(fileId))
+    .map(([fileId, file]) => ({
+      fileId,
+      mimeType: file.mimeType || "image/png",
+      dataUrl: file.dataURL || "",
+    }))
 }
 
 function toBinaryFiles(
@@ -124,7 +138,7 @@ export function useSaveScene(id: string) {
             scene.files ?? {},
             "database",
           ),
-          files: toPersistedFiles(scene.files ?? {}),
+          files: toPersistedFiles(scene.elements, scene.files ?? {}),
         },
       }),
     onSettled: () => queryClient.invalidateQueries(drawingQueryOptions(id)),
