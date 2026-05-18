@@ -1,8 +1,6 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { useParams } from "@tanstack/react-router"
 import { ChevronRight, Folder } from "lucide-react"
 import { type DragEvent, useState } from "react"
-import { toast } from "sonner"
 import {
   Collapsible,
   CollapsibleContent,
@@ -14,10 +12,7 @@ import {
   SidebarMenuItem,
   SidebarMenuSub,
 } from "@/components/ui/sidebar"
-import { drawingsQueryOptions } from "@/features/drawings/queries"
-import { useRenameFolder } from "@/features/folders/mutations"
-import { foldersQueryOptions } from "@/features/folders/queries"
-import { deleteFolder } from "@/features/folders/server"
+import { useDeleteFolder, useRenameFolder } from "@/features/folders/mutations"
 import { useInlineRename } from "@/hooks/use-inline-rename"
 import { cn } from "@/lib/utils"
 import { TreeNodeItem } from "./TreeNodeItem"
@@ -35,10 +30,7 @@ type FolderItemProps = {
   childNodes: TreeNode[]
 }
 
-const TOAST_ID = "delete-folder"
-
 export function FolderItem({ folder, childNodes }: FolderItemProps) {
-  const queryClient = useQueryClient()
   const { id: currentDrawingId } = useParams({ from: "/draw/$id" })
   const {
     dragItem,
@@ -61,16 +53,7 @@ export function FolderItem({ folder, childNodes }: FolderItemProps) {
     },
   })
 
-  const deleteMutation = useMutation({
-    mutationFn: deleteFolder,
-    onMutate: () => toast.loading("Deleting folder...", { id: TOAST_ID }),
-    onError: () => toast.error("Failed to delete folder", { id: TOAST_ID }),
-    onSuccess: () => toast.success("Folder deleted", { id: TOAST_ID }),
-    onSettled: () => {
-      queryClient.invalidateQueries(foldersQueryOptions())
-      queryClient.invalidateQueries(drawingsQueryOptions())
-    },
-  })
+  const deleteMutation = useDeleteFolder()
 
   const containsActive = hasActiveDrawing(childNodes, currentDrawingId)
   const [isExpanded, setIsExpanded] = useState(containsActive)
