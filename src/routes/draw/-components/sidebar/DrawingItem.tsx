@@ -67,7 +67,7 @@ export function DrawingItem({ drawing }: DrawingItemProps) {
     if (drawing.id !== currentDrawingId) return
 
     const remaining = queryClient.getQueryData(drawingsQueryOptions().queryKey)
-    const next = remaining?.find((d) => d.id !== drawing.id)
+    const next = remaining?.[0]
     if (next) {
       navigate({ to: "/draw/$id", params: { id: next.id } })
       return
