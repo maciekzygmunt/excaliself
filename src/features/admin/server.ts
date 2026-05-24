@@ -5,7 +5,7 @@ import { createServerFn } from "@tanstack/react-start"
 import { count, eq } from "drizzle-orm"
 import z from "zod"
 import { db } from "@/db"
-import { users } from "@/db/schema"
+import { users, verifications } from "@/db/schema"
 import { auth } from "@/lib/auth"
 import { adminMiddleware } from "@/middleware/admin"
 
@@ -52,12 +52,21 @@ export const deleteUser = createServerFn({ method: "POST" })
   .middleware([adminMiddleware])
   .inputValidator(z.string())
   .handler(async ({ data: userId }) => {
-    const deleted = await db
-      .delete(users)
-      .where(eq(users.id, userId))
-      .returning({ id: users.id })
+    await db.transaction(async (tx) => {
+      const deleted = await tx
+        .delete(users)
+        .where(eq(users.id, userId))
+        .returning({ email: users.email })
 
-    if (deleted.length === 0) {
-      throw new Error(`User not found: ${userId}`)
-    }
+      if (deleted.length === 0) {
+        throw new Error(`User not found: ${userId}`)
+      }
+
+      // verifications has no FK to users — it's keyed by identifier (email)
+      // for password resets, email verification, etc. Clean it up manually so
+      // orphan rows don't collide with a future re-registration of the same email.
+      await tx
+        .delete(verifications)
+        .where(eq(verifications.identifier, deleted[0].email))
+    })
   })
