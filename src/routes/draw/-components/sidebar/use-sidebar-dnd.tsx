@@ -19,7 +19,7 @@ import { isDescendantFolder } from "./tree"
 export type DragItem = { type: "drawing" | "folder"; id: string }
 export type DropTarget =
   | { type: "root" }
-  | { type: "folder"; id: string; position: "inside" | "above" | "below" }
+  | { type: "folder"; id: string }
   | null
 
 type Options = {
@@ -93,10 +93,7 @@ function useSidebarDnDValue({ drawings, foldersById }: Options) {
       e.stopPropagation()
       if (!dragItem) return
 
-      const targetFolderId =
-        target?.type === "folder" && target.position === "inside"
-          ? target.id
-          : null
+      const targetFolderId = target?.type === "folder" ? target.id : null
 
       setDropTarget(null)
       setDragItem(null)

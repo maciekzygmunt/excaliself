@@ -60,9 +60,7 @@ export function FolderItem({ folder, childNodes }: FolderItemProps) {
 
   const hasChildren = childNodes.length > 0
   const showDropHighlight =
-    dropTarget?.type === "folder" &&
-    dropTarget.id === folder.id &&
-    dropTarget.position === "inside"
+    dropTarget?.type === "folder" && dropTarget.id === folder.id
 
   const handleDrop = (target: DropTarget) => (e: DragEvent) => {
     onDrop(target)(e)
@@ -70,13 +68,9 @@ export function FolderItem({ folder, childNodes }: FolderItemProps) {
   }
 
   const dropTargetProps = {
-    onDragOver: onDragOver({
-      type: "folder",
-      id: folder.id,
-      position: "inside",
-    }),
+    onDragOver: onDragOver({ type: "folder", id: folder.id }),
     onDragLeave,
-    onDrop: handleDrop({ type: "folder", id: folder.id, position: "inside" }),
+    onDrop: handleDrop({ type: "folder", id: folder.id }),
   }
 
   return (
