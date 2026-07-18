@@ -94,7 +94,7 @@ export function FolderItem({ folder, childNodes }: FolderItemProps) {
               onDragStart={onDragStart({ type: "folder", id: folder.id })}
               onDragEnd={onDragEnd}
               className={cn(
-                "h-auto cursor-pointer gap-1.5 px-2 py-1.5 pr-2! active:cursor-grabbing [&>svg]:size-auto",
+                "h-auto cursor-pointer gap-1.5 px-2 py-1.5 pr-2! text-[13px] active:cursor-grabbing [&>svg]:size-auto",
                 rename.isRenaming && "pr-3!",
               )}
             >

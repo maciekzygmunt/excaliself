@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query"
 import { File, Folder, PanelLeft, Pencil, Plus } from "lucide-react"
-import { type ReactNode, useMemo, useState } from "react"
+import { useMemo, useState } from "react"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -19,6 +19,7 @@ import { drawingsQueryOptions } from "@/features/drawings/queries"
 import { foldersQueryOptions } from "@/features/folders/queries"
 import { cn } from "@/lib/utils"
 import { CreateRow } from "./CreateRow"
+import { Kbd } from "./Kbd"
 import { SidebarSearch } from "./SidebarSearch"
 import { type SidebarUser, SidebarUserMenu } from "./SidebarUserMenu"
 import { TreeNodeItem } from "./TreeNodeItem"
@@ -52,7 +53,7 @@ export function DrawSidebar({ user }: { user: SidebarUser }) {
             <div className="flex size-6 shrink-0 items-center justify-center rounded-md bg-gradient-to-b from-[#8d85d6] to-[#6f66c9] shadow-[inset_0_1px_0_rgba(255,255,255,0.3),0_1px_2px_rgba(0,0,0,0.35)]">
               <Pencil className="h-3 w-3 text-white" strokeWidth={2} />
             </div>
-            <span className="text-[14.5px] font-semibold tracking-[-0.015em] text-foreground">
+            <span className="text-sm font-semibold tracking-[-0.01em] text-foreground">
               Excaliself
             </span>
             <SidebarToggle />
@@ -63,7 +64,7 @@ export function DrawSidebar({ user }: { user: SidebarUser }) {
           <button
             type="button"
             onClick={() => setCreateType("drawing")}
-            className="flex w-full items-center justify-center gap-1.5 rounded-[7px] border border-border bg-card py-2 text-[12.5px] font-medium text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] transition-colors hover:border-iris/40 dark:shadow-none"
+            className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-card py-2 text-[13px] font-medium text-foreground shadow-[0_0_0_1px_rgba(25,25,50,0.08),0_1px_2px_rgba(20,20,45,0.05),inset_0_1px_0_rgba(255,255,255,0.9)] transition-[box-shadow,scale] duration-150 hover:shadow-[0_0_0_1px_rgba(25,25,50,0.14),0_2px_5px_rgba(20,20,45,0.08),inset_0_1px_0_rgba(255,255,255,0.9)] active:scale-[0.98] dark:shadow-[0_0_0_1px_rgba(255,255,255,0.1)] dark:hover:shadow-[0_0_0_1px_rgba(255,255,255,0.16)]"
           >
             <Plus className="h-2.75 w-2.75 text-iris" strokeWidth={2.5} />
             New drawing
@@ -74,11 +75,11 @@ export function DrawSidebar({ user }: { user: SidebarUser }) {
         <SidebarSearch value={searchQuery} onChange={setSearchQuery} />
 
         <div className="flex items-center justify-between pt-2 pb-0.5 pr-3 pl-4">
-          <span className="text-[9.5px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/80">
+          <span className="text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground/70">
             Drawings
           </span>
           <div className="flex items-center gap-1">
-            <span className="font-mono text-[9.5px] text-muted-foreground/80">
+            <span className="font-mono text-[10px] tabular-nums text-muted-foreground/70">
               {drawings.length}
             </span>
             <CreateMenu onSelect={setCreateType} />
@@ -99,14 +100,6 @@ export function DrawSidebar({ user }: { user: SidebarUser }) {
   )
 }
 
-function Kbd({ children }: { children: ReactNode }) {
-  return (
-    <span className="ml-0.5 rounded border border-border px-1 py-0.5 font-mono text-[9.5px] font-medium leading-none text-muted-foreground">
-      {children}
-    </span>
-  )
-}
-
 function SidebarToggle() {
   const { toggleSidebar } = useSidebar()
   return (
@@ -114,7 +107,7 @@ function SidebarToggle() {
       type="button"
       onClick={toggleSidebar}
       aria-label="Toggle Sidebar"
-      className="ml-auto rounded p-1 text-muted-foreground/70 transition-colors hover:bg-sidebar-accent hover:text-muted-foreground focus-visible:bg-sidebar-accent focus-visible:outline-none"
+      className="ml-auto rounded-md p-1.5 text-muted-foreground/70 transition-colors hover:bg-sidebar-accent hover:text-muted-foreground focus-visible:bg-sidebar-accent focus-visible:outline-none"
     >
       <PanelLeft className="h-3.5 w-3.5" />
     </button>
@@ -165,7 +158,7 @@ function CreateMenu({ onSelect }: { onSelect: (type: CreateType) => void }) {
       <DropdownMenuTrigger asChild>
         <button
           type="button"
-          className="rounded p-0.5 text-muted-foreground/40 transition-all hover:bg-sidebar-accent hover:text-muted-foreground focus-visible:bg-sidebar-accent focus-visible:text-muted-foreground focus-visible:outline-none"
+          className="rounded-md p-1 text-muted-foreground/40 transition-colors hover:bg-sidebar-accent hover:text-muted-foreground focus-visible:bg-sidebar-accent focus-visible:text-muted-foreground focus-visible:outline-none"
         >
           <Plus className="h-3.5 w-3.5" />
         </button>

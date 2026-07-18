@@ -1,5 +1,6 @@
 import { Search, X } from "lucide-react"
 import { useEffect, useRef } from "react"
+import { Kbd } from "./Kbd"
 
 type Props = {
   value: string
@@ -31,7 +32,7 @@ export function SidebarSearch({ value, onChange }: Props) {
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder="Search"
-          className="h-auto w-full bg-transparent text-[12.5px] text-sidebar-foreground placeholder:text-muted-foreground/70 focus:outline-none"
+          className="h-auto w-full bg-transparent text-[13px] text-sidebar-foreground placeholder:text-muted-foreground/70 focus:outline-none"
         />
         {isSearching ? (
           <button
@@ -45,9 +46,7 @@ export function SidebarSearch({ value, onChange }: Props) {
             <X className="h-3 w-3" />
           </button>
         ) : (
-          <span className="pointer-events-none shrink-0 rounded border border-border px-1 py-0.5 font-mono text-[9.5px] font-medium leading-none text-muted-foreground">
-            ⌘K
-          </span>
+          <Kbd>⌘K</Kbd>
         )}
       </div>
     </div>

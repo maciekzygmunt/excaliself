@@ -94,7 +94,7 @@ export function DrawingItem({ drawing }: DrawingItemProps) {
         asChild={!rename.isRenaming}
         isActive={isActive}
         className={cn(
-          "h-auto cursor-pointer gap-1.5 px-2 py-1.5 pr-2! active:cursor-grabbing [&>svg]:size-auto",
+          "h-auto cursor-pointer gap-1.5 px-2 py-1.5 pr-2! text-[13px] active:cursor-grabbing [&>svg]:size-auto",
           "data-[active=true]:bg-iris-muted data-[active=true]:shadow-[inset_0_0_0_1px_var(--iris-ring)]",
           rename.isRenaming && "pr-3!",
         )}
