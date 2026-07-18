@@ -1,0 +1,143 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react"
+import type { ReactNode } from "react"
+import { afterEach, beforeEach, expect, test, vi } from "vitest"
+import { createDrawing } from "@/features/drawings/server"
+import { CreateDrawingDialog } from "./CreateDrawingDialog"
+
+const { navigate } = vi.hoisted(() => ({ navigate: vi.fn() }))
+
+vi.mock("@tanstack/react-router", () => ({
+  useNavigate: () => navigate,
+}))
+
+vi.mock("@/features/drawings/server", () => ({
+  createDrawing: vi.fn(),
+  updateDrawing: vi.fn(),
+  deleteDrawing: vi.fn(),
+}))
+
+function wrapper({ children }: { children: ReactNode }) {
+  const client = new QueryClient()
+  return <QueryClientProvider client={client}>{children}</QueryClientProvider>
+}
+
+beforeEach(() => {
+  vi.clearAllMocks()
+})
+
+// Auto-cleanup needs vitest globals, which this repo leaves off; without it
+// Radix portals from the previous test linger in document.body.
+afterEach(cleanup)
+
+// createDrawing returns a UUID, so mock ids must be UUID-shaped
+const NEW_DRAWING_ID = "11111111-1111-1111-1111-111111111111"
+
+test("typing a name and pressing Enter creates the drawing and navigates to its canvas", async () => {
+  vi.mocked(createDrawing).mockResolvedValue(NEW_DRAWING_ID)
+
+  render(<CreateDrawingDialog open onOpenChange={vi.fn()} />, { wrapper })
+
+  const input = screen.getByPlaceholderText(/drawing name/i)
+  fireEvent.change(input, { target: { value: "Retro board" } })
+  fireEvent.keyDown(input, { key: "Enter" })
+
+  // react-query appends a { client } argument to mutationFn calls; the
+  // payload crossing the server-function edge is the first argument.
+  await waitFor(() => expect(createDrawing).toHaveBeenCalledTimes(1))
+  expect(vi.mocked(createDrawing).mock.calls[0]?.[0]).toEqual({
+    data: { name: "Retro board", folderId: null },
+  })
+  await waitFor(() =>
+    expect(navigate).toHaveBeenCalledWith({
+      to: "/draw/$id",
+      params: { id: NEW_DRAWING_ID },
+    }),
+  )
+})
+
+test("folder-invoked dialog shows its scope and creates the drawing in that folder", async () => {
+  vi.mocked(createDrawing).mockResolvedValue(
+    "22222222-2222-2222-2222-222222222222",
+  )
+
+  render(
+    <CreateDrawingDialog
+      open
+      onOpenChange={vi.fn()}
+      folder={{ id: "folder-1", name: "Projects" }}
+    />,
+    { wrapper },
+  )
+
+  expect(screen.getByText("in Projects")).toBeTruthy()
+
+  const input = screen.getByPlaceholderText(/drawing name/i)
+  fireEvent.change(input, { target: { value: "Roadmap" } })
+  fireEvent.keyDown(input, { key: "Enter" })
+
+  await waitFor(() => expect(createDrawing).toHaveBeenCalledTimes(1))
+  expect(vi.mocked(createDrawing).mock.calls[0]?.[0]).toEqual({
+    data: { name: "Roadmap", folderId: "folder-1" },
+  })
+})
+
+test("Escape dismisses the dialog without creating anything", async () => {
+  const onOpenChange = vi.fn()
+
+  render(<CreateDrawingDialog open onOpenChange={onOpenChange} />, { wrapper })
+
+  const input = screen.getByPlaceholderText(/drawing name/i)
+  fireEvent.change(input, { target: { value: "Almost created" } })
+  fireEvent.keyDown(input, { key: "Escape" })
+
+  await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
+  expect(createDrawing).not.toHaveBeenCalled()
+  expect(navigate).not.toHaveBeenCalled()
+})
+
+// Click-away dismissal funnels through the same Radix onOpenChange as Escape
+// (covered above) and doesn't respond to jsdom's synthetic pointer events, so
+// it is exercised in the browser instead of here.
+
+// Regression (caught live): the provider keeps the dialog mounted across
+// opens, and a successful create bypassed the name reset — reopening showed
+// the stale name and Enter created a duplicate.
+test("reopening after a successful create starts with an empty name", async () => {
+  vi.mocked(createDrawing).mockResolvedValue(NEW_DRAWING_ID)
+  const onOpenChange = vi.fn()
+
+  const { rerender } = render(
+    <CreateDrawingDialog open onOpenChange={onOpenChange} />,
+    { wrapper },
+  )
+
+  const input = screen.getByPlaceholderText(/drawing name/i)
+  fireEvent.change(input, { target: { value: "First drawing" } })
+  fireEvent.keyDown(input, { key: "Enter" })
+  await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
+
+  rerender(<CreateDrawingDialog open={false} onOpenChange={onOpenChange} />)
+  rerender(<CreateDrawingDialog open onOpenChange={onOpenChange} />)
+
+  const reopened =
+    screen.getByPlaceholderText<HTMLInputElement>(/drawing name/i)
+  expect(reopened.value).toBe("")
+})
+
+test("pressing Enter with an empty name creates nothing", async () => {
+  render(<CreateDrawingDialog open onOpenChange={vi.fn()} />, { wrapper })
+
+  const input = screen.getByPlaceholderText(/drawing name/i)
+  fireEvent.change(input, { target: { value: "   " } })
+  fireEvent.keyDown(input, { key: "Enter" })
+
+  expect(createDrawing).not.toHaveBeenCalled()
+  expect(navigate).not.toHaveBeenCalled()
+})

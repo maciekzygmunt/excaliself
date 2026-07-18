@@ -1,32 +1,24 @@
-import { useNavigate } from "@tanstack/react-router"
-import { File, Folder } from "lucide-react"
+import { Folder } from "lucide-react"
 import { useRef, useState } from "react"
 import { Input } from "@/components/ui/input"
 import { SidebarMenuItem } from "@/components/ui/sidebar"
-import { useCreateDrawing } from "@/features/drawings/mutations"
 import { useCreateFolder } from "@/features/folders/mutations"
 import { useDeferredFocusSelect } from "@/hooks/use-deferred-focus-select"
 
-const DEFAULT_NAMES = {
-  drawing: "Untitled",
-  folder: "New folder",
-} as const
-
 type Props = {
-  type: "drawing" | "folder"
   onClose: () => void
 }
 
-export function CreateRow({ type, onClose }: Props) {
-  const navigate = useNavigate()
-  const [name, setName] = useState<string>(DEFAULT_NAMES[type])
+// Inline creation is for folders only — drawings are created through the
+// Create dialog (see CreateDrawingDialog).
+export function CreateFolderRow({ onClose }: Props) {
+  const [name, setName] = useState("New folder")
   const inputRef = useRef<HTMLInputElement | null>(null)
   // Synchronous guard: Enter often blurs the input on the same tick, so
   // onKeyDown + onBlur can race before isPending updates. A ref lets us
   // short-circuit the second call without waiting for a re-render.
   const submittedRef = useRef(false)
 
-  const createDrawingMutation = useCreateDrawing()
   const createFolderMutation = useCreateFolder()
 
   useDeferredFocusSelect(inputRef)
@@ -41,15 +33,6 @@ export function CreateRow({ type, onClose }: Props) {
       return
     }
 
-    if (type === "drawing") {
-      const newId = await createDrawingMutation.mutateAsync({
-        data: { name: trimmed },
-      })
-      onClose()
-      navigate({ to: "/draw/$id", params: { id: newId } })
-      return
-    }
-
     await createFolderMutation.mutateAsync({
       data: { name: trimmed, parentId: null },
     })
@@ -59,11 +42,7 @@ export function CreateRow({ type, onClose }: Props) {
   return (
     <SidebarMenuItem>
       <div className="flex items-center gap-2 px-2 py-1">
-        {type === "folder" ? (
-          <Folder className="h-3.5 w-3.5 shrink-0 fill-iris/70 text-iris" />
-        ) : (
-          <File className="h-3.25 w-3.25 shrink-0 text-muted-foreground/40" />
-        )}
+        <Folder className="h-3.5 w-3.5 shrink-0 fill-iris/70 text-iris" />
         <Input
           ref={inputRef}
           value={name}
