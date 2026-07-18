@@ -15,22 +15,28 @@ export type SidebarUser = {
 }
 
 export function SidebarUserMenu({ user }: { user: SidebarUser }) {
+  const displayName = user.email.split("@")[0] || user.email
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button
           type="button"
-          className="flex w-full items-center gap-2 rounded-md px-2 py-2 transition-colors hover:bg-sidebar-accent focus-visible:bg-sidebar-accent focus-visible:outline-none"
+          className="flex w-full items-center gap-2.5 rounded-[10px] bg-card px-2.5 py-2 shadow-[0_0_0_1px_rgba(25,25,50,0.08),0_1px_2px_rgba(20,20,45,0.05),inset_0_1px_0_rgba(255,255,255,0.9)] transition-[box-shadow,scale] duration-150 hover:shadow-[0_0_0_1px_rgba(25,25,50,0.14),0_2px_5px_rgba(20,20,45,0.08),inset_0_1px_0_rgba(255,255,255,0.9)] focus-visible:outline-none active:scale-[0.98] dark:shadow-[0_0_0_1px_rgba(255,255,255,0.1)] dark:hover:shadow-[0_0_0_1px_rgba(255,255,255,0.16)]"
         >
-          <div className="flex h-6 w-6 items-center justify-center rounded-full bg-muted-foreground/20 text-[10px] font-medium text-sidebar-foreground">
+          <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-iris-ring text-[10px] font-semibold text-iris-strong">
             {user.email.charAt(0).toUpperCase()}
           </div>
-          <div className="flex-1 min-w-0 text-left">
-            <div className="truncate text-sm text-sidebar-foreground/80">
-              {user.email}
+          <div className="min-w-0 flex-1 text-left">
+            <div className="truncate text-xs font-medium leading-tight text-foreground">
+              {displayName}
             </div>
+            {user.isAdmin && (
+              <div className="font-mono text-[10px] leading-snug text-muted-foreground">
+                admin
+              </div>
+            )}
           </div>
-          <Settings className="h-[13px] w-[13px] shrink-0 text-muted-foreground/30" />
+          <Settings className="h-[13px] w-[13px] shrink-0 text-muted-foreground/60" />
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent

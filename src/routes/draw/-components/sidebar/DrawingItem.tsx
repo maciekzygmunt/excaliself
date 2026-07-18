@@ -63,7 +63,7 @@ export function DrawingItem({ drawing }: DrawingItemProps) {
       <File
         className={cn(
           "h-3.25! w-3.25! shrink-0 transition-colors",
-          isActive ? "text-notion-terracotta" : "text-muted-foreground/30",
+          isActive ? "text-iris" : "text-muted-foreground/40",
         )}
       />
       {rename.isRenaming ? (
@@ -73,7 +73,7 @@ export function DrawingItem({ drawing }: DrawingItemProps) {
           className={cn(
             "truncate transition-colors",
             isActive
-              ? "font-medium text-sidebar-foreground"
+              ? "font-medium text-iris-strong"
               : "text-sidebar-foreground/60",
           )}
         >
@@ -94,7 +94,8 @@ export function DrawingItem({ drawing }: DrawingItemProps) {
         asChild={!rename.isRenaming}
         isActive={isActive}
         className={cn(
-          "h-auto cursor-pointer gap-1.5 px-2 py-1.5 pr-2! active:cursor-grabbing [&>svg]:size-auto",
+          "h-auto cursor-pointer gap-1.5 px-2 py-1.5 pr-2! text-[13px] active:cursor-grabbing [&>svg]:size-auto",
+          "data-[active=true]:bg-iris-muted data-[active=true]:shadow-[inset_0_0_0_1px_var(--iris-ring)]",
           rename.isRenaming && "pr-3!",
         )}
       >

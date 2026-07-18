@@ -1,5 +1,7 @@
 import { Search, X } from "lucide-react"
-import { useRef } from "react"
+import { useEffect, useRef } from "react"
+import { useSidebar } from "@/components/ui/sidebar"
+import { Kbd } from "./Kbd"
 
 type Props = {
   value: string
@@ -8,21 +10,37 @@ type Props = {
 
 export function SidebarSearch({ value, onChange }: Props) {
   const inputRef = useRef<HTMLInputElement>(null)
+  const { isMobile, setOpen, setOpenMobile } = useSidebar()
   const isSearching = value.length > 0
 
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault()
+        if (isMobile) setOpenMobile(true)
+        else setOpen(true)
+        // Defer so the input exists when the sidebar was unmounted (mobile
+        // sheet) and focus lands after the open state is committed.
+        setTimeout(() => inputRef.current?.focus(), 0)
+      }
+    }
+    window.addEventListener("keydown", onKeyDown)
+    return () => window.removeEventListener("keydown", onKeyDown)
+  }, [isMobile, setOpen, setOpenMobile])
+
   return (
-    <div className="px-3 pb-1">
+    <div className="px-2 pb-1">
       <div className="group/search relative flex items-center gap-2 rounded-md px-2 py-1.5 transition-colors focus-within:bg-sidebar-accent hover:bg-sidebar-accent">
-        <Search className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60" />
+        <Search className="h-3 w-3 shrink-0 text-muted-foreground/70" />
         <input
           ref={inputRef}
           type="text"
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          placeholder="Search..."
-          className="h-auto w-full bg-transparent text-sm text-sidebar-foreground placeholder:text-muted-foreground/60 focus:outline-none"
+          placeholder="Search"
+          className="h-auto w-full bg-transparent text-[13px] text-sidebar-foreground placeholder:text-muted-foreground/70 focus:outline-none"
         />
-        {isSearching && (
+        {isSearching ? (
           <button
             type="button"
             onClick={() => {
@@ -33,6 +51,8 @@ export function SidebarSearch({ value, onChange }: Props) {
           >
             <X className="h-3 w-3" />
           </button>
+        ) : (
+          <Kbd>⌘K</Kbd>
         )}
       </div>
     </div>

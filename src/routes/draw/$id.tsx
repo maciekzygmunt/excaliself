@@ -6,7 +6,7 @@ import { drawingQueryOptions } from "@/features/drawings/queries"
 const DrawingCanvas = lazy(() => import("./-components/DrawingCanvas"))
 
 const LoadingState = () => (
-  <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-background text-muted-foreground">
+  <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-card text-muted-foreground">
     <Pencil className="h-8 w-8 animate-pulse" />
     <span className="text-sm">Loading drawing...</span>
   </div>

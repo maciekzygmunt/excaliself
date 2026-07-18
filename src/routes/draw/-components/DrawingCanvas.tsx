@@ -91,7 +91,7 @@ export function DrawingCanvas({ drawingId }: Props) {
     (_isMobile: boolean, _appState: UIAppState) => {
       if (!saving && !saved) return null
       return (
-        <div className="pointer-events-auto absolute bottom-(--editor-container-padding) right-(--editor-container-padding) z-(--zIndex-layerUI) flex items-center gap-1.5 rounded-(--border-radius-lg) bg-(--island-bg-color) px-2 py-1 text-xs font-(--ui-font) text-(--text-primary-color) shadow-(--shadow-island)">
+        <div className="pointer-events-auto absolute bottom-(--editor-container-padding) right-[calc(var(--editor-container-padding)+var(--lg-button-size)+0.5rem)] z-(--zIndex-layerUI) flex h-(--lg-button-size) items-center gap-1.5 rounded-(--border-radius-lg) bg-(--island-bg-color) px-2.5 text-xs font-(--ui-font) text-(--text-primary-color) shadow-(--shadow-island)">
           {saving ? (
             <>
               <Loader2 className="h-3.5 w-3.5 animate-spin" />

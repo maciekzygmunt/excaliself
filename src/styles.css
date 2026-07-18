@@ -7,7 +7,7 @@
 body {
   @apply m-0;
   font-family:
-    "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto",
+    "Instrument Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto",
     "Oxygen", "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans",
     "Helvetica Neue", sans-serif;
   -webkit-font-smoothing: antialiased;
@@ -21,42 +21,47 @@ code {
 }
 
 :root {
-  --background: oklch(0.988 0.002 75);
-  --foreground: oklch(0.16 0.01 60);
-  --card: oklch(0.988 0.002 75);
-  --card-foreground: oklch(0.16 0.01 60);
-  --popover: oklch(0.995 0.001 75);
-  --popover-foreground: oklch(0.16 0.01 60);
-  --primary: oklch(0.16 0.01 60);
-  --primary-foreground: oklch(0.988 0.002 75);
-  --secondary: oklch(0.965 0.004 75);
-  --secondary-foreground: oklch(0.16 0.01 60);
-  --muted: oklch(0.965 0.004 75);
-  --muted-foreground: oklch(0.52 0.01 60);
-  --accent: oklch(0.965 0.004 75);
-  --accent-foreground: oklch(0.16 0.01 60);
+  /* Porcelain — cool light chrome, iris accent (design 4a) */
+  --background: #f2f2f6;
+  --foreground: #26262c;
+  --card: #ffffff;
+  --card-foreground: #26262c;
+  --popover: #ffffff;
+  --popover-foreground: #26262c;
+  --primary: #6f66c9;
+  --primary-foreground: #ffffff;
+  --secondary: #e9e9ef;
+  --secondary-foreground: #26262c;
+  --muted: #e9e9ef;
+  --muted-foreground: #6d6d78;
+  --accent: #e9e9ef;
+  --accent-foreground: #26262c;
   --destructive: oklch(0.577 0.245 27.325);
   --destructive-foreground: oklch(0.577 0.245 27.325);
-  --border: oklch(0.935 0.005 75);
-  --input: oklch(0.935 0.005 75);
-  --ring: oklch(0.88 0.005 75);
+  --border: rgba(25, 25, 50, 0.13);
+  --input: rgba(25, 25, 50, 0.13);
+  --ring: rgba(111, 102, 201, 0.45);
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
   --chart-4: oklch(0.828 0.189 84.429);
   --chart-5: oklch(0.769 0.188 70.08);
   --radius: 0.5rem;
-  --sidebar: oklch(0.988 0.002 75);
-  --sidebar-foreground: oklch(0.16 0.01 60);
-  --sidebar-primary: oklch(0.16 0.01 60);
-  --sidebar-primary-foreground: oklch(0.988 0.002 75);
-  --sidebar-accent: oklch(0.96 0.005 75);
-  --sidebar-accent-foreground: oklch(0.16 0.01 60);
-  --sidebar-border: oklch(0.935 0.005 75);
-  --sidebar-ring: oklch(0.88 0.005 75);
-  --notion-terracotta: oklch(0.62 0.16 30);
-  --notion-terracotta-muted: oklch(0.62 0.16 30 / 0.1);
-  --notion-gold: oklch(0.78 0.12 80);
+  --sidebar: #f2f2f6;
+  --sidebar-foreground: #3f3f49;
+  --sidebar-primary: #6f66c9;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: rgba(25, 25, 50, 0.055);
+  --sidebar-accent-foreground: #26262c;
+  --sidebar-border: rgba(25, 25, 50, 0.1);
+  --sidebar-ring: rgba(111, 102, 201, 0.45);
+  --iris: #6f66c9;
+  --iris-strong: #453da5;
+  --iris-muted: rgba(111, 102, 201, 0.1);
+  --iris-ring: rgba(111, 102, 201, 0.16);
+  --notion-terracotta: #6f66c9;
+  --notion-terracotta-muted: rgba(111, 102, 201, 0.1);
+  --notion-gold: #6f66c9;
 }
 
 .dark {
@@ -92,9 +97,13 @@ code {
   --sidebar-accent-foreground: oklch(0.93 0.005 75);
   --sidebar-border: oklch(0.26 0.008 60);
   --sidebar-ring: oklch(0.4 0.01 60);
-  --notion-terracotta: oklch(0.68 0.15 30);
-  --notion-terracotta-muted: oklch(0.68 0.15 30 / 0.12);
-  --notion-gold: oklch(0.75 0.1 80);
+  --iris: #8d85d6;
+  --iris-strong: #b6b0e8;
+  --iris-muted: rgba(141, 133, 214, 0.14);
+  --iris-ring: rgba(141, 133, 214, 0.22);
+  --notion-terracotta: #8d85d6;
+  --notion-terracotta-muted: rgba(141, 133, 214, 0.14);
+  --notion-gold: #8d85d6;
 }
 
 @theme inline {
@@ -137,6 +146,16 @@ code {
   --color-notion-terracotta: var(--notion-terracotta);
   --color-notion-terracotta-muted: var(--notion-terracotta-muted);
   --color-notion-gold: var(--notion-gold);
+  --color-iris: var(--iris);
+  --color-iris-strong: var(--iris-strong);
+  --color-iris-muted: var(--iris-muted);
+  --color-iris-ring: var(--iris-ring);
+  --font-sans:
+    "Instrument Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto",
+    "Helvetica Neue", sans-serif;
+  --font-mono:
+    "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    monospace;
 }
 
 @layer components {
