@@ -30,10 +30,11 @@ export function SidebarUserMenu({ user }: { user: SidebarUser }) {
             <div className="truncate text-xs font-medium leading-tight text-foreground">
               {displayName}
             </div>
-            <div className="flex items-center gap-1 font-mono text-[10px] leading-snug text-muted-foreground">
-              <span className="h-[5px] w-[5px] rounded-full bg-[#7fae7a]" />
-              synced{user.isAdmin ? " · admin" : ""}
-            </div>
+            {user.isAdmin && (
+              <div className="font-mono text-[10px] leading-snug text-muted-foreground">
+                admin
+              </div>
+            )}
           </div>
           <Settings className="h-[13px] w-[13px] shrink-0 text-muted-foreground/60" />
         </button>
