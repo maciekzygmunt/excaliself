@@ -1,13 +1,10 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { useNavigate } from "@tanstack/react-router"
 import { File, Folder } from "lucide-react"
 import { useRef, useState } from "react"
 import { Input } from "@/components/ui/input"
 import { SidebarMenuItem } from "@/components/ui/sidebar"
-import { drawingsQueryOptions } from "@/features/drawings/queries"
-import { createDrawing } from "@/features/drawings/server"
-import { foldersQueryOptions } from "@/features/folders/queries"
-import { createFolder } from "@/features/folders/server"
+import { useCreateDrawing } from "@/features/drawings/mutations"
+import { useCreateFolder } from "@/features/folders/mutations"
 import { useDeferredFocusSelect } from "@/hooks/use-deferred-focus-select"
 
 const DEFAULT_NAMES = {
@@ -22,7 +19,6 @@ type Props = {
 
 export function CreateRow({ type, onClose }: Props) {
   const navigate = useNavigate()
-  const queryClient = useQueryClient()
   const [name, setName] = useState<string>(DEFAULT_NAMES[type])
   const inputRef = useRef<HTMLInputElement | null>(null)
   // Synchronous guard: Enter often blurs the input on the same tick, so
@@ -30,15 +26,8 @@ export function CreateRow({ type, onClose }: Props) {
   // short-circuit the second call without waiting for a re-render.
   const submittedRef = useRef(false)
 
-  const createDrawingMutation = useMutation({
-    mutationFn: createDrawing,
-    onSettled: () => queryClient.invalidateQueries(drawingsQueryOptions()),
-  })
-
-  const createFolderMutation = useMutation({
-    mutationFn: createFolder,
-    onSettled: () => queryClient.invalidateQueries(foldersQueryOptions()),
-  })
+  const createDrawingMutation = useCreateDrawing()
+  const createFolderMutation = useCreateFolder()
 
   useDeferredFocusSelect(inputRef)
 

@@ -1,14 +1,14 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query"
+import { useQueryClient } from "@tanstack/react-query"
 import { Link, useNavigate, useParams } from "@tanstack/react-router"
 import { File } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar"
 import {
+  useCreateDrawing,
   useDeleteDrawing,
   useRenameDrawing,
 } from "@/features/drawings/mutations"
 import { drawingsQueryOptions } from "@/features/drawings/queries"
-import { createDrawing } from "@/features/drawings/server"
 import { useInlineRename } from "@/hooks/use-inline-rename"
 import { cn } from "@/lib/utils"
 import { TreeRowActions } from "./TreeRowActions"
@@ -41,10 +41,7 @@ export function DrawingItem({ drawing }: DrawingItemProps) {
 
   const deleteMutation = useDeleteDrawing()
 
-  const createMutation = useMutation({
-    mutationFn: createDrawing,
-    onSettled: () => queryClient.invalidateQueries(drawingsQueryOptions()),
-  })
+  const createMutation = useCreateDrawing()
 
   const handleDelete = async () => {
     await deleteMutation.mutateAsync({ data: drawing.id })
