@@ -1,1 +1,2 @@
+UPDATE "invites" SET "usedBy" = NULL WHERE "usedBy" IS NOT NULL AND NOT EXISTS (SELECT 1 FROM "users" WHERE "users"."id" = "invites"."usedBy");--> statement-breakpoint
 ALTER TABLE "invites" ADD CONSTRAINT "invites_usedBy_users_id_fk" FOREIGN KEY ("usedBy") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;
