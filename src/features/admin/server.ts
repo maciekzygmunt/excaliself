@@ -6,6 +6,7 @@ import { count, eq } from "drizzle-orm"
 import z from "zod"
 import { db } from "@/db"
 import { users, verifications } from "@/db/schema"
+import { registerFieldsSchema } from "@/features/auth/schema"
 import { auth } from "@/lib/auth"
 import { adminMiddleware } from "@/middleware/admin"
 
@@ -17,9 +18,7 @@ export const getUserCount = createServerFn({ method: "GET" }).handler(
 )
 
 export const setupAdmin = createServerFn({ method: "POST" })
-  .inputValidator(
-    (data: { email: string; password: string; name: string }) => data,
-  )
+  .inputValidator(registerFieldsSchema)
   .handler(async ({ data }) => {
     const userCount = await getUserCount()
     if (userCount > 0) {

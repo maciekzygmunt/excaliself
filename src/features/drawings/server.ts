@@ -5,7 +5,6 @@ import { createServerFn } from "@tanstack/react-start"
 import { and, desc, eq, inArray } from "drizzle-orm"
 import { z } from "zod"
 import { db } from "@/db"
-import { requireOwned } from "@/db/require-owned"
 import { drawingFiles, drawings } from "@/db/schema"
 import { authMiddleware } from "@/middleware/auth"
 
@@ -85,11 +84,14 @@ export const updateDrawing = createServerFn({ method: "POST" })
   )
   .handler(async ({ data: { id, updateData }, context }) => {
     const userId = context.session.user.id
-    await requireOwned(db, drawings, id, userId, "Drawing")
-    await db
+    // Ownership is enforced in the statement itself; zero rows means "not
+    // found" so non-owners can't tell the resource exists.
+    const updated = await db
       .update(drawings)
       .set({ ...updateData, updatedAt: new Date() })
-      .where(eq(drawings.id, id))
+      .where(and(eq(drawings.id, id), eq(drawings.ownerId, userId)))
+      .returning({ id: drawings.id })
+    if (updated.length === 0) throw new Error("Drawing not found")
   })
 
 export const saveDrawingScene = createServerFn({ method: "POST" })
@@ -105,13 +107,14 @@ export const saveDrawingScene = createServerFn({ method: "POST" })
     const userId = context.session.user.id
 
     await db.transaction(async (tx) => {
-      await requireOwned(tx, drawings, id, userId, "Drawing")
       const now = new Date()
 
-      await tx
+      const updated = await tx
         .update(drawings)
         .set({ data: sceneData, updatedAt: now })
-        .where(eq(drawings.id, id))
+        .where(and(eq(drawings.id, id), eq(drawings.ownerId, userId)))
+        .returning({ id: drawings.id })
+      if (updated.length === 0) throw new Error("Drawing not found")
 
       const existing = await tx
         .select({ fileId: drawingFiles.fileId })
@@ -158,6 +161,9 @@ export const deleteDrawing = createServerFn({ method: "POST" })
   .inputValidator(z.string())
   .handler(async ({ data: id, context }) => {
     const userId = context.session.user.id
-    await requireOwned(db, drawings, id, userId, "Drawing")
-    await db.delete(drawings).where(eq(drawings.id, id))
+    const deleted = await db
+      .delete(drawings)
+      .where(and(eq(drawings.id, id), eq(drawings.ownerId, userId)))
+      .returning({ id: drawings.id })
+    if (deleted.length === 0) throw new Error("Drawing not found")
   })

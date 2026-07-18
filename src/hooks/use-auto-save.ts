@@ -32,12 +32,20 @@ export function useAutoSave<T>({
 
   const [saved, setSaved] = useState(false)
   const initializedRef = useRef(false)
+  const unmountedRef = useRef(false)
   const lastSavedSigRef = useRef<string | null>(null)
 
   const performSave = useCallback(
     (data: T) => {
       const sig = handlersRef.current.getSignature(data)
       if (sig === lastSavedSigRef.current) return
+      // After unmount, mutate() drops its observer callbacks — save directly.
+      if (unmountedRef.current) {
+        void handlersRef.current
+          .onSave(data)
+          .catch((err) => handlersRef.current.onError?.(err))
+        return
+      }
       mutate(data, {
         onSuccess: () => {
           lastSavedSigRef.current = sig
@@ -73,7 +81,13 @@ export function useAutoSave<T>({
   }, [saved])
 
   // Flush any pending save on unmount so the user doesn't lose work.
-  useEffect(() => () => flushDebouncedSave(), [flushDebouncedSave])
+  useEffect(() => {
+    unmountedRef.current = false
+    return () => {
+      unmountedRef.current = true
+      flushDebouncedSave()
+    }
+  }, [flushDebouncedSave])
 
   return {
     saving: isPending,

@@ -2,10 +2,9 @@
 
 import { randomUUID } from "node:crypto"
 import { createServerFn } from "@tanstack/react-start"
-import { asc, eq } from "drizzle-orm"
+import { and, asc, eq } from "drizzle-orm"
 import { z } from "zod"
 import { db } from "@/db"
-import { requireOwned } from "@/db/require-owned"
 import { folders } from "@/db/schema"
 import { authMiddleware } from "@/middleware/auth"
 
@@ -64,16 +63,19 @@ export const updateFolder = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const userId = context.session.user.id
-    await requireOwned(db, folders, data.id, userId, "Folder")
 
     const updateFields: { name?: string; parentId?: string | null } = {}
     if (data.name !== undefined) updateFields.name = data.name
     if (data.parentId !== undefined) updateFields.parentId = data.parentId
 
-    await db
+    // Ownership is enforced in the statement itself; zero rows means "not
+    // found" so non-owners can't tell the resource exists.
+    const updated = await db
       .update(folders)
       .set({ ...updateFields, updatedAt: new Date() })
-      .where(eq(folders.id, data.id))
+      .where(and(eq(folders.id, data.id), eq(folders.ownerId, userId)))
+      .returning({ id: folders.id })
+    if (updated.length === 0) throw new Error("Folder not found")
   })
 
 export const deleteFolder = createServerFn({ method: "POST" })
@@ -81,6 +83,9 @@ export const deleteFolder = createServerFn({ method: "POST" })
   .inputValidator(z.string())
   .handler(async ({ data: id, context }) => {
     const userId = context.session.user.id
-    await requireOwned(db, folders, id, userId, "Folder")
-    await db.delete(folders).where(eq(folders.id, id))
+    const deleted = await db
+      .delete(folders)
+      .where(and(eq(folders.id, id), eq(folders.ownerId, userId)))
+      .returning({ id: folders.id })
+    if (deleted.length === 0) throw new Error("Folder not found")
   })

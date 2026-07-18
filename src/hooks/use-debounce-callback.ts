@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from "react"
+import { useCallback, useRef } from "react"
 
 type DebouncedCallback<TArgs extends unknown[]> = {
   /** Schedule (or reschedule) the callback to fire after the delay. */
@@ -47,7 +47,7 @@ export function useDebounceCallback<TArgs extends unknown[]>(
     [delayMs],
   )
 
-  useEffect(() => cancel, [cancel])
-
+  // No cleanup on unmount: whether a pending invocation should be cancelled,
+  // flushed, or left to fire is the caller's policy via cancel()/flush().
   return { run, cancel, flush }
 }

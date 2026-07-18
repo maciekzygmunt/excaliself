@@ -6,31 +6,57 @@ import { and, eq, gt, isNull } from "drizzle-orm"
 import z from "zod"
 import { db } from "@/db"
 import { invites } from "@/db/schema"
+import { registerFieldsSchema } from "@/features/auth/schema"
+import { auth } from "@/lib/auth"
 import { adminMiddleware } from "@/middleware/admin"
+
+const usableInvite = (token: string) =>
+  and(
+    eq(invites.token, token),
+    isNull(invites.usedAt),
+    gt(invites.expiresAt, new Date()),
+  )
 
 export const validateInvite = createServerFn({ method: "GET" })
   .inputValidator(z.string())
   .handler(async ({ data: token }) => {
-    const [invite] = await db
-      .select()
-      .from(invites)
-      .where(
-        and(
-          eq(invites.token, token),
-          isNull(invites.usedAt),
-          gt(invites.expiresAt, new Date()),
-        ),
-      )
+    const [invite] = await db.select().from(invites).where(usableInvite(token))
     return invite ?? null
   })
 
-export const consumeInvite = createServerFn({ method: "POST" })
-  .inputValidator(z.object({ token: z.string(), userId: z.string() }))
+export const registerWithInvite = createServerFn({ method: "POST" })
+  .inputValidator(registerFieldsSchema.extend({ token: z.string().min(1) }))
   .handler(async ({ data }) => {
-    await db
+    const [invite] = await db
+      .select({ id: invites.id })
+      .from(invites)
+      .where(usableInvite(data.token))
+    if (!invite) {
+      throw new Error("Invalid or expired invite link")
+    }
+
+    const result = await auth.api.signUpEmail({
+      body: {
+        email: data.email,
+        password: data.password,
+        name: data.name,
+      },
+    })
+
+    if (!result.user) {
+      throw new Error("Failed to create account")
+    }
+
+    // Conditional update so two concurrent signups can't both consume the
+    // same invite — only the one that wins the update completes registration.
+    const consumed = await db
       .update(invites)
-      .set({ usedAt: new Date(), usedBy: data.userId })
-      .where(eq(invites.token, data.token))
+      .set({ usedAt: new Date(), usedBy: result.user.id })
+      .where(usableInvite(data.token))
+      .returning({ id: invites.id })
+    if (consumed.length === 0) {
+      throw new Error("Invalid or expired invite link")
+    }
   })
 
 export const createInvite = createServerFn({ method: "POST" })

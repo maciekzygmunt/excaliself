@@ -37,7 +37,13 @@ function SetupPage() {
     },
     validators: { onSubmit: registerFormSchema },
     onSubmit: async ({ value }) => {
-      await createAdmin({ data: value })
+      await createAdmin({
+        data: {
+          name: value.name,
+          email: value.email,
+          password: value.password,
+        },
+      })
     },
   })
 

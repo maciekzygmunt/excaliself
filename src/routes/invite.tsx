@@ -1,41 +1,13 @@
 import { useForm } from "@tanstack/react-form"
 import { useMutation } from "@tanstack/react-query"
 import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router"
-import { createServerFn } from "@tanstack/react-start"
 import { toast } from "sonner"
 import { AuthPage } from "@/components/auth-page"
 import { FormTextField } from "@/components/form-text-field"
 import { Button } from "@/components/ui/button"
 import { FieldGroup } from "@/components/ui/field"
 import { registerFormSchema } from "@/features/auth/schema"
-import { consumeInvite, validateInvite } from "@/features/invites/server"
-import { auth } from "@/lib/auth"
-
-const registerWithInvite = createServerFn({ method: "POST" })
-  .inputValidator(
-    (data: { token: string; email: string; password: string; name: string }) =>
-      data,
-  )
-  .handler(async ({ data }) => {
-    const invite = await validateInvite({ data: data.token })
-    if (!invite) {
-      throw new Error("Invalid or expired invite link")
-    }
-
-    const result = await auth.api.signUpEmail({
-      body: {
-        email: data.email,
-        password: data.password,
-        name: data.name,
-      },
-    })
-
-    if (!result.user) {
-      throw new Error("Failed to create account")
-    }
-
-    await consumeInvite({ data: { token: data.token, userId: result.user.id } })
-  })
+import { registerWithInvite, validateInvite } from "@/features/invites/server"
 
 export const Route = createFileRoute("/invite")({
   validateSearch: (search: Record<string, unknown>) => ({
