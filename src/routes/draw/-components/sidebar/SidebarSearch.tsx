@@ -1,5 +1,6 @@
 import { Search, X } from "lucide-react"
 import { useEffect, useRef } from "react"
+import { useSidebar } from "@/components/ui/sidebar"
 import { Kbd } from "./Kbd"
 
 type Props = {
@@ -9,18 +10,23 @@ type Props = {
 
 export function SidebarSearch({ value, onChange }: Props) {
   const inputRef = useRef<HTMLInputElement>(null)
+  const { isMobile, setOpen, setOpenMobile } = useSidebar()
   const isSearching = value.length > 0
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "k") {
         e.preventDefault()
-        inputRef.current?.focus()
+        if (isMobile) setOpenMobile(true)
+        else setOpen(true)
+        // Defer so the input exists when the sidebar was unmounted (mobile
+        // sheet) and focus lands after the open state is committed.
+        setTimeout(() => inputRef.current?.focus(), 0)
       }
     }
     window.addEventListener("keydown", onKeyDown)
     return () => window.removeEventListener("keydown", onKeyDown)
-  }, [])
+  }, [isMobile, setOpen, setOpenMobile])
 
   return (
     <div className="px-2 pb-1">
