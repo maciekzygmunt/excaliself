@@ -6,9 +6,17 @@ import {
   useOptimisticListMutation,
 } from "@/hooks/use-optimistic-list-mutation"
 import { type Folder, foldersQueryOptions } from "./queries"
-import { deleteFolder, updateFolder } from "./server"
+import { createFolder, deleteFolder, updateFolder } from "./server"
 
 type RenameVars = Parameters<typeof updateFolder>[0]
+
+export function useCreateFolder() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: createFolder,
+    onSettled: () => queryClient.invalidateQueries(foldersQueryOptions()),
+  })
+}
 
 export function useRenameFolder() {
   return useOptimisticListMutation<Folder, RenameVars>({

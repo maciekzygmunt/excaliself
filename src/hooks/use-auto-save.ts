@@ -5,73 +5,117 @@ import { useDebounceCallback } from "./use-debounce-callback"
 const DEBOUNCE_MS = 300
 const SAVED_INDICATOR_MS = 2000
 
-type Options<T> = {
-  onSave: (data: T) => Promise<void>
-  /** Fingerprint used to skip redundant saves. */
-  getSignature: (data: T) => string
+type Options<TData, TPayload> = {
+  /** Build the exact payload that gets persisted. Runs once per save attempt. */
+  toPayload: (data: TData) => TPayload
+  /** Fingerprint of a payload, used to skip redundant saves. */
+  getSignature: (payload: TPayload) => string
+  onSave: (payload: TPayload) => Promise<unknown>
+  /**
+   * Saves sharing this scope id run one at a time (react-query mutation
+   * scope), so a slow older save can never land after a newer one.
+   */
+  scopeId?: string
   /** When true, the very first change is treated as initial state and skipped. */
   skipInitialChange?: boolean
+  /**
+   * While true, changes are recorded but not saved. When the pause lifts, the
+   * latest recorded state is saved (the signature dedup skips it if nothing
+   * actually changed).
+   */
+  paused?: boolean
   onError?: (error: unknown) => void
 }
 
-export function useAutoSave<T>({
-  onSave,
+type SaveVars<TPayload> = { payload: TPayload; sig: string }
+
+export function useAutoSave<TData, TPayload>({
+  toPayload,
   getSignature,
+  onSave,
+  scopeId,
   skipInitialChange = false,
+  paused = false,
   onError,
-}: Options<T>) {
+}: Options<TData, TPayload>) {
   // Hold all consumer callbacks in a single ref so the debounced closure stays
   // stable across renders without going stale on consumer re-renders.
-  const handlersRef = useRef({ onSave, getSignature, onError })
-  handlersRef.current = { onSave, getSignature, onError }
-
-  const { mutate, isPending } = useMutation({
-    mutationFn: (data: T) => handlersRef.current.onSave(data),
-    onError: (err) => handlersRef.current.onError?.(err),
-  })
+  const handlersRef = useRef({ toPayload, getSignature, onSave, onError })
+  handlersRef.current = { toPayload, getSignature, onSave, onError }
+  const pausedRef = useRef(paused)
+  pausedRef.current = paused
 
   const [saved, setSaved] = useState(false)
   const initializedRef = useRef(false)
-  const unmountedRef = useRef(false)
   const lastSavedSigRef = useRef<string | null>(null)
+  const pendingSigRef = useRef<string | null>(null)
+  const latestDataRef = useRef<TData | null>(null)
+  const performSaveRef = useRef<(data: TData) => void>(() => {})
+
+  // All bookkeeping lives in mutation-level callbacks: unlike per-mutate
+  // callbacks, they run even after unmount, so the post-settle re-check and
+  // error reporting survive the unmount flush.
+  const { mutate, isPending } = useMutation({
+    mutationFn: (vars: SaveVars<TPayload>) =>
+      handlersRef.current.onSave(vars.payload),
+    scope: scopeId ? { id: scopeId } : undefined,
+    onSuccess: (_data, { sig }) => {
+      lastSavedSigRef.current = sig
+      setSaved(true)
+      // The user may have kept editing — or undone back to the previously
+      // saved state — while this save was in flight. If the latest state no
+      // longer matches what was committed, save it now.
+      const latest = latestDataRef.current
+      if (latest != null) performSaveRef.current(latest)
+    },
+    onError: (err) => handlersRef.current.onError?.(err),
+    onSettled: (_data, _err, { sig }) => {
+      if (pendingSigRef.current === sig) pendingSigRef.current = null
+    },
+  })
 
   const performSave = useCallback(
-    (data: T) => {
-      const sig = handlersRef.current.getSignature(data)
-      if (sig === lastSavedSigRef.current) return
-      // After unmount, mutate() drops its observer callbacks — save directly.
-      if (unmountedRef.current) {
-        void handlersRef.current
-          .onSave(data)
-          .catch((err) => handlersRef.current.onError?.(err))
+    (data: TData) => {
+      const payload = handlersRef.current.toPayload(data)
+      const sig = handlersRef.current.getSignature(payload)
+      if (sig === lastSavedSigRef.current || sig === pendingSigRef.current) {
         return
       }
-      mutate(data, {
-        onSuccess: () => {
-          lastSavedSigRef.current = sig
-          setSaved(true)
-        },
-      })
+      pendingSigRef.current = sig
+      mutate({ payload, sig })
     },
     [mutate],
   )
+  performSaveRef.current = performSave
 
   const { run: runDebouncedSave, flush: flushDebouncedSave } =
     useDebounceCallback(performSave, DEBOUNCE_MS)
 
   const handleChange = useCallback(
-    (data: T) => {
+    (data: TData) => {
+      latestDataRef.current = data
       if (!initializedRef.current) {
         initializedRef.current = true
         if (skipInitialChange) {
-          lastSavedSigRef.current = handlersRef.current.getSignature(data)
+          lastSavedSigRef.current = handlersRef.current.getSignature(
+            handlersRef.current.toPayload(data),
+          )
           return
         }
       }
+      if (pausedRef.current) return
       runDebouncedSave(data)
     },
     [runDebouncedSave, skipInitialChange],
   )
+
+  // When a pause lifts, save the state recorded while paused; the signature
+  // dedup turns this into a no-op if nothing actually changed.
+  useEffect(() => {
+    if (paused) return
+    const latest = latestDataRef.current
+    if (initializedRef.current && latest != null) runDebouncedSave(latest)
+  }, [paused, runDebouncedSave])
 
   // Auto-clear the "Saved" indicator after a moment.
   useEffect(() => {
@@ -82,11 +126,7 @@ export function useAutoSave<T>({
 
   // Flush any pending save on unmount so the user doesn't lose work.
   useEffect(() => {
-    unmountedRef.current = false
-    return () => {
-      unmountedRef.current = true
-      flushDebouncedSave()
-    }
+    return () => flushDebouncedSave()
   }, [flushDebouncedSave])
 
   return {
