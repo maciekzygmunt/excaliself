@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query"
 import { File, Folder, PanelLeft, Pencil, Plus } from "lucide-react"
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -33,6 +33,28 @@ export function DrawSidebar({ user }: { user: SidebarUser }) {
   const { data: folders = [] } = useQuery(foldersQueryOptions())
   const [searchQuery, setSearchQuery] = useState("")
   const [createType, setCreateType] = useState<CreateType | null>(null)
+  const { isMobile, setOpen, setOpenMobile } = useSidebar()
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== "n" && e.key !== "N") return
+      if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return
+      const target = e.target as HTMLElement | null
+      if (
+        target &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.isContentEditable)
+      )
+        return
+      e.preventDefault()
+      if (isMobile) setOpenMobile(true)
+      else setOpen(true)
+      setCreateType("drawing")
+    }
+    window.addEventListener("keydown", onKeyDown)
+    return () => window.removeEventListener("keydown", onKeyDown)
+  }, [isMobile, setOpen, setOpenMobile])
 
   const foldersById = useMemo(
     () => new Map(folders.map((f) => [f.id, f])),
