@@ -30,8 +30,9 @@ function formatEditedAgo(updatedAt: Date | string): string {
   if (hours < 24) return `${hours}h ago`
   const days = Math.floor(hours / 24)
   if (days < 30) return `${days}d ago`
-  const months = Math.floor(days / 30)
-  if (months < 12) return `${months}mo ago`
+  // 30-day months drift past the calendar: days 360-364 are under a year but
+  // floor to 12 — cap at 11mo so it never reads "12mo ago" or "0y ago"
+  if (days < 365) return `${Math.min(Math.floor(days / 30), 11)}mo ago`
   return `${Math.floor(days / 365)}y ago`
 }
 
@@ -159,6 +160,7 @@ function Preview({ name, data }: { name: string; data: string }) {
       />
       {state === "empty" && (
         <div
+          role="img"
           aria-label="No preview"
           className="absolute inset-0 flex items-center justify-center"
         >
@@ -180,7 +182,7 @@ function EmptyState() {
         No drawings yet
       </span>
       <p className="max-w-60 text-[13px] text-muted-foreground">
-        Everything you sketch shows up here.
+        Your recent drawings will show up here.
       </p>
       <button
         type="button"

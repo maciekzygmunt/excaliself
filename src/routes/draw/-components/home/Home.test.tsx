@@ -159,6 +159,20 @@ test("a card shows the drawing's name, folder, and relative edit time", () => {
   expect(screen.getByText(/5m ago/)).toBeTruthy()
 })
 
+// Regression (caught in review): 360-364 days floored to "0y ago"
+test("a drawing edited just under a year ago reads in months, not zero years", () => {
+  renderHome({
+    drawings: [
+      makeDrawing({
+        id: "d1",
+        updatedAt: new Date(Date.now() - 362 * 24 * 60 * 60 * 1000),
+      }),
+    ],
+  })
+
+  expect(screen.getByText(/11mo ago/)).toBeTruthy()
+})
+
 test("a card without a folder omits the folder label", () => {
   renderHome({
     drawings: [makeDrawing({ id: "d1", name: "Loose sketch" })],

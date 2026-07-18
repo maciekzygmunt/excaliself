@@ -15,15 +15,18 @@ const LoadingState = () => (
 
 export const Route = createFileRoute("/draw/$id")({
   ssr: false,
-  loader: async ({ params, context }) => {
+  loader: async ({ params, context, preload }) => {
     const drawing = await context.queryClient.ensureQueryData(
       drawingQueryOptions(params.id),
     )
     // The server returns null for deleted drawings and drawings that aren't
     // yours (deliberately indistinguishable) — land on Home, not a dead end.
     // ssr is off, so this loader (and the toast) always runs on the client.
+    // Hover-intent preloads also run it; they swallow the redirect, so they
+    // must not toast either.
     if (!drawing) {
-      toast.error("Drawing not found", { id: "drawing-not-found" })
+      if (!preload)
+        toast.error("Drawing not found", { id: "drawing-not-found" })
       throw redirect({ to: "/draw" })
     }
   },

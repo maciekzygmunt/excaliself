@@ -10,7 +10,7 @@ import type { ExcalidrawInitialDataState } from "@excalidraw/excalidraw/types"
  * back to a placeholder.
  */
 export async function renderPreviewSvg(
-  data: string | null | undefined,
+  data: string,
 ): Promise<SVGSVGElement | null> {
   if (!data) return null
 
