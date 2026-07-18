@@ -6,15 +6,15 @@ import type {
   UIAppState,
 } from "@excalidraw/excalidraw/types"
 import { Cloud, Loader2, PanelLeftIcon } from "lucide-react"
-import { useCallback } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { toast } from "sonner"
 import { useSidebar } from "@/components/ui/sidebar"
 import { useRenameDrawing } from "@/features/drawings/mutations"
 import {
-  getSceneSignature,
-  type SceneData,
+  buildScenePayload,
+  getScenePayloadSignature,
   useDrawingScene,
-  useSaveScene,
+  useSaveScenePayload,
 } from "@/features/drawings/scene"
 import { useAutoSave } from "@/hooks/use-auto-save"
 import { TopLeftControls, TopLeftPortal } from "./TopLeftControls"
@@ -28,18 +28,38 @@ type Props = {
 export function DrawingCanvas({ drawingId }: Props) {
   const { toggleSidebar } = useSidebar()
 
-  const { drawing, initialData } = useDrawingScene(drawingId)
-  const saveSceneMutation = useSaveScene(drawingId)
+  const { drawing, initialData, isDataCorrupt } = useDrawingScene(drawingId)
+  const saveScenePayload = useSaveScenePayload(drawingId)
   const renameMutation = useRenameDrawing()
 
-  const onSave = useCallback(
-    (scene: SceneData) => saveSceneMutation.mutateAsync(scene),
-    [saveSceneMutation],
-  )
+  // A corrupt stored scene opens as an empty canvas; pause autosave until the
+  // user acknowledges, so the next save doesn't silently overwrite the data.
+  const [corruptAcknowledged, setCorruptAcknowledged] = useState(false)
+  const autoSavePaused = isDataCorrupt && !corruptAcknowledged
 
-  const { saving, saved, handleChange } = useAutoSave<SceneData>({
-    onSave,
-    getSignature: getSceneSignature,
+  useEffect(() => {
+    if (!isDataCorrupt || corruptAcknowledged) return
+    const toastId = `corrupt-scene:${drawingId}`
+    toast.error("This drawing's saved data couldn't be read", {
+      id: toastId,
+      duration: Number.POSITIVE_INFINITY,
+      description:
+        "It opened as an empty canvas. Auto-save is paused so the stored data isn't overwritten.",
+      action: {
+        label: "Edit anyway",
+        onClick: () => setCorruptAcknowledged(true),
+      },
+    })
+    return () => {
+      toast.dismiss(toastId)
+    }
+  }, [isDataCorrupt, corruptAcknowledged, drawingId])
+
+  const { saving, saved, handleChange } = useAutoSave({
+    toPayload: buildScenePayload,
+    getSignature: getScenePayloadSignature,
+    onSave: saveScenePayload,
+    scopeId: `save-drawing:${drawingId}`,
     skipInitialChange: true,
     onError: () => {
       toast.error("Failed to save drawing", { id: "drawing-save-error" })
@@ -52,9 +72,10 @@ export function DrawingCanvas({ drawingId }: Props) {
       appState: AppState,
       files: BinaryFiles,
     ) => {
+      if (autoSavePaused) return
       handleChange({ elements, appState, files })
     },
-    [handleChange],
+    [handleChange, autoSavePaused],
   )
 
   const handleNameSubmit = (newName: string) => {

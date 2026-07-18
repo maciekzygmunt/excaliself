@@ -1,18 +1,13 @@
-import {
-  hashElementsVersion,
-  hashString,
-  restore,
-  serializeAsJSON,
-} from "@excalidraw/excalidraw"
+import { hashString, restore, serializeAsJSON } from "@excalidraw/excalidraw"
 import type { ExcalidrawElement } from "@excalidraw/excalidraw/element/types"
 import type {
   AppState,
   BinaryFiles,
   ExcalidrawInitialDataState,
 } from "@excalidraw/excalidraw/types"
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { useMemo } from "react"
-import { drawingQueryOptions } from "./queries"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { useCallback, useMemo } from "react"
+import { drawingQueryOptions, drawingsQueryOptions } from "./queries"
 import { saveDrawingScene } from "./server"
 
 export type SceneData = {
@@ -26,6 +21,12 @@ export type PersistedFile = {
   mimeType: string
   dataUrl: string
   createdAt?: Date | string | null
+}
+
+/** Exactly what gets sent to the server and stored. */
+export type ScenePayload = {
+  data: string
+  files: PersistedFile[]
 }
 
 function toPersistedFiles(
@@ -50,6 +51,31 @@ function toPersistedFiles(
     }))
 }
 
+export function buildScenePayload(scene: SceneData): ScenePayload {
+  return {
+    data: serializeAsJSON(
+      scene.elements,
+      scene.appState,
+      scene.files ?? {},
+      "database",
+    ),
+    files: toPersistedFiles(scene.elements, scene.files ?? {}),
+  }
+}
+
+/**
+ * Fingerprint of the persisted payload itself, so dedup compares exactly what
+ * would be stored and can't drift from Excalidraw's persistence rules.
+ */
+export function getScenePayloadSignature(payload: ScenePayload) {
+  const filesSignature = payload.files
+    .map(
+      (file) => `${file.fileId}:${file.mimeType}:${hashString(file.dataUrl)}`,
+    )
+    .join(",")
+  return `${hashString(payload.data)}|${filesSignature}`
+}
+
 function toBinaryFiles(
   persistedFiles: PersistedFile[] | null | undefined,
 ): BinaryFiles {
@@ -66,20 +92,26 @@ function toBinaryFiles(
   return files
 }
 
-function parseSceneData(raw: string | undefined | null) {
-  if (!raw) return null
+function parseSceneData(raw: string | undefined | null): {
+  parsed: ExcalidrawInitialDataState | null
+  isCorrupt: boolean
+} {
+  if (!raw) return { parsed: null, isCorrupt: false }
   try {
-    return JSON.parse(raw) as ExcalidrawInitialDataState
+    return {
+      parsed: JSON.parse(raw) as ExcalidrawInitialDataState,
+      isCorrupt: false,
+    }
   } catch {
-    return null
+    return { parsed: null, isCorrupt: true }
   }
 }
 
 function buildInitialSceneData(
   drawing: { data: string; files?: PersistedFile[] | null } | null | undefined,
-): ExcalidrawInitialDataState {
+): { initialData: ExcalidrawInitialDataState; isDataCorrupt: boolean } {
   const files = toBinaryFiles(drawing?.files)
-  const parsed = parseSceneData(drawing?.data)
+  const { parsed, isCorrupt } = parseSceneData(drawing?.data)
   const restored = restore(
     parsed
       ? { elements: parsed.elements, appState: parsed.appState, files }
@@ -90,57 +122,62 @@ function buildInitialSceneData(
   // JSON persistence flattens collaborators to a plain object; Excalidraw
   // requires a Map.
   restored.appState.collaborators = new Map()
-  return { ...restored, files }
-}
-
-export function getSceneSignature(scene: SceneData) {
-  const elementsSignature = hashElementsVersion(scene.elements)
-  const appStateSignature = [
-    scene.appState.gridModeEnabled ? "1" : "0",
-    scene.appState.viewBackgroundColor ?? "",
-    String(scene.appState.gridSize ?? ""),
-    String(scene.appState.gridStep ?? ""),
-  ].join("|")
-
-  // Keep per-change signature cheap by hashing file metadata only.
-  let filesSignature = 0
-  for (const [fileId, file] of Object.entries(scene.files ?? {})) {
-    filesSignature =
-      (filesSignature +
-        hashString(
-          `${fileId}:${file.version ?? 0}:${file.mimeType}:${file.dataURL?.length ?? 0}`,
-        )) >>>
-      0
-  }
-
-  return `${elementsSignature}|${appStateSignature}|${filesSignature}`
+  return { initialData: { ...restored, files }, isDataCorrupt: isCorrupt }
 }
 
 export function useDrawingScene(id: string) {
   const { data: drawing } = useQuery(drawingQueryOptions(id))
-  const initialData = useMemo(
+  const scene = useMemo(
     () => (drawing ? buildInitialSceneData(drawing) : null),
     [drawing],
   )
-  return { drawing, initialData }
+  return {
+    drawing,
+    initialData: scene?.initialData ?? null,
+    isDataCorrupt: scene?.isDataCorrupt ?? false,
+  }
 }
 
-export function useSaveScene(id: string) {
+export function useSaveScenePayload(id: string) {
   const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: (scene: SceneData) =>
-      saveDrawingScene({
-        data: {
-          id,
-          data: serializeAsJSON(
-            scene.elements,
-            scene.appState,
-            scene.files ?? {},
-            "database",
-          ),
-          files: toPersistedFiles(scene.elements, scene.files ?? {}),
-        },
-      }),
-    onSettled: () => queryClient.invalidateQueries(drawingQueryOptions(id)),
-  })
+  return useCallback(
+    async (payload: ScenePayload) => {
+      await saveDrawingScene({
+        data: { id, data: payload.data, files: payload.files },
+      })
+      // Mirror the committed payload into the caches instead of invalidating:
+      // refetching the detail query would re-download every base64 blob the
+      // client just uploaded.
+      const updatedAt = new Date()
+      queryClient.setQueryData(drawingQueryOptions(id).queryKey, (prev) => {
+        if (!prev) return prev
+        return {
+          ...prev,
+          data: payload.data,
+          updatedAt,
+          files: payload.files.map((file) => {
+            const existing = prev.files.find((f) => f.fileId === file.fileId)
+            if (existing) return existing
+            // Cache-only placeholder row; the client never reads `id`.
+            return {
+              id: file.fileId,
+              drawingId: id,
+              fileId: file.fileId,
+              mimeType: file.mimeType,
+              dataUrl: file.dataUrl,
+              createdAt: updatedAt,
+            }
+          }),
+        }
+      })
+      queryClient.setQueryData(drawingsQueryOptions().queryKey, (drawings) =>
+        drawings?.map((drawing) =>
+          drawing.id === id
+            ? { ...drawing, data: payload.data, updatedAt }
+            : drawing,
+        ),
+      )
+    },
+    [id, queryClient],
+  )
 }
