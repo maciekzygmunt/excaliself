@@ -25,6 +25,10 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
         content: "width=device-width, initial-scale=1",
       },
       {
+        name: "theme-color",
+        content: "#f2f2f6",
+      },
+      {
         title: "Excaliself",
       },
     ],

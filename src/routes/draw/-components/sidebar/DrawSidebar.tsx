@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query"
-import { File, Folder, Plus } from "lucide-react"
-import { useMemo, useState } from "react"
+import { File, Folder, PanelLeft, Pencil, Plus } from "lucide-react"
+import { type ReactNode, useMemo, useState } from "react"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,6 +13,7 @@ import {
   SidebarFooter,
   SidebarHeader,
   SidebarMenu,
+  useSidebar,
 } from "@/components/ui/sidebar"
 import { drawingsQueryOptions } from "@/features/drawings/queries"
 import { foldersQueryOptions } from "@/features/folders/queries"
@@ -45,27 +46,43 @@ export function DrawSidebar({ user }: { user: SidebarUser }) {
 
   return (
     <SidebarDnDProvider drawings={drawings} foldersById={foldersById}>
-      <Sidebar collapsible="offcanvas" variant="sidebar">
-        <SidebarHeader className="gap-0 px-3 pt-4 pb-2">
-          <div className="flex items-center gap-2 rounded-md px-2 py-1.5 transition-colors hover:bg-sidebar-accent cursor-pointer">
-            <div className="flex h-5 w-5 items-center justify-center rounded bg-notion-terracotta text-[10px] font-semibold text-white">
-              E
+      <Sidebar collapsible="offcanvas" variant="inset">
+        <SidebarHeader className="gap-0 px-2 pt-2 pb-1">
+          <div className="flex items-center gap-2.5 px-2 py-1.5">
+            <div className="flex size-6 shrink-0 items-center justify-center rounded-md bg-gradient-to-b from-[#8d85d6] to-[#6f66c9] shadow-[inset_0_1px_0_rgba(255,255,255,0.3),0_1px_2px_rgba(0,0,0,0.35)]">
+              <Pencil className="h-3 w-3 text-white" strokeWidth={2} />
             </div>
-            <span className="text-sm font-medium tracking-[-0.01em] text-sidebar-foreground">
+            <span className="text-[14.5px] font-semibold tracking-[-0.015em] text-foreground">
               Excaliself
             </span>
+            <SidebarToggle />
           </div>
         </SidebarHeader>
 
+        <div className="px-2 pt-1 pb-1.5">
+          <button
+            type="button"
+            onClick={() => setCreateType("drawing")}
+            className="flex w-full items-center justify-center gap-1.5 rounded-[7px] border border-border bg-card py-2 text-[12.5px] font-medium text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] transition-colors hover:border-iris/40 dark:shadow-none"
+          >
+            <Plus className="h-2.75 w-2.75 text-iris" strokeWidth={2.5} />
+            New drawing
+            <Kbd>N</Kbd>
+          </button>
+        </div>
+
         <SidebarSearch value={searchQuery} onChange={setSearchQuery} />
 
-        <div className="mx-4 my-2 h-px bg-sidebar-border" />
-
-        <div className="flex items-center justify-between px-5 py-1">
-          <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground/50">
+        <div className="flex items-center justify-between pt-2 pb-0.5 pr-3 pl-4">
+          <span className="text-[9.5px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/80">
             Drawings
           </span>
-          <CreateMenu onSelect={setCreateType} />
+          <div className="flex items-center gap-1">
+            <span className="font-mono text-[9.5px] text-muted-foreground/80">
+              {drawings.length}
+            </span>
+            <CreateMenu onSelect={setCreateType} />
+          </div>
         </div>
 
         <TreeBody
@@ -74,11 +91,33 @@ export function DrawSidebar({ user }: { user: SidebarUser }) {
           onCloseCreate={() => setCreateType(null)}
         />
 
-        <SidebarFooter className="gap-0 border-t border-sidebar-border px-3 pb-3 pt-1">
+        <SidebarFooter className="gap-0 p-2">
           <SidebarUserMenu user={user} />
         </SidebarFooter>
       </Sidebar>
     </SidebarDnDProvider>
+  )
+}
+
+function Kbd({ children }: { children: ReactNode }) {
+  return (
+    <span className="ml-0.5 rounded border border-border px-1 py-0.5 font-mono text-[9.5px] font-medium leading-none text-muted-foreground">
+      {children}
+    </span>
+  )
+}
+
+function SidebarToggle() {
+  const { toggleSidebar } = useSidebar()
+  return (
+    <button
+      type="button"
+      onClick={toggleSidebar}
+      aria-label="Toggle Sidebar"
+      className="ml-auto rounded p-1 text-muted-foreground/70 transition-colors hover:bg-sidebar-accent hover:text-muted-foreground focus-visible:bg-sidebar-accent focus-visible:outline-none"
+    >
+      <PanelLeft className="h-3.5 w-3.5" />
+    </button>
   )
 }
 
@@ -94,13 +133,13 @@ function TreeBody({
   const { dropTarget, onDragOver, onDragLeave, onDrop } = useSidebarDnD()
 
   return (
-    <SidebarContent className="gap-0 pt-1 [scrollbar-width:none]">
-      <div className="px-3">
+    <SidebarContent className="gap-0 pt-0.5 [scrollbar-width:none]">
+      <div className="px-2">
         <div
           className={cn(
             "min-h-50 rounded-md pb-4 transition-colors",
             dropTarget?.type === "root" &&
-              "bg-notion-terracotta-muted ring-2 ring-notion-terracotta/20",
+              "bg-iris-muted ring-2 ring-iris-ring",
           )}
           onDragOver={onDragOver({ type: "root" })}
           onDragLeave={onDragLeave}

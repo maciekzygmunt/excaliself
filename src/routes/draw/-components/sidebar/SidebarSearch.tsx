@@ -1,5 +1,5 @@
 import { Search, X } from "lucide-react"
-import { useRef } from "react"
+import { useEffect, useRef } from "react"
 
 type Props = {
   value: string
@@ -10,19 +10,30 @@ export function SidebarSearch({ value, onChange }: Props) {
   const inputRef = useRef<HTMLInputElement>(null)
   const isSearching = value.length > 0
 
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault()
+        inputRef.current?.focus()
+      }
+    }
+    window.addEventListener("keydown", onKeyDown)
+    return () => window.removeEventListener("keydown", onKeyDown)
+  }, [])
+
   return (
-    <div className="px-3 pb-1">
+    <div className="px-2 pb-1">
       <div className="group/search relative flex items-center gap-2 rounded-md px-2 py-1.5 transition-colors focus-within:bg-sidebar-accent hover:bg-sidebar-accent">
-        <Search className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60" />
+        <Search className="h-3 w-3 shrink-0 text-muted-foreground/70" />
         <input
           ref={inputRef}
           type="text"
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          placeholder="Search..."
-          className="h-auto w-full bg-transparent text-sm text-sidebar-foreground placeholder:text-muted-foreground/60 focus:outline-none"
+          placeholder="Search"
+          className="h-auto w-full bg-transparent text-[12.5px] text-sidebar-foreground placeholder:text-muted-foreground/70 focus:outline-none"
         />
-        {isSearching && (
+        {isSearching ? (
           <button
             type="button"
             onClick={() => {
@@ -33,6 +44,10 @@ export function SidebarSearch({ value, onChange }: Props) {
           >
             <X className="h-3 w-3" />
           </button>
+        ) : (
+          <span className="pointer-events-none shrink-0 rounded border border-border px-1 py-0.5 font-mono text-[9.5px] font-medium leading-none text-muted-foreground">
+            ⌘K
+          </span>
         )}
       </div>
     </div>

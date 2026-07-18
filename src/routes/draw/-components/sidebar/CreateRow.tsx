@@ -60,9 +60,9 @@ export function CreateRow({ type, onClose }: Props) {
     <SidebarMenuItem>
       <div className="flex items-center gap-2 px-2 py-1">
         {type === "folder" ? (
-          <Folder className="h-3.5 w-3.5 shrink-0 text-notion-gold" />
+          <Folder className="h-3.5 w-3.5 shrink-0 fill-iris/70 text-iris" />
         ) : (
-          <File className="h-3.25 w-3.25 shrink-0 text-muted-foreground/30" />
+          <File className="h-3.25 w-3.25 shrink-0 text-muted-foreground/40" />
         )}
         <Input
           ref={inputRef}

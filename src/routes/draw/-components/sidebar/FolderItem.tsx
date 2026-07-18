@@ -78,8 +78,7 @@ export function FolderItem({ folder, childNodes }: FolderItemProps) {
       <SidebarMenuItem
         className={cn(
           "rounded-md transition-colors",
-          showDropHighlight &&
-            "bg-notion-terracotta-muted ring-1 ring-notion-terracotta/20",
+          showDropHighlight && "bg-iris-muted ring-1 ring-iris-ring",
         )}
       >
         <CollapsibleTrigger asChild>
@@ -106,7 +105,7 @@ export function FolderItem({ folder, childNodes }: FolderItemProps) {
                   !hasChildren && "opacity-0",
                 )}
               />
-              <Folder className="h-3.5! w-3.5! shrink-0 text-notion-gold" />
+              <Folder className="h-3.5! w-3.5! shrink-0 fill-iris/70 text-iris" />
               {rename.isRenaming ? (
                 <Input
                   {...rename.inputProps}
