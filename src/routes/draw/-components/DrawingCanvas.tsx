@@ -34,6 +34,7 @@ export function DrawingCanvas({ drawingId }: Props) {
 
   // A corrupt stored scene opens as an empty canvas; pause autosave until the
   // user acknowledges, so the next save doesn't silently overwrite the data.
+  // Edits made while paused are recorded and saved once acknowledged.
   const [corruptAcknowledged, setCorruptAcknowledged] = useState(false)
   const autoSavePaused = isDataCorrupt && !corruptAcknowledged
 
@@ -61,6 +62,7 @@ export function DrawingCanvas({ drawingId }: Props) {
     onSave: saveScenePayload,
     scopeId: `save-drawing:${drawingId}`,
     skipInitialChange: true,
+    paused: autoSavePaused,
     onError: () => {
       toast.error("Failed to save drawing", { id: "drawing-save-error" })
     },
@@ -72,10 +74,9 @@ export function DrawingCanvas({ drawingId }: Props) {
       appState: AppState,
       files: BinaryFiles,
     ) => {
-      if (autoSavePaused) return
       handleChange({ elements, appState, files })
     },
-    [handleChange, autoSavePaused],
+    [handleChange],
   )
 
   const handleNameSubmit = (newName: string) => {

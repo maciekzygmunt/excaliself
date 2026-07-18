@@ -12,14 +12,20 @@ function wrapper({ children }: { children: ReactNode }) {
 function Harness({
   onSave,
   onChangeRef,
+  paused = false,
+  skipInitialChange = false,
 }: {
   onSave: (payload: string) => Promise<unknown>
   onChangeRef: { current: ((data: string) => void) | null }
+  paused?: boolean
+  skipInitialChange?: boolean
 }) {
   const { handleChange } = useAutoSave<string, string>({
     toPayload: (d) => d,
     getSignature: (p) => p,
     onSave,
+    paused,
+    skipInitialChange,
   })
   onChangeRef.current = handleChange
   return null
@@ -110,5 +116,126 @@ test("state changed while a save was in flight is saved after it settles", async
   })
   expect(onSave).toHaveBeenCalledTimes(3)
   expect(onSave).toHaveBeenLastCalledWith("base")
+  vi.useRealTimers()
+})
+
+// Regression: the re-check lived in per-mutate callbacks, which react-query
+// drops after unmount — navigating away while a stale save was in flight
+// lost the revert.
+test("post-settle re-check still runs when the component unmounted mid-save", async () => {
+  vi.useFakeTimers()
+  const resolvers: Array<() => void> = []
+  const onSave = vi.fn(
+    () => new Promise<void>((resolve) => resolvers.push(resolve)),
+  )
+  const onChangeRef = { current: null as ((data: string) => void) | null }
+
+  const { unmount } = render(
+    <Harness onSave={onSave} onChangeRef={onChangeRef} />,
+    { wrapper },
+  )
+
+  act(() => onChangeRef.current?.("base"))
+  await act(async () => {
+    vi.advanceTimersByTime(300)
+  })
+  await act(async () => {
+    resolvers[0]?.()
+  })
+
+  // "newer" save starts and stays in flight; the user undoes back to "base"
+  // (skipped by dedup) and navigates away before the save settles.
+  act(() => onChangeRef.current?.("newer"))
+  await act(async () => {
+    vi.advanceTimersByTime(300)
+  })
+  act(() => onChangeRef.current?.("base"))
+  await act(async () => {
+    vi.advanceTimersByTime(300)
+  })
+  expect(onSave).toHaveBeenCalledTimes(2)
+  await act(async () => {
+    unmount()
+  })
+
+  // When "newer" commits after unmount, the re-check must still save "base".
+  await act(async () => {
+    resolvers[1]?.()
+  })
+  expect(onSave).toHaveBeenCalledTimes(3)
+  expect(onSave).toHaveBeenLastCalledWith("base")
+  vi.useRealTimers()
+})
+
+// Regression: while paused (corrupt-scene hold), edits were dropped entirely
+// and the first post-pause change was eaten by skipInitialChange.
+test("edits recorded while paused are saved once the pause lifts", async () => {
+  vi.useFakeTimers()
+  const onSave = vi.fn(() => Promise.resolve())
+  const onChangeRef = { current: null as ((data: string) => void) | null }
+
+  const { rerender } = render(
+    <Harness
+      onSave={onSave}
+      onChangeRef={onChangeRef}
+      paused
+      skipInitialChange
+    />,
+    { wrapper },
+  )
+
+  // First change is the as-loaded state (fingerprinted, never saved); the
+  // second is a user edit made while still paused.
+  act(() => onChangeRef.current?.("as-loaded"))
+  act(() => onChangeRef.current?.("drawn-while-paused"))
+  await act(async () => {
+    vi.advanceTimersByTime(1000)
+  })
+  expect(onSave).not.toHaveBeenCalled()
+
+  rerender(
+    <Harness
+      onSave={onSave}
+      onChangeRef={onChangeRef}
+      paused={false}
+      skipInitialChange
+    />,
+  )
+  await act(async () => {
+    vi.advanceTimersByTime(300)
+  })
+  expect(onSave).toHaveBeenCalledTimes(1)
+  expect(onSave).toHaveBeenCalledWith("drawn-while-paused")
+  vi.useRealTimers()
+})
+
+test("unpausing without edits does not save the as-loaded state", async () => {
+  vi.useFakeTimers()
+  const onSave = vi.fn(() => Promise.resolve())
+  const onChangeRef = { current: null as ((data: string) => void) | null }
+
+  const { rerender } = render(
+    <Harness
+      onSave={onSave}
+      onChangeRef={onChangeRef}
+      paused
+      skipInitialChange
+    />,
+    { wrapper },
+  )
+
+  act(() => onChangeRef.current?.("as-loaded"))
+  rerender(
+    <Harness
+      onSave={onSave}
+      onChangeRef={onChangeRef}
+      paused={false}
+      skipInitialChange
+    />,
+  )
+  await act(async () => {
+    vi.advanceTimersByTime(1000)
+  })
+  expect(onSave).not.toHaveBeenCalled()
   vi.useRealTimers()
 })
