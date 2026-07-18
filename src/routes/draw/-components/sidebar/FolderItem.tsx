@@ -15,6 +15,7 @@ import {
 import { useDeleteFolder, useRenameFolder } from "@/features/folders/mutations"
 import { useInlineRename } from "@/hooks/use-inline-rename"
 import { cn } from "@/lib/utils"
+import { useCreateDialog } from "../CreateDialog"
 import { TreeNodeItem } from "./TreeNodeItem"
 import { TreeRowActions } from "./TreeRowActions"
 import {
@@ -54,6 +55,7 @@ export function FolderItem({ folder, childNodes }: FolderItemProps) {
   })
 
   const deleteMutation = useDeleteFolder()
+  const { openCreateDrawingDialog } = useCreateDialog()
 
   const containsActive = hasActiveDrawing(childNodes, currentDrawingId)
   const [isExpanded, setIsExpanded] = useState(containsActive)
@@ -121,6 +123,9 @@ export function FolderItem({ folder, childNodes }: FolderItemProps) {
             <TreeRowActions
               isRenaming={rename.isRenaming}
               onStartRename={() => rename.start(folder.name)}
+              onCreateDrawing={() =>
+                openCreateDrawingDialog({ id: folder.id, name: folder.name })
+              }
               onMenuCloseAutoFocus={rename.onMenuCloseAutoFocus}
               onDelete={() => deleteMutation.mutate({ data: folder.id })}
               deleteTitle="Delete folder?"

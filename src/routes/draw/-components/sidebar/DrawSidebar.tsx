@@ -18,7 +18,7 @@ import {
 import { drawingsQueryOptions } from "@/features/drawings/queries"
 import { foldersQueryOptions } from "@/features/folders/queries"
 import { cn } from "@/lib/utils"
-import { CreateRow } from "./CreateRow"
+import { useCreateDialog } from "../CreateDialog"
 import { Kbd } from "./Kbd"
 import { SidebarSearch } from "./SidebarSearch"
 import { type SidebarUser, SidebarUserMenu } from "./SidebarUserMenu"
@@ -26,14 +26,11 @@ import { TreeNodeItem } from "./TreeNodeItem"
 import { buildTree, filterTreeBySearch, treeNodeKey } from "./tree"
 import { SidebarDnDProvider, useSidebarDnD } from "./use-sidebar-dnd"
 
-type CreateType = "drawing" | "folder"
-
 export function DrawSidebar({ user }: { user: SidebarUser }) {
   const { data: drawings = [] } = useQuery(drawingsQueryOptions())
   const { data: folders = [] } = useQuery(foldersQueryOptions())
   const [searchQuery, setSearchQuery] = useState("")
-  const [createType, setCreateType] = useState<CreateType | null>(null)
-  const { isMobile, setOpen, setOpenMobile } = useSidebar()
+  const { openCreateDrawingDialog, openCreateFolderDialog } = useCreateDialog()
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -48,13 +45,11 @@ export function DrawSidebar({ user }: { user: SidebarUser }) {
       )
         return
       e.preventDefault()
-      if (isMobile) setOpenMobile(true)
-      else setOpen(true)
-      setCreateType("drawing")
+      openCreateDrawingDialog()
     }
     window.addEventListener("keydown", onKeyDown)
     return () => window.removeEventListener("keydown", onKeyDown)
-  }, [isMobile, setOpen, setOpenMobile])
+  }, [openCreateDrawingDialog])
 
   const foldersById = useMemo(
     () => new Map(folders.map((f) => [f.id, f])),
@@ -85,7 +80,7 @@ export function DrawSidebar({ user }: { user: SidebarUser }) {
         <div className="px-2 pt-1 pb-1.5">
           <button
             type="button"
-            onClick={() => setCreateType("drawing")}
+            onClick={() => openCreateDrawingDialog()}
             className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-card py-2 text-[13px] font-medium text-foreground shadow-[0_0_0_1px_rgba(25,25,50,0.08),0_1px_2px_rgba(20,20,45,0.05),inset_0_1px_0_rgba(255,255,255,0.9)] transition-[box-shadow,scale] duration-150 hover:shadow-[0_0_0_1px_rgba(25,25,50,0.14),0_2px_5px_rgba(20,20,45,0.08),inset_0_1px_0_rgba(255,255,255,0.9)] active:scale-[0.98] dark:shadow-[0_0_0_1px_rgba(255,255,255,0.1)] dark:hover:shadow-[0_0_0_1px_rgba(255,255,255,0.16)]"
           >
             <Plus className="h-2.75 w-2.75 text-iris" strokeWidth={2.5} />
@@ -104,15 +99,14 @@ export function DrawSidebar({ user }: { user: SidebarUser }) {
             <span className="font-mono text-[10px] tabular-nums text-muted-foreground/70">
               {drawings.length}
             </span>
-            <CreateMenu onSelect={setCreateType} />
+            <CreateMenu
+              onCreateDrawing={() => openCreateDrawingDialog()}
+              onCreateFolder={openCreateFolderDialog}
+            />
           </div>
         </div>
 
-        <TreeBody
-          displayTree={displayTree}
-          createType={createType}
-          onCloseCreate={() => setCreateType(null)}
-        />
+        <TreeBody displayTree={displayTree} />
 
         <SidebarFooter className="gap-0 p-2">
           <SidebarUserMenu user={user} />
@@ -138,12 +132,8 @@ function SidebarToggle() {
 
 function TreeBody({
   displayTree,
-  createType,
-  onCloseCreate,
 }: {
   displayTree: ReturnType<typeof buildTree>
-  createType: CreateType | null
-  onCloseCreate: () => void
 }) {
   const { dropTarget, onDragOver, onDragLeave, onDrop } = useSidebarDnD()
 
@@ -161,9 +151,6 @@ function TreeBody({
           onDrop={onDrop({ type: "root" })}
         >
           <SidebarMenu className="gap-0">
-            {createType && (
-              <CreateRow type={createType} onClose={onCloseCreate} />
-            )}
             {displayTree.map((node) => (
               <TreeNodeItem key={treeNodeKey(node)} node={node} />
             ))}
@@ -174,7 +161,13 @@ function TreeBody({
   )
 }
 
-function CreateMenu({ onSelect }: { onSelect: (type: CreateType) => void }) {
+function CreateMenu({
+  onCreateDrawing,
+  onCreateFolder,
+}: {
+  onCreateDrawing: () => void
+  onCreateFolder: () => void
+}) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -190,13 +183,13 @@ function CreateMenu({ onSelect }: { onSelect: (type: CreateType) => void }) {
         className="w-48"
         onCloseAutoFocus={(e) => e.preventDefault()}
       >
-        <DropdownMenuItem onClick={() => onSelect("drawing")}>
+        <DropdownMenuItem onClick={onCreateDrawing}>
           <File className="mr-2 h-4 w-4" />
-          New Drawing
+          New drawing
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => onSelect("folder")}>
+        <DropdownMenuItem onClick={onCreateFolder}>
           <Folder className="mr-2 h-4 w-4" />
-          New Folder
+          New folder
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

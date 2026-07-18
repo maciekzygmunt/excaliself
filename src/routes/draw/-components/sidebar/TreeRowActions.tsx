@@ -1,4 +1,4 @@
-import { MoreHorizontal, Pencil, Trash2 } from "lucide-react"
+import { FilePlus, MoreHorizontal, Pencil, Trash2 } from "lucide-react"
 import type { ReactNode } from "react"
 import {
   AlertDialog,
@@ -28,6 +28,8 @@ type TreeRowActionsProps = {
   onDelete: () => void | Promise<void>
   deleteTitle: string
   deleteDescription: ReactNode
+  // Folder rows offer creating a drawing scoped to that folder
+  onCreateDrawing?: () => void
 }
 
 // Callers must wrap the row in `group/tree-row` on whichever element should
@@ -40,6 +42,7 @@ export function TreeRowActions({
   onDelete,
   deleteTitle,
   deleteDescription,
+  onCreateDrawing,
 }: TreeRowActionsProps) {
   return (
     <AlertDialog>
@@ -66,6 +69,12 @@ export function TreeRowActions({
           align="start"
           onCloseAutoFocus={onMenuCloseAutoFocus}
         >
+          {onCreateDrawing && (
+            <DropdownMenuItem onClick={onCreateDrawing}>
+              <FilePlus className="mr-2 h-4 w-4" />
+              New drawing
+            </DropdownMenuItem>
+          )}
           <DropdownMenuItem onClick={onStartRename}>
             <Pencil className="mr-2 h-4 w-4" />
             Rename
