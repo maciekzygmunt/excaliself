@@ -1,6 +1,7 @@
-import { createFileRoute, redirect } from "@tanstack/react-router"
+import { useQuery } from "@tanstack/react-query"
+import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router"
 import { Pencil } from "lucide-react"
-import { lazy, Suspense } from "react"
+import { lazy, Suspense, useEffect } from "react"
 import { toast } from "sonner"
 import { drawingQueryOptions } from "@/features/drawings/queries"
 
@@ -36,6 +37,23 @@ export const Route = createFileRoute("/draw/$id")({
 
 function DrawingPage() {
   const { id } = Route.useParams()
+  const navigate = useNavigate()
+  const { data: drawing } = useQuery(drawingQueryOptions(id))
+
+  // The loader only guards fresh loads: within staleTime it returns the
+  // cached drawing without refetching, and the mount refetch that follows can
+  // discover the drawing was deleted from another session. React to the
+  // query turning null (undefined means still loading) the same way the
+  // loader does — Home plus a toast, never a blank canvas on a dead URL.
+  const isGone = drawing === null
+  useEffect(() => {
+    if (!isGone) return
+    toast.error("Drawing not found", { id: "drawing-not-found" })
+    navigate({ to: "/draw", replace: true })
+  }, [isGone, navigate])
+
+  if (isGone) return <LoadingState />
+
   // Remount on id change so per-document state (auto-save dedup, edits in
   // progress, Excalidraw scene) is fully reset without manual cleanup.
   return (
