@@ -2,7 +2,7 @@
 
 import { randomUUID } from "node:crypto"
 import { createServerFn } from "@tanstack/react-start"
-import { and, desc, eq } from "drizzle-orm"
+import { and, desc, eq, inArray } from "drizzle-orm"
 import { z } from "zod"
 import { db } from "@/db"
 import { drawingFiles, drawings } from "@/db/schema"
@@ -28,14 +28,12 @@ export const getDrawings = createServerFn({ method: "GET" })
 export const getDrawingWithFiles = createServerFn({ method: "GET" })
   .middleware([authMiddleware])
   .inputValidator((id: string) => id)
-  .handler(async ({ data, context }) => {
-    const id = data
+  .handler(async ({ data: id, context }) => {
     const userId = context.session.user.id
-    const result = await db
+    const [drawing] = await db
       .select()
       .from(drawings)
       .where(and(eq(drawings.id, id), eq(drawings.ownerId, userId)))
-    const drawing = result[0]
     if (!drawing) return null
 
     const files = await db
@@ -58,11 +56,10 @@ export const createDrawing = createServerFn({ method: "POST" })
     const userId = context.session.user.id
     const id = randomUUID()
     const now = new Date()
-    const name = data.name ?? "Untitled"
 
     await db.insert(drawings).values({
       id,
-      name,
+      name: data.name ?? "Untitled",
       data: JSON.stringify({ elements: [], appState: {} }),
       folderId: data.folderId ?? null,
       ownerId: userId,
@@ -81,21 +78,20 @@ export const updateDrawing = createServerFn({ method: "POST" })
       id: z.string(),
       updateData: z.object({
         name: z.string().optional(),
-        data: z.string().optional(),
-        thumbnail: z.string().optional(),
         folderId: z.string().nullable().optional(),
       }),
     }),
   )
-  .handler(async ({ data: { updateData, id }, context }) => {
+  .handler(async ({ data: { id, updateData }, context }) => {
     const userId = context.session.user.id
-    const cleanedUpdateData = Object.fromEntries(
-      Object.entries(updateData).filter(([, value]) => value !== undefined),
-    )
-    await db
+    // Ownership is enforced in the statement itself; zero rows means "not
+    // found" so non-owners can't tell the resource exists.
+    const updated = await db
       .update(drawings)
-      .set({ ...cleanedUpdateData, updatedAt: new Date() })
+      .set({ ...updateData, updatedAt: new Date() })
       .where(and(eq(drawings.id, id), eq(drawings.ownerId, userId)))
+      .returning({ id: drawings.id })
+    if (updated.length === 0) throw new Error("Drawing not found")
   })
 
 export const saveDrawingScene = createServerFn({ method: "POST" })
@@ -111,21 +107,43 @@ export const saveDrawingScene = createServerFn({ method: "POST" })
     const userId = context.session.user.id
 
     await db.transaction(async (tx) => {
-      const [drawing] = await tx
-        .select({ id: drawings.id })
-        .from(drawings)
-        .where(and(eq(drawings.id, id), eq(drawings.ownerId, userId)))
-
-      if (!drawing) return
-
       const now = new Date()
 
-      await tx.update(drawings).set({ data: sceneData, updatedAt: now }).where(eq(drawings.id, id))
-      await tx.delete(drawingFiles).where(eq(drawingFiles.drawingId, id))
+      const updated = await tx
+        .update(drawings)
+        .set({ data: sceneData, updatedAt: now })
+        .where(and(eq(drawings.id, id), eq(drawings.ownerId, userId)))
+        .returning({ id: drawings.id })
+      if (updated.length === 0) throw new Error("Drawing not found")
 
-      if (files.length > 0) {
+      const existing = await tx
+        .select({ fileId: drawingFiles.fileId })
+        .from(drawingFiles)
+        .where(eq(drawingFiles.drawingId, id))
+      const existingFileIds = new Set(existing.map((row) => row.fileId))
+      const incomingFileIds = new Set(files.map((file) => file.fileId))
+
+      const fileIdsToRemove = [...existingFileIds].filter(
+        (fileId) => !incomingFileIds.has(fileId),
+      )
+      const filesToInsert = files.filter(
+        (file) => !existingFileIds.has(file.fileId),
+      )
+
+      if (fileIdsToRemove.length > 0) {
+        await tx
+          .delete(drawingFiles)
+          .where(
+            and(
+              eq(drawingFiles.drawingId, id),
+              inArray(drawingFiles.fileId, fileIdsToRemove),
+            ),
+          )
+      }
+
+      if (filesToInsert.length > 0) {
         await tx.insert(drawingFiles).values(
-          files.map((file) => ({
+          filesToInsert.map((file) => ({
             id: randomUUID(),
             drawingId: id,
             fileId: file.fileId,
@@ -141,43 +159,11 @@ export const saveDrawingScene = createServerFn({ method: "POST" })
 export const deleteDrawing = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
   .inputValidator(z.string())
-  .handler(async ({ data, context }) => {
-    const id = data
+  .handler(async ({ data: id, context }) => {
     const userId = context.session.user.id
-    await db
+    const deleted = await db
       .delete(drawings)
       .where(and(eq(drawings.id, id), eq(drawings.ownerId, userId)))
-  })
-
-export const updateDrawingFiles = createServerFn({ method: "POST" })
-  .middleware([authMiddleware])
-  .inputValidator(
-    z.object({
-      drawingId: z.string(),
-      files: z.array(persistedFileSchema),
-    }),
-  )
-  .handler(async ({ data: { drawingId, files }, context }) => {
-    const userId = context.session.user.id
-    const [drawing] = await db
-      .select({ id: drawings.id })
-      .from(drawings)
-      .where(and(eq(drawings.id, drawingId), eq(drawings.ownerId, userId)))
-
-    if (!drawing) return
-
-    await db.delete(drawingFiles).where(eq(drawingFiles.drawingId, drawingId))
-
-    if (files.length > 0) {
-      await db.insert(drawingFiles).values(
-        files.map((file) => ({
-          id: randomUUID(),
-          drawingId,
-          fileId: file.fileId,
-          mimeType: file.mimeType,
-          dataUrl: file.dataUrl,
-          createdAt: new Date(),
-        })),
-      )
-    }
+      .returning({ id: drawings.id })
+    if (deleted.length === 0) throw new Error("Drawing not found")
   })

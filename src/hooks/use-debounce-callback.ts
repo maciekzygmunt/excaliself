@@ -1,8 +1,12 @@
-import { useCallback, useEffect, useRef } from "react"
+import { useCallback, useRef } from "react"
 
-interface DebouncedCallback<TArgs extends unknown[]> {
+type DebouncedCallback<TArgs extends unknown[]> = {
+  /** Schedule (or reschedule) the callback to fire after the delay. */
   run: (...args: TArgs) => void
+  /** Drop any pending invocation. */
   cancel: () => void
+  /** Run any pending invocation immediately (e.g. on unmount). */
+  flush: () => void
 }
 
 export function useDebounceCallback<TArgs extends unknown[]>(
@@ -10,31 +14,40 @@ export function useDebounceCallback<TArgs extends unknown[]>(
   delayMs: number,
 ): DebouncedCallback<TArgs> {
   const callbackRef = useRef(callback)
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   callbackRef.current = callback
+
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const pendingArgsRef = useRef<TArgs | null>(null)
+
+  const cancel = useCallback(() => {
+    if (timeoutRef.current) clearTimeout(timeoutRef.current)
+    timeoutRef.current = null
+    pendingArgsRef.current = null
+  }, [])
+
+  const flush = useCallback(() => {
+    if (timeoutRef.current) clearTimeout(timeoutRef.current)
+    timeoutRef.current = null
+    const args = pendingArgsRef.current
+    pendingArgsRef.current = null
+    if (args) void callbackRef.current(...args)
+  }, [])
 
   const run = useCallback(
     (...args: TArgs) => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current)
-      }
+      pendingArgsRef.current = args
+      if (timeoutRef.current) clearTimeout(timeoutRef.current)
       timeoutRef.current = setTimeout(() => {
-        void callbackRef.current(...args)
+        timeoutRef.current = null
+        const queued = pendingArgsRef.current
+        pendingArgsRef.current = null
+        if (queued) void callbackRef.current(...queued)
       }, delayMs)
     },
     [delayMs],
   )
 
-  const cancel = useCallback(() => {
-    if (!timeoutRef.current) return
-    clearTimeout(timeoutRef.current)
-    timeoutRef.current = null
-  }, [])
-
-  useEffect(() => cancel, [cancel])
-
-  return {
-    run,
-    cancel,
-  }
+  // No cleanup on unmount: whether a pending invocation should be cancelled,
+  // flushed, or left to fire is the caller's policy via cancel()/flush().
+  return { run, cancel, flush }
 }

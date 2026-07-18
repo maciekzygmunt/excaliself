@@ -2,19 +2,21 @@ services:
   db:
     image: postgres:17-alpine
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-excalidraw}
+      POSTGRES_USER: ${POSTGRES_USER:-excaliself}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
-      POSTGRES_DB: ${POSTGRES_DB:-excalidraw}
+      POSTGRES_DB: ${POSTGRES_DB:-excaliself}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     restart: unless-stopped
 
-  excalidraw:
+  excaliself:
     build: .
     ports:
       - "3000:3000"
     environment:
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-excalidraw}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@db:5432/${POSTGRES_DB:-excalidraw}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-excaliself}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@db:5432/${POSTGRES_DB:-excaliself}
       - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET:?Set BETTER_AUTH_SECRET in .env}
       - BASE_URL=${BASE_URL:-http://localhost:3000}
     depends_on:
