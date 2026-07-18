@@ -3,12 +3,12 @@ import { useMutation } from "@tanstack/react-query"
 import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router"
 import { createServerFn } from "@tanstack/react-start"
 import { toast } from "sonner"
-import { z } from "zod"
 import { AuthPage } from "@/components/auth-page"
 import { FormTextField } from "@/components/form-text-field"
 import { Button } from "@/components/ui/button"
 import { FieldGroup } from "@/components/ui/field"
-import { consumeInvite, validateInvite } from "@/features/auth/server"
+import { registerFormSchema } from "@/features/auth/schema"
+import { consumeInvite, validateInvite } from "@/features/invites/server"
 import { auth } from "@/lib/auth"
 
 const registerWithInvite = createServerFn({ method: "POST" })
@@ -49,23 +49,6 @@ export const Route = createFileRoute("/invite")({
   component: InvitePage,
 })
 
-const formSchema = z
-  .object({
-    name: z.string().min(1),
-    email: z.email(),
-    password: z.string().min(8),
-    confirmPassword: z.string().min(8),
-  })
-  .superRefine(({ password, confirmPassword }, ctx) => {
-    if (password !== confirmPassword) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["confirmPassword"],
-        message: "Passwords do not match",
-      })
-    }
-  })
-
 function InvitePage() {
   const { token } = Route.useSearch()
   const navigate = useNavigate()
@@ -80,7 +63,7 @@ function InvitePage() {
 
   const form = useForm({
     defaultValues: { name: "", email: "", password: "", confirmPassword: "" },
-    validators: { onSubmit: formSchema },
+    validators: { onSubmit: registerFormSchema },
     onSubmit: async ({ value }) => {
       await register({
         data: {

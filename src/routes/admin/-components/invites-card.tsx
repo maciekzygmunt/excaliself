@@ -2,8 +2,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Check, Copy, Plus, Trash2 } from "lucide-react"
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
-import { pendingInvitesQueryOptions } from "@/features/auth/queries"
-import { createInvite, deleteInvite } from "@/features/auth/server"
+import { pendingInvitesQueryOptions } from "@/features/invites/queries"
+import { createInvite, deleteInvite } from "@/features/invites/server"
 
 export function InvitesSection() {
   const queryClient = useQueryClient()

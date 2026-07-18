@@ -3,6 +3,6 @@ import { getPendingInvites } from "./server"
 
 export const pendingInvitesQueryOptions = () =>
   queryOptions({
-    queryKey: ["admin", "invites"] as const,
+    queryKey: ["invites", "pending"] as const,
     queryFn: () => getPendingInvites(),
   })

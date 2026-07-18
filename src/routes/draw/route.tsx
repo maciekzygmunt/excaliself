@@ -36,8 +36,10 @@ function DrawLayout() {
       style={{ "--sidebar-width": "260px" } as React.CSSProperties}
     >
       <DrawSidebar
-        userEmail={session.user?.email ?? ""}
-        isAdmin={session.user.role === "admin"}
+        user={{
+          email: session.user?.email ?? "",
+          isAdmin: session.user.role === "admin",
+        }}
       />
       <SidebarInset className="overflow-clip">
         <Outlet />

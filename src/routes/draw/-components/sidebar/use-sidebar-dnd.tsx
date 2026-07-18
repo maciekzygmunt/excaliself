@@ -6,9 +6,9 @@ import {
   useContext,
   useState,
 } from "react"
-import type { Drawing } from "@/features/drawings/queries"
+import { type Drawing, drawingsQueryOptions } from "@/features/drawings/queries"
 import { updateDrawing } from "@/features/drawings/server"
-import type { Folder } from "@/features/folders/queries"
+import { type Folder, foldersQueryOptions } from "@/features/folders/queries"
 import { updateFolder } from "@/features/folders/server"
 import {
   patchById,
@@ -35,7 +35,7 @@ function useSidebarDnDValue({ drawings, foldersById }: Options) {
     Drawing,
     Parameters<typeof updateDrawing>[0]
   >({
-    queryKey: ["drawings"],
+    queryKey: drawingsQueryOptions().queryKey,
     mutationFn: updateDrawing,
     optimisticUpdate: (list, { data }) =>
       patchById(list, data.id, { folderId: data.updateData.folderId }),
@@ -45,7 +45,7 @@ function useSidebarDnDValue({ drawings, foldersById }: Options) {
     Folder,
     Parameters<typeof updateFolder>[0]
   >({
-    queryKey: ["folders"],
+    queryKey: foldersQueryOptions().queryKey,
     mutationFn: updateFolder,
     optimisticUpdate: (list, { data }) =>
       patchById(list, data.id, { parentId: data.parentId }),
@@ -98,13 +98,9 @@ function useSidebarDnDValue({ drawings, foldersById }: Options) {
       setDropTarget(null)
       setDragItem(null)
 
+      if (isInvalidFolderTarget(dragItem, target)) return
+
       if (dragItem.type === "folder") {
-        if (
-          targetFolderId === dragItem.id ||
-          isDescendantFolder(dragItem.id, targetFolderId, foldersById)
-        ) {
-          return
-        }
         moveFolder.mutate({
           data: { id: dragItem.id, parentId: targetFolderId },
         })
@@ -117,7 +113,7 @@ function useSidebarDnDValue({ drawings, foldersById }: Options) {
         data: { id: dragItem.id, updateData: { folderId: targetFolderId } },
       })
     },
-    [dragItem, drawings, foldersById, moveDrawing, moveFolder],
+    [dragItem, drawings, isInvalidFolderTarget, moveDrawing, moveFolder],
   )
 
   return {

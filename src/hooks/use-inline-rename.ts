@@ -2,10 +2,10 @@ import {
   type ChangeEvent,
   type KeyboardEvent,
   type MouseEvent,
-  useEffect,
   useRef,
   useState,
 } from "react"
+import { useDeferredFocusSelect } from "./use-deferred-focus-select"
 
 // When a rename is triggered from a closing dropdown, the menu briefly steals
 // focus from our input. Blurs within this window are ignored so the rename
@@ -29,17 +29,7 @@ export function useInlineRename({ onSubmit }: Options) {
   const inputRef = useRef<HTMLInputElement | null>(null)
   const startedAtRef = useRef(0)
 
-  // Sync DOM focus with `isRenaming`. We wait one frame so that the closing
-  // dropdown's focus management has run before we claim focus — otherwise it
-  // would steal focus right after we set it.
-  useEffect(() => {
-    if (!isRenaming) return
-    const frame = requestAnimationFrame(() => {
-      inputRef.current?.focus()
-      inputRef.current?.select()
-    })
-    return () => cancelAnimationFrame(frame)
-  }, [isRenaming])
+  useDeferredFocusSelect(inputRef, isRenaming)
 
   const submit = () => {
     onSubmit(value)

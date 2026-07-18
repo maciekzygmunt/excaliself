@@ -9,12 +9,12 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { authClient } from "@/lib/auth-client"
 
-type Props = {
-  userEmail: string
+export type SidebarUser = {
+  email: string
   isAdmin: boolean
 }
 
-export function SidebarUserMenu({ userEmail, isAdmin }: Props) {
+export function SidebarUserMenu({ user }: { user: SidebarUser }) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -23,11 +23,11 @@ export function SidebarUserMenu({ userEmail, isAdmin }: Props) {
           className="flex w-full items-center gap-2 rounded-md px-2 py-2 transition-colors hover:bg-sidebar-accent focus-visible:bg-sidebar-accent focus-visible:outline-none"
         >
           <div className="flex h-6 w-6 items-center justify-center rounded-full bg-muted-foreground/20 text-[10px] font-medium text-sidebar-foreground">
-            {userEmail.charAt(0).toUpperCase()}
+            {user.email.charAt(0).toUpperCase()}
           </div>
           <div className="flex-1 min-w-0 text-left">
             <div className="truncate text-sm text-sidebar-foreground/80">
-              {userEmail}
+              {user.email}
             </div>
           </div>
           <Settings className="h-[13px] w-[13px] shrink-0 text-muted-foreground/30" />
@@ -39,7 +39,7 @@ export function SidebarUserMenu({ userEmail, isAdmin }: Props) {
         align="start"
         sideOffset={4}
       >
-        {isAdmin && (
+        {user.isAdmin && (
           <>
             <DropdownMenuItem asChild>
               <Link to="/admin">

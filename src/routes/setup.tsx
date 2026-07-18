@@ -2,12 +2,12 @@ import { useForm } from "@tanstack/react-form"
 import { useMutation } from "@tanstack/react-query"
 import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router"
 import { toast } from "sonner"
-import { z } from "zod"
 import { AuthPage } from "@/components/auth-page"
 import { FormTextField } from "@/components/form-text-field"
 import { Button } from "@/components/ui/button"
 import { FieldGroup } from "@/components/ui/field"
 import { getUserCount, setupAdmin } from "@/features/admin/server"
+import { registerFormSchema } from "@/features/auth/schema"
 
 export const Route = createFileRoute("/setup")({
   beforeLoad: async () => {
@@ -16,23 +16,6 @@ export const Route = createFileRoute("/setup")({
   },
   component: SetupPage,
 })
-
-const formSchema = z
-  .object({
-    name: z.string().min(1),
-    email: z.email(),
-    password: z.string().min(8),
-    confirmPassword: z.string().min(8),
-  })
-  .superRefine(({ password, confirmPassword }, ctx) => {
-    if (password !== confirmPassword) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["confirmPassword"],
-        message: "Passwords do not match",
-      })
-    }
-  })
 
 function SetupPage() {
   const navigate = useNavigate()
@@ -52,7 +35,7 @@ function SetupPage() {
       password: "",
       confirmPassword: "",
     },
-    validators: { onSubmit: formSchema },
+    validators: { onSubmit: registerFormSchema },
     onSubmit: async ({ value }) => {
       await createAdmin({ data: value })
     },

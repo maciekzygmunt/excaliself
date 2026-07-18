@@ -3,17 +3,13 @@ import { Link, useNavigate, useParams } from "@tanstack/react-router"
 import { File } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar"
-import { useRenameDrawing } from "@/features/drawings/mutations"
 import {
-  drawingQueryOptions,
-  drawingsQueryOptions,
-} from "@/features/drawings/queries"
-import { createDrawing, deleteDrawing } from "@/features/drawings/server"
+  useDeleteDrawing,
+  useRenameDrawing,
+} from "@/features/drawings/mutations"
+import { drawingsQueryOptions } from "@/features/drawings/queries"
+import { createDrawing } from "@/features/drawings/server"
 import { useInlineRename } from "@/hooks/use-inline-rename"
-import {
-  removeById,
-  useOptimisticListMutation,
-} from "@/hooks/use-optimistic-list-mutation"
 import { cn } from "@/lib/utils"
 import { TreeRowActions } from "./TreeRowActions"
 import type { Drawing } from "./tree"
@@ -37,25 +33,13 @@ export function DrawingItem({ drawing }: DrawingItemProps) {
     onSubmit: (newName) => {
       const trimmed = newName.trim()
       if (!trimmed || trimmed === drawing.name) return
-      renameMutation.mutate(
-        { data: { id: drawing.id, updateData: { name: trimmed } } },
-        {
-          onSettled: () => {
-            queryClient.invalidateQueries(drawingQueryOptions(drawing.id))
-          },
-        },
-      )
+      renameMutation.mutate({
+        data: { id: drawing.id, updateData: { name: trimmed } },
+      })
     },
   })
 
-  const deleteMutation = useOptimisticListMutation<
-    Drawing,
-    Parameters<typeof deleteDrawing>[0]
-  >({
-    queryKey: drawingsQueryOptions().queryKey,
-    mutationFn: deleteDrawing,
-    optimisticUpdate: (list, { data: id }) => removeById(list, id),
-  })
+  const deleteMutation = useDeleteDrawing()
 
   const createMutation = useMutation({
     mutationFn: createDrawing,

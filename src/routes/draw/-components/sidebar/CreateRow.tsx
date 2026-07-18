@@ -1,13 +1,14 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { useNavigate } from "@tanstack/react-router"
 import { File, Folder } from "lucide-react"
-import { useEffect, useRef, useState } from "react"
+import { useRef, useState } from "react"
 import { Input } from "@/components/ui/input"
 import { SidebarMenuItem } from "@/components/ui/sidebar"
 import { drawingsQueryOptions } from "@/features/drawings/queries"
 import { createDrawing } from "@/features/drawings/server"
 import { foldersQueryOptions } from "@/features/folders/queries"
 import { createFolder } from "@/features/folders/server"
+import { useDeferredFocusSelect } from "@/hooks/use-deferred-focus-select"
 
 const DEFAULT_NAMES = {
   drawing: "Untitled",
@@ -39,15 +40,7 @@ export function CreateRow({ type, onClose }: Props) {
     onSettled: () => queryClient.invalidateQueries(foldersQueryOptions()),
   })
 
-  // Focus + select on mount, deferred a frame so the parent dropdown's
-  // closing focus management runs first and doesn't steal it back.
-  useEffect(() => {
-    const frame = requestAnimationFrame(() => {
-      inputRef.current?.focus()
-      inputRef.current?.select()
-    })
-    return () => cancelAnimationFrame(frame)
-  }, [])
+  useDeferredFocusSelect(inputRef)
 
   const submit = async () => {
     if (submittedRef.current) return

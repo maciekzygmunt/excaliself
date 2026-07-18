@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router"
 import { ArrowLeft } from "lucide-react"
 import { usersQueryOptions } from "@/features/admin/queries"
-import { pendingInvitesQueryOptions } from "@/features/auth/queries"
+import { pendingInvitesQueryOptions } from "@/features/invites/queries"
 import { adminMiddleware } from "@/middleware/admin"
 import { setupMiddleware } from "@/middleware/setup"
 import { InvitesSection } from "./-components/invites-card"

@@ -24,7 +24,6 @@ type Options<TItem, TVariables, TData> = {
   queryKey: QueryKey
   mutationFn: MutationFunction<TData, TVariables>
   optimisticUpdate: (previous: TItem[], variables: TVariables) => TItem[]
-  invalidateOnSettled?: readonly QueryKey[]
 }
 
 /**
@@ -36,7 +35,6 @@ export function useOptimisticListMutation<TItem, TVariables, TData = unknown>({
   queryKey,
   mutationFn,
   optimisticUpdate,
-  invalidateOnSettled,
 }: Options<TItem, TVariables, TData>) {
   const queryClient = useQueryClient()
 
@@ -54,10 +52,7 @@ export function useOptimisticListMutation<TItem, TVariables, TData = unknown>({
       queryClient.setQueryData(queryKey, context?.previous)
     },
     onSettled: () => {
-      const keys = invalidateOnSettled ?? [queryKey]
-      for (const key of keys) {
-        queryClient.invalidateQueries({ queryKey: key })
-      }
+      queryClient.invalidateQueries({ queryKey })
     },
   })
 }

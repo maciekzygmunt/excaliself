@@ -60,10 +60,6 @@ export const getPendingInvites = createServerFn({ method: "GET" })
       .where(and(isNull(invites.usedAt), gt(invites.expiresAt, new Date()))),
   )
 
-export const getAllInvites = createServerFn({ method: "GET" })
-  .middleware([adminMiddleware])
-  .handler(async () => db.select().from(invites))
-
 export const deleteInvite = createServerFn({ method: "POST" })
   .middleware([adminMiddleware])
   .inputValidator(z.string())

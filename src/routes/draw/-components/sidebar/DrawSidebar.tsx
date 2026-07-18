@@ -19,19 +19,14 @@ import { foldersQueryOptions } from "@/features/folders/queries"
 import { cn } from "@/lib/utils"
 import { CreateRow } from "./CreateRow"
 import { SidebarSearch } from "./SidebarSearch"
-import { SidebarUserMenu } from "./SidebarUserMenu"
+import { type SidebarUser, SidebarUserMenu } from "./SidebarUserMenu"
 import { TreeNodeItem } from "./TreeNodeItem"
 import { buildTree, filterTreeBySearch, treeNodeKey } from "./tree"
 import { SidebarDnDProvider, useSidebarDnD } from "./use-sidebar-dnd"
 
-type DrawSidebarProps = {
-  userEmail: string
-  isAdmin: boolean
-}
-
 type CreateType = "drawing" | "folder"
 
-export function DrawSidebar({ userEmail, isAdmin }: DrawSidebarProps) {
+export function DrawSidebar({ user }: { user: SidebarUser }) {
   const { data: drawings = [] } = useQuery(drawingsQueryOptions())
   const { data: folders = [] } = useQuery(foldersQueryOptions())
   const [searchQuery, setSearchQuery] = useState("")
@@ -80,7 +75,7 @@ export function DrawSidebar({ userEmail, isAdmin }: DrawSidebarProps) {
         />
 
         <SidebarFooter className="gap-0 border-t border-sidebar-border px-3 pb-3 pt-1">
-          <SidebarUserMenu userEmail={userEmail} isAdmin={isAdmin} />
+          <SidebarUserMenu user={user} />
         </SidebarFooter>
       </Sidebar>
     </SidebarDnDProvider>
