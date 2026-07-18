@@ -9,7 +9,8 @@ import {
 import type { ReactNode } from "react"
 import { afterEach, beforeEach, expect, test, vi } from "vitest"
 import { createDrawing } from "@/features/drawings/server"
-import { CreateDrawingDialog } from "./CreateDrawingDialog"
+import { createFolder } from "@/features/folders/server"
+import { CreateDialog } from "./CreateDialog"
 
 const { navigate } = vi.hoisted(() => ({ navigate: vi.fn() }))
 
@@ -21,6 +22,12 @@ vi.mock("@/features/drawings/server", () => ({
   createDrawing: vi.fn(),
   updateDrawing: vi.fn(),
   deleteDrawing: vi.fn(),
+}))
+
+vi.mock("@/features/folders/server", () => ({
+  createFolder: vi.fn(),
+  updateFolder: vi.fn(),
+  deleteFolder: vi.fn(),
 }))
 
 function wrapper({ children }: { children: ReactNode }) {
@@ -42,7 +49,10 @@ const NEW_DRAWING_ID = "11111111-1111-1111-1111-111111111111"
 test("typing a name and pressing Enter creates the drawing and navigates to its canvas", async () => {
   vi.mocked(createDrawing).mockResolvedValue(NEW_DRAWING_ID)
 
-  render(<CreateDrawingDialog open onOpenChange={vi.fn()} />, { wrapper })
+  render(
+    <CreateDialog open onOpenChange={vi.fn()} target={{ kind: "drawing" }} />,
+    { wrapper },
+  )
 
   const input = screen.getByPlaceholderText(/drawing name/i)
   fireEvent.change(input, { target: { value: "Retro board" } })
@@ -68,10 +78,10 @@ test("folder-invoked dialog shows its scope and creates the drawing in that fold
   )
 
   render(
-    <CreateDrawingDialog
+    <CreateDialog
       open
       onOpenChange={vi.fn()}
-      folder={{ id: "folder-1", name: "Projects" }}
+      target={{ kind: "drawing", folder: { id: "folder-1", name: "Projects" } }}
     />,
     { wrapper },
   )
@@ -88,10 +98,50 @@ test("folder-invoked dialog shows its scope and creates the drawing in that fold
   })
 })
 
+test("folder target creates a root folder on Enter and does not navigate", async () => {
+  vi.mocked(createFolder).mockResolvedValue({
+    id: "33333333-3333-3333-3333-333333333333",
+    name: "Projects",
+    ownerId: "user-1",
+    parentId: null,
+    createdAt: new Date(0),
+    updatedAt: new Date(0),
+  })
+  const onOpenChange = vi.fn()
+
+  render(
+    <CreateDialog
+      open
+      onOpenChange={onOpenChange}
+      target={{ kind: "folder" }}
+    />,
+    { wrapper },
+  )
+
+  const input = screen.getByPlaceholderText(/folder name/i)
+  fireEvent.change(input, { target: { value: "Projects" } })
+  fireEvent.keyDown(input, { key: "Enter" })
+
+  await waitFor(() => expect(createFolder).toHaveBeenCalledTimes(1))
+  expect(vi.mocked(createFolder).mock.calls[0]?.[0]).toEqual({
+    data: { name: "Projects", parentId: null },
+  })
+  await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
+  expect(createDrawing).not.toHaveBeenCalled()
+  expect(navigate).not.toHaveBeenCalled()
+})
+
 test("Escape dismisses the dialog without creating anything", async () => {
   const onOpenChange = vi.fn()
 
-  render(<CreateDrawingDialog open onOpenChange={onOpenChange} />, { wrapper })
+  render(
+    <CreateDialog
+      open
+      onOpenChange={onOpenChange}
+      target={{ kind: "drawing" }}
+    />,
+    { wrapper },
+  )
 
   const input = screen.getByPlaceholderText(/drawing name/i)
   fireEvent.change(input, { target: { value: "Almost created" } })
@@ -114,7 +164,11 @@ test("reopening after a successful create starts with an empty name", async () =
   const onOpenChange = vi.fn()
 
   const { rerender } = render(
-    <CreateDrawingDialog open onOpenChange={onOpenChange} />,
+    <CreateDialog
+      open
+      onOpenChange={onOpenChange}
+      target={{ kind: "drawing" }}
+    />,
     { wrapper },
   )
 
@@ -123,8 +177,20 @@ test("reopening after a successful create starts with an empty name", async () =
   fireEvent.keyDown(input, { key: "Enter" })
   await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
 
-  rerender(<CreateDrawingDialog open={false} onOpenChange={onOpenChange} />)
-  rerender(<CreateDrawingDialog open onOpenChange={onOpenChange} />)
+  rerender(
+    <CreateDialog
+      open={false}
+      onOpenChange={onOpenChange}
+      target={{ kind: "drawing" }}
+    />,
+  )
+  rerender(
+    <CreateDialog
+      open
+      onOpenChange={onOpenChange}
+      target={{ kind: "drawing" }}
+    />,
+  )
 
   const reopened =
     screen.getByPlaceholderText<HTMLInputElement>(/drawing name/i)
@@ -132,7 +198,10 @@ test("reopening after a successful create starts with an empty name", async () =
 })
 
 test("pressing Enter with an empty name creates nothing", async () => {
-  render(<CreateDrawingDialog open onOpenChange={vi.fn()} />, { wrapper })
+  render(
+    <CreateDialog open onOpenChange={vi.fn()} target={{ kind: "drawing" }} />,
+    { wrapper },
+  )
 
   const input = screen.getByPlaceholderText(/drawing name/i)
   fireEvent.change(input, { target: { value: "   " } })

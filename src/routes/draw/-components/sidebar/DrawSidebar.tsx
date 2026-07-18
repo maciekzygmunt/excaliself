@@ -18,8 +18,7 @@ import {
 import { drawingsQueryOptions } from "@/features/drawings/queries"
 import { foldersQueryOptions } from "@/features/folders/queries"
 import { cn } from "@/lib/utils"
-import { useCreateDrawingDialog } from "../CreateDrawingDialog"
-import { CreateFolderRow } from "./CreateFolderRow"
+import { useCreateDialog } from "../CreateDialog"
 import { Kbd } from "./Kbd"
 import { SidebarSearch } from "./SidebarSearch"
 import { type SidebarUser, SidebarUserMenu } from "./SidebarUserMenu"
@@ -31,8 +30,7 @@ export function DrawSidebar({ user }: { user: SidebarUser }) {
   const { data: drawings = [] } = useQuery(drawingsQueryOptions())
   const { data: folders = [] } = useQuery(foldersQueryOptions())
   const [searchQuery, setSearchQuery] = useState("")
-  const [isCreatingFolder, setIsCreatingFolder] = useState(false)
-  const { openCreateDrawingDialog } = useCreateDrawingDialog()
+  const { openCreateDrawingDialog, openCreateFolderDialog } = useCreateDialog()
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -103,16 +101,12 @@ export function DrawSidebar({ user }: { user: SidebarUser }) {
             </span>
             <CreateMenu
               onCreateDrawing={() => openCreateDrawingDialog()}
-              onCreateFolder={() => setIsCreatingFolder(true)}
+              onCreateFolder={openCreateFolderDialog}
             />
           </div>
         </div>
 
-        <TreeBody
-          displayTree={displayTree}
-          isCreatingFolder={isCreatingFolder}
-          onCloseFolderCreate={() => setIsCreatingFolder(false)}
-        />
+        <TreeBody displayTree={displayTree} />
 
         <SidebarFooter className="gap-0 p-2">
           <SidebarUserMenu user={user} />
@@ -138,12 +132,8 @@ function SidebarToggle() {
 
 function TreeBody({
   displayTree,
-  isCreatingFolder,
-  onCloseFolderCreate,
 }: {
   displayTree: ReturnType<typeof buildTree>
-  isCreatingFolder: boolean
-  onCloseFolderCreate: () => void
 }) {
   const { dropTarget, onDragOver, onDragLeave, onDrop } = useSidebarDnD()
 
@@ -161,9 +151,6 @@ function TreeBody({
           onDrop={onDrop({ type: "root" })}
         >
           <SidebarMenu className="gap-0">
-            {isCreatingFolder && (
-              <CreateFolderRow onClose={onCloseFolderCreate} />
-            )}
             {displayTree.map((node) => (
               <TreeNodeItem key={treeNodeKey(node)} node={node} />
             ))}

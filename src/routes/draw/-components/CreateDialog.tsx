@@ -12,27 +12,36 @@ import {
 import { toast } from "sonner"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { useCreateDrawing } from "@/features/drawings/mutations"
+import { useCreateFolder } from "@/features/folders/mutations"
 import { Kbd } from "./sidebar/Kbd"
 
 export type FolderScope = { id: string; name: string }
 
-type CreateDrawingDialogProps = {
+export type CreateTarget =
+  | { kind: "drawing"; folder?: FolderScope | null }
+  | { kind: "folder" }
+
+type CreateDialogProps = {
   open: boolean
   onOpenChange: (open: boolean) => void
-  folder?: FolderScope | null
+  target: CreateTarget
 }
 
-export function CreateDrawingDialog({
+export function CreateDialog({
   open,
   onOpenChange,
-  folder = null,
-}: CreateDrawingDialogProps) {
+  target,
+}: CreateDialogProps) {
   const navigate = useNavigate()
-  const createMutation = useCreateDrawing()
+  const createDrawingMutation = useCreateDrawing()
+  const createFolderMutation = useCreateFolder()
   const [name, setName] = useState("")
   // Synchronous guard against a double Enter racing ahead of isPending's
-  // re-render (same pattern as the sidebar's CreateRow).
+  // re-render (same pattern the inline folder row used).
   const submittedRef = useRef(false)
+
+  const isPending =
+    createDrawingMutation.isPending || createFolderMutation.isPending
 
   // The provider keeps this component mounted across opens — reset on every
   // open so a previously created name can't leak into the next session
@@ -45,18 +54,31 @@ export function CreateDrawingDialog({
     if (!trimmed || submittedRef.current) return
     submittedRef.current = true
     try {
-      const id = await createMutation.mutateAsync({
-        data: { name: trimmed, folderId: folder?.id ?? null },
-      })
-      onOpenChange(false)
-      navigate({ to: "/draw/$id", params: { id } })
+      if (target.kind === "drawing") {
+        const id = await createDrawingMutation.mutateAsync({
+          data: { name: trimmed, folderId: target.folder?.id ?? null },
+        })
+        onOpenChange(false)
+        navigate({ to: "/draw/$id", params: { id } })
+      } else {
+        await createFolderMutation.mutateAsync({
+          data: { name: trimmed, parentId: null },
+        })
+        onOpenChange(false)
+      }
     } catch {
       // Keep the dialog open so the typed name isn't lost
-      toast.error("Failed to create drawing")
+      toast.error(
+        target.kind === "drawing"
+          ? "Failed to create drawing"
+          : "Failed to create folder",
+      )
     } finally {
       submittedRef.current = false
     }
   }
+
+  const folder = target.kind === "drawing" ? (target.folder ?? null) : null
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -64,7 +86,9 @@ export function CreateDrawingDialog({
         showCloseButton={false}
         className="top-[30%] translate-y-0 gap-0 overflow-hidden p-0 sm:max-w-sm"
       >
-        <DialogTitle className="sr-only">Create drawing</DialogTitle>
+        <DialogTitle className="sr-only">
+          {target.kind === "drawing" ? "Create drawing" : "Create folder"}
+        </DialogTitle>
         <div className="flex items-center gap-2.5 px-4 py-3.5">
           <Plus className="h-4 w-4 shrink-0 text-iris" strokeWidth={2.5} />
           <input
@@ -78,8 +102,10 @@ export function CreateDrawingDialog({
                 submit()
               }
             }}
-            disabled={createMutation.isPending}
-            placeholder="Drawing name…"
+            disabled={isPending}
+            placeholder={
+              target.kind === "drawing" ? "Drawing name…" : "Folder name…"
+            }
             className="flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground/60 disabled:opacity-50"
           />
         </div>
@@ -91,7 +117,7 @@ export function CreateDrawingDialog({
             </span>
           ) : (
             <span className="text-xs text-muted-foreground/60">
-              New drawing
+              {target.kind === "drawing" ? "New drawing" : "New folder"}
             </span>
           )}
           <span className="flex items-center gap-1 text-xs text-muted-foreground/60">
@@ -103,39 +129,41 @@ export function CreateDrawingDialog({
   )
 }
 
-type CreateDrawingDialogContextValue = {
+type CreateDialogContextValue = {
   openCreateDrawingDialog: (folder?: FolderScope) => void
+  openCreateFolderDialog: () => void
 }
 
-const CreateDrawingDialogContext =
-  createContext<CreateDrawingDialogContextValue | null>(null)
+const CreateDialogContext = createContext<CreateDialogContextValue | null>(null)
 
-export function CreateDrawingDialogProvider({
-  children,
-}: {
-  children: ReactNode
-}) {
+export function CreateDialogProvider({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false)
-  const [folder, setFolder] = useState<FolderScope | null>(null)
+  // Kept across close so the content doesn't flip during the exit animation
+  const [target, setTarget] = useState<CreateTarget>({ kind: "drawing" })
 
-  const openCreateDrawingDialog = useCallback((scope?: FolderScope) => {
-    setFolder(scope ?? null)
+  const openCreateDrawingDialog = useCallback((folder?: FolderScope) => {
+    setTarget({ kind: "drawing", folder: folder ?? null })
+    setOpen(true)
+  }, [])
+
+  const openCreateFolderDialog = useCallback(() => {
+    setTarget({ kind: "folder" })
     setOpen(true)
   }, [])
 
   return (
-    <CreateDrawingDialogContext.Provider value={{ openCreateDrawingDialog }}>
+    <CreateDialogContext.Provider
+      value={{ openCreateDrawingDialog, openCreateFolderDialog }}
+    >
       {children}
-      <CreateDrawingDialog open={open} onOpenChange={setOpen} folder={folder} />
-    </CreateDrawingDialogContext.Provider>
+      <CreateDialog open={open} onOpenChange={setOpen} target={target} />
+    </CreateDialogContext.Provider>
   )
 }
 
-export function useCreateDrawingDialog() {
-  const ctx = useContext(CreateDrawingDialogContext)
+export function useCreateDialog() {
+  const ctx = useContext(CreateDialogContext)
   if (!ctx)
-    throw new Error(
-      "useCreateDrawingDialog must be used within CreateDrawingDialogProvider",
-    )
+    throw new Error("useCreateDialog must be used within CreateDialogProvider")
   return ctx
 }

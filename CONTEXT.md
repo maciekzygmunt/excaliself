@@ -15,7 +15,7 @@ A single Excalidraw document owned by a user, identified by id, living in the fo
 The inset region to the right of the sidebar. Shows either an open Drawing or Home.
 
 ### Create dialog
-The single way a Drawing is created: a command-style dialog where the user types a name and confirms. Every Drawing is deliberately named at birth; the app never creates a Drawing on the user's behalf.
+The single way a Drawing or folder is created: a command-style dialog where the user types a name and confirms. Everything is deliberately named at birth; the app never creates a Drawing on the user's behalf.
 
 ### Preview
 A non-interactive visual rendering of a Drawing's scene, shown on Home so drawings are recognizable by shape rather than name.

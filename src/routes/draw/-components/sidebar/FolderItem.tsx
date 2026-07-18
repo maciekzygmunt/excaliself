@@ -15,7 +15,7 @@ import {
 import { useDeleteFolder, useRenameFolder } from "@/features/folders/mutations"
 import { useInlineRename } from "@/hooks/use-inline-rename"
 import { cn } from "@/lib/utils"
-import { useCreateDrawingDialog } from "../CreateDrawingDialog"
+import { useCreateDialog } from "../CreateDialog"
 import { TreeNodeItem } from "./TreeNodeItem"
 import { TreeRowActions } from "./TreeRowActions"
 import {
@@ -55,7 +55,7 @@ export function FolderItem({ folder, childNodes }: FolderItemProps) {
   })
 
   const deleteMutation = useDeleteFolder()
-  const { openCreateDrawingDialog } = useCreateDrawingDialog()
+  const { openCreateDrawingDialog } = useCreateDialog()
 
   const containsActive = hasActiveDrawing(childNodes, currentDrawingId)
   const [isExpanded, setIsExpanded] = useState(containsActive)
