@@ -1,0 +1,10 @@
+node_modules
+.git
+.output
+.nitro
+.tanstack
+dist
+.env
+.env.*
+*.log
+.claude
