@@ -1,6 +1,7 @@
-import { createFileRoute } from "@tanstack/react-router"
+import { createFileRoute, redirect } from "@tanstack/react-router"
 import { Pencil } from "lucide-react"
 import { lazy, Suspense } from "react"
+import { toast } from "sonner"
 import { drawingQueryOptions } from "@/features/drawings/queries"
 
 const DrawingCanvas = lazy(() => import("./-components/DrawingCanvas"))
@@ -15,7 +16,16 @@ const LoadingState = () => (
 export const Route = createFileRoute("/draw/$id")({
   ssr: false,
   loader: async ({ params, context }) => {
-    await context.queryClient.ensureQueryData(drawingQueryOptions(params.id))
+    const drawing = await context.queryClient.ensureQueryData(
+      drawingQueryOptions(params.id),
+    )
+    // The server returns null for deleted drawings and drawings that aren't
+    // yours (deliberately indistinguishable) — land on Home, not a dead end.
+    // ssr is off, so this loader (and the toast) always runs on the client.
+    if (!drawing) {
+      toast.error("Drawing not found", { id: "drawing-not-found" })
+      throw redirect({ to: "/draw" })
+    }
   },
   component: DrawingPage,
   pendingComponent: LoadingState,

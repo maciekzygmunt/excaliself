@@ -78,7 +78,11 @@ export function treeNodeKey(node: TreeNode): string {
   return node.type === "folder" ? node.folder.id : node.drawing.id
 }
 
-export function hasActiveDrawing(nodes: TreeNode[], activeId: string): boolean {
+export function hasActiveDrawing(
+  nodes: TreeNode[],
+  activeId: string | undefined,
+): boolean {
+  if (!activeId) return false
   for (const node of nodes) {
     if (node.type === "drawing" && node.drawing.id === activeId) return true
     if (node.type === "folder" && hasActiveDrawing(node.children, activeId))

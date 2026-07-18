@@ -1,14 +1,11 @@
-import { useQueryClient } from "@tanstack/react-query"
 import { Link, useNavigate, useParams } from "@tanstack/react-router"
 import { File } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar"
 import {
-  useCreateDrawing,
   useDeleteDrawing,
   useRenameDrawing,
 } from "@/features/drawings/mutations"
-import { drawingsQueryOptions } from "@/features/drawings/queries"
 import { useInlineRename } from "@/hooks/use-inline-rename"
 import { cn } from "@/lib/utils"
 import { TreeRowActions } from "./TreeRowActions"
@@ -20,9 +17,9 @@ type DrawingItemProps = {
 }
 
 export function DrawingItem({ drawing }: DrawingItemProps) {
-  const queryClient = useQueryClient()
   const navigate = useNavigate()
-  const { id: currentDrawingId } = useParams({ from: "/draw/$id" })
+  // Non-strict: on Home no drawing is open and there is no $id param
+  const { id: currentDrawingId } = useParams({ strict: false })
   const { dragItem, onDragStart, onDragEnd } = useSidebarDnD()
 
   const isDragging = dragItem?.id === drawing.id
@@ -41,20 +38,10 @@ export function DrawingItem({ drawing }: DrawingItemProps) {
 
   const deleteMutation = useDeleteDrawing()
 
-  const createMutation = useCreateDrawing()
-
   const handleDelete = async () => {
     await deleteMutation.mutateAsync({ data: drawing.id })
-    if (drawing.id !== currentDrawingId) return
-
-    const remaining = queryClient.getQueryData(drawingsQueryOptions().queryKey)
-    const next = remaining?.[0]
-    if (next) {
-      navigate({ to: "/draw/$id", params: { id: next.id } })
-      return
-    }
-    const newId = await createMutation.mutateAsync({ data: {} })
-    navigate({ to: "/draw/$id", params: { id: newId } })
+    // Deleting the open drawing lands on Home, never on a dead URL
+    if (drawing.id === currentDrawingId) navigate({ to: "/draw" })
   }
 
   const content = (

@@ -32,7 +32,8 @@ type FolderItemProps = {
 }
 
 export function FolderItem({ folder, childNodes }: FolderItemProps) {
-  const { id: currentDrawingId } = useParams({ from: "/draw/$id" })
+  // Non-strict: on Home no drawing is open and there is no $id param
+  const { id: currentDrawingId } = useParams({ strict: false })
   const {
     dragItem,
     dropTarget,
