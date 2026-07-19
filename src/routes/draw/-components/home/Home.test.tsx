@@ -89,9 +89,11 @@ function makeDrawing(overrides: Partial<Drawing> & { id: string }): Drawing {
 function renderHome({
   drawings = [],
   folders = [],
+  isAdmin = false,
 }: {
   drawings?: Drawing[]
   folders?: Folder[]
+  isAdmin?: boolean
 } = {}) {
   // Seeded data is the fixture — keep react-query from refetching it through
   // the stubbed server functions.
@@ -102,7 +104,7 @@ function renderHome({
   client.setQueryData(foldersQueryOptions().queryKey, folders)
   return render(
     <QueryClientProvider client={client}>
-      <Home />
+      <Home isAdmin={isAdmin} />
     </QueryClientProvider>,
   )
 }
@@ -291,7 +293,7 @@ test("while drawings load, skeleton cards hold the grid — no empty state flash
   client.setQueryData(foldersQueryOptions().queryKey, [])
   render(
     <QueryClientProvider client={client}>
-      <Home />
+      <Home isAdmin={false} />
     </QueryClientProvider>,
   )
 
@@ -299,7 +301,9 @@ test("while drawings load, skeleton cards hold the grid — no empty state flash
   expect(
     loading.querySelectorAll('[data-slot="skeleton"]').length,
   ).toBeGreaterThan(0)
-  expect(screen.queryByText(/no drawings yet/i)).toBeNull()
+  expect(
+    screen.queryByRole("button", { name: /create your first drawing/i }),
+  ).toBeNull()
   expect(screen.queryAllByRole("link")).toHaveLength(0)
 })
 
@@ -318,13 +322,15 @@ test("the loaded grid fades in instead of swapping in a single frame", () => {
   expect(grid?.className).toContain("fade-in-0")
 })
 
-test("the empty state cascades in: icon, title, body, then button", () => {
+test("the empty state cascades in: illustration, CTA, then hint", () => {
   renderHome({ drawings: [] })
 
-  const emptyState = screen.getByText(/no drawings yet/i).parentElement
+  const emptyState = screen.getByRole("button", {
+    name: /create your first drawing/i,
+  }).parentElement
   const children = Array.from(emptyState?.children ?? [])
-  expect(children).toHaveLength(4)
-  const [icon, title, body, button] = children
+  expect(children).toHaveLength(3)
+  const [illustration, button, hint] = children
 
   for (const child of children) {
     expect(child.className).toContain("animate-in")
@@ -346,24 +352,53 @@ test("the empty state cascades in: icon, title, body, then button", () => {
   // Staggered in DOM order — via the animation-delay variable, because the
   // delay-* utility also sets transition-delay, which would lag the button's
   // hover/press feedback
-  expect(icon.className).not.toContain("--tw-animation-delay")
-  expect(title.className).toContain("[--tw-animation-delay:75ms]")
-  expect(body.className).toContain("[--tw-animation-delay:100ms]")
-  expect(button.className).toContain("[--tw-animation-delay:150ms]")
+  expect(illustration.className).not.toContain("--tw-animation-delay")
+  expect(button.className).toContain("[--tw-animation-delay:75ms]")
+  expect(hint.className).toContain("[--tw-animation-delay:100ms]")
 
-  // The icon tile additionally zooms from 95% — never from zero
-  expect(icon.className).toContain("zoom-in-95")
-  expect(icon.className).toContain("motion-reduce:zoom-in-100")
+  // The illustration tile additionally zooms from 95% — never from zero
+  expect(illustration.className).toContain("zoom-in-95")
+  expect(illustration.className).toContain("motion-reduce:zoom-in-100")
+})
+
+test("the empty state shows the hand-drawn illustration and the press-N hint", () => {
+  renderHome({ drawings: [] })
+
+  const emptyState = screen.getByRole("button", {
+    name: /create your first drawing/i,
+  }).parentElement
+  // The auth panel's illustration, reused: decorative, on the iris tone
+  const svg = emptyState?.querySelector('svg[aria-hidden="true"]')
+  expect(svg).toBeTruthy()
+  expect(svg?.parentElement?.className).toContain("bg-iris-muted")
+
+  expect(screen.getByText(/or press/i).textContent).toBe("or press N anytime")
 })
 
 test("zero drawings shows the empty state with a working create action", () => {
   renderHome({ drawings: [] })
 
-  expect(screen.getByText(/no drawings yet/i)).toBeTruthy()
-  expect(screen.queryAllByRole("link")).toHaveLength(0)
-
   fireEvent.click(
     screen.getByRole("button", { name: /create your first drawing/i }),
   )
   expect(openCreateDrawingDialog).toHaveBeenCalledTimes(1)
+})
+
+test("members never see the invite action", () => {
+  renderHome({ drawings: [], isAdmin: false })
+
+  expect(screen.queryAllByRole("link")).toHaveLength(0)
+})
+
+test("admins get a secondary invite action leading to the invites surface", () => {
+  renderHome({ drawings: [], isAdmin: true })
+
+  const invite = screen.getByRole("link", { name: /invite your team/i })
+  expect(invite.getAttribute("href")).toBe("/admin")
+
+  // It joins the cascade as the last step, after the hint
+  expect(invite.className).toContain("animate-in")
+  expect(invite.className).toContain("fill-mode-backwards")
+  expect(invite.className).toContain("[--tw-animation-delay:150ms]")
+  expect(invite.className).toContain("motion-reduce:slide-in-from-bottom-0")
 })
