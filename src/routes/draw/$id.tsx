@@ -3,7 +3,11 @@ import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router"
 import { Pencil } from "lucide-react"
 import { lazy, Suspense, useEffect } from "react"
 import { toast } from "sonner"
-import { drawingQueryOptions } from "@/features/drawings/queries"
+import {
+  drawingQueryOptions,
+  drawingsQueryOptions,
+} from "@/features/drawings/queries"
+import { useDocumentTitle } from "@/lib/document-title"
 
 const DrawingCanvas = lazy(() => import("./-components/DrawingCanvas"))
 
@@ -39,6 +43,15 @@ function DrawingPage() {
   const { id } = Route.useParams()
   const navigate = useNavigate()
   const { data: drawing } = useQuery(drawingQueryOptions(id))
+
+  // Title from the sidebar list cache, not the detail query: renames patch
+  // the list optimistically, so the tab tracks them without waiting for the
+  // server round-trip.
+  const { data: drawingName } = useQuery({
+    ...drawingsQueryOptions(),
+    select: (drawings) => drawings.find((d) => d.id === id)?.name,
+  })
+  useDocumentTitle(drawingName)
 
   // The loader only guards fresh loads: within staleTime it returns the
   // cached drawing without refetching, and the mount refetch that follows can
