@@ -11,6 +11,6 @@ export const Route = createFileRoute("/draw/")({
 })
 
 function HomeRoute() {
-  const { session } = layoutRoute.useLoaderData()
-  return <Home isAdmin={session.user.role === "admin"} />
+  const { isAdmin } = layoutRoute.useLoaderData()
+  return <Home isAdmin={isAdmin} />
 }

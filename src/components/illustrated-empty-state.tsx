@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils"
 // duration-*/delay-*/ease-*, which also set the transition-* side) so the
 // button's 150ms hover transition stays untouched. Reduced-motion drops the
 // slide/zoom, keeps the fade.
-const ENTER =
+const CASCADE =
   "animate-in fade-in-0 slide-in-from-bottom-2 animation-duration-300 [animation-timing-function:var(--ease-out)] fill-mode-backwards motion-reduce:slide-in-from-bottom-0"
 
 /**
@@ -34,7 +34,7 @@ export function IllustratedEmptyState({
           image. */}
       <div
         className={cn(
-          ENTER,
+          CASCADE,
           "zoom-in-95 motion-reduce:zoom-in-100",
           "mb-4 flex h-36 w-44 items-center justify-center rounded-2xl bg-iris-muted shadow-[inset_0_0_0_1px_var(--iris-ring)]",
         )}
@@ -43,9 +43,12 @@ export function IllustratedEmptyState({
       </div>
       <button
         type="button"
-        onClick={onCreate}
+        // Not passed as the handler directly: onCreate's implementations may
+        // take optional params (e.g. a folder scope) that a MouseEvent would
+        // masquerade as
+        onClick={() => onCreate()}
         className={cn(
-          ENTER,
+          CASCADE,
           "[--tw-animation-delay:75ms]",
           "flex items-center gap-1.5 rounded-lg bg-iris px-3.5 py-2 text-[13px] font-medium text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.2),0_1px_2px_rgba(20,20,45,0.2)] transition-[filter,scale] duration-150 hover:brightness-105 active:scale-[0.98]",
         )}
@@ -55,7 +58,7 @@ export function IllustratedEmptyState({
       </button>
       <p
         className={cn(
-          ENTER,
+          CASCADE,
           "[--tw-animation-delay:100ms]",
           "text-[13px] text-muted-foreground",
         )}
@@ -70,7 +73,7 @@ export function IllustratedEmptyState({
         <Link
           to={INVITES_ROUTE}
           className={cn(
-            ENTER,
+            CASCADE,
             "[--tw-animation-delay:150ms]",
             "mt-3 text-[13px] font-medium text-iris transition-colors duration-150 hover:text-iris-strong",
           )}

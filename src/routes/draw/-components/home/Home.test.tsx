@@ -382,6 +382,8 @@ test("zero drawings shows the empty state with a working create action", () => {
     screen.getByRole("button", { name: /create your first drawing/i }),
   )
   expect(openCreateDrawingDialog).toHaveBeenCalledTimes(1)
+  // Argumentless — a leaked click event would masquerade as a folder scope
+  expect(openCreateDrawingDialog).toHaveBeenCalledWith()
 })
 
 test("members never see the invite action", () => {
