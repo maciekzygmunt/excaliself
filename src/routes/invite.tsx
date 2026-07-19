@@ -1,6 +1,6 @@
 import { useForm } from "@tanstack/react-form"
 import { useMutation } from "@tanstack/react-query"
-import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router"
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router"
 import { toast } from "sonner"
 import { AuthPage } from "@/components/auth-page"
 import { FormTextField } from "@/components/form-text-field"
@@ -13,21 +13,47 @@ export const Route = createFileRoute("/invite")({
   validateSearch: (search: Record<string, unknown>) => ({
     token: (search.token as string) || "",
   }),
-  beforeLoad: async ({ search }) => {
-    if (!search.token) throw redirect({ to: "/login" })
-    const invite = await validateInvite({ data: search.token })
-    if (!invite) throw redirect({ to: "/login" })
+  loaderDeps: ({ search }) => ({ token: search.token }),
+  // A dead link renders an explanation in place — never a silent redirect
+  // to /login.
+  loader: async ({ deps }) => {
+    if (!deps.token) return { invite: null }
+    return { invite: await validateInvite({ data: deps.token }) }
   },
   component: InvitePage,
 })
 
 function InvitePage() {
+  const { invite } = Route.useLoaderData()
+  if (!invite) return <DeadInvitePage />
+  return <RegisterPage inviterName={invite.inviterName} />
+}
+
+function DeadInvitePage() {
+  return (
+    <AuthPage
+      title="This invite link isn't active"
+      subtitle="This invite link has expired or was already used. Ask the person who invited you for a new link."
+    >
+      <Button
+        asChild
+        className="w-full bg-foreground text-background hover:bg-foreground/90"
+      >
+        <Link to="/login">Go to sign in</Link>
+      </Button>
+    </AuthPage>
+  )
+}
+
+function RegisterPage({ inviterName }: { inviterName: string | null }) {
   const { token } = Route.useSearch()
   const navigate = useNavigate()
 
+  // registerWithInvite signs the new member in on the same request, so
+  // success goes straight to Home — no bounce through /login.
   const { mutateAsync: register } = useMutation({
     mutationFn: registerWithInvite,
-    onSuccess: () => navigate({ to: "/login" }),
+    onSuccess: () => navigate({ to: "/" }),
     onError: (err) => {
       toast.error(err instanceof Error ? err.message : "Registration failed")
     },
@@ -50,8 +76,8 @@ function InvitePage() {
 
   return (
     <AuthPage
-      title="You're invited"
-      subtitle="Create your account to start using Excaliself"
+      title={inviterName ? `${inviterName} invited you` : "You're invited"}
+      subtitle="Create your account"
     >
       <form
         onSubmit={(e) => {
