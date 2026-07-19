@@ -69,7 +69,7 @@ export function AuthPage({ title, subtitle, children }: Props) {
         {/* Sized on both axes so the svg letterboxes its drawing to fit —
             no cropping at narrow panel widths. */}
         <AuthIllustration className="absolute inset-0 m-auto h-[82%] w-[82%] text-iris" />
-        <p className="absolute bottom-8 left-8 text-sm text-muted-foreground">
+        <p className="absolute inset-x-0 bottom-8 text-center text-sm text-muted-foreground">
           Your team's whiteboard, on your server.
         </p>
       </div>
