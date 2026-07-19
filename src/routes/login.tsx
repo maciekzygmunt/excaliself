@@ -87,6 +87,10 @@ function LoginPage() {
             </Button>
           )}
         </form.Subscribe>
+        <div className="space-y-1 pt-2 text-center text-xs text-muted-foreground">
+          <p>Registration is invite-only on this instance</p>
+          <p>Forgot your password? Ask your admin to reset it.</p>
+        </div>
       </form>
     </AuthPage>
   )

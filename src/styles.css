@@ -62,6 +62,9 @@ code {
   --notion-terracotta: #6f66c9;
   --notion-terracotta-muted: rgba(111, 102, 201, 0.1);
   --notion-gold: #6f66c9;
+  /* Deep ink — brand surface for the auth illustration panel, same in both themes */
+  --deep-ink: oklch(0.155 0.008 60);
+  --deep-ink-foreground: oklch(0.93 0.005 75);
 }
 
 .dark {
@@ -146,6 +149,8 @@ code {
   --color-notion-terracotta: var(--notion-terracotta);
   --color-notion-terracotta-muted: var(--notion-terracotta-muted);
   --color-notion-gold: var(--notion-gold);
+  --color-deep-ink: var(--deep-ink);
+  --color-deep-ink-foreground: var(--deep-ink-foreground);
   --color-iris: var(--iris);
   --color-iris-strong: var(--iris-strong);
   --color-iris-muted: var(--iris-muted);
