@@ -25,6 +25,14 @@ test("appears instantly under prefers-reduced-motion", () => {
   expect(pill?.className).toContain("motion-reduce:animate-none")
 })
 
+test("aligns via the footer flex row instead of absolute offsets", () => {
+  render(<SaveStatusPill saving={true} saved={false} />)
+  const pill = screen.getByText("Saving...").parentElement
+  expect(pill?.className).toContain("order-first")
+  expect(pill?.className).toContain("self-stretch")
+  expect(pill?.className).not.toContain("absolute")
+})
+
 test("swaps Saving/Saved content in place without remounting", () => {
   const { rerender } = render(<SaveStatusPill saving={true} saved={false} />)
   const pill = screen.getByText("Saving...").parentElement

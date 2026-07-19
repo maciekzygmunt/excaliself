@@ -1,17 +1,7 @@
 import { PanelLeftIcon } from "lucide-react"
-import {
-  type ReactNode,
-  useCallback,
-  useLayoutEffect,
-  useRef,
-  useState,
-} from "react"
+import { type ReactNode, useState } from "react"
 import { createPortal } from "react-dom"
-
-// Excalidraw mounts its top-left UI slot asynchronously; we retry for ~4s
-// (240 frames at 60fps) before giving up so the portal target can be found
-// without flashing the absence of our controls.
-const TARGET_RESOLVE_RETRY_FRAMES = 240
+import { useExcalidrawPortalTarget } from "./excalidraw-portal"
 
 const PRIMARY_TARGET_SELECTOR =
   ".excalidraw .App-menu_top__left > div:first-child"
@@ -26,46 +16,8 @@ function findPortalTarget(): HTMLElement | null {
   return fallback instanceof HTMLElement ? fallback : null
 }
 
-function useTopLeftPortalTarget() {
-  const [target, setTarget] = useState<HTMLElement | null>(null)
-  const rafRef = useRef<number | null>(null)
-  const targetRef = useRef<HTMLElement | null>(null)
-  const retryRef = useRef(0)
-
-  const resolveTarget = useCallback(() => {
-    if (rafRef.current !== null) cancelAnimationFrame(rafRef.current)
-    rafRef.current = requestAnimationFrame(() => {
-      const next = findPortalTarget()
-      if (targetRef.current !== next) {
-        targetRef.current = next
-        setTarget(next)
-      }
-      if (!next && retryRef.current < TARGET_RESOLVE_RETRY_FRAMES) {
-        retryRef.current += 1
-        resolveTarget()
-      }
-    })
-  }, [])
-
-  useLayoutEffect(() => {
-    retryRef.current = 0
-    resolveTarget()
-    const onResize = () => {
-      retryRef.current = 0
-      resolveTarget()
-    }
-    window.addEventListener("resize", onResize)
-    return () => {
-      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current)
-      window.removeEventListener("resize", onResize)
-    }
-  }, [resolveTarget])
-
-  return target
-}
-
 export function TopLeftPortal({ children }: { children: ReactNode }) {
-  const target = useTopLeftPortalTarget()
+  const target = useExcalidrawPortalTarget(findPortalTarget)
   return target ? createPortal(children, target) : null
 }
 

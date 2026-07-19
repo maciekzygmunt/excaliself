@@ -1,10 +1,6 @@
 import { Excalidraw, MainMenu } from "@excalidraw/excalidraw"
 import type { ExcalidrawElement } from "@excalidraw/excalidraw/element/types"
-import type {
-  AppState,
-  BinaryFiles,
-  UIAppState,
-} from "@excalidraw/excalidraw/types"
+import type { AppState, BinaryFiles } from "@excalidraw/excalidraw/types"
 import { PanelLeftIcon } from "lucide-react"
 import { useCallback, useEffect, useState } from "react"
 import { toast } from "sonner"
@@ -17,7 +13,7 @@ import {
   useSaveScenePayload,
 } from "@/features/drawings/scene"
 import { useAutoSave } from "@/hooks/use-auto-save"
-import { SaveStatusPill } from "./SaveStatusPill"
+import { FooterRightPortal, SaveStatusPill } from "./SaveStatusPill"
 import { TopLeftControls, TopLeftPortal } from "./TopLeftControls"
 
 import "@excalidraw/excalidraw/index.css"
@@ -88,13 +84,6 @@ export function DrawingCanvas({ drawingId }: Props) {
     })
   }
 
-  const renderTopRightUI = useCallback(
-    (_isMobile: boolean, _appState: UIAppState) => (
-      <SaveStatusPill saving={saving} saved={saved} />
-    ),
-    [saving, saved],
-  )
-
   if (!drawing || !initialData) return null
 
   return (
@@ -102,7 +91,6 @@ export function DrawingCanvas({ drawingId }: Props) {
       <Excalidraw
         initialData={initialData}
         onChange={handleSceneChange}
-        renderTopRightUI={renderTopRightUI}
         UIOptions={{
           canvasActions: {
             loadScene: false,
@@ -133,6 +121,9 @@ export function DrawingCanvas({ drawingId }: Props) {
           <MainMenu.DefaultItems.ToggleTheme />
           <MainMenu.DefaultItems.ChangeCanvasBackground />
         </MainMenu>
+        <FooterRightPortal>
+          <SaveStatusPill saving={saving} saved={saved} />
+        </FooterRightPortal>
         <TopLeftPortal>
           <TopLeftControls
             // `key` resets the uncontrolled input when the cached drawing name
