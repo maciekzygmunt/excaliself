@@ -103,7 +103,7 @@ export function FolderItem({ folder, childNodes }: FolderItemProps) {
             >
               <ChevronRight
                 className={cn(
-                  "h-3! w-3! shrink-0 text-muted-foreground/40 transition-transform duration-150",
+                  "h-3! w-3! shrink-0 text-muted-foreground/40 transition-transform duration-150 ease-out",
                   isExpanded && "rotate-90",
                   !hasChildren && "opacity-0",
                 )}

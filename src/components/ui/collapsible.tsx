@@ -1,5 +1,7 @@
 import * as CollapsiblePrimitive from "@radix-ui/react-collapsible"
 
+import { cn } from "@/lib/utils"
+
 function Collapsible({
   ...props
 }: React.ComponentProps<typeof CollapsiblePrimitive.Root>) {
@@ -18,11 +20,17 @@ function CollapsibleTrigger({
 }
 
 function CollapsibleContent({
+  className,
   ...props
 }: React.ComponentProps<typeof CollapsiblePrimitive.CollapsibleContent>) {
   return (
     <CollapsiblePrimitive.CollapsibleContent
       data-slot="collapsible-content"
+      // 150ms matches the chevron rotation so they read as one gesture
+      className={cn(
+        "overflow-hidden animation-duration-150 data-[state=open]:animate-collapsible-down data-[state=closed]:animate-collapsible-up motion-reduce:animate-none",
+        className,
+      )}
       {...props}
     />
   )
