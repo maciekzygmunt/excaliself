@@ -214,23 +214,55 @@ function Preview({ name, data }: { name: string; data: string }) {
   )
 }
 
+// First-run cascade: each child fades in and rises 8px, staggered so the eye
+// reads icon → title → body → button. Backwards fill keeps delayed items
+// invisible until their turn; the whole sequence lands in 450ms.
+// Duration, delay, and easing go through animation-only properties (not
+// duration-*/delay-*/ease-*, which also set the transition-* side) so the
+// button's 150ms hover transition stays untouched. Reduced-motion drops the
+// slide/zoom, keeps the fade.
+const EMPTY_ENTER =
+  "animate-in fade-in-0 slide-in-from-bottom-2 animation-duration-300 [animation-timing-function:var(--ease-out)] fill-mode-backwards motion-reduce:slide-in-from-bottom-0"
+
 function EmptyState() {
   const { openCreateDrawingDialog } = useCreateDialog()
   return (
-    <div className="flex flex-1 flex-col items-center justify-center gap-1.5 py-16 text-center animate-in fade-in-0 duration-200">
-      <div className="mb-2 flex size-10 items-center justify-center rounded-xl bg-iris-muted shadow-[inset_0_0_0_1px_var(--iris-ring)]">
+    <div className="flex flex-1 flex-col items-center justify-center gap-1.5 py-16 text-center">
+      <div
+        className={cn(
+          EMPTY_ENTER,
+          "zoom-in-95 motion-reduce:zoom-in-100",
+          "mb-2 flex size-10 items-center justify-center rounded-xl bg-iris-muted shadow-[inset_0_0_0_1px_var(--iris-ring)]",
+        )}
+      >
         <Pencil className="h-4.5 w-4.5 text-iris" />
       </div>
-      <span className="text-sm font-medium text-foreground">
+      <span
+        className={cn(
+          EMPTY_ENTER,
+          "[--tw-animation-delay:75ms]",
+          "text-sm font-medium text-foreground",
+        )}
+      >
         No drawings yet
       </span>
-      <p className="max-w-60 text-[13px] text-muted-foreground">
+      <p
+        className={cn(
+          EMPTY_ENTER,
+          "[--tw-animation-delay:100ms]",
+          "max-w-60 text-[13px] text-muted-foreground",
+        )}
+      >
         Your recent drawings will show up here.
       </p>
       <button
         type="button"
         onClick={() => openCreateDrawingDialog()}
-        className="mt-3 flex items-center gap-1.5 rounded-lg bg-iris px-3.5 py-2 text-[13px] font-medium text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.2),0_1px_2px_rgba(20,20,45,0.2)] transition-[filter,scale] duration-150 hover:brightness-105 active:scale-[0.98]"
+        className={cn(
+          EMPTY_ENTER,
+          "[--tw-animation-delay:150ms]",
+          "mt-3 flex items-center gap-1.5 rounded-lg bg-iris px-3.5 py-2 text-[13px] font-medium text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.2),0_1px_2px_rgba(20,20,45,0.2)] transition-[filter,scale] duration-150 hover:brightness-105 active:scale-[0.98]",
+        )}
       >
         <Plus className="h-3.5 w-3.5" strokeWidth={2.5} />
         Create your first drawing

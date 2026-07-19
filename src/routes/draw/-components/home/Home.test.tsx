@@ -318,12 +318,42 @@ test("the loaded grid fades in instead of swapping in a single frame", () => {
   expect(grid?.className).toContain("fade-in-0")
 })
 
-test("the empty state fades in instead of swapping in a single frame", () => {
+test("the empty state cascades in: icon, title, body, then button", () => {
   renderHome({ drawings: [] })
 
   const emptyState = screen.getByText(/no drawings yet/i).parentElement
-  expect(emptyState?.className).toContain("animate-in")
-  expect(emptyState?.className).toContain("fade-in-0")
+  const children = Array.from(emptyState?.children ?? [])
+  expect(children).toHaveLength(4)
+  const [icon, title, body, button] = children
+
+  for (const child of children) {
+    expect(child.className).toContain("animate-in")
+    expect(child.className).toContain("fade-in-0")
+    expect(child.className).toContain("slide-in-from-bottom-2")
+    expect(child.className).toContain("animation-duration-300")
+    // Animation-only easing — the ease-* utilities would restyle the
+    // button's hover transition
+    expect(child.className).toContain(
+      "[animation-timing-function:var(--ease-out)]",
+    )
+    expect(child.className.split(/\s+/)).not.toContain("ease-out")
+    // Later items must be invisible until their delay elapses
+    expect(child.className).toContain("fill-mode-backwards")
+    // Reduced motion keeps the fade but drops the slide
+    expect(child.className).toContain("motion-reduce:slide-in-from-bottom-0")
+  }
+
+  // Staggered in DOM order — via the animation-delay variable, because the
+  // delay-* utility also sets transition-delay, which would lag the button's
+  // hover/press feedback
+  expect(icon.className).not.toContain("--tw-animation-delay")
+  expect(title.className).toContain("[--tw-animation-delay:75ms]")
+  expect(body.className).toContain("[--tw-animation-delay:100ms]")
+  expect(button.className).toContain("[--tw-animation-delay:150ms]")
+
+  // The icon tile additionally zooms from 95% — never from zero
+  expect(icon.className).toContain("zoom-in-95")
+  expect(icon.className).toContain("motion-reduce:zoom-in-100")
 })
 
 test("zero drawings shows the empty state with a working create action", () => {
