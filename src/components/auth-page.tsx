@@ -62,14 +62,12 @@ export function AuthPage({ title, subtitle, children }: Props) {
           {children}
         </div>
       </div>
-      {/* Always deep ink regardless of page theme, so it carries the dark
-          iris tones — hence its own `dark` scope. */}
       <div
         data-auth-panel
-        className="dark relative hidden overflow-hidden bg-deep-ink md:flex md:w-1/2"
+        className="relative hidden overflow-hidden bg-iris-muted md:flex md:w-1/2"
       >
         <AuthIllustration className="absolute top-1/2 left-1/2 h-[85%] w-auto -translate-x-1/2 -translate-y-1/2 text-iris" />
-        <p className="absolute bottom-8 left-8 text-sm text-deep-ink-foreground/80">
+        <p className="absolute bottom-8 left-8 text-sm text-muted-foreground">
           Your team's whiteboard, on your server.
         </p>
       </div>

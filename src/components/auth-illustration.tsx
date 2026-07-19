@@ -1,6 +1,6 @@
 /**
  * The spark mark redrawn by rough.js — the same engine behind Excalidraw's
- * hand-drawn style — for the deep-ink auth panel. The sketchy path data was
+ * hand-drawn style — for the auth panel. The sketchy path data was
  * generated once, offline, and committed here as static markup (nothing runs
  * at runtime); hachure fills sit at reduced opacity under full-strength
  * outlines, all on currentColor so the caller picks the iris tone (see
