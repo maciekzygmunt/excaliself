@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query"
+import { Link } from "@tanstack/react-router"
 import { File, Folder, PanelLeft, Pencil, Plus } from "lucide-react"
 import { useEffect, useMemo, useState } from "react"
 import {
@@ -66,13 +67,18 @@ export function DrawSidebar({ user }: { user: SidebarUser }) {
     <SidebarDnDProvider drawings={drawings} foldersById={foldersById}>
       <Sidebar collapsible="offcanvas" variant="inset">
         <SidebarHeader className="gap-0 px-2 pt-2 pb-1">
-          <div className="flex items-center gap-2.5 px-2 py-1.5">
-            <div className="flex size-6 shrink-0 items-center justify-center rounded-md bg-gradient-to-b from-[#8d85d6] to-[#6f66c9] shadow-[inset_0_1px_0_rgba(255,255,255,0.3),0_1px_2px_rgba(0,0,0,0.35)]">
-              <Pencil className="h-3 w-3 text-white" strokeWidth={2} />
-            </div>
-            <span className="text-sm font-semibold tracking-[-0.01em] text-foreground">
-              Excaliself
-            </span>
+          <div className="flex items-center px-2 py-1.5">
+            <Link
+              to="/draw"
+              className="-mx-1 flex items-center gap-2.5 rounded-md px-1 py-0.5 focus-visible:bg-sidebar-accent focus-visible:outline-none"
+            >
+              <div className="flex size-6 shrink-0 items-center justify-center rounded-md bg-gradient-to-b from-[#8d85d6] to-[#6f66c9] shadow-[inset_0_1px_0_rgba(255,255,255,0.3),0_1px_2px_rgba(0,0,0,0.35)]">
+                <Pencil className="h-3 w-3 text-white" strokeWidth={2} />
+              </div>
+              <span className="text-sm font-semibold tracking-[-0.01em] text-foreground">
+                Excaliself
+              </span>
+            </Link>
             <SidebarToggle />
           </div>
         </SidebarHeader>

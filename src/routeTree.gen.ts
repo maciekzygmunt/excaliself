@@ -14,6 +14,7 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as InviteRouteImport } from './routes/invite'
 import { Route as DrawRouteRouteImport } from './routes/draw/route'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as DrawIndexRouteImport } from './routes/draw/index'
 import { Route as AdminIndexRouteImport } from './routes/admin/index'
 import { Route as DrawIdRouteImport } from './routes/draw/$id'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
@@ -43,6 +44,11 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DrawIndexRoute = DrawIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => DrawRouteRoute,
+} as any)
 const AdminIndexRoute = AdminIndexRouteImport.update({
   id: '/admin/',
   path: '/admin/',
@@ -67,16 +73,17 @@ export interface FileRoutesByFullPath {
   '/setup': typeof SetupRoute
   '/draw/$id': typeof DrawIdRoute
   '/admin/': typeof AdminIndexRoute
+  '/draw/': typeof DrawIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/draw': typeof DrawRouteRouteWithChildren
   '/invite': typeof InviteRoute
   '/login': typeof LoginRoute
   '/setup': typeof SetupRoute
   '/draw/$id': typeof DrawIdRoute
   '/admin': typeof AdminIndexRoute
+  '/draw': typeof DrawIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
 }
 export interface FileRoutesById {
@@ -88,6 +95,7 @@ export interface FileRoutesById {
   '/setup': typeof SetupRoute
   '/draw/$id': typeof DrawIdRoute
   '/admin/': typeof AdminIndexRoute
+  '/draw/': typeof DrawIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
 }
 export interface FileRouteTypes {
@@ -100,16 +108,17 @@ export interface FileRouteTypes {
     | '/setup'
     | '/draw/$id'
     | '/admin/'
+    | '/draw/'
     | '/api/auth/$'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
-    | '/draw'
     | '/invite'
     | '/login'
     | '/setup'
     | '/draw/$id'
     | '/admin'
+    | '/draw'
     | '/api/auth/$'
   id:
     | '__root__'
@@ -120,6 +129,7 @@ export interface FileRouteTypes {
     | '/setup'
     | '/draw/$id'
     | '/admin/'
+    | '/draw/'
     | '/api/auth/$'
   fileRoutesById: FileRoutesById
 }
@@ -170,6 +180,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/draw/': {
+      id: '/draw/'
+      path: '/'
+      fullPath: '/draw/'
+      preLoaderRoute: typeof DrawIndexRouteImport
+      parentRoute: typeof DrawRouteRoute
+    }
     '/admin/': {
       id: '/admin/'
       path: '/admin'
@@ -196,10 +213,12 @@ declare module '@tanstack/react-router' {
 
 interface DrawRouteRouteChildren {
   DrawIdRoute: typeof DrawIdRoute
+  DrawIndexRoute: typeof DrawIndexRoute
 }
 
 const DrawRouteRouteChildren: DrawRouteRouteChildren = {
   DrawIdRoute: DrawIdRoute,
+  DrawIndexRoute: DrawIndexRoute,
 }
 
 const DrawRouteRouteWithChildren = DrawRouteRoute._addFileChildren(

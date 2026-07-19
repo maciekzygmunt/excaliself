@@ -1,18 +1,10 @@
 import { createFileRoute, redirect } from "@tanstack/react-router"
-import { createDrawing, getDrawings } from "@/features/drawings/server"
-import { setupMiddleware } from "@/middleware/setup"
 
 export const Route = createFileRoute("/")({
-  server: {
-    middleware: [setupMiddleware],
-  },
-  loader: async () => {
-    const drawings = await getDrawings()
-    if (drawings.length === 0) {
-      const id = await createDrawing({ data: {} })
-      throw redirect({ to: "/draw/$id", params: { id } })
-    }
-    throw redirect({ to: "/draw/$id", params: { id: drawings[0].id } })
+  // Home lives at /draw (the canvas area with no drawing open); the app
+  // never creates or picks a drawing on the user's behalf.
+  loader: () => {
+    throw redirect({ to: "/draw", statusCode: 301 })
   },
   component: () => null,
 })
