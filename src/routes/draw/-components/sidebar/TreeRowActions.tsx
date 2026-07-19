@@ -68,6 +68,10 @@ export function TreeRowActions({
           side="right"
           align="start"
           onCloseAutoFocus={onMenuCloseAutoFocus}
+          // Portaled, but still a React child of the row — clicks bubble
+          // through the React tree to ancestor triggers such as FolderItem's
+          // CollapsibleTrigger unless fenced here
+          onClick={(e) => e.stopPropagation()}
         >
           {onCreateDrawing && (
             <DropdownMenuItem onClick={onCreateDrawing}>
@@ -91,7 +95,9 @@ export function TreeRowActions({
           </AlertDialogTrigger>
         </DropdownMenuContent>
       </DropdownMenu>
-      <AlertDialogContent>
+      {/* Same fence as the dropdown: the dialog portals out of the DOM row
+          but not out of the React tree */}
+      <AlertDialogContent onClick={(e) => e.stopPropagation()}>
         <AlertDialogHeader>
           <AlertDialogTitle>{deleteTitle}</AlertDialogTitle>
           <AlertDialogDescription>{deleteDescription}</AlertDialogDescription>

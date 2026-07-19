@@ -47,7 +47,9 @@ function AlertDialogContent({
 }: React.ComponentProps<typeof AlertDialogPrimitive.Content>) {
   return (
     <AlertDialogPortal>
-      <AlertDialogOverlay />
+      {/* A modal's backdrop click must not reach React ancestors — portals
+          bubble through the React tree even though the DOM parent is body */}
+      <AlertDialogOverlay onClick={(e) => e.stopPropagation()} />
       <AlertDialogPrimitive.Content
         data-slot="alert-dialog-content"
         className={cn(
