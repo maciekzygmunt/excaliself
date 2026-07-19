@@ -1,5 +1,11 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
-import { cleanup, fireEvent, render, screen } from "@testing-library/react"
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react"
 import { afterEach, beforeEach, expect, test, vi } from "vitest"
 import type { Drawing } from "@/features/drawings/queries"
 import { drawingsQueryOptions } from "@/features/drawings/queries"
@@ -204,7 +210,9 @@ test("the preview renderer is invoked with each drawing's scene", async () => {
   const scene = JSON.stringify({ elements: [{ type: "rectangle" }] })
   renderHome({ drawings: [makeDrawing({ id: "d1", data: scene })] })
 
-  expect(renderPreviewSvg).toHaveBeenCalledWith(scene)
+  // The renderer module is dynamically imported, so the call lands a tick
+  // after mount
+  await waitFor(() => expect(renderPreviewSvg).toHaveBeenCalledWith(scene))
 
   // The resolved SVG lands inside the card
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg")
@@ -233,6 +241,8 @@ test("a preview fades in when its render resolves, without flashing the placehol
   expect(container.className).toContain("ease-out")
   expect(screen.queryByLabelText(/no preview/i)).toBeNull()
 
+  // The dynamically imported renderer starts a tick after mount
+  await waitFor(() => expect(renderPreviewSvg).toHaveBeenCalled())
   resolveRender(document.createElementNS("http://www.w3.org/2000/svg", "svg"))
 
   // Resolved: the same container transitions to full opacity

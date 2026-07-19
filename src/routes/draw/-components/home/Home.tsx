@@ -7,7 +7,6 @@ import { type Drawing, drawingsQueryOptions } from "@/features/drawings/queries"
 import { foldersQueryOptions } from "@/features/folders/queries"
 import { cn } from "@/lib/utils"
 import { useCreateDialog } from "../CreateDialog"
-import { renderPreviewSvg } from "./preview"
 
 const RECENT_LIMIT = 8
 
@@ -150,7 +149,10 @@ function RecentCard({
               </span>
             </>
           )}
-          <span className="shrink-0">{formatEditedAgo(drawing.updatedAt)}</span>
+          {/* Server and client can straddle a minute boundary */}
+          <span suppressHydrationWarning className="shrink-0">
+            {formatEditedAgo(drawing.updatedAt)}
+          </span>
         </span>
       </div>
     </Link>
@@ -163,7 +165,10 @@ function Preview({ name, data }: { name: string; data: string }) {
 
   useEffect(() => {
     let cancelled = false
-    renderPreviewSvg(data)
+    // Dynamic import: @excalidraw/excalidraw is not server-safe, and this
+    // keeps it out of the SSR bundle and Home's initial chunk
+    import("./preview")
+      .then(({ renderPreviewSvg }) => renderPreviewSvg(data))
       .then((svg) => {
         if (cancelled) return
         if (!svg || !containerRef.current) {
