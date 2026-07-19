@@ -1,6 +1,5 @@
 import { cleanup, render, screen } from "@testing-library/react"
-import { afterEach, beforeEach, expect, test, vi } from "vitest"
-import { stubSystemTheme } from "@/test/system-theme"
+import { afterEach, expect, test, vi } from "vitest"
 
 vi.mock("@tanstack/react-router", () => ({
   createFileRoute: () => (options: { component: React.ComponentType }) => ({
@@ -19,13 +18,6 @@ vi.mock("@/middleware/setup", () => ({
 
 // Auto-cleanup needs vitest globals, which this repo leaves off.
 afterEach(cleanup)
-afterEach(() => {
-  vi.unstubAllGlobals()
-})
-
-beforeEach(() => {
-  stubSystemTheme(false)
-})
 
 async function renderLogin() {
   const { Route } = await import("./login")

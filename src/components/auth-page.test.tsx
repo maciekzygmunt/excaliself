@@ -1,16 +1,11 @@
 import { cleanup, render, screen } from "@testing-library/react"
-import { afterEach, beforeEach, expect, test, vi } from "vitest"
-import { stubSystemTheme } from "@/test/system-theme"
+import { afterEach, expect, test, vi } from "vitest"
 import { AuthPage } from "./auth-page"
 
 // Auto-cleanup needs vitest globals, which this repo leaves off.
 afterEach(cleanup)
 afterEach(() => {
-  vi.unstubAllGlobals()
-})
-
-beforeEach(() => {
-  stubSystemTheme(false)
+  window.localStorage.clear()
 })
 
 function renderShell() {
@@ -52,16 +47,31 @@ test("the illustration panel carries the tagline and hides at phone widths", () 
   expect(classes).toContain("md:flex")
 })
 
-test.each([
-  ["dark", true],
-  ["light", false],
-])("the shell follows the system theme — %s OS preference", (_name, prefersDark) => {
-  stubSystemTheme(prefersDark)
+test("light by default — the OS preference is never consulted", () => {
+  // A dark OS preference must not leak in: matchMedia is unavailable here
+  // (jsdom has none) and the shell must not need it.
+  const matchMediaSpy = vi.fn()
+  vi.stubGlobal("matchMedia", matchMediaSpy)
   const { container } = renderShell()
   const shell = container.firstElementChild
   expect(shell).not.toBeNull()
   // biome-ignore lint/style/noNonNullAssertion: asserted non-null above
-  expect(shell!.classList.contains("dark")).toBe(prefersDark)
+  expect(shell!.classList.contains("dark")).toBe(false)
+  expect(matchMediaSpy).not.toHaveBeenCalled()
+  vi.unstubAllGlobals()
+})
+
+test.each([
+  ["dark", true],
+  ["light", false],
+  ["system", false],
+])("an explicit theme setting of %s renders the shell accordingly", (setting, expectDark) => {
+  window.localStorage.setItem("theme", setting)
+  const { container } = renderShell()
+  const shell = container.firstElementChild
+  expect(shell).not.toBeNull()
+  // biome-ignore lint/style/noNonNullAssertion: asserted non-null above
+  expect(shell!.classList.contains("dark")).toBe(expectDark)
 })
 
 test("no wordmark lockup renders on auth pages — mark only", () => {

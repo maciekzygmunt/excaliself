@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useState } from "react"
+import { type ReactNode, useState } from "react"
 import { AuthIllustration } from "@/components/auth-illustration"
 import { Mark } from "@/components/identity"
 import { cn } from "@/lib/utils"
@@ -9,36 +9,36 @@ type Props = {
   children: ReactNode
 }
 
-const DARK_QUERY = "(prefers-color-scheme: dark)"
+// The "theme" localStorage key follows the next-themes convention, so a
+// future in-app settings toggle can write the same key.
+const THEME_KEY = "theme"
 
-// Runs while the SSR'd HTML is still parsing, so a dark-OS visitor never
-// sees a light flash before hydration.
-const themeScript = `document.currentScript.parentElement.classList.toggle("dark",window.matchMedia(${JSON.stringify(DARK_QUERY)}).matches)`
+// Runs while the SSR'd HTML is still parsing, so a visitor who explicitly
+// chose dark never sees a light flash before hydration.
+const themeScript = `try{document.currentScript.parentElement.classList.toggle("dark",localStorage.getItem(${JSON.stringify(THEME_KEY)})==="dark")}catch{}`
 
 /**
- * Follows the OS theme. Logged-out pages have no user preference to read,
- * so unlike the in-app chrome (always Porcelain light) they track the system.
+ * Light by default, always — dark only when the user has explicitly chosen
+ * it in settings. The OS preference is deliberately not consulted.
  */
-function useSystemTheme() {
-  // Lazy init reads the OS preference on the client's very first render, so
-  // client-side navigations and pre-effect re-renders never paint light.
-  const [dark, setDark] = useState<boolean | undefined>(() =>
-    typeof window === "undefined"
-      ? undefined
-      : window.matchMedia(DARK_QUERY).matches,
-  )
-  useEffect(() => {
-    const mql = window.matchMedia(DARK_QUERY)
-    const apply = () => setDark(mql.matches)
-    apply()
-    mql.addEventListener("change", apply)
-    return () => mql.removeEventListener("change", apply)
-  }, [])
+function useExplicitTheme() {
+  // Read once on the client's first render; auth pages have no toggle, so
+  // no subscription is needed.
+  const [dark] = useState(() => {
+    try {
+      return (
+        typeof window !== "undefined" &&
+        window.localStorage.getItem(THEME_KEY) === "dark"
+      )
+    } catch {
+      return false
+    }
+  })
   return dark
 }
 
 export function AuthPage({ title, subtitle, children }: Props) {
-  const dark = useSystemTheme()
+  const dark = useExplicitTheme()
   return (
     <div
       suppressHydrationWarning
