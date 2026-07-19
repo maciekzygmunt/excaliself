@@ -7,7 +7,13 @@ export const registerFieldsSchema = z.object({
   password: z.string().min(8),
 })
 
-/** Account-creation form shared by the invite and first-run setup pages. */
+/**
+ * First-run setup asks only for credentials — the admin's display name is
+ * derived from the email until they set one.
+ */
+export const setupFieldsSchema = registerFieldsSchema.omit({ name: true })
+
+/** Account-creation form for the invite page. */
 export const registerFormSchema = registerFieldsSchema
   .extend({
     confirmPassword: z.string().min(8),

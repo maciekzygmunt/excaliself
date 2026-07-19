@@ -1,5 +1,4 @@
 import { useForm } from "@tanstack/react-form"
-import { useMutation } from "@tanstack/react-query"
 import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router"
 import { toast } from "sonner"
 import { AuthPage } from "@/components/auth-page"
@@ -7,7 +6,7 @@ import { FormTextField } from "@/components/form-text-field"
 import { Button } from "@/components/ui/button"
 import { FieldGroup } from "@/components/ui/field"
 import { getUserCount, setupAdmin } from "@/features/admin/server"
-import { registerFormSchema } from "@/features/auth/schema"
+import { setupFieldsSchema } from "@/features/auth/schema"
 
 export const Route = createFileRoute("/setup")({
   beforeLoad: async () => {
@@ -19,37 +18,25 @@ export const Route = createFileRoute("/setup")({
 
 function SetupPage() {
   const navigate = useNavigate()
-
-  const { mutateAsync: createAdmin } = useMutation({
-    mutationFn: setupAdmin,
-    onSuccess: () => navigate({ to: "/login" }),
-    onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Setup failed")
-    },
-  })
-
   const form = useForm({
-    defaultValues: {
-      name: "",
-      email: "",
-      password: "",
-      confirmPassword: "",
-    },
-    validators: { onSubmit: registerFormSchema },
+    defaultValues: { email: "", password: "" },
+    validators: { onSubmit: setupFieldsSchema },
     onSubmit: async ({ value }) => {
-      await createAdmin({
-        data: {
-          name: value.name,
-          email: value.email,
-          password: value.password,
-        },
-      })
+      try {
+        // Creates the admin account and signs the browser in — the session
+        // cookie rides back on this same request.
+        await setupAdmin({ data: value })
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Setup failed")
+        return
+      }
+      navigate({ to: "/" })
     },
   })
 
   return (
     <AuthPage
-      title="Setup your instance"
+      title="Set up your instance"
       subtitle="Create the admin account to get started"
     >
       <form
@@ -60,18 +47,6 @@ function SetupPage() {
         className="space-y-4"
       >
         <FieldGroup>
-          <form.Field
-            name="name"
-            children={(field) => (
-              <FormTextField
-                field={field}
-                label="Name"
-                placeholder="Admin"
-                autoComplete="off"
-                required
-              />
-            )}
-          />
           <form.Field
             name="email"
             children={(field) => (
@@ -91,19 +66,6 @@ function SetupPage() {
               <FormTextField
                 field={field}
                 label="Password"
-                type="password"
-                placeholder="••••••••••"
-                autoComplete="new-password"
-                required
-              />
-            )}
-          />
-          <form.Field
-            name="confirmPassword"
-            children={(field) => (
-              <FormTextField
-                field={field}
-                label="Confirm password"
                 type="password"
                 placeholder="••••••••••"
                 autoComplete="new-password"
