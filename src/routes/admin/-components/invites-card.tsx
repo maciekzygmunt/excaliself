@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Check, Copy, Plus, Trash2 } from "lucide-react"
-import { useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { pendingInvitesQueryOptions } from "@/features/invites/queries"
 import { createInvite, deleteInvite } from "@/features/invites/server"
@@ -31,6 +31,8 @@ export function InvitesSection() {
 
   const [copiedToken, setCopiedToken] = useState<string | null>(null)
   const copiedTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined)
+
+  useEffect(() => () => clearTimeout(copiedTimeoutRef.current), [])
 
   const copyInviteLink = (token: string) => {
     const link = `${window.location.origin}/invite?token=${token}`
@@ -91,7 +93,7 @@ export function InvitesSection() {
                 className="rounded p-1 text-muted-foreground/40 transition-all hover:bg-muted hover:text-foreground"
               >
                 {copiedToken === invite.token ? (
-                  <Check className="h-3.5 w-3.5 text-notion-terracotta animate-in zoom-in-50 fade-in-0 duration-150" />
+                  <Check className="h-3.5 w-3.5 text-notion-terracotta animate-in zoom-in-50 fade-in-0 duration-150 ease-out motion-reduce:animate-none" />
                 ) : (
                   <Copy className="h-3.5 w-3.5" />
                 )}
