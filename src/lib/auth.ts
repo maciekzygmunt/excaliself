@@ -1,5 +1,6 @@
 import { betterAuth } from "better-auth"
 import { drizzleAdapter } from "better-auth/adapters/drizzle"
+import { APIError, createAuthMiddleware } from "better-auth/api"
 import { tanstackStartCookies } from "better-auth/tanstack-start"
 import { db } from "@/db"
 import * as schema from "@/db/schema"
@@ -20,6 +21,19 @@ export const auth = betterAuth({
   }),
   emailAndPassword: {
     enabled: true,
+  },
+  hooks: {
+    before: createAuthMiddleware(async (ctx) => {
+      // Registration is invite-only. Accounts are created server-side via
+      // registerWithInvite/setupAdmin, which call auth.api.signUpEmail
+      // directly (no ctx.request). Block the public HTTP endpoint, which
+      // would otherwise let anyone self-register past the invite check.
+      if (ctx.path === "/sign-up/email" && ctx.request) {
+        throw new APIError("FORBIDDEN", {
+          message: "Sign-up is invite-only",
+        })
+      }
+    }),
   },
   session: {
     cookieCache: {
