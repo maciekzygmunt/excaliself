@@ -8,6 +8,7 @@ import {
 } from "@tanstack/react-router"
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools"
 import { Toaster } from "@/components/ui/sonner"
+import { PRODUCT_NAME } from "@/lib/document-title"
 import appCss from "../styles.css?url"
 
 interface MyRouterContext {
@@ -29,10 +30,24 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
         content: "#f2f2f6",
       },
       {
-        title: "Excaliself",
+        title: PRODUCT_NAME,
       },
     ],
     links: [
+      {
+        rel: "icon",
+        href: "/favicon.ico",
+        sizes: "48x48",
+      },
+      {
+        rel: "icon",
+        type: "image/svg+xml",
+        href: "/favicon.svg",
+      },
+      {
+        rel: "manifest",
+        href: "/manifest.json",
+      },
       {
         rel: "preconnect",
         href: "https://fonts.googleapis.com",
