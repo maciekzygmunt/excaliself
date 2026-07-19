@@ -300,6 +300,22 @@ test("loaded drawings show cards, not skeletons", () => {
   expect(document.querySelector('[data-slot="skeleton"]')).toBeNull()
 })
 
+test("the loaded grid fades in instead of swapping in a single frame", () => {
+  renderHome({ drawings: [makeDrawing({ id: "d1" })] })
+
+  const grid = screen.getAllByRole("link")[0].parentElement
+  expect(grid?.className).toContain("animate-in")
+  expect(grid?.className).toContain("fade-in-0")
+})
+
+test("the empty state fades in instead of swapping in a single frame", () => {
+  renderHome({ drawings: [] })
+
+  const emptyState = screen.getByText(/no drawings yet/i).parentElement
+  expect(emptyState?.className).toContain("animate-in")
+  expect(emptyState?.className).toContain("fade-in-0")
+})
+
 test("zero drawings shows the empty state with a working create action", () => {
   renderHome({ drawings: [] })
 

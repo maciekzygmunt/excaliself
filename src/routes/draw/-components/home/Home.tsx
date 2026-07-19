@@ -73,7 +73,9 @@ export function Home() {
         ) : recent.length === 0 ? (
           <EmptyState />
         ) : (
-          <div className={GRID_CLASS}>
+          // Mount fade so the swap from skeletons isn't a single-frame pop.
+          // Reduced-motion keeps it: opacity-only is already the gentle form.
+          <div className={cn(GRID_CLASS, "animate-in fade-in-0 duration-200")}>
             {recent.map((drawing) => (
               <RecentCard
                 key={drawing.id}
@@ -210,7 +212,7 @@ function Preview({ name, data }: { name: string; data: string }) {
 function EmptyState() {
   const { openCreateDrawingDialog } = useCreateDialog()
   return (
-    <div className="flex flex-1 flex-col items-center justify-center gap-1.5 py-16 text-center">
+    <div className="flex flex-1 flex-col items-center justify-center gap-1.5 py-16 text-center animate-in fade-in-0 duration-200">
       <div className="mb-2 flex size-10 items-center justify-center rounded-xl bg-iris-muted shadow-[inset_0_0_0_1px_var(--iris-ring)]">
         <Pencil className="h-4.5 w-4.5 text-iris" />
       </div>
