@@ -64,9 +64,11 @@ export function AuthPage({ title, subtitle, children }: Props) {
       </div>
       <div
         data-auth-panel
-        className="relative hidden overflow-hidden bg-iris-muted md:flex md:w-1/2"
+        className="relative m-4 hidden overflow-hidden rounded-3xl bg-iris-muted md:flex md:flex-1"
       >
-        <AuthIllustration className="absolute top-1/2 left-1/2 h-[85%] w-auto -translate-x-1/2 -translate-y-1/2 text-iris" />
+        {/* Sized on both axes so the svg letterboxes its drawing to fit —
+            no cropping at narrow panel widths. */}
+        <AuthIllustration className="absolute inset-0 m-auto h-[82%] w-[82%] text-iris" />
         <p className="absolute bottom-8 left-8 text-sm text-muted-foreground">
           Your team's whiteboard, on your server.
         </p>
