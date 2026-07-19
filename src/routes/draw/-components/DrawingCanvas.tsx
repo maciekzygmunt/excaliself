@@ -5,7 +5,7 @@ import type {
   BinaryFiles,
   UIAppState,
 } from "@excalidraw/excalidraw/types"
-import { Cloud, Loader2, PanelLeftIcon } from "lucide-react"
+import { PanelLeftIcon } from "lucide-react"
 import { useCallback, useEffect, useState } from "react"
 import { toast } from "sonner"
 import { useSidebar } from "@/components/ui/sidebar"
@@ -17,6 +17,7 @@ import {
   useSaveScenePayload,
 } from "@/features/drawings/scene"
 import { useAutoSave } from "@/hooks/use-auto-save"
+import { SaveStatusPill } from "./SaveStatusPill"
 import { TopLeftControls, TopLeftPortal } from "./TopLeftControls"
 
 import "@excalidraw/excalidraw/index.css"
@@ -88,24 +89,9 @@ export function DrawingCanvas({ drawingId }: Props) {
   }
 
   const renderTopRightUI = useCallback(
-    (_isMobile: boolean, _appState: UIAppState) => {
-      if (!saving && !saved) return null
-      return (
-        <div className="pointer-events-auto absolute bottom-(--editor-container-padding) right-[calc(var(--editor-container-padding)+var(--lg-button-size)+0.5rem)] z-(--zIndex-layerUI) flex h-(--lg-button-size) items-center gap-1.5 rounded-(--border-radius-lg) bg-(--island-bg-color) px-2.5 text-xs font-(--ui-font) text-(--text-primary-color) shadow-(--shadow-island)">
-          {saving ? (
-            <>
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              <span>Saving...</span>
-            </>
-          ) : (
-            <>
-              <Cloud className="h-3.5 w-3.5" />
-              <span>Saved</span>
-            </>
-          )}
-        </div>
-      )
-    },
+    (_isMobile: boolean, _appState: UIAppState) => (
+      <SaveStatusPill saving={saving} saved={saved} />
+    ),
     [saving, saved],
   )
 
