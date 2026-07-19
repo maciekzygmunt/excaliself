@@ -213,6 +213,33 @@ test("the preview renderer is invoked with each drawing's scene", async () => {
   await screen.findByLabelText(/preview of/i)
 })
 
+test("a preview fades in when its render resolves, without flashing the placeholder", async () => {
+  let resolveRender!: (svg: SVGSVGElement | null) => void
+  vi.mocked(renderPreviewSvg).mockImplementation(
+    () =>
+      new Promise((resolve) => {
+        resolveRender = resolve
+      }),
+  )
+  renderHome({ drawings: [makeDrawing({ id: "d1" })] })
+
+  // Mid-load: the container is transparent and set up to fade, and the
+  // "no preview" pencil is not showing
+  const container = screen.getByRole("img")
+  expect(container.className).toContain("opacity-0")
+  expect(container.className).toContain("transition-opacity")
+  expect(container.className).toContain("duration-200")
+  expect(container.className).toContain("ease-out")
+  expect(screen.queryByLabelText(/no preview/i)).toBeNull()
+
+  resolveRender(document.createElementNS("http://www.w3.org/2000/svg", "svg"))
+
+  // Resolved: the same container transitions to full opacity
+  const ready = await screen.findByLabelText(/preview of/i)
+  expect(ready.className).toContain("opacity-100")
+  expect(ready.className).not.toContain("opacity-0")
+})
+
 test("a drawing whose scene cannot be rendered gets a placeholder card", async () => {
   vi.mocked(renderPreviewSvg).mockResolvedValue(null)
   renderHome({

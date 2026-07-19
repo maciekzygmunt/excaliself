@@ -4,6 +4,7 @@ import { Folder, Pencil, Plus } from "lucide-react"
 import { useEffect, useMemo, useRef, useState } from "react"
 import { type Drawing, drawingsQueryOptions } from "@/features/drawings/queries"
 import { foldersQueryOptions } from "@/features/folders/queries"
+import { cn } from "@/lib/utils"
 import { useCreateDialog } from "../CreateDialog"
 import { renderPreviewSvg } from "./preview"
 
@@ -156,7 +157,11 @@ function Preview({ name, data }: { name: string; data: string }) {
         ref={containerRef}
         role="img"
         aria-label={state === "ready" ? `Preview of ${name}` : undefined}
-        className="h-full w-full p-2 [&_svg]:h-full [&_svg]:w-full [&_svg]:object-contain"
+        // Reduced-motion keeps the fade: opacity-only is already the gentle form
+        className={cn(
+          "h-full w-full p-2 transition-opacity duration-200 ease-out [&_svg]:h-full [&_svg]:w-full [&_svg]:object-contain",
+          state === "ready" ? "opacity-100" : "opacity-0",
+        )}
       />
       {state === "empty" && (
         <div
