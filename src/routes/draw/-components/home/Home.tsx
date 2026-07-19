@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query"
 import { Link } from "@tanstack/react-router"
 import { Folder, Pencil, Plus } from "lucide-react"
 import { useEffect, useMemo, useRef, useState } from "react"
+import { Skeleton } from "@/components/ui/skeleton"
 import { type Drawing, drawingsQueryOptions } from "@/features/drawings/queries"
 import { foldersQueryOptions } from "@/features/folders/queries"
 import { cn } from "@/lib/utils"
@@ -9,6 +10,8 @@ import { useCreateDialog } from "../CreateDialog"
 import { renderPreviewSvg } from "./preview"
 
 const RECENT_LIMIT = 8
+
+const GRID_CLASS = "grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-4"
 
 // The server returns drawings newest-first, but autosave patches rows in the
 // cache without reordering — Home sorts for itself.
@@ -38,7 +41,7 @@ function formatEditedAgo(updatedAt: Date | string): string {
 }
 
 export function Home() {
-  const { data: drawings = [] } = useQuery(drawingsQueryOptions())
+  const { data: drawings = [], isPending } = useQuery(drawingsQueryOptions())
   const { data: folders = [] } = useQuery(foldersQueryOptions())
   const { openCreateDrawingDialog } = useCreateDialog()
 
@@ -65,10 +68,12 @@ export function Home() {
           </button>
         </div>
 
-        {recent.length === 0 ? (
+        {isPending ? (
+          <LoadingGrid />
+        ) : recent.length === 0 ? (
           <EmptyState />
         ) : (
-          <div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-4">
+          <div className={GRID_CLASS}>
             {recent.map((drawing) => (
               <RecentCard
                 key={drawing.id}
@@ -83,6 +88,32 @@ export function Home() {
           </div>
         )}
       </div>
+    </div>
+  )
+}
+
+// Placeholder cards mirror RecentCard's frame so the loaded grid lands on the
+// same footprint instead of popping into empty space.
+function LoadingGrid() {
+  return (
+    <div
+      role="status"
+      aria-label="Loading recent drawings"
+      className={GRID_CLASS}
+    >
+      {Array.from({ length: RECENT_LIMIT }, (_, i) => (
+        <div
+          // Static list — index keys are fine
+          key={i}
+          className="flex flex-col overflow-hidden rounded-xl bg-card shadow-[0_0_0_1px_rgba(25,25,50,0.08),0_1px_2px_rgba(20,20,45,0.05)] dark:shadow-[0_0_0_1px_rgba(255,255,255,0.1)]"
+        >
+          <Skeleton className="aspect-[4/3] rounded-none border-b border-border/60 motion-reduce:animate-none" />
+          <div className="flex flex-col gap-1.5 px-3 py-2.5">
+            <Skeleton className="h-3.5 w-24 motion-reduce:animate-none" />
+            <Skeleton className="h-3 w-16 motion-reduce:animate-none" />
+          </div>
+        </div>
+      ))}
     </div>
   )
 }

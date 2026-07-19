@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { afterEach, beforeEach, expect, test, vi } from "vitest"
 import type { Drawing } from "@/features/drawings/queries"
 import { drawingsQueryOptions } from "@/features/drawings/queries"
+import { getDrawings } from "@/features/drawings/server"
 import type { Folder } from "@/features/folders/queries"
 import { foldersQueryOptions } from "@/features/folders/queries"
 import { Home } from "./Home"
@@ -268,6 +269,35 @@ test("the New drawing button opens the Create dialog", () => {
 
   fireEvent.click(screen.getByRole("button", { name: /new drawing/i }))
   expect(openCreateDrawingDialog).toHaveBeenCalledTimes(1)
+})
+
+test("while drawings load, skeleton cards hold the grid — no empty state flash", () => {
+  // No seeded drawings cache: the query goes through the (never-resolving)
+  // server function, holding Home in its loading state
+  vi.mocked(getDrawings).mockReturnValue(new Promise(() => {}))
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  })
+  client.setQueryData(foldersQueryOptions().queryKey, [])
+  render(
+    <QueryClientProvider client={client}>
+      <Home />
+    </QueryClientProvider>,
+  )
+
+  const loading = screen.getByRole("status", { name: /loading/i })
+  expect(
+    loading.querySelectorAll('[data-slot="skeleton"]').length,
+  ).toBeGreaterThan(0)
+  expect(screen.queryByText(/no drawings yet/i)).toBeNull()
+  expect(screen.queryAllByRole("link")).toHaveLength(0)
+})
+
+test("loaded drawings show cards, not skeletons", () => {
+  renderHome({ drawings: [makeDrawing({ id: "d1" })] })
+
+  expect(screen.queryByRole("status")).toBeNull()
+  expect(document.querySelector('[data-slot="skeleton"]')).toBeNull()
 })
 
 test("zero drawings shows the empty state with a working create action", () => {
