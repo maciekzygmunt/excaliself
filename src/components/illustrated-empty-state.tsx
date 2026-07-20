@@ -29,17 +29,11 @@ export function IllustratedEmptyState({
 }) {
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-1.5 py-16 text-center">
-      {/* The auth panel in miniature: the same hand-drawn spark on the same
-          iris-muted surface, so both first-run journeys land on a familiar
-          image. */}
-      <div
-        className={cn(
-          CASCADE,
-          "zoom-in-95 motion-reduce:zoom-in-100",
-          "mb-4 flex h-36 w-44 items-center justify-center rounded-2xl bg-iris-muted shadow-[inset_0_0_0_1px_var(--iris-ring)]",
-        )}
-      >
-        <AuthIllustration className="h-[72%] w-[72%] text-iris" />
+      {/* The auth panel's hand-drawn spark, floating free on the page — a
+          containing tile at this size reads as a placeholder swatch, not an
+          illustration. */}
+      <div className={cn(CASCADE, "zoom-in-95 motion-reduce:zoom-in-100 mb-3")}>
+        <AuthIllustration className="h-36 w-auto text-iris" />
       </div>
       <button
         type="button"

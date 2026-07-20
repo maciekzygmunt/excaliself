@@ -370,7 +370,7 @@ test("the empty state shows the hand-drawn illustration and the press-N hint", (
   // The auth panel's illustration, reused: decorative, on the iris tone
   const svg = emptyState?.querySelector('svg[aria-hidden="true"]')
   expect(svg).toBeTruthy()
-  expect(svg?.parentElement?.className).toContain("bg-iris-muted")
+  expect(svg?.getAttribute("class")).toContain("text-iris")
 
   expect(screen.getByText(/or press/i).textContent).toBe("or press N anytime")
 })
