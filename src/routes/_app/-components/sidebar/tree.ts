@@ -48,19 +48,6 @@ export function buildTree(folders: Folder[], drawings: Drawing[]): TreeNode[] {
   return root
 }
 
-/** Search drawings only — folders aren't navigable destinations. */
-export function filterTreeBySearch(
-  drawings: Drawing[],
-  query: string,
-): TreeNode[] {
-  const q = query.toLowerCase().trim()
-  if (!q) return []
-  return drawings
-    .filter((d) => d.name.toLowerCase().includes(q))
-    .sort((a, b) => a.name.localeCompare(b.name))
-    .map((d) => ({ type: "drawing" as const, drawing: d }))
-}
-
 export function isDescendantFolder(
   folderId: string,
   candidateAncestorId: string | null,
