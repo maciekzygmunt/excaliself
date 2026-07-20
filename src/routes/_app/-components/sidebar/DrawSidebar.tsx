@@ -24,6 +24,7 @@ import { useCreateDialog } from "../CreateDialog"
 import { Kbd } from "./Kbd"
 import { SidebarNav } from "./SidebarNav"
 import { type SidebarUser, SidebarUserMenu } from "./SidebarUserMenu"
+import { StarredSection } from "./StarredSection"
 import { TreeNodeItem } from "./TreeNodeItem"
 import { buildTree, treeNodeKey } from "./tree"
 import { SidebarDnDProvider, useSidebarDnD } from "./use-sidebar-dnd"
@@ -93,6 +94,8 @@ export function DrawSidebar({ user }: { user: SidebarUser }) {
         </div>
 
         <SidebarNav />
+
+        <StarredSection drawings={drawings} />
 
         <div className="flex items-center justify-between pt-2 pb-0.5 pr-3 pl-4">
           <span className="text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground/70">

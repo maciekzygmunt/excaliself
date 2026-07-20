@@ -26,6 +26,7 @@ vi.mock("@/features/drawings/server", () => ({
   getDrawingWithFiles: vi.fn(),
   createDrawing: vi.fn(),
   updateDrawing: vi.fn(),
+  setDrawingStarred: vi.fn(),
   saveDrawingScene: vi.fn(),
   deleteDrawing: vi.fn(),
 }))

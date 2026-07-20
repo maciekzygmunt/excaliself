@@ -1,4 +1,11 @@
-import { FilePlus, MoreHorizontal, Pencil, Trash2 } from "lucide-react"
+import {
+  FilePlus,
+  MoreHorizontal,
+  Pencil,
+  Star,
+  StarOff,
+  Trash2,
+} from "lucide-react"
 import type { ReactNode } from "react"
 import {
   AlertDialog,
@@ -30,6 +37,9 @@ type TreeRowActionsProps = {
   deleteDescription: ReactNode
   // Folder rows offer creating a drawing scoped to that folder
   onCreateDrawing?: () => void
+  // Drawing rows offer starring; the label follows current state
+  starred?: boolean
+  onToggleStar?: () => void
 }
 
 // Callers must wrap the row in `group/tree-row` on whichever element should
@@ -43,6 +53,8 @@ export function TreeRowActions({
   deleteTitle,
   deleteDescription,
   onCreateDrawing,
+  starred,
+  onToggleStar,
 }: TreeRowActionsProps) {
   return (
     <AlertDialog>
@@ -79,6 +91,18 @@ export function TreeRowActions({
               New drawing
             </DropdownMenuItem>
           )}
+          {onToggleStar &&
+            (starred ? (
+              <DropdownMenuItem onClick={onToggleStar}>
+                <StarOff className="mr-2 h-4 w-4" />
+                Unstar
+              </DropdownMenuItem>
+            ) : (
+              <DropdownMenuItem onClick={onToggleStar}>
+                <Star className="mr-2 h-4 w-4" />
+                Star
+              </DropdownMenuItem>
+            ))}
           <DropdownMenuItem onClick={onStartRename}>
             <Pencil className="mr-2 h-4 w-4" />
             Rename

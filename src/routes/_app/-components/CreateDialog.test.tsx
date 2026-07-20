@@ -21,6 +21,7 @@ vi.mock("@tanstack/react-router", () => ({
 vi.mock("@/features/drawings/server", () => ({
   createDrawing: vi.fn(),
   updateDrawing: vi.fn(),
+  setDrawingStarred: vi.fn(),
   deleteDrawing: vi.fn(),
 }))
 

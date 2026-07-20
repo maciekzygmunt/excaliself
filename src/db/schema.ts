@@ -125,6 +125,7 @@ export const drawings = pgTable("drawings", {
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
   isPublic: boolean("isPublic").notNull().default(false),
+  starred: boolean("starred").notNull().default(false),
   createdAt: timestamp("createdAt")
     .notNull()
     .$defaultFn(() => new Date()),
