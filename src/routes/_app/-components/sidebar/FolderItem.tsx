@@ -1,4 +1,4 @@
-import { useParams } from "@tanstack/react-router"
+import { useNavigate, useParams } from "@tanstack/react-router"
 import { ChevronRight, Folder } from "lucide-react"
 import { type DragEvent, useState } from "react"
 import {
@@ -12,7 +12,7 @@ import {
   SidebarMenuItem,
   SidebarMenuSub,
 } from "@/components/ui/sidebar"
-import { useDeleteFolder, useRenameFolder } from "@/features/folders/mutations"
+import { useRenameFolder, useTrashFolder } from "@/features/folders/mutations"
 import { useInlineRename } from "@/hooks/use-inline-rename"
 import { cn } from "@/lib/utils"
 import { useCreateDialog } from "../CreateDialog"
@@ -32,6 +32,7 @@ type FolderItemProps = {
 }
 
 export function FolderItem({ folder, childNodes }: FolderItemProps) {
+  const navigate = useNavigate()
   // Non-strict: on Home no drawing is open and there is no $id param
   const { id: currentDrawingId } = useParams({ strict: false })
   const {
@@ -55,11 +56,19 @@ export function FolderItem({ folder, childNodes }: FolderItemProps) {
     },
   })
 
-  const deleteMutation = useDeleteFolder()
+  const trashFolder = useTrashFolder()
   const { openCreateDrawingDialog } = useCreateDialog()
 
   const containsActive = hasActiveDrawing(childNodes, currentDrawingId)
   const [isExpanded, setIsExpanded] = useState(containsActive)
+
+  const handleTrash = () => {
+    // Instant, no confirm — the mutation shows the undo toast itself
+    trashFolder(folder)
+    // Trashing the subtree holding the open drawing lands on Home,
+    // never on a dead URL
+    if (containsActive) navigate({ to: "/draw" })
+  }
 
   const hasChildren = childNodes.length > 0
   const showDropHighlight =
@@ -122,13 +131,7 @@ export function FolderItem({ folder, childNodes }: FolderItemProps) {
           openCreateDrawingDialog({ id: folder.id, name: folder.name })
         }
         onMenuCloseAutoFocus={rename.onMenuCloseAutoFocus}
-        onDelete={() => deleteMutation.mutate({ data: folder.id })}
-        deleteTitle="Delete folder?"
-        deleteDescription={
-          hasChildren
-            ? "This folder contains items. All files in this folder will be deleted."
-            : `Delete "${folder.name}"?`
-        }
+        onTrash={handleTrash}
       />
     </div>
   )

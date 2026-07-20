@@ -47,6 +47,8 @@ const projects: Folder = {
   name: "Projects",
   ownerId: "user-1",
   parentId: null,
+  deletedAt: null,
+  trashRootId: null,
   createdAt: new Date(0),
   updatedAt: new Date(0),
 }

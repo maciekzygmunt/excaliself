@@ -12,10 +12,13 @@ import { TreeRowActions } from "./TreeRowActions"
 afterEach(cleanup)
 
 // Mirrors FolderItem's structure: the row div (containing the actions) is the
-// CollapsibleTrigger, and the actions' dropdown/dialog render through portals
-// that are React children of that trigger — so their clicks bubble to it
+// CollapsibleTrigger, and the actions' dropdown renders through a portal
+// that is a React child of that trigger — so its clicks bubble to it
 // through the React tree unless stopped.
-function renderRow(onOpenChange: (open: boolean) => void) {
+function renderRow(
+  onOpenChange: (open: boolean) => void,
+  onTrash: () => void = vi.fn(),
+) {
   render(
     <Collapsible open onOpenChange={onOpenChange}>
       <CollapsibleTrigger asChild>
@@ -25,9 +28,7 @@ function renderRow(onOpenChange: (open: boolean) => void) {
             isRenaming={false}
             onStartRename={vi.fn()}
             onMenuCloseAutoFocus={vi.fn()}
-            onDelete={vi.fn()}
-            deleteTitle="Delete folder?"
-            deleteDescription="Delete?"
+            onTrash={onTrash}
           />
         </div>
       </CollapsibleTrigger>
@@ -43,43 +44,21 @@ function openDropdown() {
   fireEvent.click(trigger)
 }
 
-function openDeleteDialog() {
+test("Move to trash fires immediately with no confirm dialog", () => {
+  const onTrash = vi.fn()
+  renderRow(vi.fn(), onTrash)
   openDropdown()
-  const deleteItem = screen.getByRole("menuitem", { name: /delete/i })
-  fireEvent.click(deleteItem)
-  return screen.getByRole("alertdialog")
-}
-
-test("clicking Delete in the dropdown does not toggle the collapsible row", () => {
-  const onOpenChange = vi.fn()
-  renderRow(onOpenChange)
-  openDeleteDialog()
-  expect(onOpenChange).not.toHaveBeenCalled()
+  fireEvent.click(screen.getByRole("menuitem", { name: /move to trash/i }))
+  // Tier-1 destructive: the callback runs on click, no dialog in between
+  expect(onTrash).toHaveBeenCalledTimes(1)
+  expect(screen.queryByRole("alertdialog")).toBeNull()
 })
 
-test("clicking the dialog's confirm button does not toggle the collapsible row", () => {
+test("clicking Move to trash does not toggle the collapsible row", () => {
   const onOpenChange = vi.fn()
   renderRow(onOpenChange)
-  openDeleteDialog()
-  fireEvent.click(screen.getByRole("button", { name: "Delete" }))
-  expect(onOpenChange).not.toHaveBeenCalled()
-})
-
-test("clicking the dialog's cancel button does not toggle the collapsible row", () => {
-  const onOpenChange = vi.fn()
-  renderRow(onOpenChange)
-  openDeleteDialog()
-  fireEvent.click(screen.getByRole("button", { name: /cancel/i }))
-  expect(onOpenChange).not.toHaveBeenCalled()
-})
-
-test("clicking the dialog overlay does not toggle the collapsible row", () => {
-  const onOpenChange = vi.fn()
-  renderRow(onOpenChange)
-  openDeleteDialog()
-  const overlay = document.querySelector('[data-slot="alert-dialog-overlay"]')
-  if (!(overlay instanceof HTMLElement)) throw new Error("overlay not found")
-  fireEvent.click(overlay)
+  openDropdown()
+  fireEvent.click(screen.getByRole("menuitem", { name: /move to trash/i }))
   expect(onOpenChange).not.toHaveBeenCalled()
 })
 
@@ -98,9 +77,7 @@ function renderStarrableRow(starred: boolean, onToggleStar: () => void) {
       onToggleStar={onToggleStar}
       onStartRename={vi.fn()}
       onMenuCloseAutoFocus={vi.fn()}
-      onDelete={vi.fn()}
-      deleteTitle="Delete drawing?"
-      deleteDescription="Delete?"
+      onTrash={vi.fn()}
     />,
   )
 }
@@ -126,5 +103,7 @@ test("a starred row offers Unstar and triggers the toggle", () => {
 test("rows without star wiring show no star menu item", () => {
   renderRow(vi.fn())
   openDropdown()
-  expect(screen.queryByRole("menuitem", { name: /star/i })).toBeNull()
+  expect(
+    screen.queryByRole("menuitem", { name: /^(star|unstar)$/i }),
+  ).toBeNull()
 })

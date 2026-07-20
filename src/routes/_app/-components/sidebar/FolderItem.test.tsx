@@ -18,7 +18,8 @@ vi.mock("@/features/folders/server", () => ({
   getFolders: vi.fn(),
   createFolder: vi.fn(),
   updateFolder: vi.fn(),
-  deleteFolder: vi.fn(),
+  trashFolder: vi.fn(),
+  restoreFolder: vi.fn(),
 }))
 
 vi.mock("@/features/drawings/server", () => ({
@@ -28,7 +29,8 @@ vi.mock("@/features/drawings/server", () => ({
   updateDrawing: vi.fn(),
   setDrawingStarred: vi.fn(),
   saveDrawingScene: vi.fn(),
-  deleteDrawing: vi.fn(),
+  trashDrawing: vi.fn(),
+  restoreDrawing: vi.fn(),
 }))
 
 // SidebarProvider's useIsMobile needs matchMedia, which jsdom doesn't provide.
@@ -57,6 +59,8 @@ function makeFolder(
     name,
     ownerId: "user-1",
     parentId,
+    deletedAt: null,
+    trashRootId: null,
     createdAt: new Date(),
     updatedAt: new Date(),
   }

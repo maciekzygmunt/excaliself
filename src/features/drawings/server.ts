@@ -2,7 +2,7 @@
 
 import { randomUUID } from "node:crypto"
 import { createServerFn } from "@tanstack/react-start"
-import { and, desc, eq, inArray } from "drizzle-orm"
+import { and, desc, eq, inArray, isNotNull, isNull } from "drizzle-orm"
 import { z } from "zod"
 import { db } from "@/db"
 import { drawingFiles, drawings } from "@/db/schema"
@@ -21,7 +21,7 @@ export const getDrawings = createServerFn({ method: "GET" })
     return db
       .select()
       .from(drawings)
-      .where(eq(drawings.ownerId, userId))
+      .where(and(eq(drawings.ownerId, userId), isNull(drawings.deletedAt)))
       .orderBy(desc(drawings.updatedAt))
   })
 
@@ -176,14 +176,43 @@ export const saveDrawingScene = createServerFn({ method: "POST" })
     })
   })
 
-export const deleteDrawing = createServerFn({ method: "POST" })
+export const trashDrawing = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
   .inputValidator(z.string())
   .handler(async ({ data: id, context }) => {
     const userId = context.session.user.id
-    const deleted = await db
-      .delete(drawings)
-      .where(and(eq(drawings.id, id), eq(drawings.ownerId, userId)))
+    // Soft delete: the row keeps its folderId so undo restores it in place.
+    // Deliberately leaves updatedAt alone — trashing is not an edit and must
+    // not reshuffle recency-ordered lists once the drawing is restored.
+    const trashed = await db
+      .update(drawings)
+      .set({ deletedAt: new Date(), trashRootId: id })
+      .where(
+        and(
+          eq(drawings.id, id),
+          eq(drawings.ownerId, userId),
+          isNull(drawings.deletedAt),
+        ),
+      )
       .returning({ id: drawings.id })
-    if (deleted.length === 0) throw new Error("Drawing not found")
+    if (trashed.length === 0) throw new Error("Drawing not found")
+  })
+
+export const restoreDrawing = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .inputValidator(z.string())
+  .handler(async ({ data: id, context }) => {
+    const userId = context.session.user.id
+    const restored = await db
+      .update(drawings)
+      .set({ deletedAt: null, trashRootId: null })
+      .where(
+        and(
+          eq(drawings.id, id),
+          eq(drawings.ownerId, userId),
+          isNotNull(drawings.deletedAt),
+        ),
+      )
+      .returning({ id: drawings.id })
+    if (restored.length === 0) throw new Error("Drawing not found")
   })

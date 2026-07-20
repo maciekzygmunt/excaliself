@@ -6,7 +6,13 @@ import {
   useOptimisticListMutation,
 } from "@/hooks/use-optimistic-list-mutation"
 import { type Folder, foldersQueryOptions } from "./queries"
-import { createFolder, deleteFolder, updateFolder } from "./server"
+import {
+  createFolder,
+  restoreFolder,
+  trashFolder,
+  updateFolder,
+} from "./server"
+import { collectFolderSubtreeIds } from "./subtree"
 
 type RenameVars = Parameters<typeof updateFolder>[0]
 
@@ -28,16 +34,29 @@ export function useRenameFolder() {
 }
 
 /**
- * Optimistically deletes a folder and prunes its descendant folders + drawings
- * from the sidebar caches (server delete cascades via FK on delete).
+ * Tier-1 destructive ("Move to trash"): no confirm dialog. Optimistically
+ * prunes the folder's subtree (descendant folders + their drawings) from the
+ * sidebar caches, shows an undo toast right away, and rolls back with an
+ * error toast if the server call fails. Undo restores the whole unit in
+ * place, optimistically.
  */
-export function useDeleteFolder() {
+export function useTrashFolder() {
   const queryClient = useQueryClient()
   const foldersKey = foldersQueryOptions().queryKey
   const drawingsKey = drawingsQueryOptions().queryKey
+  const invalidateBoth = () => {
+    queryClient.invalidateQueries({ queryKey: foldersKey })
+    queryClient.invalidateQueries({ queryKey: drawingsKey })
+  }
 
-  return useMutation({
-    mutationFn: deleteFolder,
+  const restoreMutation = useMutation({
+    mutationFn: restoreFolder,
+    onError: () => toast.error("Couldn't restore folder"),
+    onSettled: invalidateBoth,
+  })
+
+  const trashMutation = useMutation({
+    mutationFn: trashFolder,
     onMutate: async ({ data: id }) => {
       await Promise.all([
         queryClient.cancelQueries({ queryKey: foldersKey }),
@@ -58,38 +77,58 @@ export function useDeleteFolder() {
     onError: (_err, _vars, context) => {
       queryClient.setQueryData(foldersKey, context?.prevFolders)
       queryClient.setQueryData(drawingsKey, context?.prevDrawings)
-      toast.error("Failed to delete folder")
     },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: foldersKey })
-      queryClient.invalidateQueries({ queryKey: drawingsKey })
-    },
+    onSettled: invalidateBoth,
   })
-}
 
-/** Walks parentId to collect a folder and all its descendant folder ids. */
-function collectFolderSubtreeIds(
-  folders: Folder[],
-  rootId: string,
-): Set<string> {
-  const childrenByParent = new Map<string, string[]>()
-  for (const folder of folders) {
-    if (!folder.parentId) continue
-    const list = childrenByParent.get(folder.parentId)
-    if (list) list.push(folder.id)
-    else childrenByParent.set(folder.parentId, [folder.id])
-  }
+  return (folder: Folder) => {
+    // Snapshot the unit before the optimistic prune — these rows (with their
+    // parentId/folderId untouched) are exactly what undo puts back in place.
+    const cachedFolders = queryClient.getQueryData<Folder[]>(foldersKey) ?? []
+    const cachedDrawings =
+      queryClient.getQueryData<Drawing[]>(drawingsKey) ?? []
+    const subtree = collectFolderSubtreeIds(cachedFolders, folder.id)
+    const removedFolders = cachedFolders.filter((f) => subtree.has(f.id))
+    const removedDrawings = cachedDrawings.filter(
+      (d) => d.folderId != null && subtree.has(d.folderId),
+    )
 
-  const subtree = new Set<string>([rootId])
-  const stack = [rootId]
-  while (stack.length > 0) {
-    const id = stack.pop()
-    if (!id) continue
-    for (const childId of childrenByParent.get(id) ?? []) {
-      if (subtree.has(childId)) continue
-      subtree.add(childId)
-      stack.push(childId)
-    }
+    const trashed = trashMutation.mutateAsync({ data: folder.id })
+    const toastId = toast("Moved to trash", {
+      action: {
+        label: "Undo",
+        onClick: () => {
+          // Wait out the in-flight trash call so restore can't race it
+          // server-side; if trashing failed there is nothing to restore.
+          trashed
+            .then(() => {
+              queryClient.setQueryData<Folder[]>(foldersKey, (list = []) => [
+                ...list.filter(
+                  (f) => !removedFolders.some((r) => r.id === f.id),
+                ),
+                ...removedFolders,
+              ])
+              queryClient.setQueryData<Drawing[]>(drawingsKey, (list = []) =>
+                [
+                  ...list.filter(
+                    (d) => !removedDrawings.some((r) => r.id === d.id),
+                  ),
+                  ...removedDrawings,
+                ].sort(
+                  (a, b) =>
+                    new Date(b.updatedAt).getTime() -
+                    new Date(a.updatedAt).getTime(),
+                ),
+              )
+              restoreMutation.mutate({ data: folder.id })
+            })
+            .catch(() => {})
+        },
+      },
+    })
+    trashed.catch(() => {
+      toast.dismiss(toastId)
+      toast.error("Couldn't move to trash")
+    })
   }
-  return subtree
 }
