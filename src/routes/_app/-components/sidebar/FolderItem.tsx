@@ -77,7 +77,16 @@ export function FolderItem({ folder, childNodes }: FolderItemProps) {
   }
 
   return (
-    <Collapsible open={isExpanded} onOpenChange={setIsExpanded} asChild>
+    <Collapsible
+      open={isExpanded}
+      // An empty folder has nothing to reveal: ignore the trigger so clicking
+      // it doesn't pulse an empty CollapsibleContent open and shut. Dropping
+      // into the folder still expands it (handleDrop) once it gains children.
+      onOpenChange={(open) => {
+        if (hasChildren) setIsExpanded(open)
+      }}
+      asChild
+    >
       <SidebarMenuItem
         className={cn(
           "rounded-md transition-colors",
@@ -138,16 +147,18 @@ export function FolderItem({ folder, childNodes }: FolderItemProps) {
             />
           </div>
         </CollapsibleTrigger>
-        <CollapsibleContent>
-          <SidebarMenuSub
-            className="ml-3 mr-0 gap-0 border-sidebar-border/50 pl-2 pr-0 py-0 translate-x-0"
-            {...dropTargetProps}
-          >
-            {childNodes.map((node) => (
-              <TreeNodeItem key={treeNodeKey(node)} node={node} />
-            ))}
-          </SidebarMenuSub>
-        </CollapsibleContent>
+        {hasChildren && (
+          <CollapsibleContent>
+            <SidebarMenuSub
+              className="ml-3 mr-0 gap-0 border-sidebar-border/50 pl-2 pr-0 py-0 translate-x-0"
+              {...dropTargetProps}
+            >
+              {childNodes.map((node) => (
+                <TreeNodeItem key={treeNodeKey(node)} node={node} />
+              ))}
+            </SidebarMenuSub>
+          </CollapsibleContent>
+        )}
       </SidebarMenuItem>
     </Collapsible>
   )
