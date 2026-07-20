@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query"
 import { Link } from "@tanstack/react-router"
 import { File, Folder, PanelLeft, Plus } from "lucide-react"
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo } from "react"
 import { Mark } from "@/components/identity"
 import {
   DropdownMenu,
@@ -22,16 +22,15 @@ import { foldersQueryOptions } from "@/features/folders/queries"
 import { cn } from "@/lib/utils"
 import { useCreateDialog } from "../CreateDialog"
 import { Kbd } from "./Kbd"
-import { SidebarSearch } from "./SidebarSearch"
+import { SidebarNav } from "./SidebarNav"
 import { type SidebarUser, SidebarUserMenu } from "./SidebarUserMenu"
 import { TreeNodeItem } from "./TreeNodeItem"
-import { buildTree, filterTreeBySearch, treeNodeKey } from "./tree"
+import { buildTree, treeNodeKey } from "./tree"
 import { SidebarDnDProvider, useSidebarDnD } from "./use-sidebar-dnd"
 
 export function DrawSidebar({ user }: { user: SidebarUser }) {
   const { data: drawings = [] } = useQuery(drawingsQueryOptions())
   const { data: folders = [] } = useQuery(foldersQueryOptions())
-  const [searchQuery, setSearchQuery] = useState("")
   const { openCreateDrawingDialog, openCreateFolderDialog } = useCreateDialog()
 
   useEffect(() => {
@@ -58,11 +57,10 @@ export function DrawSidebar({ user }: { user: SidebarUser }) {
     [folders],
   )
 
-  const displayTree = useMemo(() => {
-    return searchQuery.trim()
-      ? filterTreeBySearch(drawings, searchQuery)
-      : buildTree(folders, drawings)
-  }, [drawings, folders, searchQuery])
+  const displayTree = useMemo(
+    () => buildTree(folders, drawings),
+    [drawings, folders],
+  )
 
   return (
     <SidebarDnDProvider drawings={drawings} foldersById={foldersById}>
@@ -94,7 +92,7 @@ export function DrawSidebar({ user }: { user: SidebarUser }) {
           </button>
         </div>
 
-        <SidebarSearch value={searchQuery} onChange={setSearchQuery} />
+        <SidebarNav />
 
         <div className="flex items-center justify-between pt-2 pb-0.5 pr-3 pl-4">
           <span className="text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground/70">
