@@ -20,24 +20,24 @@ import {
 
 /**
  * The gallery toolbar (spec §5.2): on-page search — the app's only inline
- * filter — a folder-chip row, and a sort dropdown. Browse passes `folders`
+ * filter — a folder-chip row, and a sort dropdown. Browse passes `chips`
  * for the chip row; the folder page reuses the toolbar without it.
  */
 export function BrowseToolbar({
   query,
   onQueryChange,
-  folders,
-  scope,
-  onScopeChange,
+  chips,
   sort,
   onSortChange,
 }: {
   query: string
   onQueryChange: (query: string) => void
-  /** When present and non-empty, renders the All / per-folder / Unfiled chips. */
-  folders?: Folder[]
-  scope: GalleryScope
-  onScopeChange: (scope: GalleryScope) => void
+  /** When present with folders, renders the All / per-folder / Unfiled chips. */
+  chips?: {
+    folders: Folder[]
+    scope: GalleryScope
+    onScopeChange: (scope: GalleryScope) => void
+  }
   sort: SortOrder
   onSortChange: (sort: SortOrder) => void
 }) {
@@ -85,7 +85,7 @@ export function BrowseToolbar({
         </DropdownMenu>
       </div>
 
-      {folders && folders.length > 0 && (
+      {chips && chips.folders.length > 0 && (
         <div
           role="group"
           aria-label="Filter by folder"
@@ -93,21 +93,21 @@ export function BrowseToolbar({
         >
           <FolderChip
             label="All"
-            selected={scope === "all"}
-            onClick={() => onScopeChange("all")}
+            selected={chips.scope === "all"}
+            onClick={() => chips.onScopeChange("all")}
           />
-          {folders.map((folder) => (
+          {chips.folders.map((folder) => (
             <FolderChip
               key={folder.id}
               label={folder.name}
-              selected={scopedFolderId(scope) === folder.id}
-              onClick={() => onScopeChange({ folderId: folder.id })}
+              selected={scopedFolderId(chips.scope) === folder.id}
+              onClick={() => chips.onScopeChange({ folderId: folder.id })}
             />
           ))}
           <FolderChip
             label="Unfiled"
-            selected={scope === "unfiled"}
-            onClick={() => onScopeChange("unfiled")}
+            selected={chips.scope === "unfiled"}
+            onClick={() => chips.onScopeChange("unfiled")}
           />
         </div>
       )}

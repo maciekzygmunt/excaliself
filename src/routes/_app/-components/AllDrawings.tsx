@@ -9,6 +9,11 @@ import {
   scopedFolderId,
 } from "@/components/drawing-gallery/browse"
 import { DrawingGallery } from "@/components/drawing-gallery/DrawingGallery"
+import {
+  FolderEmpty,
+  NoMatches,
+  QuietLine,
+} from "@/components/drawing-gallery/GalleryEmpty"
 import { IllustratedEmptyState } from "@/components/illustrated-empty-state"
 import { drawingsQueryOptions } from "@/features/drawings/queries"
 import type { Folder } from "@/features/folders/queries"
@@ -59,9 +64,7 @@ export function AllDrawings({ isAdmin }: { isAdmin: boolean }) {
             <BrowseToolbar
               query={query}
               onQueryChange={setQuery}
-              folders={folders}
-              scope={liveScope}
-              onScopeChange={setScope}
+              chips={{ folders, scope: liveScope, onScopeChange: setScope }}
               sort={sort}
               onSortChange={setSort}
             />
@@ -113,33 +116,16 @@ function FilteredEmpty({
 }) {
   const trimmed = query.trim()
   if (trimmed !== "") {
-    return <QuietLine>No drawings match “{trimmed}”</QuietLine>
+    return <NoMatches query={trimmed} />
   }
   if (scope === "unfiled") {
     return <QuietLine>No unfiled drawings</QuietLine>
   }
 
-  const folder = folders.find((f) => f.id === scopedFolderId(scope))
   return (
-    <div className="flex flex-col items-center py-16">
-      <p className="text-sm text-muted-foreground">This folder is empty</p>
-      {folder && (
-        <button
-          type="button"
-          onClick={() => onCreateInFolder(folder)}
-          className="mt-3 text-[13px] font-medium text-iris transition-colors duration-150 hover:text-iris-strong"
-        >
-          New drawing here
-        </button>
-      )}
-    </div>
-  )
-}
-
-function QuietLine({ children }: { children: React.ReactNode }) {
-  return (
-    <p className="py-16 text-center text-sm text-muted-foreground">
-      {children}
-    </p>
+    <FolderEmpty
+      folder={folders.find((f) => f.id === scopedFolderId(scope))}
+      onCreateInFolder={onCreateInFolder}
+    />
   )
 }

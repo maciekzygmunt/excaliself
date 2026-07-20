@@ -6,7 +6,6 @@ import {
   render,
   screen,
   waitFor,
-  within,
 } from "@testing-library/react"
 import { afterEach, beforeEach, expect, test, vi } from "vitest"
 import { renderPreviewSvg } from "@/components/drawing-gallery/preview"
@@ -140,17 +139,21 @@ function makeFolder(id: string, name: string): Folder {
 }
 
 function cardHrefs() {
-  return screen.getAllByRole("link").map((card) => card.getAttribute("href"))
+  // Attribution chips are links too — cards are the /draw/ ones
+  return screen
+    .getAllByRole("link")
+    .map((card) => card.getAttribute("href"))
+    .filter((href) => href?.startsWith("/draw/"))
 }
 
-test("cards carry folder attribution in the All view", () => {
+test("cards carry folder attribution linking to the folder page in the All view", () => {
   renderAllDrawings({
     drawings: [makeDrawing({ id: "d1", name: "Retro board", folderId: "f1" })],
     folders: [makeFolder("f1", "Projects")],
   })
 
-  const card = screen.getByRole("link", { name: /retro board/i })
-  expect(within(card).getByText("Projects")).toBeTruthy()
+  const chip = screen.getByRole("link", { name: "Projects" })
+  expect(chip.getAttribute("href")).toBe("/folder/f1")
 })
 
 test("the tab reads All drawings · Excaliself", () => {
@@ -259,8 +262,8 @@ test("folder attribution shows only in the All view", () => {
 
   fireEvent.click(screen.getByRole("button", { name: "Projects" }))
 
-  const card = screen.getByRole("link", { name: /retro board/i })
-  expect(within(card).queryByText("Projects")).toBeNull()
+  expect(screen.getByRole("link", { name: /retro board/i })).toBeTruthy()
+  expect(screen.queryByRole("link", { name: "Projects" })).toBeNull()
 })
 
 test("search composes with the chip scope", () => {

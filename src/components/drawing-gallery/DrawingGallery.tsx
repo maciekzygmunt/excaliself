@@ -67,8 +67,8 @@ export function DrawingGallery({
     return limit === undefined ? ordered : ordered.slice(0, limit)
   }, [drawings, limit, sort])
 
-  const folderNamesById = useMemo(
-    () => new Map((folders ?? []).map((folder) => [folder.id, folder.name])),
+  const foldersById = useMemo(
+    () => new Map((folders ?? []).map((folder) => [folder.id, folder])),
     [folders],
   )
 
@@ -91,8 +91,8 @@ export function DrawingGallery({
         <DrawingCard
           key={drawing.id}
           drawing={drawing}
-          folderName={
-            drawing.folderId ? folderNamesById.get(drawing.folderId) : undefined
+          folder={
+            drawing.folderId ? foldersById.get(drawing.folderId) : undefined
           }
         />
       ))}
@@ -122,19 +122,24 @@ function LoadingGrid({ label, count }: { label: string; count: number }) {
   )
 }
 
+// Anchors can't nest, and the attribution chip is itself a link to the
+// folder page (spec §5.3) — so the card is a div with a stretched link to
+// the drawing, and the chip sits above it on its own z-layer.
 function DrawingCard({
   drawing,
-  folderName,
+  folder,
 }: {
   drawing: Drawing
-  folderName?: string
+  folder?: Folder
 }) {
   return (
-    <Link
-      to="/draw/$id"
-      params={{ id: drawing.id }}
-      className="group flex flex-col overflow-hidden rounded-xl bg-card shadow-[0_0_0_1px_rgba(25,25,50,0.08),0_1px_2px_rgba(20,20,45,0.05)] transition-[box-shadow,scale] duration-150 hover:shadow-[0_0_0_1px_rgba(25,25,50,0.14),0_3px_8px_rgba(20,20,45,0.1)] active:scale-[0.99] dark:shadow-[0_0_0_1px_rgba(255,255,255,0.1)] dark:hover:shadow-[0_0_0_1px_rgba(255,255,255,0.16)]"
-    >
+    <div className="group relative flex flex-col overflow-hidden rounded-xl bg-card shadow-[0_0_0_1px_rgba(25,25,50,0.08),0_1px_2px_rgba(20,20,45,0.05)] transition-[box-shadow,scale] duration-150 hover:shadow-[0_0_0_1px_rgba(25,25,50,0.14),0_3px_8px_rgba(20,20,45,0.1)] active:scale-[0.99] dark:shadow-[0_0_0_1px_rgba(255,255,255,0.1)] dark:hover:shadow-[0_0_0_1px_rgba(255,255,255,0.16)]">
+      <Link
+        to="/draw/$id"
+        params={{ id: drawing.id }}
+        aria-label={drawing.name}
+        className="absolute inset-0 rounded-xl"
+      />
       <div className="aspect-[4/3] overflow-hidden border-b border-border/60">
         <Preview name={drawing.name} data={drawing.data} />
       </div>
@@ -143,10 +148,16 @@ function DrawingCard({
           {drawing.name}
         </span>
         <span className="flex items-center gap-1 text-xs text-muted-foreground">
-          {folderName && (
+          {folder && (
             <>
-              <FolderIcon className="h-3 w-3 shrink-0 fill-iris/70 text-iris" />
-              <span className="truncate">{folderName}</span>
+              <Link
+                to="/folder/$id"
+                params={{ id: folder.id }}
+                className="relative z-10 flex min-w-0 items-center gap-1 transition-colors duration-150 hover:text-foreground"
+              >
+                <FolderIcon className="h-3 w-3 shrink-0 fill-iris/70 text-iris" />
+                <span className="truncate">{folder.name}</span>
+              </Link>
               <span aria-hidden className="text-muted-foreground/50">
                 ·
               </span>
@@ -158,7 +169,7 @@ function DrawingCard({
           </span>
         </span>
       </div>
-    </Link>
+    </div>
   )
 }
 
