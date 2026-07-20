@@ -11,7 +11,7 @@ import { afterEach, beforeEach, expect, test, vi } from "vitest"
 import { renderPreviewSvg } from "@/components/drawing-gallery/preview"
 import type { Drawing } from "@/features/drawings/queries"
 import { drawingsQueryOptions } from "@/features/drawings/queries"
-import { getDrawings } from "@/features/drawings/server"
+import { getDrawings, trashDrawing } from "@/features/drawings/server"
 import type { Folder } from "@/features/folders/queries"
 import { foldersQueryOptions } from "@/features/folders/queries"
 import { AllDrawings } from "./AllDrawings"
@@ -58,6 +58,9 @@ vi.mock("@/components/drawing-gallery/preview", () => ({
 vi.mock("@/features/drawings/server", () => ({
   getDrawings: vi.fn(),
   getDrawingWithFiles: vi.fn(),
+  // The gallery's Move to trash wiring (useTrashDrawing) binds these
+  trashDrawing: vi.fn(),
+  restoreDrawing: vi.fn(),
 }))
 
 vi.mock("@/features/folders/server", () => ({
@@ -339,6 +342,38 @@ test("an empty chip scope shows a quiet line, never the illustration", () => {
   expect(
     screen.queryByRole("button", { name: /create your first drawing/i }),
   ).toBeNull()
+})
+
+// Spec §5.11 / issue #52: Move to trash from a card is tier-1 destructive —
+// no dialog, the card leaves the grid optimistically, and the page's own
+// search/filter state survives untouched.
+test("Move to trash removes the card in place and keeps the active search", async () => {
+  renderAllDrawings(toolbarFixture)
+
+  fireEvent.change(screen.getByRole("searchbox", { name: /search/i }), {
+    target: { value: "r" },
+  })
+  expect(cardHrefs()).toEqual(["/draw/d2", "/draw/d1"])
+
+  // Radix triggers open on keydown in jsdom (pointer events aren't real there)
+  fireEvent.keyDown(
+    screen.getByRole("button", { name: "Actions for Roadmap" }),
+    {
+      key: "Enter",
+    },
+  )
+  fireEvent.click(screen.getByRole("menuitem", { name: /move to trash/i }))
+
+  // Optimistic: the card is gone before the server answers, no confirm dialog
+  expect(screen.queryByRole("alertdialog")).toBeNull()
+  await waitFor(() => expect(cardHrefs()).toEqual(["/draw/d1"]))
+  // react-query appends its mutation context as a second argument
+  expect(vi.mocked(trashDrawing).mock.calls[0]?.[0]).toEqual({ data: "d2" })
+
+  const search = screen.getByRole("searchbox", {
+    name: /search/i,
+  }) as HTMLInputElement
+  expect(search.value).toBe("r")
 })
 
 test("a scope whose folder was deleted falls back to the All view", async () => {

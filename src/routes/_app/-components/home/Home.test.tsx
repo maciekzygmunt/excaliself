@@ -59,6 +59,9 @@ vi.mock("@/components/drawing-gallery/preview", () => ({
 vi.mock("@/features/drawings/server", () => ({
   getDrawings: vi.fn(),
   getDrawingWithFiles: vi.fn(),
+  // The gallery's Move to trash wiring (useTrashDrawing) binds these
+  trashDrawing: vi.fn(),
+  restoreDrawing: vi.fn(),
 }))
 
 vi.mock("@/features/folders/server", () => ({

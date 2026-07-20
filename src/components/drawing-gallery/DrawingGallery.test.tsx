@@ -1,5 +1,5 @@
-import { act, cleanup, render, screen } from "@testing-library/react"
-import { afterEach, beforeEach, expect, test, vi } from "vitest"
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
+import { afterEach, beforeAll, beforeEach, expect, test, vi } from "vitest"
 import type { Drawing } from "@/features/drawings/queries"
 import type { Folder } from "@/features/folders/queries"
 import { DrawingGallery } from "./DrawingGallery"
@@ -32,6 +32,21 @@ vi.mock("@tanstack/react-router", () => ({
 vi.mock("./preview", () => ({
   renderPreviewSvg: vi.fn(),
 }))
+
+// Radix's popper positions the open menu with ResizeObserver, which jsdom
+// doesn't implement.
+beforeAll(() => {
+  if (!("ResizeObserver" in globalThis)) {
+    Object.defineProperty(globalThis, "ResizeObserver", {
+      configurable: true,
+      value: class {
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+      },
+    })
+  }
+})
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -75,6 +90,7 @@ const projectsFolder: Folder = {
 const defaultProps = {
   isPending: false,
   loadingLabel: "Loading drawings",
+  onTrash: vi.fn(),
   empty: <p>Nothing here</p>,
 }
 
@@ -259,6 +275,47 @@ test("skeleton cards mirror the loaded grid and stay static under reduced motion
   for (const skeleton of skeletons) {
     expect(skeleton.className).toContain("motion-reduce:animate-none")
   }
+})
+
+// Spec §5.11: "Move to trash" is identical everywhere — tier-1 destructive,
+// no confirm dialog; the mutation behind onTrash shows the undo toast.
+test("the card overflow menu moves its drawing to trash without a confirm dialog", () => {
+  const onTrash = vi.fn()
+  const drawings = [makeDrawing({ id: "d1" }), makeDrawing({ id: "d2" })]
+
+  render(
+    <DrawingGallery {...defaultProps} drawings={drawings} onTrash={onTrash} />,
+  )
+
+  // Radix triggers open on keydown in jsdom (pointer events aren't real there)
+  fireEvent.keyDown(
+    screen.getByRole("button", { name: "Actions for Drawing d2" }),
+    { key: "Enter" },
+  )
+  fireEvent.click(screen.getByRole("menuitem", { name: /move to trash/i }))
+
+  expect(onTrash).toHaveBeenCalledTimes(1)
+  expect(onTrash).toHaveBeenCalledWith(drawings[1])
+  expect(screen.queryByRole("alertdialog")).toBeNull()
+})
+
+test("every card gets its own actions trigger", () => {
+  render(
+    <DrawingGallery
+      {...defaultProps}
+      drawings={[
+        makeDrawing({ id: "d1", name: "Retro board" }),
+        makeDrawing({ id: "d2", name: "Wireframes" }),
+      ]}
+    />,
+  )
+
+  expect(
+    screen.getByRole("button", { name: "Actions for Retro board" }),
+  ).toBeTruthy()
+  expect(
+    screen.getByRole("button", { name: "Actions for Wireframes" }),
+  ).toBeTruthy()
 })
 
 test("the loaded grid fades in instead of swapping in a single frame", () => {

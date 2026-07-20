@@ -1,6 +1,17 @@
 import { Link } from "@tanstack/react-router"
-import { Folder as FolderIcon, Pencil } from "lucide-react"
+import {
+  Folder as FolderIcon,
+  MoreHorizontal,
+  Pencil,
+  Trash2,
+} from "lucide-react"
 import { useEffect, useMemo, useRef, useState } from "react"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { Skeleton } from "@/components/ui/skeleton"
 import type { Drawing } from "@/features/drawings/queries"
 import type { Folder } from "@/features/folders/queries"
@@ -46,6 +57,7 @@ export function DrawingGallery({
   limit,
   sort = DEFAULT_SORT,
   loadingLabel,
+  onTrash,
   empty,
 }: {
   /** Any order — the server sorts, but autosave patches cache rows in place
@@ -61,6 +73,10 @@ export function DrawingGallery({
   sort?: SortOrder
   /** Accessible name for the loading grid. */
   loadingLabel: string
+  /** Card overflow action "Move to trash" (spec §5.11): tier-1 destructive,
+   * identical everywhere — pages wire `useTrashDrawing`, which removes the
+   * card optimistically and shows the undo toast itself. No confirm dialog. */
+  onTrash: (drawing: Drawing) => void
   /** Rendered when loading settles on zero drawings. */
   empty: React.ReactNode
 }) {
@@ -100,6 +116,7 @@ export function DrawingGallery({
           folder={
             drawing.folderId ? foldersById.get(drawing.folderId) : undefined
           }
+          onTrash={() => onTrash(drawing)}
         />
       ))}
     </div>
@@ -140,9 +157,11 @@ export function LoadingGrid({
 function DrawingCard({
   drawing,
   folder,
+  onTrash,
 }: {
   drawing: Drawing
   folder?: Folder
+  onTrash: () => void
 }) {
   return (
     <div
@@ -160,33 +179,65 @@ function DrawingCard({
       <div className="aspect-[4/3] overflow-hidden border-b border-border/60">
         <Preview name={drawing.name} data={drawing.data} />
       </div>
-      <div className="flex flex-col gap-0.5 px-3 py-2.5">
-        <span className="truncate text-[13px] font-medium text-foreground">
-          {drawing.name}
-        </span>
-        <span className="flex items-center gap-1 text-xs text-muted-foreground">
-          {folder && (
-            <>
-              <Link
-                to="/folder/$id"
-                params={{ id: folder.id }}
-                className="relative z-10 flex min-w-0 items-center gap-1 transition-colors duration-150 hover:text-foreground"
-              >
-                <FolderIcon className="h-3 w-3 shrink-0 fill-iris/70 text-iris" />
-                <span className="truncate">{folder.name}</span>
-              </Link>
-              <span aria-hidden className="text-muted-foreground/50">
-                ·
-              </span>
-            </>
-          )}
-          {/* Server and client can straddle a minute boundary */}
-          <span suppressHydrationWarning className="shrink-0">
-            {formatEditedAgo(drawing.updatedAt)}
+      <div className="flex items-center gap-2 px-3 py-2.5">
+        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <span className="truncate text-[13px] font-medium text-foreground">
+            {drawing.name}
           </span>
-        </span>
+          <span className="flex items-center gap-1 text-xs text-muted-foreground">
+            {folder && (
+              <>
+                <Link
+                  to="/folder/$id"
+                  params={{ id: folder.id }}
+                  className="relative z-10 flex min-w-0 items-center gap-1 transition-colors duration-150 hover:text-foreground"
+                >
+                  <FolderIcon className="h-3 w-3 shrink-0 fill-iris/70 text-iris" />
+                  <span className="truncate">{folder.name}</span>
+                </Link>
+                <span aria-hidden className="text-muted-foreground/50">
+                  ·
+                </span>
+              </>
+            )}
+            {/* Server and client can straddle a minute boundary */}
+            <span suppressHydrationWarning className="shrink-0">
+              {formatEditedAgo(drawing.updatedAt)}
+            </span>
+          </span>
+        </div>
+        <CardActions name={drawing.name} onTrash={onTrash} />
       </div>
     </div>
+  )
+}
+
+// The card's overflow menu — z-layered above the stretched drawing link,
+// hidden until hover/focus when the primary pointer is a mouse. Gated on
+// pointer capability, not viewport width: a touch-only tablet at desktop
+// width has no hover to reveal it, so there it stays visible.
+function CardActions({ name, onTrash }: { name: string; onTrash: () => void }) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          aria-label={`Actions for ${name}`}
+          className="relative z-10 -mr-1.5 shrink-0 rounded-md p-1 text-muted-foreground/50 transition-[color,background-color,opacity] duration-150 hover:bg-accent hover:text-foreground focus-visible:bg-accent focus-visible:text-foreground focus-visible:outline-none pointer-fine:opacity-0 pointer-fine:group-focus-within:opacity-100 pointer-fine:group-hover:opacity-100 pointer-fine:data-[state=open]:opacity-100"
+        >
+          <MoreHorizontal className="h-4 w-4" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuItem
+          onClick={onTrash}
+          className="text-destructive focus:text-destructive"
+        >
+          <Trash2 className="mr-2 h-4 w-4" />
+          Move to trash
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
 }
 
