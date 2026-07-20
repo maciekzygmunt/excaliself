@@ -5,8 +5,8 @@ import { createServerFn } from "@tanstack/react-start"
 import { count, eq } from "drizzle-orm"
 import z from "zod"
 import { db } from "@/db"
-import { users, verifications } from "@/db/schema"
-import { registerFieldsSchema } from "@/features/auth/schema"
+import { sessions, users, verifications } from "@/db/schema"
+import { setupFieldsSchema } from "@/features/auth/schema"
 import { auth } from "@/lib/auth"
 import { adminMiddleware } from "@/middleware/admin"
 
@@ -18,7 +18,7 @@ export const getUserCount = createServerFn({ method: "GET" }).handler(
 )
 
 export const setupAdmin = createServerFn({ method: "POST" })
-  .inputValidator(registerFieldsSchema)
+  .inputValidator(setupFieldsSchema)
   .handler(async ({ data }) => {
     const userCount = await getUserCount()
     if (userCount > 0) {
@@ -29,7 +29,8 @@ export const setupAdmin = createServerFn({ method: "POST" })
       body: {
         email: data.email,
         password: data.password,
-        name: data.name,
+        // Setup asks only for credentials; the admin can rename later.
+        name: data.email.split("@")[0],
       },
     })
 
@@ -39,8 +40,18 @@ export const setupAdmin = createServerFn({ method: "POST" })
 
     await db
       .update(users)
-      .set({ role: "admin", name: data.name })
+      .set({ role: "admin" })
       .where(eq(users.id, result.user.id))
+
+    // The sign-up session was minted before the promotion, so its cookie
+    // cache would report role "user" for up to five minutes. Drop it and
+    // sign in fresh — tanstackStartCookies copies the new session cookie
+    // onto this server-function response, so the browser leaves /setup
+    // already authenticated as admin.
+    await db.delete(sessions).where(eq(sessions.userId, result.user.id))
+    await auth.api.signInEmail({
+      body: { email: data.email, password: data.password },
+    })
   })
 
 export const getAllUsers = createServerFn({ method: "GET" })
