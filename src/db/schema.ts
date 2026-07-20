@@ -98,6 +98,12 @@ export const folders = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     parentId: text("parentId"),
+    // Soft delete: set means "in trash". trashRootId records the trash unit —
+    // the id of the folder/drawing whose trashing swept this row along — so a
+    // whole subtree can be restored as one unit while each row's trashed
+    // state stays individually knowable.
+    deletedAt: timestamp("deletedAt"),
+    trashRootId: text("trashRootId"),
     createdAt: timestamp("createdAt")
       .notNull()
       .$defaultFn(() => new Date()),
@@ -126,6 +132,9 @@ export const drawings = pgTable("drawings", {
     .references(() => users.id, { onDelete: "cascade" }),
   isPublic: boolean("isPublic").notNull().default(false),
   starred: boolean("starred").notNull().default(false),
+  // Soft delete — see folders.deletedAt/trashRootId for the model.
+  deletedAt: timestamp("deletedAt"),
+  trashRootId: text("trashRootId"),
   createdAt: timestamp("createdAt")
     .notNull()
     .$defaultFn(() => new Date()),

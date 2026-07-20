@@ -3,9 +3,9 @@ import { File } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar"
 import {
-  useDeleteDrawing,
   useRenameDrawing,
   useToggleStarDrawing,
+  useTrashDrawing,
 } from "@/features/drawings/mutations"
 import { useInlineRename } from "@/hooks/use-inline-rename"
 import { cn } from "@/lib/utils"
@@ -37,12 +37,13 @@ export function DrawingItem({ drawing }: DrawingItemProps) {
     },
   })
 
-  const deleteMutation = useDeleteDrawing()
+  const trashDrawing = useTrashDrawing()
   const starMutation = useToggleStarDrawing()
 
-  const handleDelete = async () => {
-    await deleteMutation.mutateAsync({ data: drawing.id })
-    // Deleting the open drawing lands on Home, never on a dead URL
+  const handleTrash = () => {
+    // Instant, no confirm — the mutation shows the undo toast itself
+    trashDrawing(drawing)
+    // Trashing the open drawing lands on Home, never on a dead URL
     if (drawing.id === currentDrawingId) navigate({ to: "/draw" })
   }
 
@@ -107,9 +108,7 @@ export function DrawingItem({ drawing }: DrawingItemProps) {
         }
         onStartRename={() => rename.start(drawing.name)}
         onMenuCloseAutoFocus={rename.onMenuCloseAutoFocus}
-        onDelete={handleDelete}
-        deleteTitle="Delete drawing?"
-        deleteDescription={`Are you sure you want to delete "${drawing.name}"?`}
+        onTrash={handleTrash}
       />
     </SidebarMenuItem>
   )

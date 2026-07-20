@@ -22,13 +22,15 @@ vi.mock("@/features/drawings/server", () => ({
   createDrawing: vi.fn(),
   updateDrawing: vi.fn(),
   setDrawingStarred: vi.fn(),
-  deleteDrawing: vi.fn(),
+  trashDrawing: vi.fn(),
+  restoreDrawing: vi.fn(),
 }))
 
 vi.mock("@/features/folders/server", () => ({
   createFolder: vi.fn(),
   updateFolder: vi.fn(),
-  deleteFolder: vi.fn(),
+  trashFolder: vi.fn(),
+  restoreFolder: vi.fn(),
 }))
 
 function wrapper({ children }: { children: ReactNode }) {

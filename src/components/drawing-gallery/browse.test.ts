@@ -11,6 +11,8 @@ function makeDrawing(overrides: Partial<Drawing> & { id: string }): Drawing {
     ownerId: "user-1",
     isPublic: false,
     starred: false,
+    deletedAt: null,
+    trashRootId: null,
     createdAt: new Date("2026-01-01T00:00:00Z"),
     updatedAt: new Date("2026-01-01T00:00:00Z"),
     ...overrides,

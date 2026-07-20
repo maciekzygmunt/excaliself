@@ -6,18 +6,6 @@ import {
   StarOff,
   Trash2,
 } from "lucide-react"
-import type { ReactNode } from "react"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -32,9 +20,9 @@ type TreeRowActionsProps = {
   isRenaming: boolean
   onStartRename: () => void
   onMenuCloseAutoFocus: (e: Event) => void
-  onDelete: () => void | Promise<void>
-  deleteTitle: string
-  deleteDescription: ReactNode
+  // Tier-1 destructive: fires immediately — no confirm dialog. The caller
+  // shows the undo toast (trash is the safety net).
+  onTrash: () => void
   // Folder rows offer creating a drawing scoped to that folder
   onCreateDrawing?: () => void
   // Drawing rows offer starring; the label follows current state
@@ -49,93 +37,70 @@ export function TreeRowActions({
   isRenaming,
   onStartRename,
   onMenuCloseAutoFocus,
-  onDelete,
-  deleteTitle,
-  deleteDescription,
+  onTrash,
   onCreateDrawing,
   starred,
   onToggleStar,
 }: TreeRowActionsProps) {
   return (
-    <AlertDialog>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <SidebarMenuAction
-            className={cn(
-              "text-muted-foreground/30 md:opacity-0 group-hover/tree-row:opacity-100 group-focus-within/tree-row:opacity-100 data-[state=open]:opacity-100 [&>svg]:size-auto",
-              // Use `invisible` (not `hidden`) so the trigger stays in
-              // layout while renaming — otherwise Radix's closing popper
-              // loses its anchor and flashes at viewport (0, 0)
-              isRenaming && "invisible pointer-events-none",
-            )}
-            // Stop pointer/click from bubbling to ancestor triggers such as
-            // FolderItem's CollapsibleTrigger
-            onPointerDown={(e) => e.stopPropagation()}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <MoreHorizontal className="h-3.5! w-3.5!" />
-          </SidebarMenuAction>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent
-          side="right"
-          align="start"
-          onCloseAutoFocus={onMenuCloseAutoFocus}
-          // Portaled, but still a React child of the row — clicks bubble
-          // through the React tree to ancestor triggers such as FolderItem's
-          // CollapsibleTrigger unless fenced here
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <SidebarMenuAction
+          className={cn(
+            "text-muted-foreground/30 md:opacity-0 group-hover/tree-row:opacity-100 group-focus-within/tree-row:opacity-100 data-[state=open]:opacity-100 [&>svg]:size-auto",
+            // Use `invisible` (not `hidden`) so the trigger stays in
+            // layout while renaming — otherwise Radix's closing popper
+            // loses its anchor and flashes at viewport (0, 0)
+            isRenaming && "invisible pointer-events-none",
+          )}
+          // Stop pointer/click from bubbling to ancestor triggers such as
+          // FolderItem's CollapsibleTrigger
+          onPointerDown={(e) => e.stopPropagation()}
           onClick={(e) => e.stopPropagation()}
         >
-          {onCreateDrawing && (
-            <DropdownMenuItem onClick={onCreateDrawing}>
-              <FilePlus className="mr-2 h-4 w-4" />
-              New drawing
-            </DropdownMenuItem>
-          )}
-          {onToggleStar &&
-            (starred ? (
-              <DropdownMenuItem onClick={onToggleStar}>
-                <StarOff className="mr-2 h-4 w-4" />
-                Unstar
-              </DropdownMenuItem>
-            ) : (
-              <DropdownMenuItem onClick={onToggleStar}>
-                <Star className="mr-2 h-4 w-4" />
-                Star
-              </DropdownMenuItem>
-            ))}
-          <DropdownMenuItem onClick={onStartRename}>
-            <Pencil className="mr-2 h-4 w-4" />
-            Rename
+          <MoreHorizontal className="h-3.5! w-3.5!" />
+        </SidebarMenuAction>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent
+        side="right"
+        align="start"
+        onCloseAutoFocus={onMenuCloseAutoFocus}
+        // Portaled, but still a React child of the row — clicks bubble
+        // through the React tree to ancestor triggers such as FolderItem's
+        // CollapsibleTrigger unless fenced here
+        onClick={(e) => e.stopPropagation()}
+      >
+        {onCreateDrawing && (
+          <DropdownMenuItem onClick={onCreateDrawing}>
+            <FilePlus className="mr-2 h-4 w-4" />
+            New drawing
           </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <AlertDialogTrigger asChild>
-            <DropdownMenuItem
-              onSelect={(e) => e.preventDefault()}
-              className="text-destructive focus:text-destructive"
-            >
-              <Trash2 className="mr-2 h-4 w-4" />
-              Delete
+        )}
+        {onToggleStar &&
+          (starred ? (
+            <DropdownMenuItem onClick={onToggleStar}>
+              <StarOff className="mr-2 h-4 w-4" />
+              Unstar
             </DropdownMenuItem>
-          </AlertDialogTrigger>
-        </DropdownMenuContent>
-      </DropdownMenu>
-      {/* Same fence as the dropdown: the dialog portals out of the DOM row
-          but not out of the React tree */}
-      <AlertDialogContent onClick={(e) => e.stopPropagation()}>
-        <AlertDialogHeader>
-          <AlertDialogTitle>{deleteTitle}</AlertDialogTitle>
-          <AlertDialogDescription>{deleteDescription}</AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction
-            className="bg-destructive text-white hover:bg-destructive/90"
-            onClick={onDelete}
-          >
-            Delete
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+          ) : (
+            <DropdownMenuItem onClick={onToggleStar}>
+              <Star className="mr-2 h-4 w-4" />
+              Star
+            </DropdownMenuItem>
+          ))}
+        <DropdownMenuItem onClick={onStartRename}>
+          <Pencil className="mr-2 h-4 w-4" />
+          Rename
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
+          onClick={onTrash}
+          className="text-destructive focus:text-destructive"
+        >
+          <Trash2 className="mr-2 h-4 w-4" />
+          Move to trash
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
 }
