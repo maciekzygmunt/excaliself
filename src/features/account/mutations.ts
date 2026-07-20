@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
+import { usersQueryOptions } from "@/features/admin/queries"
 import { type CurrentUser, currentUserQueryOptions } from "./queries"
 import { updateProfile } from "./server"
 
@@ -32,7 +33,7 @@ export function useUpdateProfile() {
       queryClient.invalidateQueries({ queryKey: currentUserKey })
       // The admin member list shows the same name — drop its cache so an
       // admin's own rename shows up there without waiting out the staleTime.
-      queryClient.invalidateQueries({ queryKey: ["admin", "users"] })
+      queryClient.invalidateQueries(usersQueryOptions())
     },
   })
 

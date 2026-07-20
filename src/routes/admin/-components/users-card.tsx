@@ -13,6 +13,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
+import { userDisplayName } from "@/features/account/display-name"
 import { usersQueryOptions } from "@/features/admin/queries"
 import { deleteUser } from "@/features/admin/server"
 
@@ -60,13 +61,11 @@ export function UsersSection() {
               />
               <div className="min-w-0">
                 <p className="truncate text-sm text-foreground">
-                  {user.name || user.email}
+                  {userDisplayName(user)}
                 </p>
-                {user.name && (
-                  <p className="truncate text-xs text-muted-foreground">
-                    {user.email}
-                  </p>
-                )}
+                <p className="truncate text-xs text-muted-foreground">
+                  {user.email}
+                </p>
               </div>
             </div>
             <div className="flex items-center gap-2 shrink-0">

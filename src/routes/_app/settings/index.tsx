@@ -4,7 +4,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { currentUserQueryOptions } from "@/features/account/queries"
 import { useDelayedVisible } from "@/hooks/use-delayed-visible"
 import { useDocumentTitle } from "@/lib/document-title"
-import { ProfileSection } from "./-components/profile-section"
+import { ProfileSection } from "./-components/ProfileSection"
 
 export const Route = createFileRoute("/_app/settings/")({
   component: AccountPage,

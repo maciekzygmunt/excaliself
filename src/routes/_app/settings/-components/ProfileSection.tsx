@@ -1,5 +1,6 @@
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
+import { emailPrefix } from "@/features/account/display-name"
 import { useUpdateProfile } from "@/features/account/mutations"
 import type { CurrentUser } from "@/features/account/queries"
 
@@ -8,7 +9,6 @@ import type { CurrentUser } from "@/features/account/queries"
 export function ProfileSection({ user }: { user: CurrentUser }) {
   const updateProfile = useUpdateProfile()
   const currentName = user.name ?? ""
-  const emailPrefix = user.email.split("@")[0] || user.email
 
   const commit = (input: HTMLInputElement) => {
     const next = input.value.trim()
@@ -35,7 +35,7 @@ export function ProfileSection({ user }: { user: CurrentUser }) {
             key={currentName}
             id="display-name"
             defaultValue={currentName}
-            placeholder={emailPrefix}
+            placeholder={emailPrefix(user.email)}
             maxLength={120}
             autoComplete="name"
             onBlur={(e) => commit(e.currentTarget)}

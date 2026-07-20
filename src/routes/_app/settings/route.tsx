@@ -1,6 +1,7 @@
 import {
   createFileRoute,
   Link,
+  type LinkProps,
   Outlet,
   useLoaderData,
   useMatchRoute,
@@ -23,7 +24,7 @@ function SettingsLayout() {
             Settings
           </h1>
         </div>
-        <div className="flex flex-1 items-start gap-10">
+        <div className="flex flex-1 flex-col gap-6 md:flex-row md:items-start md:gap-10">
           {/* Sub-nav is adaptive: members see only the one Account page, so
               they get no second column at all. */}
           {isAdmin && <SettingsSubNav />}
@@ -43,17 +44,26 @@ function SettingsSubNav() {
   return (
     <nav
       aria-label="Settings sections"
-      className="hidden w-36 shrink-0 flex-col gap-1 md:flex"
+      className="flex shrink-0 flex-col gap-1 md:w-36"
     >
       <div className="px-2 pb-0.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground/70">
         Account
       </div>
-      <SettingsNavItem to="/settings" label="Account" />
+      {/* On phones the column becomes a row of pills above the content. */}
+      <div className="flex flex-row gap-1 md:flex-col">
+        <SettingsNavItem to="/settings" label="Account" />
+      </div>
     </nav>
   )
 }
 
-function SettingsNavItem({ to, label }: { to: string; label: string }) {
+function SettingsNavItem({
+  to,
+  label,
+}: {
+  to: LinkProps["to"]
+  label: string
+}) {
   const matchRoute = useMatchRoute()
   const isActive = matchRoute({ to }) !== false
   return (

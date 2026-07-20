@@ -13,13 +13,17 @@ import {
   currentUserQueryOptions,
 } from "@/features/account/queries"
 import { updateProfile } from "@/features/account/server"
-import { ProfileSection } from "./profile-section"
+import { ProfileSection } from "./ProfileSection"
 
 // The query/mutation modules import the server functions, which import the
-// db — stub the server-function edge.
+// db — stub the server-function edge (the admin one comes in via the
+// member-list invalidation in useUpdateProfile).
 vi.mock("@/features/account/server", () => ({
   getCurrentUser: vi.fn(),
   updateProfile: vi.fn(),
+}))
+vi.mock("@/features/admin/server", () => ({
+  getAllUsers: vi.fn(),
 }))
 
 vi.mock("sonner", () => ({
