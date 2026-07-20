@@ -10,6 +10,10 @@ import { updateProfile } from "./server"
  * cache, so it updates in the same frame — and rolls back with an error
  * toast if the server call fails. An empty string clears the name, flipping
  * every surface back to the email-prefix fallback.
+ *
+ * Saves share a mutation scope, so rapid successive commits run in serial:
+ * an older request can neither reach the server after a newer one nor roll
+ * the cache back over a newer optimistic write.
  */
 export function useUpdateProfile() {
   const queryClient = useQueryClient()
@@ -17,6 +21,7 @@ export function useUpdateProfile() {
 
   const mutation = useMutation({
     mutationFn: updateProfile,
+    scope: { id: "account-profile" },
     onMutate: async ({ data }) => {
       await queryClient.cancelQueries({ queryKey: currentUserKey })
       const previous = queryClient.getQueryData<CurrentUser>(currentUserKey)

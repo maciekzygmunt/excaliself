@@ -132,6 +132,36 @@ test("clearing the name saves the email-prefix fallback (null in cache)", async 
   expect(cachedName()).toBeNull()
 })
 
+test("rapid successive saves run in serial so the last edit wins", async () => {
+  let resolveFirst!: () => void
+  vi.mocked(updateProfile).mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        resolveFirst = () => resolve(undefined)
+      }),
+  )
+  renderSection()
+  const input = screen.getByLabelText("Display name")
+  fireEvent.change(input, { target: { value: "First" } })
+  fireEvent.blur(input)
+  await waitFor(() => expect(updateProfile).toHaveBeenCalledTimes(1))
+
+  fireEvent.change(input, { target: { value: "Second" } })
+  fireEvent.blur(input)
+  // The shared mutation scope holds the second RPC until the first settles.
+  await act(async () => {
+    await Promise.resolve()
+  })
+  expect(updateProfile).toHaveBeenCalledTimes(1)
+
+  resolveFirst()
+  await waitFor(() => expect(updateProfile).toHaveBeenCalledTimes(2))
+  expect(vi.mocked(updateProfile).mock.calls[1][0]).toEqual({
+    data: { name: "Second" },
+  })
+  await waitFor(() => expect(cachedName()).toBe("Second"))
+})
+
 test("a failed save rolls the cache back and shows an error toast", async () => {
   const { toast } = await import("sonner")
   vi.mocked(updateProfile).mockRejectedValue(new Error("boom"))
