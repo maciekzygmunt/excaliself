@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Trash2 } from "lucide-react"
 import { toast } from "sonner"
+import { InitialsAvatar } from "@/components/initials-avatar"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -52,9 +53,11 @@ export function UsersSection() {
             }`}
           >
             <div className="flex items-center gap-3 min-w-0">
-              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted text-[10px] font-medium text-muted-foreground">
-                {(user.name || user.email).charAt(0).toUpperCase()}
-              </div>
+              <InitialsAvatar
+                name={user.name}
+                email={user.email}
+                className="h-7 w-7"
+              />
               <div className="min-w-0">
                 <p className="truncate text-sm text-foreground">
                   {user.name || user.email}

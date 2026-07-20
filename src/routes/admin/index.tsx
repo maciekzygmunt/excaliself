@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router"
 import { ArrowLeft } from "lucide-react"
 import { usersQueryOptions } from "@/features/admin/queries"
 import { pendingInvitesQueryOptions } from "@/features/invites/queries"
+import { useSettingsShortcut } from "@/hooks/use-settings-shortcut"
 import { adminMiddleware } from "@/middleware/admin"
 import { setupMiddleware } from "@/middleware/setup"
 import { InvitesSection } from "./-components/invites-card"
@@ -21,6 +22,9 @@ export const Route = createFileRoute("/admin/")({
 })
 
 function AdminPage() {
+  // ⌘, works from every authenticated surface — /admin sits outside the
+  // _app shell, so it mounts the shortcut itself.
+  useSettingsShortcut()
   return (
     <div className="min-h-screen bg-background">
       <div className="mx-auto max-w-2xl px-6 py-10">
