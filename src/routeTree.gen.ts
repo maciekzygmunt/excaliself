@@ -12,13 +12,14 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as SetupRouteImport } from './routes/setup'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as InviteRouteImport } from './routes/invite'
-import { Route as DrawRouteRouteImport } from './routes/draw/route'
+import { Route as AppRouteRouteImport } from './routes/_app/route'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as DrawIndexRouteImport } from './routes/draw/index'
 import { Route as AdminIndexRouteImport } from './routes/admin/index'
-import { Route as DrawIdRouteImport } from './routes/draw/$id'
 import { Route as ApiHealthRouteImport } from './routes/api/health'
+import { Route as AppDrawingsRouteImport } from './routes/_app/drawings'
+import { Route as AppDrawIndexRouteImport } from './routes/_app/draw/index'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
+import { Route as AppDrawIdRouteImport } from './routes/_app/draw/$id'
 
 const SetupRoute = SetupRouteImport.update({
   id: '/setup',
@@ -35,9 +36,8 @@ const InviteRoute = InviteRouteImport.update({
   path: '/invite',
   getParentRoute: () => rootRouteImport,
 } as any)
-const DrawRouteRoute = DrawRouteRouteImport.update({
-  id: '/draw',
-  path: '/draw',
+const AppRouteRoute = AppRouteRouteImport.update({
+  id: '/_app',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -45,109 +45,118 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const DrawIndexRoute = DrawIndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => DrawRouteRoute,
-} as any)
 const AdminIndexRoute = AdminIndexRouteImport.update({
   id: '/admin/',
   path: '/admin/',
   getParentRoute: () => rootRouteImport,
-} as any)
-const DrawIdRoute = DrawIdRouteImport.update({
-  id: '/$id',
-  path: '/$id',
-  getParentRoute: () => DrawRouteRoute,
 } as any)
 const ApiHealthRoute = ApiHealthRouteImport.update({
   id: '/api/health',
   path: '/api/health',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AppDrawingsRoute = AppDrawingsRouteImport.update({
+  id: '/drawings',
+  path: '/drawings',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AppDrawIndexRoute = AppDrawIndexRouteImport.update({
+  id: '/draw/',
+  path: '/draw/',
+  getParentRoute: () => AppRouteRoute,
+} as any)
 const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   id: '/api/auth/$',
   path: '/api/auth/$',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AppDrawIdRoute = AppDrawIdRouteImport.update({
+  id: '/draw/$id',
+  path: '/draw/$id',
+  getParentRoute: () => AppRouteRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/draw': typeof DrawRouteRouteWithChildren
   '/invite': typeof InviteRoute
   '/login': typeof LoginRoute
   '/setup': typeof SetupRoute
+  '/drawings': typeof AppDrawingsRoute
   '/api/health': typeof ApiHealthRoute
-  '/draw/$id': typeof DrawIdRoute
   '/admin/': typeof AdminIndexRoute
-  '/draw/': typeof DrawIndexRoute
+  '/draw/$id': typeof AppDrawIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/draw/': typeof AppDrawIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/invite': typeof InviteRoute
   '/login': typeof LoginRoute
   '/setup': typeof SetupRoute
+  '/drawings': typeof AppDrawingsRoute
   '/api/health': typeof ApiHealthRoute
-  '/draw/$id': typeof DrawIdRoute
   '/admin': typeof AdminIndexRoute
-  '/draw': typeof DrawIndexRoute
+  '/draw/$id': typeof AppDrawIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/draw': typeof AppDrawIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/draw': typeof DrawRouteRouteWithChildren
+  '/_app': typeof AppRouteRouteWithChildren
   '/invite': typeof InviteRoute
   '/login': typeof LoginRoute
   '/setup': typeof SetupRoute
+  '/_app/drawings': typeof AppDrawingsRoute
   '/api/health': typeof ApiHealthRoute
-  '/draw/$id': typeof DrawIdRoute
   '/admin/': typeof AdminIndexRoute
-  '/draw/': typeof DrawIndexRoute
+  '/_app/draw/$id': typeof AppDrawIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/_app/draw/': typeof AppDrawIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
-    | '/draw'
     | '/invite'
     | '/login'
     | '/setup'
+    | '/drawings'
     | '/api/health'
-    | '/draw/$id'
     | '/admin/'
-    | '/draw/'
+    | '/draw/$id'
     | '/api/auth/$'
+    | '/draw/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/invite'
     | '/login'
     | '/setup'
+    | '/drawings'
     | '/api/health'
-    | '/draw/$id'
     | '/admin'
-    | '/draw'
+    | '/draw/$id'
     | '/api/auth/$'
+    | '/draw'
   id:
     | '__root__'
     | '/'
-    | '/draw'
+    | '/_app'
     | '/invite'
     | '/login'
     | '/setup'
+    | '/_app/drawings'
     | '/api/health'
-    | '/draw/$id'
     | '/admin/'
-    | '/draw/'
+    | '/_app/draw/$id'
     | '/api/auth/$'
+    | '/_app/draw/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  DrawRouteRoute: typeof DrawRouteRouteWithChildren
+  AppRouteRoute: typeof AppRouteRouteWithChildren
   InviteRoute: typeof InviteRoute
   LoginRoute: typeof LoginRoute
   SetupRoute: typeof SetupRoute
@@ -179,11 +188,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof InviteRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/draw': {
-      id: '/draw'
-      path: '/draw'
-      fullPath: '/draw'
-      preLoaderRoute: typeof DrawRouteRouteImport
+    '/_app': {
+      id: '/_app'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AppRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -193,26 +202,12 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/draw/': {
-      id: '/draw/'
-      path: '/'
-      fullPath: '/draw/'
-      preLoaderRoute: typeof DrawIndexRouteImport
-      parentRoute: typeof DrawRouteRoute
-    }
     '/admin/': {
       id: '/admin/'
       path: '/admin'
       fullPath: '/admin/'
       preLoaderRoute: typeof AdminIndexRouteImport
       parentRoute: typeof rootRouteImport
-    }
-    '/draw/$id': {
-      id: '/draw/$id'
-      path: '/$id'
-      fullPath: '/draw/$id'
-      preLoaderRoute: typeof DrawIdRouteImport
-      parentRoute: typeof DrawRouteRoute
     }
     '/api/health': {
       id: '/api/health'
@@ -221,6 +216,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiHealthRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_app/drawings': {
+      id: '/_app/drawings'
+      path: '/drawings'
+      fullPath: '/drawings'
+      preLoaderRoute: typeof AppDrawingsRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/_app/draw/': {
+      id: '/_app/draw/'
+      path: '/draw'
+      fullPath: '/draw/'
+      preLoaderRoute: typeof AppDrawIndexRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
     '/api/auth/$': {
       id: '/api/auth/$'
       path: '/api/auth/$'
@@ -228,26 +237,35 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAuthSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_app/draw/$id': {
+      id: '/_app/draw/$id'
+      path: '/draw/$id'
+      fullPath: '/draw/$id'
+      preLoaderRoute: typeof AppDrawIdRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
   }
 }
 
-interface DrawRouteRouteChildren {
-  DrawIdRoute: typeof DrawIdRoute
-  DrawIndexRoute: typeof DrawIndexRoute
+interface AppRouteRouteChildren {
+  AppDrawingsRoute: typeof AppDrawingsRoute
+  AppDrawIdRoute: typeof AppDrawIdRoute
+  AppDrawIndexRoute: typeof AppDrawIndexRoute
 }
 
-const DrawRouteRouteChildren: DrawRouteRouteChildren = {
-  DrawIdRoute: DrawIdRoute,
-  DrawIndexRoute: DrawIndexRoute,
+const AppRouteRouteChildren: AppRouteRouteChildren = {
+  AppDrawingsRoute: AppDrawingsRoute,
+  AppDrawIdRoute: AppDrawIdRoute,
+  AppDrawIndexRoute: AppDrawIndexRoute,
 }
 
-const DrawRouteRouteWithChildren = DrawRouteRoute._addFileChildren(
-  DrawRouteRouteChildren,
+const AppRouteRouteWithChildren = AppRouteRoute._addFileChildren(
+  AppRouteRouteChildren,
 )
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  DrawRouteRoute: DrawRouteRouteWithChildren,
+  AppRouteRoute: AppRouteRouteWithChildren,
   InviteRoute: InviteRoute,
   LoginRoute: LoginRoute,
   SetupRoute: SetupRoute,

@@ -1,0 +1,205 @@
+import { act, cleanup, render, screen } from "@testing-library/react"
+import { afterEach, beforeEach, expect, test, vi } from "vitest"
+import type { Drawing } from "@/features/drawings/queries"
+import type { Folder } from "@/features/folders/queries"
+import { DrawingGallery } from "./DrawingGallery"
+import { renderPreviewSvg } from "./preview"
+
+vi.mock("@tanstack/react-router", () => ({
+  Link: ({
+    to,
+    params,
+    children,
+    ...rest
+  }: {
+    to: string
+    params?: Record<string, string>
+    children: React.ReactNode
+  }) => (
+    <a
+      href={Object.entries(params ?? {}).reduce(
+        (path, [key, value]) => path.replace(`$${key}`, value),
+        to,
+      )}
+      {...rest}
+    >
+      {children}
+    </a>
+  ),
+}))
+
+// jsdom cannot rasterize Excalidraw scenes — assert cards, not pixels.
+vi.mock("./preview", () => ({
+  renderPreviewSvg: vi.fn(),
+}))
+
+beforeEach(() => {
+  vi.clearAllMocks()
+  vi.mocked(renderPreviewSvg).mockResolvedValue(null)
+})
+
+// Auto-cleanup needs vitest globals, which this repo leaves off.
+afterEach(() => {
+  cleanup()
+  vi.useRealTimers()
+})
+
+function makeDrawing(overrides: Partial<Drawing> & { id: string }): Drawing {
+  return {
+    name: `Drawing ${overrides.id}`,
+    data: "{}",
+    thumbnail: null,
+    folderId: null,
+    ownerId: "user-1",
+    isPublic: false,
+    createdAt: new Date("2026-01-01T00:00:00Z"),
+    updatedAt: new Date("2026-01-01T00:00:00Z"),
+    ...overrides,
+  }
+}
+
+const projectsFolder: Folder = {
+  id: "f1",
+  name: "Projects",
+  ownerId: "user-1",
+  parentId: null,
+  createdAt: new Date(0),
+  updatedAt: new Date(0),
+}
+
+const defaultProps = {
+  isPending: false,
+  loadingLabel: "Loading drawings",
+  empty: <p>Nothing here</p>,
+}
+
+test("renders every drawing newest-edited first, whatever the cache order", () => {
+  const drawings = Array.from({ length: 10 }, (_, i) =>
+    makeDrawing({ id: `d${i}`, updatedAt: new Date(Date.UTC(2026, 0, 1 + i)) }),
+  )
+  const shuffled = [drawings[3], ...drawings.filter((_, i) => i !== 3)]
+
+  render(<DrawingGallery {...defaultProps} drawings={shuffled} />)
+
+  const cards = screen.getAllByRole("link")
+  expect(cards.map((card) => card.getAttribute("href"))).toEqual(
+    Array.from({ length: 10 }, (_, i) => `/draw/d${9 - i}`),
+  )
+})
+
+test("limit caps the grid after sorting", () => {
+  const drawings = Array.from({ length: 5 }, (_, i) =>
+    makeDrawing({ id: `d${i}`, updatedAt: new Date(Date.UTC(2026, 0, 1 + i)) }),
+  )
+
+  render(<DrawingGallery {...defaultProps} drawings={drawings} limit={2} />)
+
+  expect(
+    screen.getAllByRole("link").map((card) => card.getAttribute("href")),
+  ).toEqual(["/draw/d4", "/draw/d3"])
+})
+
+test("cards show name, folder attribution, and relative edit time", () => {
+  render(
+    <DrawingGallery
+      {...defaultProps}
+      drawings={[
+        makeDrawing({
+          id: "d1",
+          name: "Retro board",
+          folderId: "f1",
+          updatedAt: new Date(Date.now() - 5 * 60 * 1000),
+        }),
+      ]}
+      folders={[projectsFolder]}
+    />,
+  )
+
+  expect(screen.getByText("Retro board")).toBeTruthy()
+  expect(screen.getByText("Projects")).toBeTruthy()
+  expect(screen.getByText(/5m ago/)).toBeTruthy()
+})
+
+test("without a folders prop, attribution stays off even for filed drawings", () => {
+  render(
+    <DrawingGallery
+      {...defaultProps}
+      drawings={[makeDrawing({ id: "d1", name: "Filed", folderId: "f1" })]}
+    />,
+  )
+
+  expect(screen.getByText("Filed")).toBeTruthy()
+  expect(screen.queryByText("Projects")).toBeNull()
+})
+
+test("the empty slot renders only when loaded and empty", () => {
+  const { rerender } = render(
+    <DrawingGallery {...defaultProps} drawings={[]} isPending />,
+  )
+  expect(screen.queryByText("Nothing here")).toBeNull()
+
+  rerender(<DrawingGallery {...defaultProps} drawings={[]} />)
+  expect(screen.getByText("Nothing here")).toBeTruthy()
+
+  rerender(
+    <DrawingGallery {...defaultProps} drawings={[makeDrawing({ id: "d1" })]} />,
+  )
+  expect(screen.queryByText("Nothing here")).toBeNull()
+})
+
+// Spec §4.3: skeletons appear only after ~150 ms so cache hits render
+// instantly — no skeleton flash on fast loads.
+test("the skeleton grid appears only after the 150ms grace period", () => {
+  vi.useFakeTimers()
+  render(<DrawingGallery {...defaultProps} drawings={[]} isPending />)
+
+  expect(screen.queryByRole("status")).toBeNull()
+
+  act(() => vi.advanceTimersByTime(149))
+  expect(screen.queryByRole("status")).toBeNull()
+
+  act(() => vi.advanceTimersByTime(1))
+  const loading = screen.getByRole("status", { name: "Loading drawings" })
+  expect(
+    loading.querySelectorAll('[data-slot="skeleton"]').length,
+  ).toBeGreaterThan(0)
+})
+
+test("a load finishing inside the grace period never flashes a skeleton", () => {
+  vi.useFakeTimers()
+  const { rerender } = render(
+    <DrawingGallery {...defaultProps} drawings={[]} isPending />,
+  )
+
+  act(() => vi.advanceTimersByTime(100))
+  rerender(
+    <DrawingGallery {...defaultProps} drawings={[makeDrawing({ id: "d1" })]} />,
+  )
+  act(() => vi.advanceTimersByTime(500))
+
+  expect(screen.queryByRole("status")).toBeNull()
+  expect(screen.getAllByRole("link")).toHaveLength(1)
+})
+
+test("skeleton cards mirror the loaded grid and stay static under reduced motion", () => {
+  vi.useFakeTimers()
+  render(<DrawingGallery {...defaultProps} drawings={[]} isPending limit={3} />)
+  act(() => vi.advanceTimersByTime(150))
+
+  const loading = screen.getByRole("status")
+  const skeletons = loading.querySelectorAll('[data-slot="skeleton"]')
+  expect(skeletons.length).toBeGreaterThanOrEqual(3)
+  for (const skeleton of skeletons) {
+    expect(skeleton.className).toContain("motion-reduce:animate-none")
+  }
+})
+
+test("the loaded grid fades in instead of swapping in a single frame", () => {
+  render(
+    <DrawingGallery {...defaultProps} drawings={[makeDrawing({ id: "d1" })]} />,
+  )
+
+  const grid = screen.getAllByRole("link")[0].parentElement
+  expect(grid?.className).toContain("animate-in")
+  expect(grid?.className).toContain("fade-in-0")
+})
