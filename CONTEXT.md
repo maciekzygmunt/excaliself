@@ -17,5 +17,11 @@ The inset region to the right of the sidebar. Shows either an open Drawing or Ho
 ### Create dialog
 The single way a Drawing or folder is created: a command-style dialog where the user types a name and confirms. Everything is deliberately named at birth; the app never creates a Drawing on the user's behalf.
 
+### Gallery
+The app's one grid of Drawing cards (Preview, name, folder attribution, edited-ago), always ordered by Recent. Home shows it capped at 8; All drawings shows it whole; later surfaces (folder pages, trash) reuse it rather than fork it.
+
+### All drawings
+The browse surface at `/drawings`: the Gallery over every Drawing the user owns, uncapped. Reached from Home's "View all" link.
+
 ### Preview
-A non-interactive visual rendering of a Drawing's scene, shown on Home so drawings are recognizable by shape rather than name.
+A non-interactive visual rendering of a Drawing's scene, shown on Gallery cards so drawings are recognizable by shape rather than name.
