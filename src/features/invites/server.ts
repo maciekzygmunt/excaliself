@@ -6,6 +6,7 @@ import { and, eq, gt, isNull } from "drizzle-orm"
 import z from "zod"
 import { db } from "@/db"
 import { invites, users } from "@/db/schema"
+import { userDisplayName } from "@/features/account/display-name"
 import { registerFieldsSchema } from "@/features/auth/schema"
 import { auth } from "@/lib/auth"
 import { adminMiddleware } from "@/middleware/admin"
@@ -26,12 +27,21 @@ export const validateInvite = createServerFn({ method: "GET" })
   .inputValidator(z.string())
   .handler(async ({ data: token }) => {
     const [invite] = await db
-      .select({ inviterName: users.name })
+      .select({ inviterName: users.name, inviterEmail: users.email })
       .from(invites)
       .leftJoin(users, eq(invites.invitedBy, users.id))
       .where(usableInvite(token))
     if (!invite) return null
-    return { inviterName: invite.inviterName || null }
+    // Same fallback rule as everywhere: display name, else email prefix.
+    // Null only when the inviter no longer exists.
+    return {
+      inviterName: invite.inviterEmail
+        ? userDisplayName({
+            name: invite.inviterName,
+            email: invite.inviterEmail,
+          })
+        : null,
+    }
   })
 
 export const registerWithInvite = createServerFn({ method: "POST" })
@@ -53,13 +63,21 @@ export const registerWithInvite = createServerFn({ method: "POST" })
       body: {
         email: data.email,
         password: data.password,
-        name: data.name,
+        // better-auth requires a name in the sign-up body; it's nulled just
+        // below — display names are only ever set in Settings, and the
+        // email-prefix fallback covers everyone else (spec §5.12).
+        name: data.email.split("@")[0],
       },
     })
 
     if (!result.user || !result.token) {
       throw new Error("Failed to create account")
     }
+
+    await db
+      .update(users)
+      .set({ name: null })
+      .where(eq(users.id, result.user.id))
 
     // Conditional update so two concurrent signups can't both consume the
     // same invite — only the one that wins the update completes registration.

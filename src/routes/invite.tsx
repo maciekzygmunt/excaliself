@@ -59,14 +59,15 @@ function RegisterPage({ inviterName }: { inviterName: string | null }) {
     },
   })
 
+  // Credentials only — no name field: members go by their email prefix
+  // until they set a display name in Settings (spec §5.12).
   const form = useForm({
-    defaultValues: { name: "", email: "", password: "", confirmPassword: "" },
+    defaultValues: { email: "", password: "", confirmPassword: "" },
     validators: { onSubmit: registerFormSchema },
     onSubmit: async ({ value }) => {
       await register({
         data: {
           token,
-          name: value.name,
           email: value.email,
           password: value.password,
         },
@@ -87,18 +88,6 @@ function RegisterPage({ inviterName }: { inviterName: string | null }) {
         className="space-y-4"
       >
         <FieldGroup>
-          <form.Field
-            name="name"
-            children={(field) => (
-              <FormTextField
-                field={field}
-                label="Name"
-                placeholder="Your name"
-                autoComplete="name"
-                required
-              />
-            )}
-          />
           <form.Field
             name="email"
             children={(field) => (

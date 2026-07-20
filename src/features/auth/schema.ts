@@ -1,17 +1,16 @@
 import { z } from "zod"
 
-/** Server-side validation for account creation (invite signup, admin setup). */
+/**
+ * Server-side validation for account creation (invite signup, admin setup).
+ * Credentials only — a display name is never collected at signup (spec
+ * §5.12); users go by their email prefix until they set one in Settings.
+ */
 export const registerFieldsSchema = z.object({
-  name: z.string().min(1),
   email: z.email(),
   password: z.string().min(8),
 })
 
-/**
- * First-run setup asks only for credentials — the admin's display name is
- * derived from the email until they set one.
- */
-export const setupFieldsSchema = registerFieldsSchema.omit({ name: true })
+export const setupFieldsSchema = registerFieldsSchema
 
 /** Account-creation form for the invite page. */
 export const registerFormSchema = registerFieldsSchema

@@ -58,11 +58,13 @@ test("valid invite personalizes the headline with the inviter's name", async () 
     screen.getByRole("heading", { name: "Maciek invited you" }),
   ).toBeDefined()
   expect(screen.getByText("Create your account")).toBeDefined()
-  expect(screen.getByLabelText(/name/i)).toBeDefined()
   expect(screen.getByLabelText(/email/i)).toBeDefined()
   expect(screen.getByLabelText(/^password$/i)).toBeDefined()
   expect(screen.getByLabelText(/confirm password/i)).toBeDefined()
   expect(screen.getByRole("button", { name: "Create account" })).toBeDefined()
+  // Credentials only — a display name is never collected at signup; it's
+  // set later in Settings (spec §5.12).
+  expect(screen.queryByLabelText(/^name$/i)).toBeNull()
 })
 
 test("headline falls back gracefully when the inviter is unavailable", async () => {
@@ -90,9 +92,6 @@ test("successful registration lands on Home, not the login page", async () => {
   vi.mocked(registerWithInvite).mockResolvedValue(undefined)
 
   await renderInvite({ inviterName: "Maciek" })
-  fireEvent.change(screen.getByLabelText(/name/i), {
-    target: { value: "New Member" },
-  })
   fireEvent.change(screen.getByLabelText(/email/i), {
     target: { value: "new@example.com" },
   })
@@ -109,7 +108,6 @@ test("successful registration lands on Home, not the login page", async () => {
       {
         data: {
           token: "tok-123",
-          name: "New Member",
           email: "new@example.com",
           password: "password123",
         },
