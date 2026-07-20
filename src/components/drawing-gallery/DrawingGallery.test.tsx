@@ -162,6 +162,26 @@ test("cards show name, folder attribution, and relative edit time", () => {
   expect(screen.getByText(/5m ago/)).toBeTruthy()
 })
 
+// Spec §5.3: the attribution chip is the folder page's entry point.
+test("folder attribution links to the folder page, the card to its drawing", () => {
+  render(
+    <DrawingGallery
+      {...defaultProps}
+      drawings={[
+        makeDrawing({ id: "d1", name: "Retro board", folderId: "f1" }),
+      ]}
+      folders={[projectsFolder]}
+    />,
+  )
+
+  expect(
+    screen.getByRole("link", { name: "Projects" }).getAttribute("href"),
+  ).toBe("/folder/f1")
+  expect(
+    screen.getByRole("link", { name: "Retro board" }).getAttribute("href"),
+  ).toBe("/draw/d1")
+})
+
 test("without a folders prop, attribution stays off even for filed drawings", () => {
   render(
     <DrawingGallery
@@ -237,11 +257,11 @@ test("skeleton cards mirror the loaded grid and stay static under reduced motion
 })
 
 test("the loaded grid fades in instead of swapping in a single frame", () => {
-  render(
+  const { container } = render(
     <DrawingGallery {...defaultProps} drawings={[makeDrawing({ id: "d1" })]} />,
   )
 
-  const grid = screen.getAllByRole("link")[0].parentElement
+  const grid = container.firstElementChild
   expect(grid?.className).toContain("animate-in")
   expect(grid?.className).toContain("fade-in-0")
 })

@@ -342,7 +342,9 @@ test("loaded drawings show cards, not skeletons", () => {
 test("the loaded grid fades in instead of swapping in a single frame", () => {
   renderHome({ drawings: [makeDrawing({ id: "d1", name: "Retro board" })] })
 
+  // link → card div → grid
   const grid = screen.getByRole("link", { name: /retro board/i }).parentElement
+    ?.parentElement
   expect(grid?.className).toContain("animate-in")
   expect(grid?.className).toContain("fade-in-0")
 })
