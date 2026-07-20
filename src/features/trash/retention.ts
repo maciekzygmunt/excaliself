@@ -1,17 +1,38 @@
-// The 30-day retention window (spec §5.11). Pure date math, shared by every
-// surface that discloses when a trashed item will be purged.
+// The single source of truth for the 30-day retention window (spec §5.11).
+// The server purge job (purge.ts) and every surface that discloses when a
+// trashed item will be purged must derive from these helpers so the promised
+// countdown matches the real horizon. Deliberately dependency-free so client
+// code can import it safely.
 
 export const TRASH_RETENTION_DAYS = 30
 
 const DAY_MS = 24 * 60 * 60 * 1000
 
-/** Whole days (ceiling) until `deletedAt + 30d`; 0 or negative means due. */
+/** The instant an item trashed at `deletedAt` becomes eligible for purge. */
+export function purgeDeadline(deletedAt: Date | string): Date {
+  return new Date(new Date(deletedAt).getTime() + TRASH_RETENTION_DAYS * DAY_MS)
+}
+
+/**
+ * The mirror image of purgeDeadline for the purge job: items with
+ * deletedAt on or before this cutoff have a lapsed deadline at `now`.
+ */
+export function purgeCutoff(now: Date): Date {
+  return new Date(now.getTime() - TRASH_RETENTION_DAYS * DAY_MS)
+}
+
+/**
+ * Whole days left before the purge deadline, for "Purges in N days" copy.
+ * Rounds up (29.1 days left reads "30 days") and clamps at 0 for overdue
+ * items awaiting the next purge pass.
+ */
 export function daysUntilPurge(
   deletedAt: Date | string,
-  now: number = Date.now(),
+  now: number | Date = Date.now(),
 ): number {
-  const purgeAt = new Date(deletedAt).getTime() + TRASH_RETENTION_DAYS * DAY_MS
-  return Math.ceil((purgeAt - now) / DAY_MS)
+  const nowMs = typeof now === "number" ? now : now.getTime()
+  const msLeft = purgeDeadline(deletedAt).getTime() - nowMs
+  return Math.max(0, Math.ceil(msLeft / DAY_MS))
 }
 
 /** Card meta line: "Purges in N days" (spec §5.11), collapsing sensibly. */
