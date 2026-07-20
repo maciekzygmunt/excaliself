@@ -31,18 +31,13 @@ export const getDrawingWithFiles = createServerFn({ method: "GET" })
   .inputValidator((id: string) => id)
   .handler(async ({ data: id, context }) => {
     const userId = context.session.user.id
-    // Trashed drawings behave as not-found so direct /draw/$id URLs (and
-    // stale tabs refetching) fall into the route loader's redirect home.
+    // Trashed drawings load too (deletedAt set) so /draw/$id can render the
+    // read-only trashed view (spec §5.11) instead of a dead end. Writes stay
+    // blocked server-side in saveDrawingScene regardless.
     const [drawing] = await db
       .select()
       .from(drawings)
-      .where(
-        and(
-          eq(drawings.id, id),
-          eq(drawings.ownerId, userId),
-          isNull(drawings.deletedAt),
-        ),
-      )
+      .where(and(eq(drawings.id, id), eq(drawings.ownerId, userId)))
     if (!drawing) return null
 
     const files = await db

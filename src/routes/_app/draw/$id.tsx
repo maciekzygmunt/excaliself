@@ -8,6 +8,7 @@ import {
   drawingsQueryOptions,
 } from "@/features/drawings/queries"
 import { useDocumentTitle } from "@/lib/document-title"
+import { TrashedDrawingBanner } from "../-components/TrashedDrawingBanner"
 
 const DrawingCanvas = lazy(() => import("../-components/DrawingCanvas"))
 
@@ -24,8 +25,9 @@ export const Route = createFileRoute("/_app/draw/$id")({
     const drawing = await context.queryClient.ensureQueryData(
       drawingQueryOptions(params.id),
     )
-    // The server returns null for deleted drawings and drawings that aren't
-    // yours (deliberately indistinguishable) — land on Home, not a dead end.
+    // The server returns null for hard-deleted drawings and drawings that
+    // aren't yours (deliberately indistinguishable) — land on Home, not a
+    // dead end. Trashed drawings load and render read-only (spec §5.11).
     // ssr is off, so this loader (and the toast) always runs on the client.
     // Hover-intent preloads also run it; they swallow the redirect, so they
     // must not toast either.
@@ -46,16 +48,17 @@ function DrawingPage() {
 
   // Title from the sidebar list cache, not the detail query: renames patch
   // the list optimistically, so the tab tracks them without waiting for the
-  // server round-trip.
+  // server round-trip. Trashed drawings aren't in the live list — their name
+  // comes from the detail query instead (no renaming in the trash anyway).
   const { data: drawingName } = useQuery({
     ...drawingsQueryOptions(),
     select: (drawings) => drawings.find((d) => d.id === id)?.name,
   })
-  useDocumentTitle(drawingName)
+  useDocumentTitle(drawingName ?? drawing?.name)
 
   // The loader only guards fresh loads: within staleTime it returns the
   // cached drawing without refetching, and the mount refetch that follows can
-  // discover the drawing was deleted from another session. React to the
+  // discover the drawing was hard-deleted from another session. React to the
   // query turning null (undefined means still loading) the same way the
   // loader does — Home plus a toast, never a blank canvas on a dead URL.
   const isGone = drawing === null
@@ -67,11 +70,30 @@ function DrawingPage() {
 
   if (isGone) return <LoadingState />
 
+  // Trashed drawings render read-only under a purge banner (spec §5.11).
+  // A trashing/restore from any surface refetches the detail query, so this
+  // flips live without a reload.
+  const trashedAt = drawing?.deletedAt ?? null
+  const isTrashed = trashedAt != null
+
   // Remount on id change so per-document state (auto-save dedup, edits in
-  // progress, Excalidraw scene) is fully reset without manual cleanup.
+  // progress, Excalidraw scene) is fully reset without manual cleanup — and
+  // on the trashed flag so a restore lands on a freshly editable canvas
+  // instead of toggling Excalidraw's view mode in place.
   return (
-    <Suspense fallback={<LoadingState />}>
-      <DrawingCanvas key={id} drawingId={id} />
-    </Suspense>
+    <div className="flex h-full min-h-0 flex-col">
+      {trashedAt && drawing && (
+        <TrashedDrawingBanner drawing={{ ...drawing, deletedAt: trashedAt }} />
+      )}
+      <div className="relative min-h-0 flex-1">
+        <Suspense fallback={<LoadingState />}>
+          <DrawingCanvas
+            key={`${id}:${isTrashed}`}
+            drawingId={id}
+            readOnly={isTrashed}
+          />
+        </Suspense>
+      </div>
+    </div>
   )
 }
