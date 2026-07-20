@@ -76,90 +76,95 @@ export function FolderItem({ folder, childNodes }: FolderItemProps) {
     onDrop: handleDrop({ type: "folder", id: folder.id }),
   }
 
-  return (
-    <Collapsible
-      open={isExpanded}
-      // An empty folder has nothing to reveal: ignore the trigger so clicking
-      // it doesn't pulse an empty CollapsibleContent open and shut. Dropping
-      // into the folder still expands it (handleDrop) once it gains children.
-      onOpenChange={(open) => {
-        if (hasChildren) setIsExpanded(open)
-      }}
-      asChild
+  // An empty folder has nothing to reveal, so it gets no collapsible at all —
+  // no trigger to pulse an empty CollapsibleContent open and shut, and no
+  // aria-expanded/aria-controls promising a disclosure that doesn't exist.
+  // Dropping into the folder still expands it (handleDrop) once it gains
+  // children, at which point the collapsible mounts already open.
+  const row = (
+    <div
+      className={cn(
+        "group/tree-row relative flex w-full rounded-md transition-colors",
+        isDragging && "opacity-50",
+      )}
+      {...dropTargetProps}
     >
-      <SidebarMenuItem
+      <SidebarMenuButton
+        draggable
+        onDragStart={onDragStart({ type: "folder", id: folder.id })}
+        onDragEnd={onDragEnd}
         className={cn(
-          "rounded-md transition-colors",
-          showDropHighlight && "bg-iris-muted ring-1 ring-iris-ring",
+          "h-auto cursor-pointer gap-1.5 px-2 py-1.5 pr-2! text-[13px] active:cursor-grabbing [&>svg]:size-auto",
+          rename.isRenaming && "pr-3!",
         )}
       >
-        <CollapsibleTrigger asChild>
-          <div
-            className={cn(
-              "group/tree-row relative flex w-full rounded-md transition-colors",
-              isDragging && "opacity-50",
-            )}
+        <ChevronRight
+          className={cn(
+            "h-3! w-3! shrink-0 text-muted-foreground/40 transition-transform duration-150 ease-out",
+            isExpanded && "rotate-90",
+            !hasChildren && "opacity-0",
+          )}
+        />
+        <Folder className="h-3.5! w-3.5! shrink-0 fill-iris/70 text-iris" />
+        {rename.isRenaming ? (
+          <Input {...rename.inputProps} className="h-5 rounded px-1 text-sm" />
+        ) : (
+          <span className="truncate text-sidebar-foreground/70">
+            {folder.name}
+          </span>
+        )}
+      </SidebarMenuButton>
+
+      <TreeRowActions
+        isRenaming={rename.isRenaming}
+        onStartRename={() => rename.start(folder.name)}
+        onCreateDrawing={() =>
+          openCreateDrawingDialog({ id: folder.id, name: folder.name })
+        }
+        onMenuCloseAutoFocus={rename.onMenuCloseAutoFocus}
+        onDelete={() => deleteMutation.mutate({ data: folder.id })}
+        deleteTitle="Delete folder?"
+        deleteDescription={
+          hasChildren
+            ? "This folder contains items. All files in this folder will be deleted."
+            : `Delete "${folder.name}"?`
+        }
+      />
+    </div>
+  )
+
+  const item = (
+    <SidebarMenuItem
+      className={cn(
+        "rounded-md transition-colors",
+        showDropHighlight && "bg-iris-muted ring-1 ring-iris-ring",
+      )}
+    >
+      {hasChildren ? (
+        <CollapsibleTrigger asChild>{row}</CollapsibleTrigger>
+      ) : (
+        row
+      )}
+      {hasChildren && (
+        <CollapsibleContent>
+          <SidebarMenuSub
+            className="ml-3 mr-0 gap-0 border-sidebar-border/50 pl-2 pr-0 py-0 translate-x-0"
             {...dropTargetProps}
           >
-            <SidebarMenuButton
-              draggable
-              onDragStart={onDragStart({ type: "folder", id: folder.id })}
-              onDragEnd={onDragEnd}
-              className={cn(
-                "h-auto cursor-pointer gap-1.5 px-2 py-1.5 pr-2! text-[13px] active:cursor-grabbing [&>svg]:size-auto",
-                rename.isRenaming && "pr-3!",
-              )}
-            >
-              <ChevronRight
-                className={cn(
-                  "h-3! w-3! shrink-0 text-muted-foreground/40 transition-transform duration-150 ease-out",
-                  isExpanded && "rotate-90",
-                  !hasChildren && "opacity-0",
-                )}
-              />
-              <Folder className="h-3.5! w-3.5! shrink-0 fill-iris/70 text-iris" />
-              {rename.isRenaming ? (
-                <Input
-                  {...rename.inputProps}
-                  className="h-5 rounded px-1 text-sm"
-                />
-              ) : (
-                <span className="truncate text-sidebar-foreground/70">
-                  {folder.name}
-                </span>
-              )}
-            </SidebarMenuButton>
+            {childNodes.map((node) => (
+              <TreeNodeItem key={treeNodeKey(node)} node={node} />
+            ))}
+          </SidebarMenuSub>
+        </CollapsibleContent>
+      )}
+    </SidebarMenuItem>
+  )
 
-            <TreeRowActions
-              isRenaming={rename.isRenaming}
-              onStartRename={() => rename.start(folder.name)}
-              onCreateDrawing={() =>
-                openCreateDrawingDialog({ id: folder.id, name: folder.name })
-              }
-              onMenuCloseAutoFocus={rename.onMenuCloseAutoFocus}
-              onDelete={() => deleteMutation.mutate({ data: folder.id })}
-              deleteTitle="Delete folder?"
-              deleteDescription={
-                hasChildren
-                  ? "This folder contains items. All files in this folder will be deleted."
-                  : `Delete "${folder.name}"?`
-              }
-            />
-          </div>
-        </CollapsibleTrigger>
-        {hasChildren && (
-          <CollapsibleContent>
-            <SidebarMenuSub
-              className="ml-3 mr-0 gap-0 border-sidebar-border/50 pl-2 pr-0 py-0 translate-x-0"
-              {...dropTargetProps}
-            >
-              {childNodes.map((node) => (
-                <TreeNodeItem key={treeNodeKey(node)} node={node} />
-              ))}
-            </SidebarMenuSub>
-          </CollapsibleContent>
-        )}
-      </SidebarMenuItem>
+  if (!hasChildren) return item
+
+  return (
+    <Collapsible open={isExpanded} onOpenChange={setIsExpanded} asChild>
+      {item}
     </Collapsible>
   )
 }

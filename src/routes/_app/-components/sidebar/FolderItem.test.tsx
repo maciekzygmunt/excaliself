@@ -99,14 +99,20 @@ const childNode = (folder: Folder): TreeNode => ({
   children: [],
 })
 
-test("clicking an empty folder does not toggle it open", () => {
+test("an empty folder renders no collapsible and clicking it is inert", () => {
   renderFolder(makeFolder("f1", "Empty folder"), [])
 
   fireEvent.click(screen.getByText("Empty folder"))
 
-  expect(rowState()).toBe("closed")
-  // No CollapsibleContent at all for an empty folder — nothing to pulse open
+  // An empty folder gets no collapsible machinery at all: no trigger
+  // announcing a disclosure (aria-expanded/aria-controls pointing at nothing)
+  // and no content to pulse open and shut.
+  expect(document.querySelector('[data-slot="collapsible-trigger"]')).toBeNull()
   expect(document.querySelector('[data-slot="collapsible-content"]')).toBeNull()
+  // The row button itself (not the actions menu) must not announce a disclosure
+  const rowButton = document.querySelector('[data-sidebar="menu-button"]')
+  if (!rowButton) throw new Error("folder row button not found")
+  expect(rowButton.getAttribute("aria-expanded")).toBeNull()
 })
 
 test("clicking a folder with children still expands and collapses it", () => {
