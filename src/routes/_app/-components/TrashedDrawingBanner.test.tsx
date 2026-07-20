@@ -179,6 +179,52 @@ test("a failed delete keeps the dialog open with an error toast, no navigation",
   expect(screen.getByRole("button", { name: "Delete forever" })).toBeTruthy()
 })
 
+test("confirm stays disabled while the folder unit's counts are loading", async () => {
+  const trashItems: TrashItems = {
+    drawings: [],
+    folders: [
+      {
+        id: "f1",
+        name: "Archive",
+        ownerId: "user-1",
+        parentId: null,
+        deletedAt: daysAgo(5),
+        trashRootId: "f1",
+        itemCount: 3,
+        drawingCount: 2,
+        createdAt: new Date("2026-01-01T00:00:00Z"),
+        updatedAt: new Date("2026-01-01T00:00:00Z"),
+      },
+    ],
+    totals: { drawings: 2, folders: 1 },
+  }
+  let resolveTrash!: (items: TrashItems) => void
+  vi.mocked(getTrashItems).mockReturnValue(
+    new Promise((resolve) => {
+      resolveTrash = resolve
+    }),
+  )
+  // No seeded cache — the counts fetch is genuinely in flight.
+  renderBanner({ ...soloDrawing, trashRootId: "f1" })
+
+  fireEvent.click(screen.getByRole("button", { name: "Delete forever…" }))
+  const confirm = screen.getByRole("button", {
+    name: "Delete forever",
+  }) as HTMLButtonElement
+  // A quick click can't outrun the counts fetch (spec §4.5: count-aware).
+  expect(confirm.disabled).toBe(true)
+  fireEvent.click(confirm)
+  expect(deleteTrashUnitForever).not.toHaveBeenCalled()
+
+  resolveTrash(trashItems)
+  await waitFor(() => expect(confirm.disabled).toBe(false))
+  expect(
+    screen.getByText(
+      'This drawing was trashed with its folder. "Archive" and the 2 drawings and 1 folder inside will be permanently deleted. This can\'t be undone.',
+    ),
+  ).toBeTruthy()
+})
+
 test("a drawing trashed with its folder deletes the whole unit, with count-aware copy", async () => {
   vi.mocked(deleteTrashUnitForever).mockResolvedValue(undefined)
   const trashItems: TrashItems = {

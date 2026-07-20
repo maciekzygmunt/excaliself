@@ -47,10 +47,16 @@ export function TrashedDrawingBanner({
   // live on the trash page's query; only fetched when actually needed.
   const unitId = drawing.trashRootId ?? drawing.id
   const isFolderUnit = unitId !== drawing.id
-  const { data: trashItems } = useQuery({
+  const { data: trashItems, isPending: trashPending } = useQuery({
     ...trashQueryOptions(),
     enabled: isFolderUnit,
   })
+  // A direct link to a folder-swept drawing can race the counts fetch: block
+  // confirmation until it settles so the dialog is count-aware (spec §4.5).
+  // If the fetch errors out (isPending goes false, no data), the generic
+  // everything-inside copy below still warns and confirm unblocks — the
+  // counts query mustn't be able to wedge Delete forever shut.
+  const countsLoading = isFolderUnit && trashPending
 
   let description = `"${drawing.name}" will be permanently deleted. This can't be undone.`
   if (isFolderUnit) {
@@ -99,6 +105,7 @@ export function TrashedDrawingBanner({
           description={description}
           confirmLabel="Delete forever"
           pendingLabel="Deleting…"
+          confirmDisabled={countsLoading}
           onConfirm={async () => {
             await deleteForever(unitId)
             // The drawing no longer exists — Home, not a dead canvas URL.
