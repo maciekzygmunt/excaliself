@@ -1,15 +1,23 @@
-import { cleanup, render, screen } from "@testing-library/react"
-import { afterEach, expect, test, vi } from "vitest"
+import { cleanup, fireEvent, render, screen } from "@testing-library/react"
+import { afterEach, beforeEach, expect, test, vi } from "vitest"
+
+const navigate = vi.fn()
+let search: { redirect?: string } = {}
 
 vi.mock("@tanstack/react-router", () => ({
   createFileRoute: () => (options: { component: React.ComponentType }) => ({
     options,
   }),
-  useNavigate: () => vi.fn(),
+  useNavigate: () => navigate,
+  useSearch: () => search,
 }))
 
+const signInEmail = vi.fn()
+
 vi.mock("@/lib/auth-client", () => ({
-  authClient: { signIn: { email: vi.fn() } },
+  authClient: {
+    signIn: { email: (...args: unknown[]) => signInEmail(...args) },
+  },
 }))
 
 vi.mock("@/middleware/setup", () => ({
@@ -19,12 +27,29 @@ vi.mock("@/middleware/setup", () => ({
 // Auto-cleanup needs vitest globals, which this repo leaves off.
 afterEach(cleanup)
 
+beforeEach(() => {
+  navigate.mockClear()
+  signInEmail.mockClear()
+  search = {}
+})
+
 async function renderLogin() {
   const { Route } = await import("./login")
   const LoginPage = (
     Route as unknown as { options: { component: React.ComponentType } }
   ).options.component
   return render(<LoginPage />)
+}
+
+async function signIn() {
+  fireEvent.change(screen.getByLabelText(/email/i), {
+    target: { value: "user@example.com" },
+  })
+  fireEvent.change(screen.getByLabelText(/password/i), {
+    target: { value: "hunter22" },
+  })
+  fireEvent.click(screen.getByRole("button", { name: "Sign in" }))
+  await screen.findByRole("button", { name: "Sign in" })
 }
 
 test("login is email + password + Sign in — nothing else", async () => {
@@ -46,4 +71,27 @@ test("microcopy explains invite-only registration and admin-managed resets", asy
   expect(
     screen.getByText("Forgot your password? Ask your admin to reset it."),
   ).toBeDefined()
+})
+
+test("signing in without a redirect param lands on /draw", async () => {
+  signInEmail.mockResolvedValueOnce({ error: null })
+  await renderLogin()
+  await signIn()
+  expect(navigate).toHaveBeenCalledWith({ href: "/draw" })
+})
+
+test("signing in with a ?redirect param lands on that path", async () => {
+  search = { redirect: "/draw/abc123?tab=export" }
+  signInEmail.mockResolvedValueOnce({ error: null })
+  await renderLogin()
+  await signIn()
+  expect(navigate).toHaveBeenCalledWith({ href: "/draw/abc123?tab=export" })
+})
+
+test("a cross-origin ?redirect is ignored in favor of /draw", async () => {
+  search = { redirect: "https://evil.example/phish" }
+  signInEmail.mockResolvedValueOnce({ error: null })
+  await renderLogin()
+  await signIn()
+  expect(navigate).toHaveBeenCalledWith({ href: "/draw" })
 })

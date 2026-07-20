@@ -1,5 +1,5 @@
 import { useForm } from "@tanstack/react-form"
-import { createFileRoute, useNavigate } from "@tanstack/react-router"
+import { createFileRoute, useNavigate, useSearch } from "@tanstack/react-router"
 import { toast } from "sonner"
 import { z } from "zod"
 import { AuthPage } from "@/components/auth-page"
@@ -7,9 +7,13 @@ import { FormTextField } from "@/components/form-text-field"
 import { Button } from "@/components/ui/button"
 import { FieldGroup } from "@/components/ui/field"
 import { authClient } from "@/lib/auth-client"
+import { resolveRedirect } from "@/lib/redirects"
 import { setupMiddleware } from "@/middleware/setup"
 
 export const Route = createFileRoute("/login")({
+  validateSearch: (search: Record<string, unknown>): { redirect?: string } => ({
+    redirect: typeof search.redirect === "string" ? search.redirect : undefined,
+  }),
   server: { middleware: [setupMiddleware] },
   component: LoginPage,
 })
@@ -21,6 +25,7 @@ const formSchema = z.object({
 
 function LoginPage() {
   const navigate = useNavigate()
+  const { redirect } = useSearch({ from: "/login" })
   const form = useForm({
     defaultValues: { email: "", password: "" },
     validators: { onSubmit: formSchema },
@@ -30,7 +35,7 @@ function LoginPage() {
         toast.error(result.error.message)
         return
       }
-      navigate({ to: "/" })
+      navigate({ href: resolveRedirect(redirect) })
     },
   })
 
