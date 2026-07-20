@@ -18,10 +18,13 @@ The inset region to the right of the sidebar. Shows either an open Drawing or Ho
 The single way a Drawing or folder is created: a command-style dialog where the user types a name and confirms. Everything is deliberately named at birth; the app never creates a Drawing on the user's behalf.
 
 ### Gallery
-The app's one grid of Drawing cards (Preview, name, folder attribution, edited-ago), always ordered by Recent. Home shows it capped at 8; All drawings shows it whole; later surfaces (folder pages, trash) reuse it rather than fork it.
+The app's one grid of Drawing cards (Preview, name, folder attribution, edited-ago), ordered by Recent unless a Browse toolbar re-sorts it. Home shows it capped at 8; All drawings shows it whole; later surfaces (folder pages, trash) reuse it rather than fork it.
 
 ### All drawings
-The browse surface at `/drawings`: the Gallery over every Drawing the user owns, uncapped. Reached from Home's "View all" link.
+The browse surface at `/drawings`: the Gallery over every Drawing the user owns, uncapped, under the Browse toolbar. Reached from Home's "View all" link.
+
+### Browse toolbar
+The Gallery's filter chrome on All drawings: on-page search (the app's only inline filter — there is no search-results page), folder chips (All / one per folder / Unfiled) that scope the grid, and a sort dropdown (Last edited default / Date created / Name). Search and chip scope compose. Folder pages reuse it without the chip row.
 
 ### Preview
 A non-interactive visual rendering of a Drawing's scene, shown on Gallery cards so drawings are recognizable by shape rather than name.

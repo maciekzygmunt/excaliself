@@ -99,6 +99,48 @@ test("limit caps the grid after sorting", () => {
   ).toEqual(["/draw/d4", "/draw/d3"])
 })
 
+test("the sort prop reorders the grid", () => {
+  const drawings = [
+    makeDrawing({
+      id: "b",
+      name: "Banana",
+      createdAt: new Date(1000),
+      updatedAt: new Date(3000),
+    }),
+    makeDrawing({
+      id: "a",
+      name: "Apple",
+      createdAt: new Date(3000),
+      updatedAt: new Date(1000),
+    }),
+    makeDrawing({
+      id: "c",
+      name: "Cherry",
+      createdAt: new Date(2000),
+      updatedAt: new Date(2000),
+    }),
+  ]
+  const hrefs = () =>
+    screen.getAllByRole("link").map((card) => card.getAttribute("href"))
+
+  const { rerender } = render(
+    <DrawingGallery {...defaultProps} drawings={drawings} sort="name" />,
+  )
+  expect(hrefs()).toEqual(["/draw/a", "/draw/b", "/draw/c"])
+
+  rerender(
+    <DrawingGallery
+      {...defaultProps}
+      drawings={drawings}
+      sort="date-created"
+    />,
+  )
+  expect(hrefs()).toEqual(["/draw/a", "/draw/c", "/draw/b"])
+
+  rerender(<DrawingGallery {...defaultProps} drawings={drawings} />)
+  expect(hrefs()).toEqual(["/draw/b", "/draw/c", "/draw/a"])
+})
+
 test("cards show name, folder attribution, and relative edit time", () => {
   render(
     <DrawingGallery

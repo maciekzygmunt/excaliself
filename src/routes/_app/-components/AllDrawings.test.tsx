@@ -1,5 +1,13 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react"
 import { afterEach, beforeEach, expect, test, vi } from "vitest"
 import { renderPreviewSvg } from "@/components/drawing-gallery/preview"
 import type { Drawing } from "@/features/drawings/queries"
@@ -98,11 +106,12 @@ function renderAllDrawings({
   })
   client.setQueryData(drawingsQueryOptions().queryKey, drawings)
   client.setQueryData(foldersQueryOptions().queryKey, folders)
-  return render(
+  const view = render(
     <QueryClientProvider client={client}>
       <AllDrawings isAdmin={isAdmin} />
     </QueryClientProvider>,
   )
+  return { ...view, client }
 }
 
 test("every drawing renders, newest-edited first — no recents cap", () => {
@@ -119,22 +128,29 @@ test("every drawing renders, newest-edited first — no recents cap", () => {
   )
 })
 
+function makeFolder(id: string, name: string): Folder {
+  return {
+    id,
+    name,
+    ownerId: "user-1",
+    parentId: null,
+    createdAt: new Date(0),
+    updatedAt: new Date(0),
+  }
+}
+
+function cardHrefs() {
+  return screen.getAllByRole("link").map((card) => card.getAttribute("href"))
+}
+
 test("cards carry folder attribution in the All view", () => {
   renderAllDrawings({
     drawings: [makeDrawing({ id: "d1", name: "Retro board", folderId: "f1" })],
-    folders: [
-      {
-        id: "f1",
-        name: "Projects",
-        ownerId: "user-1",
-        parentId: null,
-        createdAt: new Date(0),
-        updatedAt: new Date(0),
-      },
-    ],
+    folders: [makeFolder("f1", "Projects")],
   })
 
-  expect(screen.getByText("Projects")).toBeTruthy()
+  const card = screen.getByRole("link", { name: /retro board/i })
+  expect(within(card).getByText("Projects")).toBeTruthy()
 })
 
 test("the tab reads All drawings · Excaliself", () => {
@@ -164,6 +180,200 @@ test("admins get the invite variant of the empty state", () => {
   renderAllDrawings({ drawings: [], isAdmin: true })
 
   expect(screen.getByRole("link", { name: /invite your team/i })).toBeTruthy()
+})
+
+// --- Browse toolbar (issue #36) ---
+
+const toolbarFixture = {
+  drawings: [
+    makeDrawing({
+      id: "d1",
+      name: "Retro board",
+      folderId: "f1",
+      createdAt: new Date(Date.UTC(2026, 0, 3)),
+      updatedAt: new Date(Date.UTC(2026, 0, 10)),
+    }),
+    makeDrawing({
+      id: "d2",
+      name: "Roadmap",
+      folderId: "f2",
+      createdAt: new Date(Date.UTC(2026, 0, 1)),
+      updatedAt: new Date(Date.UTC(2026, 0, 12)),
+    }),
+    makeDrawing({
+      id: "d3",
+      name: "Loose sketch",
+      folderId: null,
+      createdAt: new Date(Date.UTC(2026, 0, 2)),
+      updatedAt: new Date(Date.UTC(2026, 0, 11)),
+    }),
+  ],
+  folders: [makeFolder("f1", "Projects"), makeFolder("f2", "Archive")],
+}
+
+test("typing in search filters the grid in place", () => {
+  renderAllDrawings(toolbarFixture)
+
+  fireEvent.change(screen.getByRole("searchbox", { name: /search/i }), {
+    target: { value: "road" },
+  })
+
+  expect(cardHrefs()).toEqual(["/draw/d2"])
+  // Still the browse page — search never navigates
+  expect(screen.getByRole("heading", { name: /all drawings/i })).toBeTruthy()
+})
+
+test("folder chips scope the grid: All / per-folder / Unfiled", () => {
+  renderAllDrawings(toolbarFixture)
+
+  fireEvent.click(screen.getByRole("button", { name: "Projects" }))
+  expect(cardHrefs()).toEqual(["/draw/d1"])
+
+  fireEvent.click(screen.getByRole("button", { name: "Unfiled" }))
+  expect(cardHrefs()).toEqual(["/draw/d3"])
+
+  fireEvent.click(screen.getByRole("button", { name: "All" }))
+  expect(cardHrefs()).toEqual(["/draw/d2", "/draw/d3", "/draw/d1"])
+})
+
+test("the selected chip is marked pressed", () => {
+  renderAllDrawings(toolbarFixture)
+
+  expect(
+    screen.getByRole("button", { name: "All" }).getAttribute("aria-pressed"),
+  ).toBe("true")
+
+  fireEvent.click(screen.getByRole("button", { name: "Projects" }))
+  expect(
+    screen
+      .getByRole("button", { name: "Projects" })
+      .getAttribute("aria-pressed"),
+  ).toBe("true")
+  expect(
+    screen.getByRole("button", { name: "All" }).getAttribute("aria-pressed"),
+  ).toBe("false")
+})
+
+test("folder attribution shows only in the All view", () => {
+  renderAllDrawings(toolbarFixture)
+
+  fireEvent.click(screen.getByRole("button", { name: "Projects" }))
+
+  const card = screen.getByRole("link", { name: /retro board/i })
+  expect(within(card).queryByText("Projects")).toBeNull()
+})
+
+test("search composes with the chip scope", () => {
+  renderAllDrawings(toolbarFixture)
+
+  fireEvent.click(screen.getByRole("button", { name: "Projects" }))
+  fireEvent.change(screen.getByRole("searchbox", { name: /search/i }), {
+    target: { value: "retro" },
+  })
+  expect(cardHrefs()).toEqual(["/draw/d1"])
+
+  // Roadmap exists but lives outside the scoped folder
+  fireEvent.change(screen.getByRole("searchbox", { name: /search/i }), {
+    target: { value: "roadmap" },
+  })
+  expect(screen.queryAllByRole("link")).toEqual([])
+})
+
+test("the sort dropdown reorders the grid: Last edited default, Date created, Name", () => {
+  renderAllDrawings(toolbarFixture)
+
+  // Default: last edited, newest first
+  expect(cardHrefs()).toEqual(["/draw/d2", "/draw/d3", "/draw/d1"])
+
+  const trigger = screen.getByRole("button", { name: /sort/i })
+  fireEvent.pointerDown(trigger)
+  fireEvent.click(trigger)
+  fireEvent.click(screen.getByRole("menuitemradio", { name: "Name" }))
+  expect(cardHrefs()).toEqual(["/draw/d3", "/draw/d1", "/draw/d2"])
+
+  fireEvent.pointerDown(trigger)
+  fireEvent.click(trigger)
+  fireEvent.click(screen.getByRole("menuitemradio", { name: "Date created" }))
+  expect(cardHrefs()).toEqual(["/draw/d1", "/draw/d3", "/draw/d2"])
+})
+
+test("empty search results show the quiet tier-2 line, not the illustration", () => {
+  renderAllDrawings(toolbarFixture)
+
+  fireEvent.change(screen.getByRole("searchbox", { name: /search/i }), {
+    target: { value: "zzz" },
+  })
+
+  expect(screen.getByText("No drawings match “zzz”")).toBeTruthy()
+  expect(
+    screen.queryByRole("button", { name: /create your first drawing/i }),
+  ).toBeNull()
+})
+
+test("an empty chip scope shows a quiet line, never the illustration", () => {
+  renderAllDrawings({
+    drawings: [makeDrawing({ id: "d1", folderId: "f1" })],
+    folders: [makeFolder("f1", "Projects"), makeFolder("f2", "Empty one")],
+  })
+
+  fireEvent.click(screen.getByRole("button", { name: "Empty one" }))
+  expect(screen.getByText("This folder is empty")).toBeTruthy()
+
+  // Spec §5.10 pairs the folder line with its contextual action
+  fireEvent.click(screen.getByRole("button", { name: /new drawing here/i }))
+  expect(openCreateDrawingDialog).toHaveBeenCalledWith({
+    id: "f2",
+    name: "Empty one",
+  })
+
+  fireEvent.click(screen.getByRole("button", { name: "Unfiled" }))
+  expect(screen.getByText("No unfiled drawings")).toBeTruthy()
+  expect(
+    screen.queryByRole("button", { name: /create your first drawing/i }),
+  ).toBeNull()
+})
+
+test("a scope whose folder was deleted falls back to the All view", async () => {
+  const { client } = renderAllDrawings(toolbarFixture)
+
+  fireEvent.click(screen.getByRole("button", { name: "Projects" }))
+  expect(cardHrefs()).toEqual(["/draw/d1"])
+
+  // The folder is deleted from the sidebar: the mutation prunes it and its
+  // drawings from both caches while this page holds the stale scope.
+  act(() => {
+    client.setQueryData(foldersQueryOptions().queryKey, [
+      makeFolder("f2", "Archive"),
+    ])
+    client.setQueryData(
+      drawingsQueryOptions().queryKey,
+      toolbarFixture.drawings.filter((drawing) => drawing.folderId !== "f1"),
+    )
+  })
+
+  await waitFor(() => expect(cardHrefs()).toEqual(["/draw/d2", "/draw/d3"]))
+  expect(
+    screen.getByRole("button", { name: "All" }).getAttribute("aria-pressed"),
+  ).toBe("true")
+})
+
+test("with zero drawings the toolbar stays hidden and tier-1 owns the page", () => {
+  renderAllDrawings({ drawings: [], folders: [makeFolder("f1", "Projects")] })
+
+  expect(screen.queryByRole("searchbox")).toBeNull()
+  expect(screen.queryByRole("button", { name: "Projects" })).toBeNull()
+  expect(
+    screen.getByRole("button", { name: /create your first drawing/i }),
+  ).toBeTruthy()
+})
+
+test("without folders there is no chip row, but search and sort remain", () => {
+  renderAllDrawings({ drawings: [makeDrawing({ id: "d1" })] })
+
+  expect(screen.queryByRole("button", { name: "Unfiled" })).toBeNull()
+  expect(screen.queryByRole("button", { name: "All" })).toBeNull()
+  expect(screen.getByRole("searchbox", { name: /search/i })).toBeTruthy()
+  expect(screen.getByRole("button", { name: /sort/i })).toBeTruthy()
 })
 
 test("loading holds the grid with the delayed skeleton, not a spinner", () => {

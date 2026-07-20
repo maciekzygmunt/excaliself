@@ -6,6 +6,7 @@ import type { Drawing } from "@/features/drawings/queries"
 import type { Folder } from "@/features/folders/queries"
 import { useDelayedVisible } from "@/hooks/use-delayed-visible"
 import { cn } from "@/lib/utils"
+import { compareDrawings, DEFAULT_SORT, type SortOrder } from "./browse"
 
 const GRID_CLASS = "grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-4"
 
@@ -37,6 +38,7 @@ export function DrawingGallery({
   folders,
   isPending,
   limit,
+  sort = DEFAULT_SORT,
   loadingLabel,
   empty,
 }: {
@@ -49,6 +51,8 @@ export function DrawingGallery({
   isPending: boolean
   /** Cap applied after sorting (Home's 8 recents). */
   limit?: number
+  /** Grid order — browse's sort dropdown; everywhere else keeps Recent. */
+  sort?: SortOrder
   /** Accessible name for the loading grid. */
   loadingLabel: string
   /** Rendered when loading settles on zero drawings. */
@@ -59,12 +63,9 @@ export function DrawingGallery({
   const showSkeleton = useDelayedVisible(isPending)
 
   const sorted = useMemo(() => {
-    const byLastEdited = [...drawings].sort(
-      (a, b) =>
-        new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
-    )
-    return limit === undefined ? byLastEdited : byLastEdited.slice(0, limit)
-  }, [drawings, limit])
+    const ordered = [...drawings].sort(compareDrawings(sort))
+    return limit === undefined ? ordered : ordered.slice(0, limit)
+  }, [drawings, limit, sort])
 
   const folderNamesById = useMemo(
     () => new Map((folders ?? []).map((folder) => [folder.id, folder.name])),
