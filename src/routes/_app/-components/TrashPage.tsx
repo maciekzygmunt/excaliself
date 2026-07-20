@@ -1,7 +1,12 @@
 import { useQuery } from "@tanstack/react-query"
+import { DangerConfirmDialog } from "@/components/danger-confirm-dialog"
 import { QuietLine } from "@/components/drawing-gallery/GalleryEmpty"
 import { TrashGallery } from "@/components/drawing-gallery/TrashGallery"
+import { Button } from "@/components/ui/button"
+import { describeContents } from "@/features/trash/destroy-copy"
 import {
+  useDeleteTrashUnitForever,
+  useEmptyTrash,
   useRestoreTrashedDrawing,
   useRestoreTrashedFolder,
 } from "@/features/trash/mutations"
@@ -14,15 +19,44 @@ export function TrashPage() {
   const { data, isPending } = useQuery(trashQueryOptions())
   const restoreDrawing = useRestoreTrashedDrawing()
   const restoreFolder = useRestoreTrashedFolder()
+  const deleteForever = useDeleteTrashUnitForever()
+  const emptyTrash = useEmptyTrash()
   useDocumentTitle("Trash", { chrome: true })
+
+  const hasUnits =
+    (data?.drawings.length ?? 0) + (data?.folders.length ?? 0) > 0
+  // Every row Empty trash would destroy, subtree members included —
+  // the count-aware phrasing for the tier-2 dialog (spec §4.5).
+  const totalsPhrase = data
+    ? describeContents(data.totals.drawings, data.totals.folders)
+    : null
 
   return (
     <div className="h-full overflow-y-auto">
       <div className="mx-auto flex min-h-full w-full max-w-4xl flex-col px-6 py-8">
-        <div className="flex items-center pb-5">
+        <div className="flex items-center justify-between pb-5">
           <h1 className="text-sm font-semibold tracking-[-0.01em] text-foreground">
             Trash
           </h1>
+          {/* Absent (not disabled) when trash is empty — spec §5.11 */}
+          {hasUnits && totalsPhrase && (
+            <DangerConfirmDialog
+              trigger={
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="text-destructive hover:bg-destructive/5 hover:text-destructive"
+                >
+                  Empty trash
+                </Button>
+              }
+              title="Empty trash?"
+              description={`This will permanently delete ${totalsPhrase}. This can't be undone.`}
+              confirmLabel="Empty trash"
+              pendingLabel="Emptying…"
+              onConfirm={emptyTrash}
+            />
+          )}
         </div>
 
         <TrashGallery
@@ -32,6 +66,7 @@ export function TrashPage() {
           loadingLabel="Loading trash"
           onRestoreDrawing={restoreDrawing}
           onRestoreFolder={restoreFolder}
+          onDeleteForever={deleteForever}
           empty={
             // Tier-2 quiet line doubling as the retention disclosure —
             // no CTA, no illustration (spec §5.10).

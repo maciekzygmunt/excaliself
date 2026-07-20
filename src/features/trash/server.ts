@@ -2,6 +2,7 @@
 
 import { createServerFn } from "@tanstack/react-start"
 import { and, eq, isNotNull } from "drizzle-orm"
+import { z } from "zod"
 import { db } from "@/db"
 import { drawings, folders } from "@/db/schema"
 import { authMiddleware } from "@/middleware/auth"
@@ -55,20 +56,102 @@ export const getTrashItems = createServerFn({ method: "GET" })
       ])
 
     const countsByRoot = new Map<string, number>()
-    const count = (rootId: string | null, selfId: string) => {
+    const drawingCountsByRoot = new Map<string, number>()
+    const count = (
+      map: Map<string, number>,
+      rootId: string | null,
+      selfId: string,
+    ) => {
       // The unit root folder itself is a card, not part of its own count
       if (!rootId || rootId === selfId) return
-      countsByRoot.set(rootId, (countsByRoot.get(rootId) ?? 0) + 1)
+      map.set(rootId, (map.get(rootId) ?? 0) + 1)
     }
-    for (const folder of trashedFolders) count(folder.trashRootId, folder.id)
-    for (const drawing of trashedDrawings)
-      count(drawing.trashRootId, drawing.id)
+    for (const folder of trashedFolders)
+      count(countsByRoot, folder.trashRootId, folder.id)
+    for (const drawing of trashedDrawings) {
+      count(countsByRoot, drawing.trashRootId, drawing.id)
+      count(drawingCountsByRoot, drawing.trashRootId, drawing.id)
+    }
 
     return {
       drawings: drawingUnits,
       folders: folderUnits.map((folder) => ({
         ...folder,
         itemCount: countsByRoot.get(folder.id) ?? 0,
+        // Drawings-only slice of itemCount, for count-aware danger copy
+        drawingCount: drawingCountsByRoot.get(folder.id) ?? 0,
       })),
+      // Every trashed row (subtree members included) — what Empty trash
+      // would destroy, for its count-aware danger dialog (spec §4.5).
+      totals: {
+        drawings: trashedDrawings.length,
+        folders: trashedFolders.length,
+      },
     }
+  })
+
+/**
+ * Delete forever for one trash unit (spec §5.11, §4.5 tier 2): hard-deletes
+ * every row swept into the unit — matched by trashRootId, so a folder unit
+ * takes its whole subtree — and frees embedded drawing_files via the FK
+ * cascade from drawings. Only unit roots qualify; ids of rows inside a unit
+ * (or live rows) delete nothing and read as not-found.
+ */
+export const deleteTrashUnitForever = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .inputValidator(z.string())
+  .handler(async ({ data: id, context }) => {
+    const userId = context.session.user.id
+
+    await db.transaction(async (tx) => {
+      // Drawings first: folder deletion would cascade into them anyway, but
+      // the explicit statement keeps the freed rows owner-scoped and audited
+      // here rather than implied by FK order.
+      const deletedDrawings = await tx
+        .delete(drawings)
+        .where(
+          and(
+            eq(drawings.ownerId, userId),
+            eq(drawings.trashRootId, id),
+            isNotNull(drawings.deletedAt),
+          ),
+        )
+        .returning({ id: drawings.id })
+      const deletedFolders = await tx
+        .delete(folders)
+        .where(
+          and(
+            eq(folders.ownerId, userId),
+            eq(folders.trashRootId, id),
+            isNotNull(folders.deletedAt),
+          ),
+        )
+        .returning({ id: folders.id })
+
+      if (deletedDrawings.length === 0 && deletedFolders.length === 0)
+        throw new Error("Trash item not found")
+    })
+  })
+
+/**
+ * Empty trash (spec §5.11): hard-deletes every trashed row the owner has,
+ * freeing embedded drawing_files via FK cascade. Idempotent — an already
+ * empty trash is a no-op, not an error (the UI hides the action anyway).
+ */
+export const emptyTrash = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .handler(async ({ context }) => {
+    const userId = context.session.user.id
+
+    await db.transaction(async (tx) => {
+      // Same ordering rationale as deleteTrashUnitForever. No live drawing
+      // ever points into a trashed folder (trashing sweeps the subtree;
+      // restore pulls drawings out), so the folder cascade frees nothing live.
+      await tx
+        .delete(drawings)
+        .where(and(eq(drawings.ownerId, userId), isNotNull(drawings.deletedAt)))
+      await tx
+        .delete(folders)
+        .where(and(eq(folders.ownerId, userId), isNotNull(folders.deletedAt)))
+    })
   })

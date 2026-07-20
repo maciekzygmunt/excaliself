@@ -10,6 +10,7 @@ import {
   type TrashItems,
   trashQueryOptions,
 } from "./queries"
+import { deleteTrashUnitForever, emptyTrash } from "./server"
 
 const RESTORED_TO_ROOT_TOAST = "Restored to root — its folder no longer exists"
 
@@ -90,4 +91,57 @@ export function useRestoreTrashedFolder() {
   })
 
   return (folder: TrashedFolder) => mutation.mutate({ data: folder.id })
+}
+
+/**
+ * Delete forever for one trash unit (spec §5.11, §4.5 tier 2). Deliberately
+ * pessimistic per spec §4.3 — confirm-gated destruction gets no optimistic
+ * removal; the caller awaits the returned promise and holds an in-button
+ * pending state. On success the unit is dropped from the cache directly
+ * (that's the confirmed result, not a guess) before revalidating.
+ */
+export function useDeleteTrashUnitForever() {
+  const queryClient = useQueryClient()
+  const trashKey = trashQueryOptions().queryKey
+
+  const mutation = useMutation({
+    mutationFn: deleteTrashUnitForever,
+    onError: () => toast.error("Couldn't delete — nothing was removed"),
+    onSuccess: (_result, { data: id }) => {
+      queryClient.setQueryData<TrashItems>(trashKey, (current) =>
+        current
+          ? {
+              ...current,
+              drawings: current.drawings.filter((d) => d.id !== id),
+              folders: current.folders.filter((f) => f.id !== id),
+            }
+          : current,
+      )
+      // Refresh totals (a folder unit removed subtree rows beyond its card)
+      queryClient.invalidateQueries({ queryKey: trashKey })
+    },
+  })
+
+  return (unitId: string) => mutation.mutateAsync({ data: unitId })
+}
+
+/** Empty trash (spec §5.11): pessimistic, same rules as delete forever. */
+export function useEmptyTrash() {
+  const queryClient = useQueryClient()
+  const trashKey = trashQueryOptions().queryKey
+
+  const mutation = useMutation({
+    mutationFn: () => emptyTrash(),
+    onError: () => toast.error("Couldn't empty trash"),
+    onSuccess: () => {
+      queryClient.setQueryData<TrashItems>(trashKey, {
+        drawings: [],
+        folders: [],
+        totals: { drawings: 0, folders: 0 },
+      })
+      queryClient.invalidateQueries({ queryKey: trashKey })
+    },
+  })
+
+  return () => mutation.mutateAsync()
 }

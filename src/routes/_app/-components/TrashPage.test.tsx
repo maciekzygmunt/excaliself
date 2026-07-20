@@ -6,6 +6,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react"
 import { afterEach, beforeEach, expect, test, vi } from "vitest"
 import { renderPreviewSvg } from "@/components/drawing-gallery/preview"
@@ -17,7 +18,11 @@ import type {
   TrashItems,
 } from "@/features/trash/queries"
 import { trashQueryOptions } from "@/features/trash/queries"
-import { getTrashItems } from "@/features/trash/server"
+import {
+  deleteTrashUnitForever,
+  emptyTrash,
+  getTrashItems,
+} from "@/features/trash/server"
 import { TrashPage } from "./TrashPage"
 
 const { toastMock } = vi.hoisted(() => ({
@@ -35,6 +40,8 @@ vi.mock("@/components/drawing-gallery/preview", () => ({
 // db — stub the server-function edge.
 vi.mock("@/features/trash/server", () => ({
   getTrashItems: vi.fn(),
+  deleteTrashUnitForever: vi.fn(),
+  emptyTrash: vi.fn(),
 }))
 
 vi.mock("@/features/drawings/server", () => ({
@@ -91,12 +98,15 @@ function makeTrashedFolder(
     deletedAt: daysAgo(2),
     trashRootId: overrides.id,
     itemCount: 0,
+    drawingCount: 0,
     createdAt: new Date("2026-01-01T00:00:00Z"),
     updatedAt: new Date("2026-01-01T00:00:00Z"),
     ...overrides,
   }
 }
 
+// Archive holds 2 drawings + 1 subfolder; with the loose drawing that makes
+// 3 drawings and 2 folders trashed in total.
 const fixture: TrashItems = {
   drawings: [
     makeTrashedDrawing({ id: "d1", name: "Old sketch", deletedAt: daysAgo(5) }),
@@ -106,9 +116,17 @@ const fixture: TrashItems = {
       id: "f1",
       name: "Archive",
       itemCount: 3,
+      drawingCount: 2,
       deletedAt: daysAgo(2),
     }),
   ],
+  totals: { drawings: 3, folders: 2 },
+}
+
+const EMPTY_TRASH: TrashItems = {
+  drawings: [],
+  folders: [],
+  totals: { drawings: 0, folders: 0 },
 }
 
 function renderTrashPage(items: TrashItems = fixture) {
@@ -218,7 +236,7 @@ test("a live original folder restores silently — no root toast", async () => {
 })
 
 test("empty trash shows the quiet retention line only", () => {
-  renderTrashPage({ drawings: [], folders: [] })
+  renderTrashPage(EMPTY_TRASH)
 
   expect(
     screen.getByText(
@@ -227,6 +245,156 @@ test("empty trash shows the quiet retention line only", () => {
   ).toBeTruthy()
   // No CTA, no illustration — tier 2 (spec §5.10)
   expect(screen.queryByRole("button")).toBeNull()
+})
+
+test("Delete forever opens a danger dialog — nothing fires without confirm", async () => {
+  renderTrashPage()
+
+  fireEvent.click(
+    screen.getByRole("button", { name: "Delete forever Old sketch" }),
+  )
+  await flush()
+
+  expect(
+    screen.getByText(
+      `"Old sketch" will be permanently deleted. This can't be undone.`,
+    ),
+  ).toBeTruthy()
+  expect(deleteTrashUnitForever).not.toHaveBeenCalled()
+})
+
+test("the folder dialog states exact contents counts", async () => {
+  renderTrashPage()
+
+  fireEvent.click(
+    screen.getByRole("button", { name: "Delete forever Archive" }),
+  )
+  await flush()
+
+  expect(
+    screen.getByText(
+      `"Archive" and the 2 drawings and 1 folder inside will be permanently deleted. This can't be undone.`,
+    ),
+  ).toBeTruthy()
+})
+
+test("confirmed delete forever is pessimistic — the card stays and the button pends until the server answers", async () => {
+  vi.mocked(deleteTrashUnitForever).mockReturnValue(new Promise(() => {}))
+  renderTrashPage()
+
+  fireEvent.click(
+    screen.getByRole("button", { name: "Delete forever Old sketch" }),
+  )
+  await flush()
+  fireEvent.click(screen.getByRole("button", { name: "Delete forever" }))
+  await flush()
+
+  expect(deleteTrashUnitForever).toHaveBeenCalledWith(
+    { data: "d1" },
+    expect.anything(),
+  )
+  // No optimistic removal (spec §4.3) — the card is still there…
+  expect(screen.getByText("Old sketch")).toBeTruthy()
+  // …and the pending state lives in the button, dialog still open
+  const pending = screen.getByRole("button", {
+    name: "Deleting…",
+  }) as HTMLButtonElement
+  expect(pending.disabled).toBe(true)
+})
+
+test("a confirmed delete removes the card once the server answers", async () => {
+  vi.mocked(deleteTrashUnitForever).mockResolvedValue(undefined)
+  renderTrashPage()
+  // The revalidation refetch serves the post-delete state
+  vi.mocked(getTrashItems).mockResolvedValue({
+    ...fixture,
+    drawings: [],
+    totals: { drawings: 2, folders: 2 },
+  })
+
+  fireEvent.click(
+    screen.getByRole("button", { name: "Delete forever Old sketch" }),
+  )
+  await flush()
+  fireEvent.click(screen.getByRole("button", { name: "Delete forever" }))
+  await flush()
+
+  await waitFor(() => expect(screen.queryByText("Old sketch")).toBeNull())
+  expect(screen.getByText("Archive")).toBeTruthy()
+})
+
+test("a failed delete keeps the card and the dialog and shows an error toast", async () => {
+  vi.mocked(deleteTrashUnitForever).mockRejectedValue(new Error("boom"))
+  renderTrashPage()
+
+  fireEvent.click(
+    screen.getByRole("button", { name: "Delete forever Old sketch" }),
+  )
+  await flush()
+  fireEvent.click(screen.getByRole("button", { name: "Delete forever" }))
+  await flush()
+
+  expect(toastMock.error).toHaveBeenCalledWith(
+    "Couldn't delete — nothing was removed",
+  )
+  expect(screen.getByText("Old sketch")).toBeTruthy()
+  // Dialog stays open for retry or cancel
+  expect(screen.getByRole("alertdialog")).toBeTruthy()
+})
+
+test("Empty trash sits in the header behind a count-aware danger dialog", async () => {
+  renderTrashPage()
+
+  fireEvent.click(screen.getByRole("button", { name: "Empty trash" }))
+  await flush()
+
+  expect(
+    screen.getByText(
+      `This will permanently delete 3 drawings and 2 folders. This can't be undone.`,
+    ),
+  ).toBeTruthy()
+  expect(emptyTrash).not.toHaveBeenCalled()
+})
+
+test("confirming Empty trash is pessimistic, then clears the page", async () => {
+  vi.mocked(emptyTrash).mockReturnValue(new Promise(() => {}))
+  renderTrashPage()
+
+  fireEvent.click(screen.getByRole("button", { name: "Empty trash" }))
+  await flush()
+  const dialog = screen.getByRole("alertdialog")
+  fireEvent.click(within(dialog).getByRole("button", { name: "Empty trash" }))
+  await flush()
+
+  expect(emptyTrash).toHaveBeenCalledTimes(1)
+  // Pessimistic: everything still on screen while the server is answering
+  expect(screen.getByText("Old sketch")).toBeTruthy()
+  expect(screen.getByText("Archive")).toBeTruthy()
+  expect(
+    (
+      within(dialog).getByRole("button", {
+        name: "Emptying…",
+      }) as HTMLButtonElement
+    ).disabled,
+  ).toBe(true)
+})
+
+test("a confirmed Empty trash clears the page once the server answers", async () => {
+  vi.mocked(emptyTrash).mockResolvedValue(undefined)
+  renderTrashPage()
+  vi.mocked(getTrashItems).mockResolvedValue(EMPTY_TRASH)
+
+  fireEvent.click(screen.getByRole("button", { name: "Empty trash" }))
+  await flush()
+  fireEvent.click(
+    within(screen.getByRole("alertdialog")).getByRole("button", {
+      name: "Empty trash",
+    }),
+  )
+  await flush()
+
+  await waitFor(() => expect(screen.getByText(/Nothing in trash/)).toBeTruthy())
+  expect(screen.queryByRole("button", { name: "Empty trash" })).toBeNull()
 })
 
 test("the tab reads Trash · Excaliself", () => {
