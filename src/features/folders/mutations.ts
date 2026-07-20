@@ -47,6 +47,9 @@ export function useTrashFolder() {
   const invalidateBoth = () => {
     queryClient.invalidateQueries({ queryKey: foldersKey })
     queryClient.invalidateQueries({ queryKey: drawingsKey })
+    // Key literal, not trashQueryOptions(): importing the trash feature here
+    // would drag its server module into every consumer of these mutations.
+    queryClient.invalidateQueries({ queryKey: ["trash"] })
   }
 
   const restoreMutation = useMutation({

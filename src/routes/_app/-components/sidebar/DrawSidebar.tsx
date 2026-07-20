@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query"
 import { Link } from "@tanstack/react-router"
-import { File, Folder, PanelLeft, Plus } from "lucide-react"
+import { File, Folder, PanelLeft, Plus, Trash2 } from "lucide-react"
 import { useEffect, useMemo } from "react"
 import { Mark } from "@/components/identity"
 import {
@@ -22,7 +22,7 @@ import { foldersQueryOptions } from "@/features/folders/queries"
 import { cn } from "@/lib/utils"
 import { useCreateDialog } from "../CreateDialog"
 import { Kbd } from "./Kbd"
-import { SidebarNav } from "./SidebarNav"
+import { SidebarNav, SidebarNavItem } from "./SidebarNav"
 import { type SidebarUser, SidebarUserMenu } from "./SidebarUserMenu"
 import { StarredSection } from "./StarredSection"
 import { TreeNodeItem } from "./TreeNodeItem"
@@ -103,6 +103,11 @@ export function DrawSidebar({ user }: { user: SidebarUser }) {
         />
 
         <SidebarFooter className="gap-0 p-2">
+          {/* Pinned below the scroll region — Trash stays reachable no
+              matter how tall the tree grows (spec §2.3). */}
+          <SidebarMenu className="gap-0 pb-1">
+            <SidebarNavItem to="/trash" label="Trash" icon={Trash2} />
+          </SidebarMenu>
           <SidebarUserMenu user={user} />
         </SidebarFooter>
       </Sidebar>

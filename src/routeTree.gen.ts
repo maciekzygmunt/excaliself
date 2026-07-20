@@ -16,6 +16,7 @@ import { Route as AppRouteRouteImport } from './routes/_app/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminIndexRouteImport } from './routes/admin/index'
 import { Route as ApiHealthRouteImport } from './routes/api/health'
+import { Route as AppTrashRouteImport } from './routes/_app/trash'
 import { Route as AppDrawingsRouteImport } from './routes/_app/drawings'
 import { Route as AppDrawIndexRouteImport } from './routes/_app/draw/index'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
@@ -56,6 +57,11 @@ const ApiHealthRoute = ApiHealthRouteImport.update({
   path: '/api/health',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AppTrashRoute = AppTrashRouteImport.update({
+  id: '/trash',
+  path: '/trash',
+  getParentRoute: () => AppRouteRoute,
+} as any)
 const AppDrawingsRoute = AppDrawingsRouteImport.update({
   id: '/drawings',
   path: '/drawings',
@@ -88,6 +94,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/setup': typeof SetupRoute
   '/drawings': typeof AppDrawingsRoute
+  '/trash': typeof AppTrashRoute
   '/api/health': typeof ApiHealthRoute
   '/admin/': typeof AdminIndexRoute
   '/draw/$id': typeof AppDrawIdRoute
@@ -101,6 +108,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/setup': typeof SetupRoute
   '/drawings': typeof AppDrawingsRoute
+  '/trash': typeof AppTrashRoute
   '/api/health': typeof ApiHealthRoute
   '/admin': typeof AdminIndexRoute
   '/draw/$id': typeof AppDrawIdRoute
@@ -116,6 +124,7 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/setup': typeof SetupRoute
   '/_app/drawings': typeof AppDrawingsRoute
+  '/_app/trash': typeof AppTrashRoute
   '/api/health': typeof ApiHealthRoute
   '/admin/': typeof AdminIndexRoute
   '/_app/draw/$id': typeof AppDrawIdRoute
@@ -131,6 +140,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/setup'
     | '/drawings'
+    | '/trash'
     | '/api/health'
     | '/admin/'
     | '/draw/$id'
@@ -144,6 +154,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/setup'
     | '/drawings'
+    | '/trash'
     | '/api/health'
     | '/admin'
     | '/draw/$id'
@@ -158,6 +169,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/setup'
     | '/_app/drawings'
+    | '/_app/trash'
     | '/api/health'
     | '/admin/'
     | '/_app/draw/$id'
@@ -228,6 +240,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiHealthRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_app/trash': {
+      id: '/_app/trash'
+      path: '/trash'
+      fullPath: '/trash'
+      preLoaderRoute: typeof AppTrashRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
     '/_app/drawings': {
       id: '/_app/drawings'
       path: '/drawings'
@@ -268,6 +287,7 @@ declare module '@tanstack/react-router' {
 
 interface AppRouteRouteChildren {
   AppDrawingsRoute: typeof AppDrawingsRoute
+  AppTrashRoute: typeof AppTrashRoute
   AppDrawIdRoute: typeof AppDrawIdRoute
   AppFolderIdRoute: typeof AppFolderIdRoute
   AppDrawIndexRoute: typeof AppDrawIndexRoute
@@ -275,6 +295,7 @@ interface AppRouteRouteChildren {
 
 const AppRouteRouteChildren: AppRouteRouteChildren = {
   AppDrawingsRoute: AppDrawingsRoute,
+  AppTrashRoute: AppTrashRoute,
   AppDrawIdRoute: AppDrawIdRoute,
   AppFolderIdRoute: AppFolderIdRoute,
   AppDrawIndexRoute: AppDrawIndexRoute,

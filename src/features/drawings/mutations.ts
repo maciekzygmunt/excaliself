@@ -63,11 +63,18 @@ export function useToggleStarDrawing() {
 export function useTrashDrawing() {
   const queryClient = useQueryClient()
   const queryKey = drawingsQueryOptions().queryKey
+  // Key literal, not trashQueryOptions(): importing the trash feature here
+  // would drag its server module into every consumer of these mutations.
+  const invalidateTrash = () =>
+    queryClient.invalidateQueries({ queryKey: ["trash"] })
 
   const restoreMutation = useMutation({
     mutationFn: restoreDrawing,
     onError: () => toast.error("Couldn't restore drawing"),
-    onSettled: () => queryClient.invalidateQueries({ queryKey }),
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey })
+      invalidateTrash()
+    },
   })
 
   const trashMutation = useOptimisticListMutation<
@@ -81,6 +88,7 @@ export function useTrashDrawing() {
 
   return (drawing: Drawing) => {
     const trashed = trashMutation.mutateAsync({ data: drawing.id })
+    trashed.then(invalidateTrash, () => {})
     const toastId = toast("Moved to trash", {
       action: {
         label: "Undo",

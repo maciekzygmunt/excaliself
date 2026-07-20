@@ -3,6 +3,8 @@
 
 type FolderRef = { id: string; parentId: string | null }
 
+type TrashableFolderRef = FolderRef & { deletedAt: Date | null }
+
 /** Walks parentId to collect a folder and all its descendant folder ids. */
 export function collectFolderSubtreeIds(
   folders: FolderRef[],
@@ -28,4 +30,28 @@ export function collectFolderSubtreeIds(
     }
   }
   return subtree
+}
+
+/**
+ * Restore targeting (spec §5.11): walks up from `startId` through parentId
+ * links and returns the first folder that is not trashed — the folder itself
+ * when it is live. Returns null (root) when the chain dead-ends in missing
+ * rows, is trashed all the way up, or cycles. Restore never resurrects a
+ * trashed parent chain, so this is the only legal landing spot.
+ */
+export function findNearestLiveAncestorId(
+  folders: TrashableFolderRef[],
+  startId: string,
+): string | null {
+  const byId = new Map(folders.map((folder) => [folder.id, folder]))
+  const seen = new Set<string>()
+  let currentId: string | null = startId
+  while (currentId && !seen.has(currentId)) {
+    seen.add(currentId)
+    const folder = byId.get(currentId)
+    if (!folder) return null
+    if (folder.deletedAt === null) return folder.id
+    currentId = folder.parentId
+  }
+  return null
 }
