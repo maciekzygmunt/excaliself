@@ -7,7 +7,7 @@ import { z } from "zod"
 import { db } from "@/db"
 import { drawings, folders } from "@/db/schema"
 import { authMiddleware } from "@/middleware/auth"
-import { collectFolderSubtreeIds } from "./subtree"
+import { collectFolderSubtreeIds, findNearestLiveAncestorId } from "./subtree"
 
 export const getFolders = createServerFn({ method: "GET" })
   .middleware([authMiddleware])
@@ -134,24 +134,60 @@ export const trashFolder = createServerFn({ method: "POST" })
     })
   })
 
-/** Restores a folder trash unit: everything trashFolder(id) swept, in place. */
+/**
+ * Restores a folder trash unit: everything trashFolder(id) swept, with the
+ * subtree intact. The root folder lands under its original parent when that
+ * parent is live, under the nearest live ancestor when the parent is trashed
+ * (a trashed parent chain is never resurrected), or at root when the parent
+ * no longer exists — flagged as `originalParentGone` for the caller's toast.
+ */
 export const restoreFolder = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
   .inputValidator(z.string())
   .handler(async ({ data: id, context }) => {
     const userId = context.session.user.id
 
-    await db.transaction(async (tx) => {
+    return db.transaction(async (tx) => {
       const restored = await tx
         .update(folders)
         .set({ deletedAt: null, trashRootId: null })
         .where(and(eq(folders.trashRootId, id), eq(folders.ownerId, userId)))
-        .returning({ id: folders.id })
+        .returning({ id: folders.id, parentId: folders.parentId })
       if (restored.length === 0) throw new Error("Folder not found")
 
       await tx
         .update(drawings)
         .set({ deletedAt: null, trashRootId: null })
         .where(and(eq(drawings.trashRootId, id), eq(drawings.ownerId, userId)))
+
+      const originalParentId =
+        restored.find((folder) => folder.id === id)?.parentId ?? null
+      if (!originalParentId) return { originalParentGone: false }
+
+      const ownerFolders = await tx
+        .select({
+          id: folders.id,
+          parentId: folders.parentId,
+          deletedAt: folders.deletedAt,
+        })
+        .from(folders)
+        .where(eq(folders.ownerId, userId))
+
+      const landingId = findNearestLiveAncestorId(
+        ownerFolders,
+        originalParentId,
+      )
+      if (landingId !== originalParentId) {
+        await tx
+          .update(folders)
+          .set({ parentId: landingId })
+          .where(eq(folders.id, id))
+      }
+
+      return {
+        originalParentGone: !ownerFolders.some(
+          (folder) => folder.id === originalParentId,
+        ),
+      }
     })
   })

@@ -5,7 +5,8 @@ import { createServerFn } from "@tanstack/react-start"
 import { and, desc, eq, inArray, isNotNull, isNull } from "drizzle-orm"
 import { z } from "zod"
 import { db } from "@/db"
-import { drawingFiles, drawings } from "@/db/schema"
+import { drawingFiles, drawings, folders } from "@/db/schema"
+import { findNearestLiveAncestorId } from "@/features/folders/subtree"
 import { authMiddleware } from "@/middleware/auth"
 
 const persistedFileSchema = z.object({
@@ -228,21 +229,60 @@ export const trashDrawing = createServerFn({ method: "POST" })
     if (trashed.length === 0) throw new Error("Drawing not found")
   })
 
+/**
+ * Restores a trashed drawing with the full landing rules (spec §5.11): back
+ * to its original folder when that folder is live; to the nearest live
+ * ancestor when the folder is trashed (never resurrecting a trashed parent
+ * chain); to root when the folder no longer exists at all — the caller gets
+ * `originalFolderGone` so it can show the "Restored to root" toast.
+ */
 export const restoreDrawing = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
   .inputValidator(z.string())
   .handler(async ({ data: id, context }) => {
     const userId = context.session.user.id
-    const restored = await db
-      .update(drawings)
-      .set({ deletedAt: null, trashRootId: null })
-      .where(
-        and(
-          eq(drawings.id, id),
-          eq(drawings.ownerId, userId),
-          isNotNull(drawings.deletedAt),
-        ),
+
+    return db.transaction(async (tx) => {
+      const restored = await tx
+        .update(drawings)
+        .set({ deletedAt: null, trashRootId: null })
+        .where(
+          and(
+            eq(drawings.id, id),
+            eq(drawings.ownerId, userId),
+            isNotNull(drawings.deletedAt),
+          ),
+        )
+        .returning({ id: drawings.id, folderId: drawings.folderId })
+      if (restored.length === 0) throw new Error("Drawing not found")
+
+      const originalFolderId = restored[0].folderId
+      if (!originalFolderId) return { originalFolderGone: false }
+
+      const ownerFolders = await tx
+        .select({
+          id: folders.id,
+          parentId: folders.parentId,
+          deletedAt: folders.deletedAt,
+        })
+        .from(folders)
+        .where(eq(folders.ownerId, userId))
+
+      const landingId = findNearestLiveAncestorId(
+        ownerFolders,
+        originalFolderId,
       )
-      .returning({ id: drawings.id })
-    if (restored.length === 0) throw new Error("Drawing not found")
+      if (landingId !== originalFolderId) {
+        await tx
+          .update(drawings)
+          .set({ folderId: landingId })
+          .where(eq(drawings.id, id))
+      }
+
+      return {
+        originalFolderGone: !ownerFolders.some(
+          (folder) => folder.id === originalFolderId,
+        ),
+      }
+    })
   })

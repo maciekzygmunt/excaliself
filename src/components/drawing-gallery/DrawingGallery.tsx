@@ -8,7 +8,13 @@ import { useDelayedVisible } from "@/hooks/use-delayed-visible"
 import { cn } from "@/lib/utils"
 import { compareDrawings, DEFAULT_SORT, type SortOrder } from "./browse"
 
-const GRID_CLASS = "grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-4"
+// Shared with TrashGallery so browse and trash stay one grid language.
+export const GRID_CLASS =
+  "grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-4"
+
+/** The card's resting frame; interactive cards layer hover/active on top. */
+export const CARD_FRAME_CLASS =
+  "relative flex flex-col overflow-hidden rounded-xl bg-card shadow-[0_0_0_1px_rgba(25,25,50,0.08),0_1px_2px_rgba(20,20,45,0.05)] dark:shadow-[0_0_0_1px_rgba(255,255,255,0.1)]"
 
 const DEFAULT_SKELETON_COUNT = 8
 
@@ -102,7 +108,13 @@ export function DrawingGallery({
 
 // Placeholder cards mirror DrawingCard's frame so the loaded grid lands on
 // the same footprint instead of popping into empty space.
-function LoadingGrid({ label, count }: { label: string; count: number }) {
+export function LoadingGrid({
+  label,
+  count,
+}: {
+  label: string
+  count: number
+}) {
   return (
     <div role="status" aria-label={label} className={GRID_CLASS}>
       {Array.from({ length: count }, (_, i) => (
@@ -133,7 +145,12 @@ function DrawingCard({
   folder?: Folder
 }) {
   return (
-    <div className="group relative flex flex-col overflow-hidden rounded-xl bg-card shadow-[0_0_0_1px_rgba(25,25,50,0.08),0_1px_2px_rgba(20,20,45,0.05)] transition-[box-shadow,scale] duration-150 hover:shadow-[0_0_0_1px_rgba(25,25,50,0.14),0_3px_8px_rgba(20,20,45,0.1)] active:scale-[0.99] dark:shadow-[0_0_0_1px_rgba(255,255,255,0.1)] dark:hover:shadow-[0_0_0_1px_rgba(255,255,255,0.16)]">
+    <div
+      className={cn(
+        CARD_FRAME_CLASS,
+        "group transition-[box-shadow,scale] duration-150 hover:shadow-[0_0_0_1px_rgba(25,25,50,0.14),0_3px_8px_rgba(20,20,45,0.1)] active:scale-[0.99] dark:hover:shadow-[0_0_0_1px_rgba(255,255,255,0.16)]",
+      )}
+    >
       <Link
         to="/draw/$id"
         params={{ id: drawing.id }}
@@ -173,7 +190,7 @@ function DrawingCard({
   )
 }
 
-function Preview({ name, data }: { name: string; data: string }) {
+export function Preview({ name, data }: { name: string; data: string }) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [state, setState] = useState<"pending" | "ready" | "empty">("pending")
 
