@@ -6,6 +6,7 @@ import { z } from "zod"
 import { db } from "@/db"
 import { drawings, folders } from "@/db/schema"
 import { authMiddleware } from "@/middleware/auth"
+import { destroyTrashUnit } from "./destroy"
 
 /**
  * The trash page's data (spec §5.11): the owner's trash *units*, not raw
@@ -91,46 +92,16 @@ export const getTrashItems = createServerFn({ method: "GET" })
   })
 
 /**
- * Delete forever for one trash unit (spec §5.11, §4.5 tier 2): hard-deletes
- * every row swept into the unit — matched by trashRootId, so a folder unit
- * takes its whole subtree — and frees embedded drawing_files via the FK
- * cascade from drawings. Only unit roots qualify; ids of rows inside a unit
- * (or live rows) delete nothing and read as not-found.
+ * Delete forever for one trash unit (spec §5.11, §4.5 tier 2). The actual
+ * delete lives in destroyTrashUnit (see destroy.ts), which also evacuates
+ * other trash units nested inside a folder unit so the FK cascade cannot
+ * take them down with it.
  */
 export const deleteTrashUnitForever = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
   .inputValidator(z.string())
   .handler(async ({ data: id, context }) => {
-    const userId = context.session.user.id
-
-    await db.transaction(async (tx) => {
-      // Drawings first: folder deletion would cascade into them anyway, but
-      // the explicit statement keeps the freed rows owner-scoped and audited
-      // here rather than implied by FK order.
-      const deletedDrawings = await tx
-        .delete(drawings)
-        .where(
-          and(
-            eq(drawings.ownerId, userId),
-            eq(drawings.trashRootId, id),
-            isNotNull(drawings.deletedAt),
-          ),
-        )
-        .returning({ id: drawings.id })
-      const deletedFolders = await tx
-        .delete(folders)
-        .where(
-          and(
-            eq(folders.ownerId, userId),
-            eq(folders.trashRootId, id),
-            isNotNull(folders.deletedAt),
-          ),
-        )
-        .returning({ id: folders.id })
-
-      if (deletedDrawings.length === 0 && deletedFolders.length === 0)
-        throw new Error("Trash item not found")
-    })
+    await destroyTrashUnit(db, context.session.user.id, id)
   })
 
 /**
