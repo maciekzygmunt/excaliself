@@ -213,8 +213,9 @@ function DrawingCard({
 }
 
 // The card's overflow menu — z-layered above the stretched drawing link,
-// hidden until hover/focus on pointer devices (always visible on touch,
-// which has no hover to reveal it).
+// hidden until hover/focus when the primary pointer is a mouse. Gated on
+// pointer capability, not viewport width: a touch-only tablet at desktop
+// width has no hover to reveal it, so there it stays visible.
 function CardActions({ name, onTrash }: { name: string; onTrash: () => void }) {
   return (
     <DropdownMenu>
@@ -222,7 +223,7 @@ function CardActions({ name, onTrash }: { name: string; onTrash: () => void }) {
         <button
           type="button"
           aria-label={`Actions for ${name}`}
-          className="relative z-10 -mr-1.5 shrink-0 rounded-md p-1 text-muted-foreground/50 transition-[color,background-color,opacity] duration-150 hover:bg-accent hover:text-foreground focus-visible:bg-accent focus-visible:text-foreground focus-visible:outline-none md:opacity-0 md:group-focus-within:opacity-100 md:group-hover:opacity-100 md:data-[state=open]:opacity-100"
+          className="relative z-10 -mr-1.5 shrink-0 rounded-md p-1 text-muted-foreground/50 transition-[color,background-color,opacity] duration-150 hover:bg-accent hover:text-foreground focus-visible:bg-accent focus-visible:text-foreground focus-visible:outline-none pointer-fine:opacity-0 pointer-fine:group-focus-within:opacity-100 pointer-fine:group-hover:opacity-100 pointer-fine:data-[state=open]:opacity-100"
         >
           <MoreHorizontal className="h-4 w-4" />
         </button>
