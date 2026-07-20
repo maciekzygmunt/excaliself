@@ -70,11 +70,18 @@ export const updateFolder = createServerFn({ method: "POST" })
     if (data.parentId !== undefined) updateFields.parentId = data.parentId
 
     // Ownership is enforced in the statement itself; zero rows means "not
-    // found" so non-owners can't tell the resource exists.
+    // found" so non-owners can't tell the resource exists. Trashed folders
+    // are treated the same — no edits while in the trash.
     const updated = await db
       .update(folders)
       .set({ ...updateFields, updatedAt: new Date() })
-      .where(and(eq(folders.id, data.id), eq(folders.ownerId, userId)))
+      .where(
+        and(
+          eq(folders.id, data.id),
+          eq(folders.ownerId, userId),
+          isNull(folders.deletedAt),
+        ),
+      )
       .returning({ id: folders.id })
     if (updated.length === 0) throw new Error("Folder not found")
   })

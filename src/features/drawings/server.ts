@@ -30,10 +30,18 @@ export const getDrawingWithFiles = createServerFn({ method: "GET" })
   .inputValidator((id: string) => id)
   .handler(async ({ data: id, context }) => {
     const userId = context.session.user.id
+    // Trashed drawings behave as not-found so direct /draw/$id URLs (and
+    // stale tabs refetching) fall into the route loader's redirect home.
     const [drawing] = await db
       .select()
       .from(drawings)
-      .where(and(eq(drawings.id, id), eq(drawings.ownerId, userId)))
+      .where(
+        and(
+          eq(drawings.id, id),
+          eq(drawings.ownerId, userId),
+          isNull(drawings.deletedAt),
+        ),
+      )
     if (!drawing) return null
 
     const files = await db
@@ -85,11 +93,18 @@ export const updateDrawing = createServerFn({ method: "POST" })
   .handler(async ({ data: { id, updateData }, context }) => {
     const userId = context.session.user.id
     // Ownership is enforced in the statement itself; zero rows means "not
-    // found" so non-owners can't tell the resource exists.
+    // found" so non-owners can't tell the resource exists. Trashed drawings
+    // are treated the same — no edits while in the trash.
     const updated = await db
       .update(drawings)
       .set({ ...updateData, updatedAt: new Date() })
-      .where(and(eq(drawings.id, id), eq(drawings.ownerId, userId)))
+      .where(
+        and(
+          eq(drawings.id, id),
+          eq(drawings.ownerId, userId),
+          isNull(drawings.deletedAt),
+        ),
+      )
       .returning({ id: drawings.id })
     if (updated.length === 0) throw new Error("Drawing not found")
   })
@@ -109,7 +124,13 @@ export const setDrawingStarred = createServerFn({ method: "POST" })
     const updated = await db
       .update(drawings)
       .set({ starred })
-      .where(and(eq(drawings.id, id), eq(drawings.ownerId, userId)))
+      .where(
+        and(
+          eq(drawings.id, id),
+          eq(drawings.ownerId, userId),
+          isNull(drawings.deletedAt),
+        ),
+      )
       .returning({ id: drawings.id })
     if (updated.length === 0) throw new Error("Drawing not found")
   })
@@ -129,10 +150,19 @@ export const saveDrawingScene = createServerFn({ method: "POST" })
     await db.transaction(async (tx) => {
       const now = new Date()
 
+      // Refuses writes to trashed drawings so a stale open tab can't keep
+      // autosaving into the trash. This guard is permanent: even once trashed
+      // drawings become viewable read-only (#53), writes stay blocked here.
       const updated = await tx
         .update(drawings)
         .set({ data: sceneData, updatedAt: now })
-        .where(and(eq(drawings.id, id), eq(drawings.ownerId, userId)))
+        .where(
+          and(
+            eq(drawings.id, id),
+            eq(drawings.ownerId, userId),
+            isNull(drawings.deletedAt),
+          ),
+        )
         .returning({ id: drawings.id })
       if (updated.length === 0) throw new Error("Drawing not found")
 
