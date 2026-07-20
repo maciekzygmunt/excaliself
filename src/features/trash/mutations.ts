@@ -15,11 +15,13 @@ import { deleteTrashUnitForever, emptyTrash } from "./server"
 const RESTORED_TO_ROOT_TOAST = "Restored to root — its folder no longer exists"
 
 /**
- * Restore from the trash page (spec §5.11): the card vanishes optimistically
- * and rolls back with an error toast if the server call fails. The live
- * lists are invalidated so the item reappears where the server landed it;
- * when the original folder no longer exists the specified toast explains the
- * fallback to root.
+ * Restore a trashed drawing (spec §5.11): the trash card vanishes
+ * optimistically and rolls back with an error toast if the server call
+ * fails. The live lists are invalidated so the item reappears where the
+ * server landed it — the `["drawings"]` invalidation prefix-matches the
+ * `["drawings", id]` detail query too, which is how the read-only trashed
+ * canvas flips back to editable. When the original folder no longer exists
+ * the specified toast explains the fallback to root.
  */
 export function useRestoreTrashedDrawing() {
   const queryClient = useQueryClient()
@@ -53,7 +55,10 @@ export function useRestoreTrashedDrawing() {
     },
   })
 
-  return (drawing: TrashedDrawing) => mutation.mutate({ data: drawing.id })
+  // Accepts any drawing-shaped object: trash-page cards pass TrashedDrawing,
+  // the trashed canvas banner passes the detail-query row.
+  return (drawing: Pick<TrashedDrawing, "id">) =>
+    mutation.mutate({ data: drawing.id })
 }
 
 /** Folder variant of useRestoreTrashedDrawing: the unit comes back intact. */

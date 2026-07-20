@@ -25,6 +25,7 @@ export function DangerConfirmDialog({
   description,
   confirmLabel,
   pendingLabel,
+  confirmDisabled = false,
   onConfirm,
 }: {
   /** Rendered via asChild — must accept button props (a plain element works). */
@@ -34,6 +35,12 @@ export function DangerConfirmDialog({
   confirmLabel: string
   /** In-button pending state, e.g. "Deleting…". */
   pendingLabel: string
+  /**
+   * Blocks the confirm button (not the dialog) while the caller can't yet
+   * word a count-aware description — e.g. the unit's counts are still
+   * loading. Cancel stays available.
+   */
+  confirmDisabled?: boolean
   /**
    * Awaited on confirm. Resolution closes the dialog; rejection keeps it
    * open for retry — surface the error via toast in the mutation itself.
@@ -71,7 +78,11 @@ export function DangerConfirmDialog({
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel disabled={pending}>Cancel</AlertDialogCancel>
-          <Button variant="destructive" disabled={pending} onClick={confirm}>
+          <Button
+            variant="destructive"
+            disabled={pending || confirmDisabled}
+            onClick={confirm}
+          >
             {pending ? pendingLabel : confirmLabel}
           </Button>
         </AlertDialogFooter>

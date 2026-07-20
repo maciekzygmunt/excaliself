@@ -20,9 +20,16 @@ import "@excalidraw/excalidraw/index.css"
 
 type Props = {
   drawingId: string
+  /**
+   * Trashed drawings (spec §5.11): Excalidraw view mode, no autosave wiring,
+   * no rename. The server refuses writes to trashed drawings regardless —
+   * this keeps the client from even trying. The parent remounts the canvas
+   * when the flag flips, so it can be treated as fixed for a mount.
+   */
+  readOnly?: boolean
 }
 
-export function DrawingCanvas({ drawingId }: Props) {
+export function DrawingCanvas({ drawingId, readOnly = false }: Props) {
   const { toggleSidebar } = useSidebar()
 
   const { drawing, initialData, isDataCorrupt } = useDrawingScene(drawingId)
@@ -36,6 +43,9 @@ export function DrawingCanvas({ drawingId }: Props) {
   const autoSavePaused = isDataCorrupt && !corruptAcknowledged
 
   useEffect(() => {
+    // Read-only view: nothing can save, so the "auto-save is paused" toast
+    // and its "Edit anyway" escape hatch would only mislead.
+    if (readOnly) return
     if (!isDataCorrupt || corruptAcknowledged) return
     const toastId = `corrupt-scene:${drawingId}`
     toast.error("This drawing's saved data couldn't be read", {
@@ -51,7 +61,7 @@ export function DrawingCanvas({ drawingId }: Props) {
     return () => {
       toast.dismiss(toastId)
     }
-  }, [isDataCorrupt, corruptAcknowledged, drawingId])
+  }, [isDataCorrupt, corruptAcknowledged, drawingId, readOnly])
 
   const { saving, saved, handleChange } = useAutoSave({
     toPayload: buildScenePayload,
@@ -59,7 +69,9 @@ export function DrawingCanvas({ drawingId }: Props) {
     onSave: saveScenePayload,
     scopeId: `save-drawing:${drawingId}`,
     skipInitialChange: true,
-    paused: autoSavePaused,
+    // `readOnly` also unwires onChange below; pausing here is belt and
+    // braces so no code path can flush a save for a trashed drawing.
+    paused: autoSavePaused || readOnly,
     onError: () => {
       toast.error("Failed to save drawing", { id: "drawing-save-error" })
     },
@@ -90,7 +102,8 @@ export function DrawingCanvas({ drawingId }: Props) {
     <div className="size-full">
       <Excalidraw
         initialData={initialData}
-        onChange={handleSceneChange}
+        viewModeEnabled={readOnly || undefined}
+        onChange={readOnly ? undefined : handleSceneChange}
         UIOptions={{
           canvasActions: {
             loadScene: false,
@@ -121,15 +134,19 @@ export function DrawingCanvas({ drawingId }: Props) {
           <MainMenu.DefaultItems.ToggleTheme />
           <MainMenu.DefaultItems.ChangeCanvasBackground />
         </MainMenu>
-        <FooterRightPortal>
-          <SaveStatusPill saving={saving} saved={saved} />
-        </FooterRightPortal>
+        {/* No autosave in read-only mode, so no save status to report. */}
+        {!readOnly && (
+          <FooterRightPortal>
+            <SaveStatusPill saving={saving} saved={saved} />
+          </FooterRightPortal>
+        )}
         <TopLeftPortal>
           <TopLeftControls
             // `key` resets the uncontrolled input when the cached drawing name
             // changes from outside (e.g., rename triggered in the sidebar).
             key={drawing.name}
             initialName={drawing.name}
+            readOnly={readOnly}
             onToggleSidebar={toggleSidebar}
             onSubmit={handleNameSubmit}
           />
