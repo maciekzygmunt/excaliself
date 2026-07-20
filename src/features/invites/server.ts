@@ -5,7 +5,7 @@ import { createServerFn } from "@tanstack/react-start"
 import { and, eq, gt, isNull } from "drizzle-orm"
 import z from "zod"
 import { db } from "@/db"
-import { invites } from "@/db/schema"
+import { invites, users } from "@/db/schema"
 import { registerFieldsSchema } from "@/features/auth/schema"
 import { auth } from "@/lib/auth"
 import { adminMiddleware } from "@/middleware/admin"
@@ -17,11 +17,21 @@ const usableInvite = (token: string) =>
     gt(invites.expiresAt, new Date()),
   )
 
+/**
+ * Public (pre-auth) check of an invite token. Returns only what the invite
+ * page needs — the inviter's name for the personalized headline — never the
+ * invite row itself.
+ */
 export const validateInvite = createServerFn({ method: "GET" })
   .inputValidator(z.string())
   .handler(async ({ data: token }) => {
-    const [invite] = await db.select().from(invites).where(usableInvite(token))
-    return invite ?? null
+    const [invite] = await db
+      .select({ inviterName: users.name })
+      .from(invites)
+      .leftJoin(users, eq(invites.invitedBy, users.id))
+      .where(usableInvite(token))
+    if (!invite) return null
+    return { inviterName: invite.inviterName || null }
   })
 
 export const registerWithInvite = createServerFn({ method: "POST" })
@@ -35,6 +45,10 @@ export const registerWithInvite = createServerFn({ method: "POST" })
       throw new Error("Invalid or expired invite link")
     }
 
+    // signUpEmail also signs the new member in: better-auth creates a session
+    // (autoSignIn default) and the tanstackStartCookies plugin copies its
+    // set-cookie onto this server function's response, so the browser is
+    // authenticated when this call returns.
     const result = await auth.api.signUpEmail({
       body: {
         email: data.email,
@@ -43,7 +57,7 @@ export const registerWithInvite = createServerFn({ method: "POST" })
       },
     })
 
-    if (!result.user) {
+    if (!result.user || !result.token) {
       throw new Error("Failed to create account")
     }
 
