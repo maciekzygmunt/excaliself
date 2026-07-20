@@ -24,6 +24,8 @@ type Options<TItem, TVariables, TData> = {
   queryKey: QueryKey
   mutationFn: MutationFunction<TData, TVariables>
   optimisticUpdate: (previous: TItem[], variables: TVariables) => TItem[]
+  // Runs after the cache is rolled back on error — surface a toast here
+  onRollback?: (variables: TVariables) => void
 }
 
 /**
@@ -35,6 +37,7 @@ export function useOptimisticListMutation<TItem, TVariables, TData = unknown>({
   queryKey,
   mutationFn,
   optimisticUpdate,
+  onRollback,
 }: Options<TItem, TVariables, TData>) {
   const queryClient = useQueryClient()
 
@@ -48,8 +51,9 @@ export function useOptimisticListMutation<TItem, TVariables, TData = unknown>({
       )
       return { previous }
     },
-    onError: (_err, _vars, context) => {
+    onError: (_err, vars, context) => {
       queryClient.setQueryData(queryKey, context?.previous)
+      onRollback?.(vars)
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey })

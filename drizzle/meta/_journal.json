@@ -15,6 +15,13 @@
       "when": 1778831264945,
       "tag": "0001_elite_terror",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1784552986061,
+      "tag": "0002_sturdy_spot",
+      "breakpoints": true
     }
   ]
 }

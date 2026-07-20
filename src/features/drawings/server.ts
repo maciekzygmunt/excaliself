@@ -94,6 +94,26 @@ export const updateDrawing = createServerFn({ method: "POST" })
     if (updated.length === 0) throw new Error("Drawing not found")
   })
 
+export const setDrawingStarred = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .inputValidator(
+    z.object({
+      id: z.string(),
+      starred: z.boolean(),
+    }),
+  )
+  .handler(async ({ data: { id, starred }, context }) => {
+    const userId = context.session.user.id
+    // Deliberately leaves updatedAt alone: starring is not an edit and must
+    // not reshuffle recency-ordered lists.
+    const updated = await db
+      .update(drawings)
+      .set({ starred })
+      .where(and(eq(drawings.id, id), eq(drawings.ownerId, userId)))
+      .returning({ id: drawings.id })
+    if (updated.length === 0) throw new Error("Drawing not found")
+  })
+
 export const saveDrawingScene = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
   .inputValidator(

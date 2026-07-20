@@ -5,6 +5,7 @@ import { SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar"
 import {
   useDeleteDrawing,
   useRenameDrawing,
+  useToggleStarDrawing,
 } from "@/features/drawings/mutations"
 import { useInlineRename } from "@/hooks/use-inline-rename"
 import { cn } from "@/lib/utils"
@@ -37,6 +38,7 @@ export function DrawingItem({ drawing }: DrawingItemProps) {
   })
 
   const deleteMutation = useDeleteDrawing()
+  const starMutation = useToggleStarDrawing()
 
   const handleDelete = async () => {
     await deleteMutation.mutateAsync({ data: drawing.id })
@@ -97,6 +99,12 @@ export function DrawingItem({ drawing }: DrawingItemProps) {
 
       <TreeRowActions
         isRenaming={rename.isRenaming}
+        starred={drawing.starred}
+        onToggleStar={() =>
+          starMutation.mutate({
+            data: { id: drawing.id, starred: !drawing.starred },
+          })
+        }
         onStartRename={() => rename.start(drawing.name)}
         onMenuCloseAutoFocus={rename.onMenuCloseAutoFocus}
         onDelete={handleDelete}

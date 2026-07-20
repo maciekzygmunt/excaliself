@@ -17,13 +17,14 @@ import {
   SidebarMenu,
   useSidebar,
 } from "@/components/ui/sidebar"
-import { drawingsQueryOptions } from "@/features/drawings/queries"
+import { type Drawing, drawingsQueryOptions } from "@/features/drawings/queries"
 import { foldersQueryOptions } from "@/features/folders/queries"
 import { cn } from "@/lib/utils"
 import { useCreateDialog } from "../CreateDialog"
 import { Kbd } from "./Kbd"
 import { SidebarNav } from "./SidebarNav"
 import { type SidebarUser, SidebarUserMenu } from "./SidebarUserMenu"
+import { StarredSection } from "./StarredSection"
 import { TreeNodeItem } from "./TreeNodeItem"
 import { buildTree, treeNodeKey } from "./tree"
 import { SidebarDnDProvider, useSidebarDnD } from "./use-sidebar-dnd"
@@ -94,22 +95,12 @@ export function DrawSidebar({ user }: { user: SidebarUser }) {
 
         <SidebarNav />
 
-        <div className="flex items-center justify-between pt-2 pb-0.5 pr-3 pl-4">
-          <span className="text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground/70">
-            Drawings
-          </span>
-          <div className="flex items-center gap-1">
-            <span className="font-mono text-[10px] tabular-nums text-muted-foreground/70">
-              {drawings.length}
-            </span>
-            <CreateMenu
-              onCreateDrawing={() => openCreateDrawingDialog()}
-              onCreateFolder={openCreateFolderDialog}
-            />
-          </div>
-        </div>
-
-        <TreeBody displayTree={displayTree} />
+        <TreeBody
+          displayTree={displayTree}
+          drawings={drawings}
+          onCreateDrawing={() => openCreateDrawingDialog()}
+          onCreateFolder={openCreateFolderDialog}
+        />
 
         <SidebarFooter className="gap-0 p-2">
           <SidebarUserMenu user={user} />
@@ -133,15 +124,40 @@ function SidebarToggle() {
   )
 }
 
+// Starred and the tree share the sidebar's single scroll region — a fixed
+// starred list would otherwise squeeze the tree out of view as stars grow.
 function TreeBody({
   displayTree,
+  drawings,
+  onCreateDrawing,
+  onCreateFolder,
 }: {
   displayTree: ReturnType<typeof buildTree>
+  drawings: Drawing[]
+  onCreateDrawing: () => void
+  onCreateFolder: () => void
 }) {
   const { dropTarget, onDragOver, onDragLeave, onDrop } = useSidebarDnD()
 
   return (
     <SidebarContent className="gap-0 pt-0.5 [scrollbar-width:none]">
+      <StarredSection drawings={drawings} />
+
+      <div className="flex items-center justify-between pt-2 pb-0.5 pr-3 pl-4">
+        <span className="text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground/70">
+          Drawings
+        </span>
+        <div className="flex items-center gap-1">
+          <span className="font-mono text-[10px] tabular-nums text-muted-foreground/70">
+            {drawings.length}
+          </span>
+          <CreateMenu
+            onCreateDrawing={onCreateDrawing}
+            onCreateFolder={onCreateFolder}
+          />
+        </div>
+      </div>
+
       <div className="px-2">
         <div
           className={cn(

@@ -89,3 +89,42 @@ test("clicking the row itself still toggles the collapsible", () => {
   fireEvent.click(screen.getByText("Row label"))
   expect(onOpenChange).toHaveBeenCalledWith(false)
 })
+
+function renderStarrableRow(starred: boolean, onToggleStar: () => void) {
+  render(
+    <TreeRowActions
+      isRenaming={false}
+      starred={starred}
+      onToggleStar={onToggleStar}
+      onStartRename={vi.fn()}
+      onMenuCloseAutoFocus={vi.fn()}
+      onDelete={vi.fn()}
+      deleteTitle="Delete drawing?"
+      deleteDescription="Delete?"
+    />,
+  )
+}
+
+test("an unstarred row offers Star and triggers the toggle", () => {
+  const onToggleStar = vi.fn()
+  renderStarrableRow(false, onToggleStar)
+  openDropdown()
+  expect(screen.queryByRole("menuitem", { name: "Unstar" })).toBeNull()
+  fireEvent.click(screen.getByRole("menuitem", { name: "Star" }))
+  expect(onToggleStar).toHaveBeenCalledTimes(1)
+})
+
+test("a starred row offers Unstar and triggers the toggle", () => {
+  const onToggleStar = vi.fn()
+  renderStarrableRow(true, onToggleStar)
+  openDropdown()
+  expect(screen.queryByRole("menuitem", { name: "Star" })).toBeNull()
+  fireEvent.click(screen.getByRole("menuitem", { name: "Unstar" }))
+  expect(onToggleStar).toHaveBeenCalledTimes(1)
+})
+
+test("rows without star wiring show no star menu item", () => {
+  renderRow(vi.fn())
+  openDropdown()
+  expect(screen.queryByRole("menuitem", { name: /star/i })).toBeNull()
+})
