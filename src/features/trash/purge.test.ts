@@ -1,3 +1,5 @@
+import type { SQL } from "drizzle-orm"
+import { PgDialect } from "drizzle-orm/pg-core"
 import { afterEach, expect, test, vi } from "vitest"
 import { drawings, folders } from "@/db/schema"
 import {
@@ -110,8 +112,18 @@ test("items trashed exactly at the cutoff are purged", () => {
 // --- purgeExpiredTrash orchestration ---------------------------------------
 
 type Call =
-  | { kind: "update"; table: unknown; set: Record<string, unknown> }
-  | { kind: "delete"; table: unknown }
+  | { kind: "select"; lock: unknown }
+  | {
+      kind: "update"
+      table: unknown
+      set: Record<string, unknown>
+      where: SQL
+    }
+  | { kind: "delete"; table: unknown; where: SQL }
+
+// Renders a captured drizzle condition so tests can assert what the SQL
+// actually re-checks at write time (the crux of the concurrent-restore fix).
+const toSql = (where: SQL) => new PgDialect().sqlToQuery(where)
 
 function fakeDb(options: {
   folderRows: ReturnType<typeof folderRow>[]
@@ -120,19 +132,26 @@ function fakeDb(options: {
 }) {
   const calls: Call[] = []
   const tx = {
-    select: () => ({ from: () => Promise.resolve(options.folderRows) }),
+    select: () => ({
+      from: () => ({
+        for: (lock: unknown) => {
+          calls.push({ kind: "select", lock })
+          return Promise.resolve(options.folderRows)
+        },
+      }),
+    }),
     update: (table: unknown) => ({
       set: (set: Record<string, unknown>) => ({
-        where: () => {
-          calls.push({ kind: "update", table, set })
+        where: (where: SQL) => {
+          calls.push({ kind: "update", table, set, where })
           return Promise.resolve()
         },
       }),
     }),
     delete: (table: unknown) => ({
-      where: () => ({
+      where: (where: SQL) => ({
         returning: () => {
-          calls.push({ kind: "delete", table })
+          calls.push({ kind: "delete", table, where })
           const ids =
             table === drawings
               ? (options.deletedDrawingIds ?? [])
@@ -148,7 +167,14 @@ function fakeDb(options: {
   return { db, calls }
 }
 
-test("a full pass re-parents survivors, then deletes expired drawings and folders, reporting counts", async () => {
+const shape = (call: Call) =>
+  call.kind === "select"
+    ? { kind: call.kind, lock: call.lock }
+    : call.kind === "update"
+      ? { kind: call.kind, table: call.table, set: call.set }
+      : { kind: call.kind, table: call.table }
+
+test("a full pass locks folders, re-parents surviving folders, deletes expired drawings, then evacuates and deletes expired folders", async () => {
   const { db, calls } = fakeDb({
     folderRows: [
       folderRow("expired", null, daysAgo(31)),
@@ -161,10 +187,13 @@ test("a full pass re-parents survivors, then deletes expired drawings and folder
   const counts = await purgeExpiredTrash(db, NOW)
 
   expect(counts).toEqual({ purgedDrawings: 2, purgedFolders: 1 })
-  expect(calls).toEqual([
+  expect(calls.map(shape)).toEqual([
+    { kind: "select", lock: "update" },
     { kind: "update", table: folders, set: { parentId: null } },
-    { kind: "update", table: drawings, set: { folderId: null } },
     { kind: "delete", table: drawings },
+    // Survivors are pulled out of expired folders AFTER the drawings delete,
+    // so even a drawing restored mid-pass escapes the folder cascade.
+    { kind: "update", table: drawings, set: { folderId: null } },
     { kind: "delete", table: folders },
   ])
 })
@@ -178,7 +207,90 @@ test("with no expired folders, only the expired-drawings delete runs", async () 
   const counts = await purgeExpiredTrash(db, NOW)
 
   expect(counts).toEqual({ purgedDrawings: 1, purgedFolders: 0 })
-  expect(calls).toEqual([{ kind: "delete", table: drawings }])
+  expect(calls.map(shape)).toEqual([
+    { kind: "select", lock: "update" },
+    { kind: "delete", table: drawings },
+  ])
+})
+
+// --- concurrent restore between select and delete ---------------------------
+// Under READ COMMITTED a restore can commit after the folder snapshot is
+// read; the writes must never trust the pre-selected ID sets alone.
+
+test("the folder delete re-asserts the expiry predicate, and counts come from the rows actually deleted", async () => {
+  const { db, calls } = fakeDb({
+    folderRows: [
+      folderRow("purged", null, daysAgo(31)),
+      folderRow("restored-mid-pass", null, daysAgo(31)),
+    ],
+    // Simulates "restored-mid-pass" being restored between the select and
+    // the delete: the re-asserted deletedAt <= cutoff predicate skips it.
+    deletedFolderIds: ["purged"],
+  })
+
+  const counts = await purgeExpiredTrash(db, NOW)
+
+  // The count reflects what was deleted, not the pre-selected expired set.
+  expect(counts).toEqual({ purgedDrawings: 0, purgedFolders: 1 })
+
+  const folderDelete = calls.find(
+    (call) => call.kind === "delete" && call.table === folders,
+  )
+  expect(folderDelete).toBeDefined()
+  const { sql, params } = toSql((folderDelete as { where: SQL }).where)
+  // Deletes by ID *and* by still-lapsed deletedAt — an ID match alone must
+  // never delete a row whose restore committed after the select.
+  expect(sql).toContain(`"folders"."id" in `)
+  expect(sql).toContain(`"folders"."deletedAt" <= `)
+  expect(params).toContainEqual(purgeCutoff(NOW).toISOString())
+})
+
+test("the drawings delete matches on deletedAt, never on pre-selected IDs", async () => {
+  const { db, calls } = fakeDb({
+    folderRows: [folderRow("expired", null, daysAgo(31))],
+    deletedFolderIds: ["expired"],
+  })
+
+  await purgeExpiredTrash(db, NOW)
+
+  const drawingsDelete = calls.find(
+    (call) => call.kind === "delete" && call.table === drawings,
+  )
+  const { sql, params } = toSql((drawingsDelete as { where: SQL }).where)
+  expect(sql).toContain(`"drawings"."deletedAt" <= `)
+  expect(params).toEqual([purgeCutoff(NOW).toISOString()])
+})
+
+test("the post-delete evacuation moves EVERY drawing left in an expired folder, including one restored mid-pass", async () => {
+  const { db, calls } = fakeDb({
+    folderRows: [folderRow("expired", null, daysAgo(31))],
+    deletedFolderIds: ["expired"],
+  })
+
+  await purgeExpiredTrash(db, NOW)
+
+  const evacuation = calls.find(
+    (call) => call.kind === "update" && call.table === drawings,
+  )
+  expect(evacuation).toBeDefined()
+  const { sql } = toSql((evacuation as { where: SQL }).where)
+  // No deletedAt filter: a drawing whose restore committed after the
+  // drawings delete skipped it must still be re-parented out of the folder
+  // before the cascade fires.
+  expect(sql).toContain(`"drawings"."folderId" in `)
+  expect(sql).not.toContain("deletedAt")
+  // And it runs between the drawings delete and the folder delete.
+  const kinds = calls.map((call) =>
+    call.kind === "select"
+      ? "select"
+      : `${call.kind}:${call.table === drawings ? "drawings" : "folders"}`,
+  )
+  expect(kinds.indexOf("update:drawings")).toBeGreaterThan(
+    kinds.indexOf("delete:drawings"),
+  )
+  expect(kinds.indexOf("update:drawings")).toBeLessThan(
+    kinds.indexOf("delete:folders"),
+  )
 })
 
 // --- startTrashPurgeJob -----------------------------------------------------

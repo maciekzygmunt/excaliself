@@ -4,7 +4,7 @@
 // external cron — and repeated on an interval, so purge-overdue items left
 // over from downtime are caught on the next boot.
 
-import { and, gt, inArray, isNull, lte, or } from "drizzle-orm"
+import { and, inArray, lte } from "drizzle-orm"
 import type { NodePgDatabase } from "drizzle-orm/node-postgres"
 import type * as schema from "@/db/schema"
 import { drawings, folders } from "@/db/schema"
@@ -59,6 +59,17 @@ export function splitExpiredFolders(
  * rows whose FK points into the expired set (a drawing restored out of a
  * trashed subtree, a folder restored or re-trashed later) are re-parented to
  * root before the deletes so no cascade ever purges something still live.
+ *
+ * Concurrency: under READ COMMITTED a restore can commit between our reads
+ * and our writes, clearing deletedAt — and an ID-only delete would then
+ * cascade over the freshly restored rows. Guards, in order: the folder rows
+ * are locked FOR UPDATE for the whole pass (a concurrent folder restore
+ * blocks, then sees the purged rows as gone — the same outcome as restoring
+ * a moment after the purge); the drawings delete re-evaluates deletedAt at
+ * delete time, so a drawing restored before the delete reaches it is
+ * skipped; and every drawing still inside an expired folder after that
+ * delete — including one restored mid-pass — is re-parented to root before
+ * the folder cascade fires.
  */
 export async function purgeExpiredTrash(
   db: Db,
@@ -67,6 +78,10 @@ export async function purgeExpiredTrash(
   const cutoff = purgeCutoff(now)
 
   return db.transaction(async (tx) => {
+    // FOR UPDATE freezes every folder's deletedAt/parentId for the pass, so
+    // the sets computed below stay true through the deletes; it also blocks
+    // inserts of new children under a folder that is about to be purged
+    // (the FK check needs a share lock this transaction already holds).
     const folderRows = await tx
       .select({
         id: folders.id,
@@ -74,6 +89,7 @@ export async function purgeExpiredTrash(
         deletedAt: folders.deletedAt,
       })
       .from(folders)
+      .for("update")
     const { expiredIds, reparentIds } = splitExpiredFolders(folderRows, cutoff)
 
     if (reparentIds.length > 0) {
@@ -82,34 +98,37 @@ export async function purgeExpiredTrash(
         .set({ parentId: null })
         .where(inArray(folders.id, reparentIds))
     }
-    if (expiredIds.length > 0) {
-      // Surviving drawings inside expired folders: live ones (restored out of
-      // the trashed subtree) and trash still inside its own window.
-      await tx
-        .update(drawings)
-        .set({ folderId: null })
-        .where(
-          and(
-            inArray(drawings.folderId, expiredIds),
-            or(isNull(drawings.deletedAt), gt(drawings.deletedAt, cutoff)),
-          ),
-        )
-    }
 
     // Deleting drawings explicitly (rather than via the folder cascade) keeps
     // the purged count exact; drawing_files rows cascade off each drawing.
+    // The WHERE re-checks deletedAt against the latest committed version of
+    // each row, so a concurrently restored drawing is skipped.
     const purgedDrawings = await tx
       .delete(drawings)
       .where(lte(drawings.deletedAt, cutoff))
       .returning({ id: drawings.id })
 
-    const purgedFolders =
-      expiredIds.length > 0
-        ? await tx
-            .delete(folders)
-            .where(inArray(folders.id, expiredIds))
-            .returning({ id: folders.id })
-        : []
+    let purgedFolders: { id: string }[] = []
+    if (expiredIds.length > 0) {
+      // Anything still inside an expired folder after the delete above
+      // survived it — live drawings, trash inside its own window, or a
+      // drawing whose restore landed mid-pass — so sever the FK edge before
+      // the folder cascade can take it.
+      await tx
+        .update(drawings)
+        .set({ folderId: null })
+        .where(inArray(drawings.folderId, expiredIds))
+
+      // The rows are locked, but re-assert the expiry predicate anyway so a
+      // restored folder can never be hard-deleted even if the locking above
+      // is ever weakened; the count reflects the rows actually deleted.
+      purgedFolders = await tx
+        .delete(folders)
+        .where(
+          and(inArray(folders.id, expiredIds), lte(folders.deletedAt, cutoff)),
+        )
+        .returning({ id: folders.id })
+    }
 
     return {
       purgedDrawings: purgedDrawings.length,
