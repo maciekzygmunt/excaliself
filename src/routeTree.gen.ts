@@ -18,6 +18,8 @@ import { Route as AdminIndexRouteImport } from './routes/admin/index'
 import { Route as ApiHealthRouteImport } from './routes/api/health'
 import { Route as AppTrashRouteImport } from './routes/_app/trash'
 import { Route as AppDrawingsRouteImport } from './routes/_app/drawings'
+import { Route as AppSettingsRouteRouteImport } from './routes/_app/settings/route'
+import { Route as AppSettingsIndexRouteImport } from './routes/_app/settings/index'
 import { Route as AppDrawIndexRouteImport } from './routes/_app/draw/index'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as AppFolderIdRouteImport } from './routes/_app/folder.$id'
@@ -67,6 +69,16 @@ const AppDrawingsRoute = AppDrawingsRouteImport.update({
   path: '/drawings',
   getParentRoute: () => AppRouteRoute,
 } as any)
+const AppSettingsRouteRoute = AppSettingsRouteRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AppSettingsIndexRoute = AppSettingsIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AppSettingsRouteRoute,
+} as any)
 const AppDrawIndexRoute = AppDrawIndexRouteImport.update({
   id: '/draw/',
   path: '/draw/',
@@ -93,6 +105,7 @@ export interface FileRoutesByFullPath {
   '/invite': typeof InviteRoute
   '/login': typeof LoginRoute
   '/setup': typeof SetupRoute
+  '/settings': typeof AppSettingsRouteRouteWithChildren
   '/drawings': typeof AppDrawingsRoute
   '/trash': typeof AppTrashRoute
   '/api/health': typeof ApiHealthRoute
@@ -101,6 +114,7 @@ export interface FileRoutesByFullPath {
   '/folder/$id': typeof AppFolderIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/draw/': typeof AppDrawIndexRoute
+  '/settings/': typeof AppSettingsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -115,6 +129,7 @@ export interface FileRoutesByTo {
   '/folder/$id': typeof AppFolderIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/draw': typeof AppDrawIndexRoute
+  '/settings': typeof AppSettingsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -123,6 +138,7 @@ export interface FileRoutesById {
   '/invite': typeof InviteRoute
   '/login': typeof LoginRoute
   '/setup': typeof SetupRoute
+  '/_app/settings': typeof AppSettingsRouteRouteWithChildren
   '/_app/drawings': typeof AppDrawingsRoute
   '/_app/trash': typeof AppTrashRoute
   '/api/health': typeof ApiHealthRoute
@@ -131,6 +147,7 @@ export interface FileRoutesById {
   '/_app/folder/$id': typeof AppFolderIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/_app/draw/': typeof AppDrawIndexRoute
+  '/_app/settings/': typeof AppSettingsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -139,6 +156,7 @@ export interface FileRouteTypes {
     | '/invite'
     | '/login'
     | '/setup'
+    | '/settings'
     | '/drawings'
     | '/trash'
     | '/api/health'
@@ -147,6 +165,7 @@ export interface FileRouteTypes {
     | '/folder/$id'
     | '/api/auth/$'
     | '/draw/'
+    | '/settings/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -161,6 +180,7 @@ export interface FileRouteTypes {
     | '/folder/$id'
     | '/api/auth/$'
     | '/draw'
+    | '/settings'
   id:
     | '__root__'
     | '/'
@@ -168,6 +188,7 @@ export interface FileRouteTypes {
     | '/invite'
     | '/login'
     | '/setup'
+    | '/_app/settings'
     | '/_app/drawings'
     | '/_app/trash'
     | '/api/health'
@@ -176,6 +197,7 @@ export interface FileRouteTypes {
     | '/_app/folder/$id'
     | '/api/auth/$'
     | '/_app/draw/'
+    | '/_app/settings/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -254,6 +276,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppDrawingsRouteImport
       parentRoute: typeof AppRouteRoute
     }
+    '/_app/settings': {
+      id: '/_app/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof AppSettingsRouteRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/_app/settings/': {
+      id: '/_app/settings/'
+      path: '/'
+      fullPath: '/settings/'
+      preLoaderRoute: typeof AppSettingsIndexRouteImport
+      parentRoute: typeof AppSettingsRouteRoute
+    }
     '/_app/draw/': {
       id: '/_app/draw/'
       path: '/draw'
@@ -285,7 +321,19 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface AppSettingsRouteRouteChildren {
+  AppSettingsIndexRoute: typeof AppSettingsIndexRoute
+}
+
+const AppSettingsRouteRouteChildren: AppSettingsRouteRouteChildren = {
+  AppSettingsIndexRoute: AppSettingsIndexRoute,
+}
+
+const AppSettingsRouteRouteWithChildren =
+  AppSettingsRouteRoute._addFileChildren(AppSettingsRouteRouteChildren)
+
 interface AppRouteRouteChildren {
+  AppSettingsRouteRoute: typeof AppSettingsRouteRouteWithChildren
   AppDrawingsRoute: typeof AppDrawingsRoute
   AppTrashRoute: typeof AppTrashRoute
   AppDrawIdRoute: typeof AppDrawIdRoute
@@ -294,6 +342,7 @@ interface AppRouteRouteChildren {
 }
 
 const AppRouteRouteChildren: AppRouteRouteChildren = {
+  AppSettingsRouteRoute: AppSettingsRouteRouteWithChildren,
   AppDrawingsRoute: AppDrawingsRoute,
   AppTrashRoute: AppTrashRoute,
   AppDrawIdRoute: AppDrawIdRoute,

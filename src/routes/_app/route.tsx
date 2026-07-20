@@ -1,9 +1,12 @@
+import { useQuery } from "@tanstack/react-query"
 import { createFileRoute, Outlet } from "@tanstack/react-router"
 import { createServerFn } from "@tanstack/react-start"
 import type React from "react"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
+import { currentUserQueryOptions } from "@/features/account/queries"
 import { drawingsQueryOptions } from "@/features/drawings/queries"
 import { foldersQueryOptions } from "@/features/folders/queries"
+import { useSettingsShortcut } from "@/hooks/use-settings-shortcut"
 import { authMiddleware } from "@/middleware/auth"
 import { setupMiddleware } from "@/middleware/setup"
 import { CreateDialogProvider } from "./-components/CreateDialog"
@@ -21,6 +24,7 @@ export const Route = createFileRoute("/_app")({
   loader: async ({ context }) => {
     const session = await getSession()
     await Promise.all([
+      context.queryClient.ensureQueryData(currentUserQueryOptions()),
       context.queryClient.ensureQueryData(drawingsQueryOptions()),
       context.queryClient.ensureQueryData(foldersQueryOptions()),
     ])
@@ -31,6 +35,10 @@ export const Route = createFileRoute("/_app")({
 
 function AppShellLayout() {
   const { session, isAdmin } = Route.useLoaderData()
+  // The user card subscribes to the currentUser cache so an optimistic
+  // profile save on /settings shows up in the sidebar in the same frame.
+  const { data: currentUser } = useQuery(currentUserQueryOptions())
+  useSettingsShortcut()
 
   return (
     <SidebarProvider
@@ -40,7 +48,8 @@ function AppShellLayout() {
       <CreateDialogProvider>
         <DrawSidebar
           user={{
-            email: session.user?.email ?? "",
+            email: currentUser?.email ?? session.user?.email ?? "",
+            name: currentUser?.name ?? null,
             isAdmin,
           }}
         />
