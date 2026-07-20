@@ -5,6 +5,7 @@ import {
   fireEvent,
   render,
   screen,
+  waitFor,
   within,
 } from "@testing-library/react"
 import { afterEach, beforeEach, expect, test, vi } from "vitest"
@@ -105,11 +106,12 @@ function renderAllDrawings({
   })
   client.setQueryData(drawingsQueryOptions().queryKey, drawings)
   client.setQueryData(foldersQueryOptions().queryKey, folders)
-  return render(
+  const view = render(
     <QueryClientProvider client={client}>
       <AllDrawings isAdmin={isAdmin} />
     </QueryClientProvider>,
   )
+  return { ...view, client }
 }
 
 test("every drawing renders, newest-edited first — no recents cap", () => {
@@ -329,6 +331,30 @@ test("an empty chip scope shows a quiet line, never the illustration", () => {
   expect(
     screen.queryByRole("button", { name: /create your first drawing/i }),
   ).toBeNull()
+})
+
+test("a scope whose folder was deleted falls back to the All view", async () => {
+  const { client } = renderAllDrawings(toolbarFixture)
+
+  fireEvent.click(screen.getByRole("button", { name: "Projects" }))
+  expect(cardHrefs()).toEqual(["/draw/d1"])
+
+  // The folder is deleted from the sidebar: the mutation prunes it and its
+  // drawings from both caches while this page holds the stale scope.
+  act(() => {
+    client.setQueryData(foldersQueryOptions().queryKey, [
+      makeFolder("f2", "Archive"),
+    ])
+    client.setQueryData(
+      drawingsQueryOptions().queryKey,
+      toolbarFixture.drawings.filter((drawing) => drawing.folderId !== "f1"),
+    )
+  })
+
+  await waitFor(() => expect(cardHrefs()).toEqual(["/draw/d2", "/draw/d3"]))
+  expect(
+    screen.getByRole("button", { name: "All" }).getAttribute("aria-pressed"),
+  ).toBe("true")
 })
 
 test("with zero drawings the toolbar stays hidden and tier-1 owns the page", () => {

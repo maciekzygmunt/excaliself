@@ -28,9 +28,17 @@ export function AllDrawings({ isAdmin }: { isAdmin: boolean }) {
   const [scope, setScope] = useState<GalleryScope>("all")
   const [sort, setSort] = useState<SortOrder>(DEFAULT_SORT)
 
+  // The scoped folder can be deleted from the sidebar while we hold its id —
+  // fall back to the All view instead of filtering on a ghost folder.
+  const scopedId = scopedFolderId(scope)
+  const liveScope: GalleryScope =
+    scopedId !== null && !folders.some((folder) => folder.id === scopedId)
+      ? "all"
+      : scope
+
   const filtered = useMemo(
-    () => filterDrawings(drawings, { query, scope }),
-    [drawings, query, scope],
+    () => filterDrawings(drawings, { query, scope: liveScope }),
+    [drawings, query, liveScope],
   )
 
   // Tier-1 is reserved for a truly empty account; a grid emptied by the
@@ -52,7 +60,7 @@ export function AllDrawings({ isAdmin }: { isAdmin: boolean }) {
               query={query}
               onQueryChange={setQuery}
               folders={folders}
-              scope={scope}
+              scope={liveScope}
               onScopeChange={setScope}
               sort={sort}
               onSortChange={setSort}
@@ -63,7 +71,7 @@ export function AllDrawings({ isAdmin }: { isAdmin: boolean }) {
         <DrawingGallery
           drawings={filtered}
           // Attribution only in the All view — a scoped grid repeats one folder
-          folders={scope === "all" ? folders : undefined}
+          folders={liveScope === "all" ? folders : undefined}
           isPending={isPending}
           sort={sort}
           loadingLabel="Loading drawings"
@@ -71,7 +79,7 @@ export function AllDrawings({ isAdmin }: { isAdmin: boolean }) {
             hasAnyDrawings ? (
               <FilteredEmpty
                 query={query}
-                scope={scope}
+                scope={liveScope}
                 folders={folders}
                 onCreateInFolder={(folder) =>
                   openCreateDrawingDialog({ id: folder.id, name: folder.name })
