@@ -20,7 +20,13 @@ const config = defineConfig({
     viteTsConfigPaths({
       projects: ["./tsconfig.json"],
     }),
-    tanstackStart(),
+    tanstackStart({
+      router: {
+        // Keep co-located *.test.tsx files out of route scanning so the
+        // generator does not warn that they "do not export a Route".
+        routeFileIgnorePattern: "\\.test\\.",
+      },
+    }),
     viteReact(),
   ],
 })
