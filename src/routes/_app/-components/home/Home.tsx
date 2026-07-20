@@ -3,6 +3,7 @@ import { Link } from "@tanstack/react-router"
 import { Plus } from "lucide-react"
 import { DrawingGallery } from "@/components/drawing-gallery/DrawingGallery"
 import { IllustratedEmptyState } from "@/components/illustrated-empty-state"
+import { useTrashDrawing } from "@/features/drawings/mutations"
 import { drawingsQueryOptions } from "@/features/drawings/queries"
 import { foldersQueryOptions } from "@/features/folders/queries"
 import { useCreateDialog } from "../CreateDialog"
@@ -13,6 +14,7 @@ export function Home({ isAdmin }: { isAdmin: boolean }) {
   const { data: drawings = [], isPending } = useQuery(drawingsQueryOptions())
   const { data: folders = [] } = useQuery(foldersQueryOptions())
   const { openCreateDrawingDialog } = useCreateDialog()
+  const trashDrawing = useTrashDrawing()
 
   return (
     <div className="h-full overflow-y-auto">
@@ -49,6 +51,7 @@ export function Home({ isAdmin }: { isAdmin: boolean }) {
           isPending={isPending}
           limit={RECENT_LIMIT}
           loadingLabel="Loading recent drawings"
+          onTrash={trashDrawing}
           empty={
             <IllustratedEmptyState
               isAdmin={isAdmin}

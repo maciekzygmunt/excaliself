@@ -15,6 +15,7 @@ import {
   QuietLine,
 } from "@/components/drawing-gallery/GalleryEmpty"
 import { IllustratedEmptyState } from "@/components/illustrated-empty-state"
+import { useTrashDrawing } from "@/features/drawings/mutations"
 import { drawingsQueryOptions } from "@/features/drawings/queries"
 import type { Folder } from "@/features/folders/queries"
 import { foldersQueryOptions } from "@/features/folders/queries"
@@ -27,6 +28,7 @@ export function AllDrawings({ isAdmin }: { isAdmin: boolean }) {
   const { data: drawings = [], isPending } = useQuery(drawingsQueryOptions())
   const { data: folders = [] } = useQuery(foldersQueryOptions())
   const { openCreateDrawingDialog } = useCreateDialog()
+  const trashDrawing = useTrashDrawing()
   useDocumentTitle("All drawings", { chrome: true })
 
   const [query, setQuery] = useState("")
@@ -78,6 +80,7 @@ export function AllDrawings({ isAdmin }: { isAdmin: boolean }) {
           isPending={isPending}
           sort={sort}
           loadingLabel="Loading drawings"
+          onTrash={trashDrawing}
           empty={
             hasAnyDrawings ? (
               <FilteredEmpty

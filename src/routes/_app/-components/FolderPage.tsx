@@ -12,6 +12,7 @@ import {
   FolderEmpty,
   NoMatches,
 } from "@/components/drawing-gallery/GalleryEmpty"
+import { useTrashDrawing } from "@/features/drawings/mutations"
 import { drawingsQueryOptions } from "@/features/drawings/queries"
 import { foldersQueryOptions } from "@/features/folders/queries"
 import { useDocumentTitle } from "@/lib/document-title"
@@ -24,6 +25,7 @@ export function FolderPage({ folderId }: { folderId: string }) {
   const { data: drawings = [], isPending } = useQuery(drawingsQueryOptions())
   const { data: folders = [] } = useQuery(foldersQueryOptions())
   const { openCreateDrawingDialog } = useCreateDialog()
+  const trashDrawing = useTrashDrawing()
   const navigate = useNavigate()
 
   const folder = folders.find((candidate) => candidate.id === folderId)
@@ -80,6 +82,7 @@ export function FolderPage({ folderId }: { folderId: string }) {
           isPending={isPending}
           sort={sort}
           loadingLabel="Loading drawings"
+          onTrash={trashDrawing}
           empty={
             trimmedQuery !== "" ? (
               <NoMatches query={trimmedQuery} />
