@@ -1,5 +1,7 @@
-import { Folder as FolderIcon } from "lucide-react"
+import { Folder as FolderIcon, Trash2 } from "lucide-react"
 import { useMemo } from "react"
+import { DangerConfirmDialog } from "@/components/danger-confirm-dialog"
+import { describeContents } from "@/features/trash/destroy-copy"
 import type { TrashedDrawing, TrashedFolder } from "@/features/trash/queries"
 import { purgeCountdownLabel } from "@/features/trash/retention"
 import { useDelayedVisible } from "@/hooks/use-delayed-visible"
@@ -16,8 +18,9 @@ const DEFAULT_SKELETON_COUNT = 8
 /**
  * The gallery grid in trash mode (spec §5.11): the same card language as
  * browse, but units instead of drawings — a trashed folder is one card with
- * a contents count, never dispersed children — and the card action is
- * Restore. Cards don't link anywhere; nothing in trash is editable.
+ * a contents count, never dispersed children — and the card actions are
+ * Restore / Delete forever. Cards don't link anywhere; nothing in trash is
+ * editable.
  */
 export function TrashGallery({
   drawings,
@@ -26,6 +29,7 @@ export function TrashGallery({
   loadingLabel,
   onRestoreDrawing,
   onRestoreFolder,
+  onDeleteForever,
   empty,
 }: {
   drawings: TrashedDrawing[]
@@ -35,6 +39,11 @@ export function TrashGallery({
   loadingLabel: string
   onRestoreDrawing: (drawing: TrashedDrawing) => void
   onRestoreFolder: (folder: TrashedFolder) => void
+  /**
+   * Hard-deletes one trash unit by its root id. Pessimistic (spec §4.3) —
+   * the card's danger dialog awaits this with an in-button pending state.
+   */
+  onDeleteForever: (unitId: string) => Promise<unknown>
   /** Rendered when loading settles on an empty trash. */
   empty: React.ReactNode
 }) {
@@ -75,12 +84,14 @@ export function TrashGallery({
             key={unit.folder.id}
             folder={unit.folder}
             onRestore={() => onRestoreFolder(unit.folder)}
+            onDeleteForever={() => onDeleteForever(unit.folder.id)}
           />
         ) : (
           <TrashedDrawingCard
             key={unit.drawing.id}
             drawing={unit.drawing}
             onRestore={() => onRestoreDrawing(unit.drawing)}
+            onDeleteForever={() => onDeleteForever(unit.drawing.id)}
           />
         ),
       )}
@@ -99,9 +110,11 @@ function trashedAt(unit: TrashUnit): number {
 function TrashedDrawingCard({
   drawing,
   onRestore,
+  onDeleteForever,
 }: {
   drawing: TrashedDrawing
   onRestore: () => void
+  onDeleteForever: () => Promise<unknown>
 }) {
   return (
     <div className={CARD_FRAME_CLASS}>
@@ -118,6 +131,16 @@ function TrashedDrawingCard({
         }
         restoreLabel={`Restore ${drawing.name}`}
         onRestore={onRestore}
+        deleteDialog={
+          <DangerConfirmDialog
+            trigger={<DeleteForeverTrigger label={drawing.name} />}
+            title="Delete forever?"
+            description={`"${drawing.name}" will be permanently deleted. This can't be undone.`}
+            confirmLabel="Delete forever"
+            pendingLabel="Deleting…"
+            onConfirm={onDeleteForever}
+          />
+        }
       />
     </div>
   )
@@ -126,11 +149,19 @@ function TrashedDrawingCard({
 function TrashedFolderCard({
   folder,
   onRestore,
+  onDeleteForever,
 }: {
   folder: TrashedFolder
   onRestore: () => void
+  onDeleteForever: () => Promise<unknown>
 }) {
   const count = folder.itemCount === 1 ? "1 item" : `${folder.itemCount} items`
+  // Count-aware danger copy (spec §4.5): "…and the 8 drawings inside".
+  // itemCount minus the drawings slice is the swept subfolders.
+  const contents = describeContents(
+    folder.drawingCount,
+    folder.itemCount - folder.drawingCount,
+  )
   return (
     <div className={CARD_FRAME_CLASS}>
       <div className="flex aspect-[4/3] items-center justify-center border-b border-border/60">
@@ -158,8 +189,39 @@ function TrashedFolderCard({
         }
         restoreLabel={`Restore ${folder.name}`}
         onRestore={onRestore}
+        deleteDialog={
+          <DangerConfirmDialog
+            trigger={<DeleteForeverTrigger label={folder.name} />}
+            title="Delete forever?"
+            description={
+              contents
+                ? `"${folder.name}" and the ${contents} inside will be permanently deleted. This can't be undone.`
+                : `"${folder.name}" will be permanently deleted. This can't be undone.`
+            }
+            confirmLabel="Delete forever"
+            pendingLabel="Deleting…"
+            onConfirm={onDeleteForever}
+          />
+        }
       />
     </div>
+  )
+}
+
+/** Card-footer trigger for the per-unit Delete forever dialog. */
+function DeleteForeverTrigger({
+  label,
+  ...props
+}: { label: string } & React.ComponentProps<"button">) {
+  return (
+    <button
+      type="button"
+      aria-label={`Delete forever ${label}`}
+      className="shrink-0 rounded-md p-1.5 text-muted-foreground/40 transition-colors duration-150 hover:bg-destructive/10 hover:text-destructive focus-visible:bg-destructive/10 focus-visible:text-destructive focus-visible:outline-none"
+      {...props}
+    >
+      <Trash2 className="h-3.5 w-3.5" />
+    </button>
   )
 }
 
@@ -168,11 +230,13 @@ function CardFooter({
   meta,
   restoreLabel,
   onRestore,
+  deleteDialog,
 }: {
   name: string
   meta: React.ReactNode
   restoreLabel: string
   onRestore: () => void
+  deleteDialog: React.ReactNode
 }) {
   return (
     <div className="flex items-center gap-2 px-3 py-2.5">
@@ -182,14 +246,17 @@ function CardFooter({
         </span>
         <span className="truncate text-xs text-muted-foreground">{meta}</span>
       </div>
-      <button
-        type="button"
-        aria-label={restoreLabel}
-        onClick={onRestore}
-        className="-mr-1 shrink-0 rounded-md px-2 py-1 text-xs font-medium text-iris transition-colors duration-150 hover:bg-iris-muted hover:text-iris-strong focus-visible:bg-iris-muted focus-visible:outline-none"
-      >
-        Restore
-      </button>
+      <div className="-mr-1 flex shrink-0 items-center gap-0.5">
+        <button
+          type="button"
+          aria-label={restoreLabel}
+          onClick={onRestore}
+          className="shrink-0 rounded-md px-2 py-1 text-xs font-medium text-iris transition-colors duration-150 hover:bg-iris-muted hover:text-iris-strong focus-visible:bg-iris-muted focus-visible:outline-none"
+        >
+          Restore
+        </button>
+        {deleteDialog}
+      </div>
     </div>
   )
 }
