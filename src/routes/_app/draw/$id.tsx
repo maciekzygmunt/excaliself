@@ -9,7 +9,7 @@ import {
 } from "@/features/drawings/queries"
 import { useDocumentTitle } from "@/lib/document-title"
 
-const DrawingCanvas = lazy(() => import("./-components/DrawingCanvas"))
+const DrawingCanvas = lazy(() => import("../-components/DrawingCanvas"))
 
 const LoadingState = () => (
   <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-card text-muted-foreground">
@@ -18,7 +18,7 @@ const LoadingState = () => (
   </div>
 )
 
-export const Route = createFileRoute("/draw/$id")({
+export const Route = createFileRoute("/_app/draw/$id")({
   ssr: false,
   loader: async ({ params, context, preload }) => {
     const drawing = await context.queryClient.ensureQueryData(

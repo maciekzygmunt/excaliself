@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -7,13 +8,13 @@ import {
   waitFor,
 } from "@testing-library/react"
 import { afterEach, beforeEach, expect, test, vi } from "vitest"
+import { renderPreviewSvg } from "@/components/drawing-gallery/preview"
 import type { Drawing } from "@/features/drawings/queries"
 import { drawingsQueryOptions } from "@/features/drawings/queries"
 import { getDrawings } from "@/features/drawings/server"
 import type { Folder } from "@/features/folders/queries"
 import { foldersQueryOptions } from "@/features/folders/queries"
 import { Home } from "./Home"
-import { renderPreviewSvg } from "./preview"
 
 const { openCreateDrawingDialog, openCreateFolderDialog } = vi.hoisted(() => ({
   openCreateDrawingDialog: vi.fn(),
@@ -49,7 +50,7 @@ vi.mock("@tanstack/react-router", () => ({
 
 // jsdom cannot rasterize Excalidraw scenes — assert the renderer is invoked
 // with the right scene, not pixels.
-vi.mock("./preview", () => ({
+vi.mock("@/components/drawing-gallery/preview", () => ({
   renderPreviewSvg: vi.fn(),
 }))
 
@@ -70,7 +71,10 @@ beforeEach(() => {
 })
 
 // Auto-cleanup needs vitest globals, which this repo leaves off.
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  vi.useRealTimers()
+})
 
 function makeDrawing(overrides: Partial<Drawing> & { id: string }): Drawing {
   return {
@@ -124,7 +128,10 @@ test("shows at most the 8 most recently edited drawings, newest first", () => {
 
   renderHome({ drawings: shuffled })
 
-  const cards = screen.getAllByRole("link")
+  // The header's View all link is not a card
+  const cards = screen
+    .getAllByRole("link")
+    .filter((link) => link.getAttribute("href")?.startsWith("/draw/"))
   expect(cards).toHaveLength(8)
   expect(cards.map((card) => card.getAttribute("href"))).toEqual([
     "/draw/d9",
@@ -276,6 +283,19 @@ test("a rejected preview render is contained to a placeholder, not a crash", asy
   expect(screen.getByText("Still here")).toBeTruthy()
 })
 
+test("View all leads to the browse page once there are drawings", () => {
+  renderHome({ drawings: [makeDrawing({ id: "d1" })] })
+
+  const viewAll = screen.getByRole("link", { name: /view all/i })
+  expect(viewAll.getAttribute("href")).toBe("/drawings")
+})
+
+test("View all is not offered next to the empty state", () => {
+  renderHome({ drawings: [] })
+
+  expect(screen.queryByRole("link", { name: /view all/i })).toBeNull()
+})
+
 test("the New drawing button opens the Create dialog", () => {
   renderHome({ drawings: [makeDrawing({ id: "d1" })] })
 
@@ -284,6 +304,7 @@ test("the New drawing button opens the Create dialog", () => {
 })
 
 test("while drawings load, skeleton cards hold the grid — no empty state flash", () => {
+  vi.useFakeTimers()
   // No seeded drawings cache: the query goes through the (never-resolving)
   // server function, holding Home in its loading state
   vi.mocked(getDrawings).mockReturnValue(new Promise(() => {}))
@@ -296,6 +317,10 @@ test("while drawings load, skeleton cards hold the grid — no empty state flash
       <Home isAdmin={false} />
     </QueryClientProvider>,
   )
+
+  // Spec §4.3: the skeleton waits out the 150ms grace period first
+  expect(screen.queryByRole("status")).toBeNull()
+  act(() => vi.advanceTimersByTime(150))
 
   const loading = screen.getByRole("status", { name: /loading/i })
   expect(
@@ -315,9 +340,9 @@ test("loaded drawings show cards, not skeletons", () => {
 })
 
 test("the loaded grid fades in instead of swapping in a single frame", () => {
-  renderHome({ drawings: [makeDrawing({ id: "d1" })] })
+  renderHome({ drawings: [makeDrawing({ id: "d1", name: "Retro board" })] })
 
-  const grid = screen.getAllByRole("link")[0].parentElement
+  const grid = screen.getByRole("link", { name: /retro board/i }).parentElement
   expect(grid?.className).toContain("animate-in")
   expect(grid?.className).toContain("fade-in-0")
 })

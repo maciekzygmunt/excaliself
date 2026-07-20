@@ -13,7 +13,7 @@ const getSession = createServerFn({ method: "GET" })
   .middleware([authMiddleware])
   .handler(async ({ context }) => context.session)
 
-export const Route = createFileRoute("/draw")({
+export const Route = createFileRoute("/_app")({
   server: {
     middleware: [setupMiddleware, authMiddleware],
   },
@@ -25,10 +25,10 @@ export const Route = createFileRoute("/draw")({
     ])
     return { session, isAdmin: session.user.role === "admin" }
   },
-  component: DrawLayout,
+  component: AppShellLayout,
 })
 
-function DrawLayout() {
+function AppShellLayout() {
   const { session, isAdmin } = Route.useLoaderData()
 
   return (

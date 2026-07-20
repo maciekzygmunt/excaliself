@@ -14,10 +14,28 @@ test("page context first, product last", () => {
   expect(documentTitle("Roadmap sketch")).toBe("Roadmap sketch — Excaliself")
 })
 
-function TitledPage({ context }: { context?: string }) {
-  useDocumentTitle(context)
+test("chrome pages join with a middle dot, content with an em dash", () => {
+  expect(documentTitle("All drawings", { chrome: true })).toBe(
+    "All drawings · Excaliself",
+  )
+  expect(documentTitle("", { chrome: true })).toBe("Excaliself")
+})
+
+function TitledPage({
+  context,
+  chrome,
+}: {
+  context?: string
+  chrome?: boolean
+}) {
+  useDocumentTitle(context, { chrome })
   return null
 }
+
+test("hook supports the chrome separator", () => {
+  render(<TitledPage context="All drawings" chrome />)
+  expect(document.title).toBe("All drawings · Excaliself")
+})
 
 test("hook sets the tab title from the page context", () => {
   render(<TitledPage context="Roadmap sketch" />)
