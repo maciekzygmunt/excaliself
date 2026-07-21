@@ -5,6 +5,8 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { currentUserQueryOptions } from "@/features/account/queries"
 import { useDelayedVisible } from "@/hooks/use-delayed-visible"
 import { useDocumentTitle } from "@/lib/document-title"
+import { EmailSection } from "./-components/EmailSection"
+import { PasswordSection } from "./-components/PasswordSection"
 import { ProfileSection } from "./-components/ProfileSection"
 import { SessionsSection } from "./-components/SessionsSection"
 
@@ -24,32 +26,39 @@ function AccountPage() {
   if (!user) return null
 
   return (
-    <div className="animate-in fade-in-0 duration-200 motion-reduce:animate-none">
+    <div className="flex flex-col gap-8 animate-in fade-in-0 duration-200 motion-reduce:animate-none">
       <ProfileSection user={user} />
-      <Separator className="my-8" />
+      <Separator />
+      <EmailSection user={user} />
+      <Separator />
+      <PasswordSection />
+      <Separator />
       <SessionsSection />
     </div>
   )
 }
 
-// Mirrors the loaded layout: the Profile section header plus its two
-// labeled fields.
+// Mirrors the loaded layout: three section headers, each with its labeled
+// fields (Profile has one, Email and Password two each).
 function AccountSkeleton() {
   return (
-    <div>
-      <div className="mb-4 flex flex-col gap-1.5">
-        <Skeleton className="h-4 w-16 motion-reduce:animate-none" />
-        <Skeleton className="h-3 w-56 motion-reduce:animate-none" />
-      </div>
-      <div className="flex max-w-md flex-col gap-5">
-        {[0, 1].map((field) => (
-          <div key={field} className="flex flex-col gap-2">
-            <Skeleton className="h-3.5 w-24 motion-reduce:animate-none" />
-            <Skeleton className="h-9 w-full motion-reduce:animate-none" />
-            <Skeleton className="h-3 w-64 motion-reduce:animate-none" />
+    <div className="flex flex-col gap-8">
+      {[1, 2, 2].map((fields, section) => (
+        <div key={section}>
+          <div className="mb-4 flex flex-col gap-1.5">
+            <Skeleton className="h-4 w-16 motion-reduce:animate-none" />
+            <Skeleton className="h-3 w-56 motion-reduce:animate-none" />
           </div>
-        ))}
-      </div>
+          <div className="flex max-w-md flex-col gap-5">
+            {Array.from({ length: fields }, (_, field) => (
+              <div key={field} className="flex flex-col gap-2">
+                <Skeleton className="h-3.5 w-24 motion-reduce:animate-none" />
+                <Skeleton className="h-9 w-full motion-reduce:animate-none" />
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
     </div>
   )
 }
