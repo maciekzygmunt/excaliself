@@ -33,18 +33,32 @@ export const createPasswordReset = createServerFn({ method: "POST" })
     const token = randomBytes(32).toString("hex")
     const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
 
-    // Generating again replaces the outstanding link — at most one usable
-    // reset per user, so a revoked-and-regenerated link can't resurrect an
-    // older copy.
-    await db.delete(passwordResets).where(pendingResetsForUser(data.userId))
-    await db.insert(passwordResets).values({
-      id,
-      token,
-      userId: data.userId,
-      createdBy: context.session.user.id,
-      expiresAt,
-      createdAt: new Date(),
-    })
+    // Generating again replaces the outstanding link. One atomic upsert
+    // against the one-pending-per-user partial index — overlapping
+    // generations serialize at the database instead of racing a
+    // delete+insert into two live links, and the loser's update makes the
+    // winner's token dead.
+    await db
+      .insert(passwordResets)
+      .values({
+        id,
+        token,
+        userId: data.userId,
+        createdBy: context.session.user.id,
+        expiresAt,
+        createdAt: new Date(),
+      })
+      .onConflictDoUpdate({
+        target: passwordResets.userId,
+        targetWhere: isNull(passwordResets.usedAt),
+        set: {
+          id,
+          token,
+          createdBy: context.session.user.id,
+          expiresAt,
+          createdAt: new Date(),
+        },
+      })
 
     return { token }
   })

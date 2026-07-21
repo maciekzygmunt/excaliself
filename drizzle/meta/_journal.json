@@ -43,6 +43,13 @@
       "when": 1784630091393,
       "tag": "0005_jittery_king_cobra",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1784632142139,
+      "tag": "0006_nostalgic_black_widow",
+      "breakpoints": true
     }
   ]
 }

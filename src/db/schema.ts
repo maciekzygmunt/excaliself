@@ -1,9 +1,11 @@
+import { sql } from "drizzle-orm"
 import {
   boolean,
   foreignKey,
   pgTable,
   text,
   timestamp,
+  uniqueIndex,
 } from "drizzle-orm/pg-core"
 
 export const users = pgTable("users", {
@@ -92,21 +94,32 @@ export const invites = pgTable("invites", {
 // Admin-generated password-reset links (issue #68) — the product's only
 // reset flow, shared out-of-band. Same single-use token model as invites,
 // but targeted at a user and short-lived (24 h).
-export const passwordResets = pgTable("password_resets", {
-  id: text("id").primaryKey(),
-  token: text("token").notNull().unique(),
-  userId: text("userId")
-    .notNull()
-    .references(() => users.id, { onDelete: "cascade" }),
-  createdBy: text("createdBy").references(() => users.id, {
-    onDelete: "set null",
+export const passwordResets = pgTable(
+  "password_resets",
+  {
+    id: text("id").primaryKey(),
+    token: text("token").notNull().unique(),
+    userId: text("userId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    createdBy: text("createdBy").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    usedAt: timestamp("usedAt"),
+    expiresAt: timestamp("expiresAt").notNull(),
+    createdAt: timestamp("createdAt")
+      .notNull()
+      .$defaultFn(() => new Date()),
+  },
+  (table) => ({
+    // At most one unused reset per user, enforced by the database — the
+    // upsert in createPasswordReset targets this index so concurrent
+    // generations serialize instead of leaving two live links.
+    onePendingPerUser: uniqueIndex("password_resets_one_pending_per_user")
+      .on(table.userId)
+      .where(sql`${table.usedAt} is null`),
   }),
-  usedAt: timestamp("usedAt"),
-  expiresAt: timestamp("expiresAt").notNull(),
-  createdAt: timestamp("createdAt")
-    .notNull()
-    .$defaultFn(() => new Date()),
-})
+)
 
 export const folders = pgTable(
   "folders",
