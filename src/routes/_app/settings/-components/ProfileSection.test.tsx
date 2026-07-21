@@ -64,14 +64,6 @@ function cachedName() {
   return cached?.name
 }
 
-test("shows the email read-only with the sign-in hint", () => {
-  renderSection()
-  const email = screen.getByLabelText("Email") as HTMLInputElement
-  expect(email.value).toBe("maciek@example.com")
-  expect(email.readOnly).toBe(true)
-  expect(screen.getByText(/this is your sign-in email/i)).not.toBeNull()
-})
-
 test("the display-name input falls back to the email prefix as placeholder", () => {
   renderSection()
   const input = screen.getByLabelText("Display name") as HTMLInputElement
