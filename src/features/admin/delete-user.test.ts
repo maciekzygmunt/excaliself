@@ -2,7 +2,7 @@ import type { SQL } from "drizzle-orm"
 import { PgDialect } from "drizzle-orm/pg-core"
 import { expect, test } from "vitest"
 import { users, verifications } from "@/db/schema"
-import { deleteUserAccount } from "./delete-user"
+import { deleteUserAccount, hardDeleteUser } from "./delete-user"
 
 type Call =
   | { kind: "select"; where: SQL; lock?: string }
@@ -151,6 +151,35 @@ test("self-delete through the admin path is rejected before touching the db", as
 
   await expect(deleteUserAccount(db, "admin-1", "admin-1")).rejects.toThrow()
   expect(calls).toEqual([])
+})
+
+// hardDeleteUser is the actorless core the Account danger zone calls
+// directly (issue #67): no self-delete rejection, same last-admin guard.
+
+test("hardDeleteUser lets an admin delete themselves while another admin remains", async () => {
+  const { db, calls } = fakeDb({
+    target: { role: "admin", email: "ada@example.com" },
+    adminIds: ["user-ada", "user-bea"],
+  })
+
+  await hardDeleteUser(db, "user-ada")
+
+  expect(calls.map(shape)).toEqual([
+    { kind: "select" },
+    { kind: "select" },
+    { kind: "delete", table: users },
+    { kind: "delete", table: verifications },
+  ])
+})
+
+test("hardDeleteUser rejects the sole admin deleting themselves", async () => {
+  const { db, calls } = fakeDb({
+    target: { role: "admin", email: "ada@example.com" },
+    adminIds: ["user-ada"],
+  })
+
+  await expect(hardDeleteUser(db, "user-ada")).rejects.toThrow("last admin")
+  expect(calls.some((call) => call.kind === "delete")).toBe(false)
 })
 
 test("an unknown user id throws not-found", async () => {

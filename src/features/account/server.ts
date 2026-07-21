@@ -3,10 +3,12 @@
 import { createServerFn } from "@tanstack/react-start"
 import { getRequestHeaders } from "@tanstack/react-start/server"
 import { APIError } from "better-auth/api"
-import { and, eq, ne } from "drizzle-orm"
+import { and, count, eq, ne } from "drizzle-orm"
 import z from "zod"
 import { db } from "@/db"
-import { sessions, users } from "@/db/schema"
+import { drawings, folders, sessions, users } from "@/db/schema"
+import { hardDeleteUser } from "@/features/admin/delete-user"
+import { isLastAdmin } from "@/features/admin/roles"
 import { auth } from "@/lib/auth"
 import { authMiddleware } from "@/middleware/auth"
 import { compareSessions } from "./sessions"
@@ -154,4 +156,59 @@ export const revokeOtherSessions = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
   .handler(async () => {
     await auth.api.revokeOtherSessions({ headers: getRequestHeaders() })
+  })
+
+// Whether the danger zone must block self-deletion (issue #67): the sole
+// admin can't delete their account, or the instance would be locked out of
+// every admin page. Roles are read fresh from the db — the session's cookie
+// cache can lag a demotion by minutes.
+export const getDeleteAccountState = createServerFn({ method: "GET" })
+  .middleware([authMiddleware])
+  .handler(async ({ context }) => {
+    const admins = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.role, "admin"))
+    return {
+      soleAdmin: isLastAdmin(
+        admins.map((admin) => admin.id),
+        context.session.user.id,
+      ),
+    }
+  })
+
+// Feeds the danger zone's tier-3 confirm copy — the caller-scoped twin of
+// the admin getUserContentCounts. Counts everything owned, trashed rows
+// included, since the delete cascade destroys those too.
+export const getMyContentCounts = createServerFn({ method: "GET" })
+  .middleware([authMiddleware])
+  .handler(async ({ context }) => {
+    const userId = context.session.user.id
+    const [[drawingCount], [folderCount]] = await Promise.all([
+      db
+        .select({ count: count() })
+        .from(drawings)
+        .where(eq(drawings.ownerId, userId)),
+      db
+        .select({ count: count() })
+        .from(folders)
+        .where(eq(folders.ownerId, userId)),
+    ])
+    return { drawings: drawingCount.count, folders: folderCount.count }
+  })
+
+// Self-delete behind the Account danger zone (issue #67). hardDeleteUser
+// enforces the last-admin guard server-side regardless of what the UI shows.
+export const deleteMyAccount = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .handler(async ({ context }) => {
+    await hardDeleteUser(db, context.session.user.id)
+    // The session rows died with the user, but the browser still holds the
+    // session cookie, whose cookie cache would keep reporting the account
+    // for up to five minutes. Sign out to clear it — best-effort, because a
+    // stale cache makes better-auth re-read the now-empty sessions table and
+    // reject; the client hard-redirects to /login either way.
+    try {
+      await auth.api.signOut({ headers: getRequestHeaders() })
+    } catch {}
   })

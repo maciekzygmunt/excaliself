@@ -1,6 +1,7 @@
 // Hard-delete engine behind the admin "Delete user" action (issue #66,
-// spec §4.5 tier 3). Kept out of server.ts — which imports the live db — so
-// tests can drive it with a fake db, mirroring trash/destroy.ts.
+// spec §4.5 tier 3) and the Account danger zone's self-delete (issue #67).
+// Kept out of server.ts — which imports the live db — so tests can drive it
+// with a fake db, mirroring trash/destroy.ts.
 
 import { eq } from "drizzle-orm"
 import type { NodePgDatabase } from "drizzle-orm/node-postgres"
@@ -10,13 +11,9 @@ import { users, verifications } from "@/db/schema"
 type Db = NodePgDatabase<typeof schema>
 
 /**
- * Hard-deletes a user account and, via the schema's FK cascades, everything
- * they own: sessions, accounts, folders, drawings, and drawing_files.
- *
- * Two invariants are enforced here rather than trusted to the UI: the last
- * remaining admin can never be deleted (the instance would be locked out of
- * every admin page), and an admin can't delete themselves through this path
- * — self-deletion lives in the Account danger zone with its own flow.
+ * The admin members-page delete: hardDeleteUser plus one extra invariant —
+ * an admin can't delete themselves through this path. Self-deletion lives
+ * in the Account danger zone, which calls hardDeleteUser directly.
  */
 export async function deleteUserAccount(
   db: Db,
@@ -27,6 +24,18 @@ export async function deleteUserAccount(
     throw new Error("You can't delete your own account from the members page")
   }
 
+  await hardDeleteUser(db, userId)
+}
+
+/**
+ * Hard-deletes a user account and, via the schema's FK cascades, everything
+ * they own: sessions, accounts, folders, drawings, and drawing_files.
+ *
+ * One invariant is enforced here rather than trusted to the UI: the last
+ * remaining admin can never be deleted (the instance would be locked out of
+ * every admin page).
+ */
+export async function hardDeleteUser(db: Db, userId: string): Promise<void> {
   await db.transaction(async (tx) => {
     const [target] = await tx
       .select({ role: users.role })
