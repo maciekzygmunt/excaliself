@@ -20,8 +20,8 @@ type Options = {
  * Inline rename UI shared by folder and drawing rows in the sidebar tree.
  *
  * Spread `inputProps` on the rename `<input>` and call `start(name)` from the
- * menu trigger. Pass `onMenuCloseAutoFocus` to the dropdown's
- * `onCloseAutoFocus` to avoid focus flicker when transitioning to the input.
+ * menu trigger. Pass `menuFinalFocus` to the dropdown content's
+ * `finalFocus` to avoid focus flicker when transitioning to the input.
  */
 export function useInlineRename({ onSubmit }: Options) {
   const [isRenaming, setIsRenaming] = useState(false)
@@ -60,8 +60,9 @@ export function useInlineRename({ onSubmit }: Options) {
       },
       onClick: (e: MouseEvent) => e.stopPropagation(),
     },
-    onMenuCloseAutoFocus(e: Event) {
-      if (isRenaming) e.preventDefault()
+    // Returning false tells Base UI not to move focus back to the trigger
+    menuFinalFocus(): boolean | undefined {
+      return isRenaming ? false : undefined
     },
   }
 }

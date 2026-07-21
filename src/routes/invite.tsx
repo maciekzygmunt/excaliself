@@ -36,10 +36,11 @@ function DeadInvitePage() {
       subtitle="This invite link has expired or was already used. Ask the person who invited you for a new link."
     >
       <Button
-        asChild
+        render={<Link to="/login" />}
+        nativeButton={false}
         className="w-full bg-foreground text-background hover:bg-foreground/90"
       >
-        <Link to="/login">Go to sign in</Link>
+        Go to sign in
       </Button>
     </AuthPage>
   )

@@ -150,12 +150,14 @@ test("Escape dismisses the dialog without creating anything", async () => {
   fireEvent.change(input, { target: { value: "Almost created" } })
   fireEvent.keyDown(input, { key: "Escape" })
 
-  await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
+  await waitFor(() =>
+    expect(onOpenChange).toHaveBeenCalledWith(false, expect.anything()),
+  )
   expect(createDrawing).not.toHaveBeenCalled()
   expect(navigate).not.toHaveBeenCalled()
 })
 
-// Click-away dismissal funnels through the same Radix onOpenChange as Escape
+// Click-away dismissal funnels through the same Base UI onOpenChange as Escape
 // (covered above) and doesn't respond to jsdom's synthetic pointer events, so
 // it is exercised in the browser instead of here.
 

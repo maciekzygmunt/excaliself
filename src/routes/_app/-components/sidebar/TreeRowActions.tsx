@@ -19,7 +19,7 @@ import { cn } from "@/lib/utils"
 type TreeRowActionsProps = {
   isRenaming: boolean
   onStartRename: () => void
-  onMenuCloseAutoFocus: (e: Event) => void
+  menuFinalFocus: () => boolean | undefined
   // Tier-1 destructive: fires immediately — no confirm dialog. The caller
   // shows the undo toast (trash is the safety net).
   onTrash: () => void
@@ -36,7 +36,7 @@ type TreeRowActionsProps = {
 export function TreeRowActions({
   isRenaming,
   onStartRename,
-  onMenuCloseAutoFocus,
+  menuFinalFocus,
   onTrash,
   onCreateDrawing,
   starred,
@@ -44,27 +44,29 @@ export function TreeRowActions({
 }: TreeRowActionsProps) {
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <SidebarMenuAction
-          className={cn(
-            "text-muted-foreground/30 md:opacity-0 group-hover/tree-row:opacity-100 group-focus-within/tree-row:opacity-100 data-[state=open]:opacity-100 [&>svg]:size-auto",
-            // Use `invisible` (not `hidden`) so the trigger stays in
-            // layout while renaming — otherwise Radix's closing popper
-            // loses its anchor and flashes at viewport (0, 0)
-            isRenaming && "invisible pointer-events-none",
-          )}
-          // Stop pointer/click from bubbling to ancestor triggers such as
-          // FolderItem's CollapsibleTrigger
-          onPointerDown={(e) => e.stopPropagation()}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <MoreHorizontal className="h-3.5! w-3.5!" />
-        </SidebarMenuAction>
+      <DropdownMenuTrigger
+        render={
+          <SidebarMenuAction
+            className={cn(
+              "text-muted-foreground/30 md:opacity-0 group-hover/tree-row:opacity-100 group-focus-within/tree-row:opacity-100 data-popup-open:opacity-100 [&>svg]:size-auto",
+              // Use `invisible` (not `hidden`) so the trigger stays in
+              // layout while renaming — otherwise the closing popup
+              // loses its anchor and flashes at viewport (0, 0)
+              isRenaming && "invisible pointer-events-none",
+            )}
+            // Stop pointer/click from bubbling to ancestor triggers such as
+            // FolderItem's CollapsibleTrigger
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
+          />
+        }
+      >
+        <MoreHorizontal className="h-3.5! w-3.5!" />
       </DropdownMenuTrigger>
       <DropdownMenuContent
         side="right"
         align="start"
-        onCloseAutoFocus={onMenuCloseAutoFocus}
+        finalFocus={menuFinalFocus}
         // Portaled, but still a React child of the row — clicks bubble
         // through the React tree to ancestor triggers such as FolderItem's
         // CollapsibleTrigger unless fenced here

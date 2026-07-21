@@ -81,7 +81,15 @@ export function DrawingItem({ drawing }: DrawingItemProps) {
       onDragEnd={onDragEnd}
     >
       <SidebarMenuButton
-        asChild={!rename.isRenaming}
+        render={
+          rename.isRenaming ? undefined : (
+            <Link
+              to="/draw/$id"
+              params={{ id: drawing.id }}
+              draggable={false}
+            />
+          )
+        }
         isActive={isActive}
         className={cn(
           "h-auto cursor-pointer gap-1.5 px-2 py-1.5 pr-2! text-[13px] active:cursor-grabbing [&>svg]:size-auto",
@@ -89,13 +97,7 @@ export function DrawingItem({ drawing }: DrawingItemProps) {
           rename.isRenaming && "pr-3!",
         )}
       >
-        {rename.isRenaming ? (
-          content
-        ) : (
-          <Link to="/draw/$id" params={{ id: drawing.id }} draggable={false}>
-            {content}
-          </Link>
-        )}
+        {content}
       </SidebarMenuButton>
 
       <TreeRowActions
@@ -107,7 +109,7 @@ export function DrawingItem({ drawing }: DrawingItemProps) {
           })
         }
         onStartRename={() => rename.start(drawing.name)}
-        onMenuCloseAutoFocus={rename.onMenuCloseAutoFocus}
+        menuFinalFocus={rename.menuFinalFocus}
         onTrash={handleTrash}
       />
     </SidebarMenuItem>

@@ -59,16 +59,18 @@ export function BrowseToolbar({
         </div>
 
         <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="sm"
-              aria-label={`Sort: ${sortLabel}`}
-              className="ml-auto text-muted-foreground hover:text-foreground"
-            >
-              <ArrowUpDown className="h-4 w-4" />
-              {sortLabel}
-            </Button>
+          <DropdownMenuTrigger
+            render={
+              <Button
+                variant="ghost"
+                size="sm"
+                aria-label={`Sort: ${sortLabel}`}
+                className="ml-auto text-muted-foreground hover:text-foreground"
+              />
+            }
+          >
+            <ArrowUpDown className="h-4 w-4" />
+            {sortLabel}
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuRadioGroup
@@ -76,7 +78,9 @@ export function BrowseToolbar({
               onValueChange={(value) => onSortChange(value as SortOrder)}
             >
               {SORT_ORDERS.map((order) => (
-                <DropdownMenuRadioItem key={order} value={order}>
+                // closeOnClick: Base UI radio items keep the menu open by
+                // default; picking a sort order should dismiss it
+                <DropdownMenuRadioItem key={order} value={order} closeOnClick>
                   {SORT_LABELS[order]}
                 </DropdownMenuRadioItem>
               ))}

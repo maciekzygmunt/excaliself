@@ -21,16 +21,14 @@ function renderRow(
 ) {
   render(
     <Collapsible open onOpenChange={onOpenChange}>
-      <CollapsibleTrigger asChild>
-        <div>
-          <span>Row label</span>
-          <TreeRowActions
-            isRenaming={false}
-            onStartRename={vi.fn()}
-            onMenuCloseAutoFocus={vi.fn()}
-            onTrash={onTrash}
-          />
-        </div>
+      <CollapsibleTrigger render={<div />} nativeButton={false}>
+        <span>Row label</span>
+        <TreeRowActions
+          isRenaming={false}
+          onStartRename={vi.fn()}
+          menuFinalFocus={vi.fn()}
+          onTrash={onTrash}
+        />
       </CollapsibleTrigger>
       <CollapsibleContent>children</CollapsibleContent>
     </Collapsible>,
@@ -66,7 +64,7 @@ test("clicking the row itself still toggles the collapsible", () => {
   const onOpenChange = vi.fn()
   renderRow(onOpenChange)
   fireEvent.click(screen.getByText("Row label"))
-  expect(onOpenChange).toHaveBeenCalledWith(false)
+  expect(onOpenChange).toHaveBeenCalledWith(false, expect.anything())
 })
 
 function renderStarrableRow(starred: boolean, onToggleStar: () => void) {
@@ -76,7 +74,7 @@ function renderStarrableRow(starred: boolean, onToggleStar: () => void) {
       starred={starred}
       onToggleStar={onToggleStar}
       onStartRename={vi.fn()}
-      onMenuCloseAutoFocus={vi.fn()}
+      menuFinalFocus={vi.fn()}
       onTrash={vi.fn()}
     />,
   )

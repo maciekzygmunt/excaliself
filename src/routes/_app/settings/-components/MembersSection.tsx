@@ -247,25 +247,27 @@ function MemberRowActions({ user }: { user: AdminUser }) {
   return (
     <>
       <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            aria-label={`Actions for ${displayName}`}
-            className="text-muted-foreground/60"
-          >
-            <MoreHorizontal className="h-4 w-4" />
-          </Button>
+        <DropdownMenuTrigger
+          render={
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label={`Actions for ${displayName}`}
+              className="text-muted-foreground/60"
+            />
+          }
+        >
+          <MoreHorizontal className="h-4 w-4" />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <DropdownMenuItem onSelect={() => createResetLink.mutate()}>
+          <DropdownMenuItem onClick={() => createResetLink.mutate()}>
             <KeyRound />
             Reset password
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem
             variant="destructive"
-            onSelect={() => setConfirmOpen(true)}
+            onClick={() => setConfirmOpen(true)}
           >
             <Trash2 />
             Delete user
@@ -316,6 +318,8 @@ function RoleSelect({
     <Select
       value={member.role}
       disabled={lastAdmin}
+      // Base UI's Value renders the raw value unless items provides labels
+      items={ROLE_LABELS}
       onValueChange={(role) => onChange(role as Role)}
     >
       <SelectTrigger
@@ -344,15 +348,18 @@ function RoleSelect({
     <Tooltip>
       {/* A disabled trigger swallows pointer events, so the tooltip listens
           on a focusable wrapper instead. */}
-      <TooltipTrigger asChild>
-        {/* tabIndex lets keyboard users reach the wrapper and hear why the
-            control is disabled. */}
-        <span
-          tabIndex={0}
-          className="rounded-md outline-none focus-visible:ring-ring/30 focus-visible:ring-[2px]"
-        >
-          {select}
-        </span>
+      <TooltipTrigger
+        render={
+          // tabIndex lets keyboard users reach the wrapper and hear why the
+          // control is disabled. inline-block so the anchor rect measured for
+          // tooltip positioning actually wraps the select.
+          <span
+            tabIndex={0}
+            className="inline-block rounded-md outline-none focus-visible:ring-ring/30 focus-visible:ring-[2px]"
+          />
+        }
+      >
+        {select}
       </TooltipTrigger>
       <TooltipContent>The last admin can't be demoted.</TooltipContent>
     </Tooltip>

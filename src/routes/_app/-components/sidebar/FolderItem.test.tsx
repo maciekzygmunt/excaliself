@@ -95,7 +95,7 @@ function renderFolder(folder: Folder, childNodes: TreeNode[]) {
 function rowState() {
   const row = document.querySelector('[data-slot="collapsible-trigger"]')
   if (!(row instanceof HTMLElement)) throw new Error("trigger row not found")
-  return row.getAttribute("data-state")
+  return row.hasAttribute("data-panel-open") ? "open" : "closed"
 }
 
 const childNode = (folder: Folder): TreeNode => ({
@@ -132,7 +132,7 @@ test("clicking a folder with children still expands and collapses it", () => {
   expect(screen.getByText("Child folder")).toBeTruthy()
 
   fireEvent.click(screen.getByText("Parent folder"))
-  // Radix keeps the content mounted for the exit animation; the state flips
+  // Base UI keeps the content mounted for the exit animation; the state flips
   expect(rowState()).toBe("closed")
 })
 

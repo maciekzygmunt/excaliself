@@ -287,11 +287,10 @@ test("the card overflow menu moves its drawing to trash without a confirm dialog
     <DrawingGallery {...defaultProps} drawings={drawings} onTrash={onTrash} />,
   )
 
-  // Radix triggers open on keydown in jsdom (pointer events aren't real there)
-  fireEvent.keyDown(
-    screen.getByRole("button", { name: "Actions for Drawing d2" }),
-    { key: "Enter" },
-  )
+  // jsdom has no real pointer events; the pointerdown+click pair opens the menu
+  const trigger = screen.getByRole("button", { name: "Actions for Drawing d2" })
+  fireEvent.pointerDown(trigger)
+  fireEvent.click(trigger)
   fireEvent.click(screen.getByRole("menuitem", { name: /move to trash/i }))
 
   expect(onTrash).toHaveBeenCalledTimes(1)

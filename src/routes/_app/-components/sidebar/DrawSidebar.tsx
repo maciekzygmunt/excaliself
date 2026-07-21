@@ -194,19 +194,17 @@ function CreateMenu({
 }) {
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <button
-          type="button"
-          className="rounded-md p-1 text-muted-foreground/40 transition-colors hover:bg-sidebar-accent hover:text-muted-foreground focus-visible:bg-sidebar-accent focus-visible:text-muted-foreground focus-visible:outline-none"
-        >
-          <Plus className="h-3.5 w-3.5" />
-        </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent
-        align="end"
-        className="w-48"
-        onCloseAutoFocus={(e) => e.preventDefault()}
+      <DropdownMenuTrigger
+        render={
+          <button
+            type="button"
+            className="rounded-md p-1 text-muted-foreground/40 transition-colors hover:bg-sidebar-accent hover:text-muted-foreground focus-visible:bg-sidebar-accent focus-visible:text-muted-foreground focus-visible:outline-none"
+          />
+        }
       >
+        <Plus className="h-3.5 w-3.5" />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-48" finalFocus={false}>
         <DropdownMenuItem onClick={onCreateDrawing}>
           <File className="mr-2 h-4 w-4" />
           New drawing
