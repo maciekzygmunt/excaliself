@@ -26,7 +26,7 @@ function renderRow(
         <TreeRowActions
           isRenaming={false}
           onStartRename={vi.fn()}
-          onMenuCloseAutoFocus={vi.fn()}
+          menuFinalFocus={vi.fn()}
           onTrash={onTrash}
         />
       </CollapsibleTrigger>
@@ -74,7 +74,7 @@ function renderStarrableRow(starred: boolean, onToggleStar: () => void) {
       starred={starred}
       onToggleStar={onToggleStar}
       onStartRename={vi.fn()}
-      onMenuCloseAutoFocus={vi.fn()}
+      menuFinalFocus={vi.fn()}
       onTrash={vi.fn()}
     />,
   )

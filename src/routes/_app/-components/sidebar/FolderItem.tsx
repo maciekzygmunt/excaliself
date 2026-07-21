@@ -130,7 +130,7 @@ export function FolderItem({ folder, childNodes }: FolderItemProps) {
         onCreateDrawing={() =>
           openCreateDrawingDialog({ id: folder.id, name: folder.name })
         }
-        onMenuCloseAutoFocus={rename.onMenuCloseAutoFocus}
+        menuFinalFocus={rename.menuFinalFocus}
         onTrash={handleTrash}
       />
     </div>

@@ -247,25 +247,27 @@ function MemberRowActions({ user }: { user: AdminUser }) {
   return (
     <>
       <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            aria-label={`Actions for ${displayName}`}
-            className="text-muted-foreground/60"
-          >
-            <MoreHorizontal className="h-4 w-4" />
-          </Button>
+        <DropdownMenuTrigger
+          render={
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label={`Actions for ${displayName}`}
+              className="text-muted-foreground/60"
+            />
+          }
+        >
+          <MoreHorizontal className="h-4 w-4" />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <DropdownMenuItem onSelect={() => createResetLink.mutate()}>
+          <DropdownMenuItem onClick={() => createResetLink.mutate()}>
             <KeyRound />
             Reset password
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem
             variant="destructive"
-            onSelect={() => setConfirmOpen(true)}
+            onClick={() => setConfirmOpen(true)}
           >
             <Trash2 />
             Delete user

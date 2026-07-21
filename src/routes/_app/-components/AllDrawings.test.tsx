@@ -355,13 +355,10 @@ test("Move to trash removes the card in place and keeps the active search", asyn
   })
   expect(cardHrefs()).toEqual(["/draw/d2", "/draw/d1"])
 
-  // Radix triggers open on keydown in jsdom (pointer events aren't real there)
-  fireEvent.keyDown(
-    screen.getByRole("button", { name: "Actions for Roadmap" }),
-    {
-      key: "Enter",
-    },
-  )
+  // jsdom has no real pointer events; the pointerdown+click pair opens the menu
+  const trigger = screen.getByRole("button", { name: "Actions for Roadmap" })
+  fireEvent.pointerDown(trigger)
+  fireEvent.click(trigger)
   fireEvent.click(screen.getByRole("menuitem", { name: /move to trash/i }))
 
   // Optimistic: the card is gone before the server answers, no confirm dialog

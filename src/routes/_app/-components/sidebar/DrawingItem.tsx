@@ -107,7 +107,7 @@ export function DrawingItem({ drawing }: DrawingItemProps) {
           })
         }
         onStartRename={() => rename.start(drawing.name)}
-        onMenuCloseAutoFocus={rename.onMenuCloseAutoFocus}
+        menuFinalFocus={rename.menuFinalFocus}
         onTrash={handleTrash}
       />
     </SidebarMenuItem>
