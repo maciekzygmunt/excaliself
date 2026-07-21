@@ -19,8 +19,8 @@ export function adminIds(
 
 /** True when demoting `targetId` would leave the instance with no admin. */
 export function isLastAdmin(
-  adminIds: readonly string[],
+  admins: readonly string[],
   targetId: string,
 ): boolean {
-  return adminIds.length === 1 && adminIds[0] === targetId
+  return admins.length === 1 && admins[0] === targetId
 }

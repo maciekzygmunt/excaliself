@@ -24,7 +24,7 @@ import {
   type CurrentUser,
   currentUserQueryOptions,
 } from "@/features/account/queries"
-import { useSetRole } from "@/features/admin/mutations"
+import { ROLE_CHANGE_ERROR_TOAST, useSetRole } from "@/features/admin/mutations"
 import { type AdminUser, usersQueryOptions } from "@/features/admin/queries"
 import {
   adminIds,
@@ -55,7 +55,11 @@ export function MembersSection() {
 
   const handleRoleChange = (member: AdminUser, role: Role) => {
     if (role === member.role) return
-    if (member.id === currentUser?.id && role === "user") {
+    // Fail closed: without knowing who's viewing, a self-demote couldn't be
+    // told apart from any other demotion and would skip its confirm. The
+    // _app loader ensures the currentUser query, so this doesn't happen.
+    if (!currentUser) return
+    if (member.id === currentUser.id && role === "user") {
       // Losing your own admin access is confirmed first (issue #65); the
       // select stays on Admin because the cache only changes on confirm.
       setConfirmingSelfDemote(true)
@@ -191,7 +195,7 @@ function SelfDemoteDialog({
       await setUserRole({ data: { userId: currentUser.id, role: "user" } })
     } catch {
       // Stay open — the intent is still live for a retry or a cancel.
-      toast.error("Couldn't change role")
+      toast.error(ROLE_CHANGE_ERROR_TOAST)
       setPending(false)
       return
     }

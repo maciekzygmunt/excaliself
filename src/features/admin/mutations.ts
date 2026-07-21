@@ -7,6 +7,10 @@ import { type AdminUser, usersQueryOptions } from "./queries"
 import type { Role } from "./roles"
 import { setUserRole } from "./server"
 
+// Shared with the pessimistic self-demote path in MembersSection so both
+// failure surfaces speak with one voice.
+export const ROLE_CHANGE_ERROR_TOAST = "Couldn't change role"
+
 /**
  * Change another member's role optimistically (spec §4.3): the row flips in
  * place and rolls back with an error toast if the server rejects — e.g. the
@@ -22,7 +26,7 @@ export function useSetRole() {
     mutationFn: setUserRole,
     optimisticUpdate: (previous, { data }) =>
       patchById(previous, data.userId, { role: data.role }),
-    onRollback: () => toast.error("Couldn't change role"),
+    onRollback: () => toast.error(ROLE_CHANGE_ERROR_TOAST),
   })
 
   return (userId: string, role: Role) =>
