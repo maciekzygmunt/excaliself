@@ -214,14 +214,25 @@ export function CommandPalette({
     }
   }
 
+  // Keyboard moves must keep the active row visible in the scrollable list.
+  // Only keyboard: scrolling on hover would yank the list under the cursor.
+  // The rows are all rendered, so the target exists before React re-renders.
+  const moveActive = (delta: number) => {
+    if (!rows.length) return
+    const next = (activeIndex + delta + rows.length) % rows.length
+    setActiveIndex(next)
+    document
+      .getElementById(`command-palette-row-${rows[next].id}`)
+      ?.scrollIntoView?.({ block: "nearest" })
+  }
+
   const onInputKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "ArrowDown") {
       e.preventDefault()
-      if (rows.length) setActiveIndex((i) => (i + 1) % rows.length)
+      moveActive(1)
     } else if (e.key === "ArrowUp") {
       e.preventDefault()
-      if (rows.length)
-        setActiveIndex((i) => (i - 1 + rows.length) % rows.length)
+      moveActive(-1)
     } else if (e.key === "Enter") {
       e.preventDefault()
       const row = rows[activeIndex]
@@ -250,6 +261,9 @@ export function CommandPalette({
             onChange={(e) => {
               setQuery(e.target.value)
               setActiveIndex(0)
+              // The active row is the first again — start the list at the top
+              const list = document.getElementById("command-palette-list")
+              if (list) list.scrollTop = 0
             }}
             onKeyDown={onInputKeyDown}
             role="combobox"

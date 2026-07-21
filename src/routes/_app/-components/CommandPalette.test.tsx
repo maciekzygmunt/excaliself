@@ -180,6 +180,25 @@ test("arrow keys move the active row before Enter", () => {
   expect(navigate).toHaveBeenCalledWith({ to: "/drawings", params: undefined })
 })
 
+// The list scrolls (max-h + overflow) while jsdom doesn't, so assert the
+// scroll calls themselves: keyboard moves keep the active row visible, hover
+// must not scroll or the list would yank under the cursor.
+test("arrow keys scroll the newly active row into view; hover does not", () => {
+  const scrollIntoView = vi.fn()
+  window.HTMLElement.prototype.scrollIntoView = scrollIntoView
+  try {
+    const input = renderOpenPalette()
+    fireEvent.keyDown(input, { key: "ArrowDown" })
+    expect(scrollIntoView).toHaveBeenCalledWith({ block: "nearest" })
+
+    scrollIntoView.mockClear()
+    fireEvent.mouseEnter(screen.getByRole("option", { name: "Settings" }))
+    expect(scrollIntoView).not.toHaveBeenCalled()
+  } finally {
+    delete (window.HTMLElement.prototype as Partial<HTMLElement>).scrollIntoView
+  }
+})
+
 test("arrow keys cross the section boundary into Actions", () => {
   const input = renderOpenPalette()
   for (let i = 0; i < 4; i++) fireEvent.keyDown(input, { key: "ArrowDown" })
