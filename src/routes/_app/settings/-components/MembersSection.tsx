@@ -166,8 +166,12 @@ export function MembersSection() {
                   This page being admin-gated, a sole admin is always the
                   viewer, so this also blocks deleting the last admin in
                   the UI; the server enforces both. */}
-              {member.id !== currentUser?.id && (
+              {member.id !== currentUser?.id ? (
                 <MemberRowActions user={member} />
+              ) : (
+                // Invisible stand-in for the menu button so the role
+                // selects and joined dates line up across rows.
+                <div aria-hidden className="size-8" />
               )}
             </div>
           </li>
@@ -307,7 +311,9 @@ function RoleSelect({
       disabled={lastAdmin}
       aria-label={`Role for ${userDisplayName(member)}`}
       onChange={(event) => onChange(event.target.value as Role)}
-      className="h-7 rounded-md border border-input/80 bg-transparent pl-2 pr-6 text-xs text-foreground transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-ring/30 focus-visible:ring-[2px] disabled:cursor-not-allowed disabled:opacity-50"
+      // Fixed width: "Admin" and "Member" render at different natural
+      // widths, which would stagger the Joined column row to row.
+      className="h-7 w-24 rounded-md border border-input/80 bg-transparent pl-2 pr-6 text-xs text-foreground transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-ring/30 focus-visible:ring-[2px] disabled:cursor-not-allowed disabled:opacity-50"
     >
       <option value="user">{ROLE_LABELS.user}</option>
       <option value="admin">{ROLE_LABELS.admin}</option>
