@@ -181,7 +181,7 @@ function openRowMenu(name: string) {
   fireEvent.click(trigger)
 }
 
-// The role control is a Radix Select: the trigger is a combobox button
+// The role control is a Base UI Select: the trigger is a combobox button
 // whose text is the current role; picking means open + click an option.
 const roleSelect = (displayName: string) =>
   screen.getByRole("combobox", {
@@ -192,7 +192,11 @@ function chooseRole(displayName: string, label: string) {
   const trigger = roleSelect(displayName)
   fireEvent.pointerDown(trigger)
   fireEvent.click(trigger)
-  fireEvent.click(screen.getByRole("option", { name: label }))
+  // Base UI commits a selection on the full press-release-click sequence
+  const option = screen.getByRole("option", { name: label })
+  fireEvent.pointerDown(option)
+  fireEvent.pointerUp(option)
+  fireEvent.click(option)
 }
 
 test("the header shows the member count", () => {

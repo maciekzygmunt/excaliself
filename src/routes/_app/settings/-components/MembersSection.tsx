@@ -318,6 +318,8 @@ function RoleSelect({
     <Select
       value={member.role}
       disabled={lastAdmin}
+      // Base UI's Value renders the raw value unless items provides labels
+      items={ROLE_LABELS}
       onValueChange={(role) => onChange(role as Role)}
     >
       <SelectTrigger
