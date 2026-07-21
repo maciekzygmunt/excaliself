@@ -1,22 +1,41 @@
 // Hard-delete engine behind the admin "Delete user" action (issue #66,
-// spec §4.5 tier 3). Kept out of server.ts — which imports the live db — so
-// tests can drive it with a fake db, mirroring trash/destroy.ts.
+// spec §4.5 tier 3) and the Account danger zone's self-delete (issue #67).
+// Kept out of server.ts — which imports the live db — so tests can drive it
+// with a fake db, mirroring trash/destroy.ts.
 
-import { eq } from "drizzle-orm"
+import { count, eq, or } from "drizzle-orm"
 import type { NodePgDatabase } from "drizzle-orm/node-postgres"
 import type * as schema from "@/db/schema"
-import { users, verifications } from "@/db/schema"
+import { drawings, folders, users, verifications } from "@/db/schema"
 
 type Db = NodePgDatabase<typeof schema>
 
 /**
- * Hard-deletes a user account and, via the schema's FK cascades, everything
- * they own: sessions, accounts, folders, drawings, and drawing_files.
- *
- * Two invariants are enforced here rather than trusted to the UI: the last
- * remaining admin can never be deleted (the instance would be locked out of
- * every admin page), and an admin can't delete themselves through this path
- * — self-deletion lives in the Account danger zone with its own flow.
+ * Counts everything the delete cascade would destroy — trashed rows
+ * included — so both tier-3 confirms (admin delete and the Account danger
+ * zone) can state real numbers in their danger copy.
+ */
+export async function countOwnedContent(
+  db: Db,
+  userId: string,
+): Promise<{ drawings: number; folders: number }> {
+  const [[drawingCount], [folderCount]] = await Promise.all([
+    db
+      .select({ count: count() })
+      .from(drawings)
+      .where(eq(drawings.ownerId, userId)),
+    db
+      .select({ count: count() })
+      .from(folders)
+      .where(eq(folders.ownerId, userId)),
+  ])
+  return { drawings: drawingCount.count, folders: folderCount.count }
+}
+
+/**
+ * The admin members-page delete: hardDeleteUser plus one extra invariant —
+ * an admin can't delete themselves through this path. Self-deletion lives
+ * in the Account danger zone, which calls hardDeleteUser directly.
  */
 export async function deleteUserAccount(
   db: Db,
@@ -27,29 +46,41 @@ export async function deleteUserAccount(
     throw new Error("You can't delete your own account from the members page")
   }
 
-  await db.transaction(async (tx) => {
-    const [target] = await tx
-      .select({ role: users.role })
-      .from(users)
-      .where(eq(users.id, userId))
+  await hardDeleteUser(db, userId)
+}
 
+/**
+ * Hard-deletes a user account and, via the schema's FK cascades, everything
+ * they own: sessions, accounts, folders, drawings, and drawing_files.
+ *
+ * One invariant is enforced here rather than trusted to the UI: the last
+ * remaining admin can never be deleted (the instance would be locked out of
+ * every admin page).
+ */
+export async function hardDeleteUser(db: Db, userId: string): Promise<void> {
+  await db.transaction(async (tx) => {
+    // One locking read over the target and every admin, mirroring
+    // setUserRole's: FOR UPDATE serializes concurrent deletes and role
+    // changes (two admins deleting each other would both read 2 admins and
+    // both succeed), and the id order keeps overlapping transactions from
+    // deadlocking. The target row must be in the locked set even when it
+    // isn't an admin — an unlocked role read can go stale while concurrent
+    // role changes make the target the sole admin, and the delete would
+    // then lock the instance out.
+    const relevant = await tx
+      .select({ id: users.id, role: users.role })
+      .from(users)
+      .where(or(eq(users.role, "admin"), eq(users.id, userId)))
+      .orderBy(users.id)
+      .for("update")
+
+    const target = relevant.find((row) => row.id === userId)
     if (!target) {
       throw new Error(`User not found: ${userId}`)
     }
 
     if (target.role === "admin") {
-      // Locked headcount, not a plain count(): two admins deleting each
-      // other concurrently would both read 2 and both succeed. FOR UPDATE
-      // serializes them, so the second re-reads after the first commits
-      // and sees a single admin left. Ordered by id like setUserRole's
-      // locking read, so overlapping role/delete transactions take row
-      // locks in the same order instead of deadlocking.
-      const admins = await tx
-        .select({ id: users.id })
-        .from(users)
-        .where(eq(users.role, "admin"))
-        .orderBy(users.id)
-        .for("update")
+      const admins = relevant.filter((row) => row.role === "admin")
       if (admins.length <= 1) {
         throw new Error("Can't delete the last admin")
       }
@@ -60,8 +91,8 @@ export async function deleteUserAccount(
       .where(eq(users.id, userId))
       .returning({ email: users.email })
 
-    // The row can vanish between the role select and here (another admin
-    // deleting the same user); surface it as not-found, not a crash.
+    // With the target row locked it can no longer vanish mid-transaction,
+    // but surface an empty delete as not-found rather than trusting that.
     if (deleted.length === 0) {
       throw new Error(`User not found: ${userId}`)
     }

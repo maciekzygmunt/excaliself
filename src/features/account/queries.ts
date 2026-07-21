@@ -1,5 +1,10 @@
 import { queryOptions } from "@tanstack/react-query"
-import { getCurrentUser, listActiveSessions } from "./server"
+import {
+  getCurrentUser,
+  getDeleteAccountState,
+  getMyContentCounts,
+  listActiveSessions,
+} from "./server"
 
 export type CurrentUser = Awaited<ReturnType<typeof getCurrentUser>>
 export type ActiveSession = Awaited<
@@ -16,4 +21,16 @@ export const sessionsQueryOptions = () =>
   queryOptions({
     queryKey: ["account", "sessions"] as const,
     queryFn: () => listActiveSessions(),
+  })
+
+export const deleteAccountStateQueryOptions = () =>
+  queryOptions({
+    queryKey: ["account", "deleteAccountState"] as const,
+    queryFn: () => getDeleteAccountState(),
+  })
+
+export const myContentCountsQueryOptions = () =>
+  queryOptions({
+    queryKey: ["account", "contentCounts"] as const,
+    queryFn: () => getMyContentCounts(),
   })
