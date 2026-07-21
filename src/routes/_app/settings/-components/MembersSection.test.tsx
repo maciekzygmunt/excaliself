@@ -104,7 +104,7 @@ const viewer = {
 const clipboardWriteText = vi.fn()
 
 // Radix's popper positions the open tooltip with ResizeObserver, which jsdom
-// doesn't implement.
+// doesn't implement; Radix Select additionally scrolls and pointer-captures.
 beforeAll(() => {
   if (!("ResizeObserver" in globalThis)) {
     Object.defineProperty(globalThis, "ResizeObserver", {
@@ -116,6 +116,10 @@ beforeAll(() => {
       },
     })
   }
+  Element.prototype.scrollIntoView = vi.fn()
+  Element.prototype.hasPointerCapture = vi.fn().mockReturnValue(false)
+  Element.prototype.setPointerCapture = vi.fn()
+  Element.prototype.releasePointerCapture = vi.fn()
 })
 
 beforeEach(() => {
@@ -177,10 +181,19 @@ function openRowMenu(name: string) {
   fireEvent.click(trigger)
 }
 
+// The role control is a Radix Select: the trigger is a combobox button
+// whose text is the current role; picking means open + click an option.
 const roleSelect = (displayName: string) =>
   screen.getByRole("combobox", {
     name: `Role for ${displayName}`,
-  }) as HTMLSelectElement
+  }) as HTMLButtonElement
+
+function chooseRole(displayName: string, label: string) {
+  const trigger = roleSelect(displayName)
+  fireEvent.pointerDown(trigger)
+  fireEvent.click(trigger)
+  fireEvent.click(screen.getByRole("option", { name: label }))
+}
 
 test("the header shows the member count", () => {
   renderSection()
@@ -375,9 +388,9 @@ test("confirming deletes the user and the refreshed list drops them", async () =
 
 test("every row shows a role select reflecting the current role", () => {
   renderSection()
-  expect(roleSelect("ada").value).toBe("admin")
-  expect(roleSelect("Bea").value).toBe("user")
-  expect(roleSelect("Cy").value).toBe("user")
+  expect(roleSelect("ada").textContent).toBe("Admin")
+  expect(roleSelect("Bea").textContent).toBe("Member")
+  expect(roleSelect("Cy").textContent).toBe("Member")
 })
 
 test("the sole admin's select is disabled with an explanation", async () => {
@@ -385,7 +398,7 @@ test("the sole admin's select is disabled with an explanation", async () => {
   const select = roleSelect("ada")
   expect(select.disabled).toBe(true)
 
-  // The tooltip listens on the focusable wrapper around the disabled select.
+  // The tooltip listens on the focusable wrapper around the disabled trigger.
   fireEvent.focus(select.parentElement as HTMLElement)
   await waitFor(() =>
     expect(
@@ -401,8 +414,8 @@ test("an admin can be demoted while another admin remains", async () => {
   const select = roleSelect("Bea")
   expect(select.disabled).toBe(false)
 
-  fireEvent.change(select, { target: { value: "user" } })
-  await waitFor(() => expect(roleSelect("Bea").value).toBe("user"))
+  chooseRole("Bea", "Member")
+  await waitFor(() => expect(roleSelect("Bea").textContent).toBe("Member"))
   // react-query passes a context object as a second argument.
   await waitFor(() =>
     expect(vi.mocked(setUserRole).mock.calls[0]?.[0]).toEqual({
@@ -414,10 +427,8 @@ test("an admin can be demoted while another admin remains", async () => {
 test("promoting a member applies optimistically", async () => {
   vi.mocked(setUserRole).mockReturnValue(new Promise(() => {}))
   renderSection()
-  fireEvent.change(roleSelect("Bea"), {
-    target: { value: "admin" },
-  })
-  await waitFor(() => expect(roleSelect("Bea").value).toBe("admin"))
+  chooseRole("Bea", "Admin")
+  await waitFor(() => expect(roleSelect("Bea").textContent).toBe("Admin"))
   await waitFor(() =>
     expect(vi.mocked(setUserRole).mock.calls[0]?.[0]).toEqual({
       data: { userId: "user-bea", role: "admin" },
@@ -429,21 +440,17 @@ test("a rejected role change rolls back with an error toast", async () => {
   vi.mocked(setUserRole).mockRejectedValue(new Error("boom"))
   renderSection()
 
-  fireEvent.change(roleSelect("Bea"), {
-    target: { value: "admin" },
-  })
+  chooseRole("Bea", "Admin")
 
   await waitFor(() =>
     expect(toastMock.error).toHaveBeenCalledWith("Couldn't change role"),
   )
-  await waitFor(() => expect(roleSelect("Bea").value).toBe("user"))
+  await waitFor(() => expect(roleSelect("Bea").textContent).toBe("Member"))
 })
 
 test("demoting yourself asks for confirmation before anything is sent", () => {
   renderSection({ users: twoAdmins })
-  fireEvent.change(roleSelect("ada"), {
-    target: { value: "user" },
-  })
+  chooseRole("ada", "Member")
 
   expect(screen.getByText("Leave the admin role?")).not.toBeNull()
   expect(setUserRole).not.toHaveBeenCalled()
@@ -452,15 +459,13 @@ test("demoting yourself asks for confirmation before anything is sent", () => {
   const select = screen.getByRole("combobox", {
     name: "Role for ada",
     hidden: true,
-  }) as HTMLSelectElement
-  expect(select.value).toBe("admin")
+  })
+  expect(select.textContent).toBe("Admin")
 })
 
 test("confirming a self-demote applies it and leaves the admin area", async () => {
   renderSection({ users: twoAdmins })
-  fireEvent.change(roleSelect("ada"), {
-    target: { value: "user" },
-  })
+  chooseRole("ada", "Member")
   fireEvent.click(screen.getByRole("button", { name: "Demote me" }))
 
   await waitFor(() =>
@@ -478,24 +483,20 @@ test("confirming a self-demote applies it and leaves the admin area", async () =
 
 test("cancelling a self-demote changes nothing", async () => {
   renderSection({ users: twoAdmins })
-  fireEvent.change(roleSelect("ada"), {
-    target: { value: "user" },
-  })
+  chooseRole("ada", "Member")
   fireEvent.click(screen.getByRole("button", { name: "Cancel" }))
 
   await waitFor(() =>
     expect(screen.queryByText("Leave the admin role?")).toBeNull(),
   )
   expect(setUserRole).not.toHaveBeenCalled()
-  expect(roleSelect("ada").value).toBe("admin")
+  expect(roleSelect("ada").textContent).toBe("Admin")
 })
 
 test("a failed self-demote keeps the dialog open with an error toast", async () => {
   vi.mocked(setUserRole).mockRejectedValue(new Error("boom"))
   renderSection({ users: twoAdmins })
-  fireEvent.change(roleSelect("ada"), {
-    target: { value: "user" },
-  })
+  chooseRole("ada", "Member")
   fireEvent.click(screen.getByRole("button", { name: "Demote me" }))
 
   await waitFor(() =>

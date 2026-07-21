@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useNavigate, useRouter } from "@tanstack/react-router"
-import { ChevronDown, KeyRound, MoreHorizontal, Trash2 } from "lucide-react"
+import { KeyRound, MoreHorizontal, Trash2 } from "lucide-react"
 import { useState } from "react"
 import { toast } from "sonner"
 import { InitialsAvatar } from "@/components/initials-avatar"
@@ -22,6 +22,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
   Tooltip,
@@ -306,51 +313,45 @@ function RoleSelect({
   onChange: (role: Role) => void
 }) {
   const select = (
-    <select
+    <Select
       value={member.role}
       disabled={lastAdmin}
-      aria-label={`Role for ${userDisplayName(member)}`}
-      onChange={(event) => onChange(event.target.value as Role)}
-      // Fixed width: "Admin" and "Member" render at different natural
-      // widths, which would stagger the Joined column row to row.
-      // appearance-none drops the browser's own chevron, which hugs the
-      // right edge — the ChevronDown below sits at a proper inset.
-      className="h-7 w-24 appearance-none rounded-md border border-input/80 bg-transparent pl-2 pr-6 text-xs text-foreground transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-ring/30 focus-visible:ring-[2px] disabled:cursor-not-allowed disabled:opacity-50"
+      onValueChange={(role) => onChange(role as Role)}
     >
-      <option value="user">{ROLE_LABELS.user}</option>
-      <option value="admin">{ROLE_LABELS.admin}</option>
-    </select>
-  )
-  const chevron = (
-    <ChevronDown
-      aria-hidden
-      className={`pointer-events-none absolute top-1/2 right-2 size-3.5 -translate-y-1/2 text-muted-foreground ${
-        lastAdmin ? "opacity-50" : ""
-      }`}
-    />
+      <SelectTrigger
+        size="sm"
+        aria-label={`Role for ${userDisplayName(member)}`}
+        // Fixed width: "Admin" and "Member" render at different natural
+        // widths, which would stagger the Joined column row to row.
+        className="h-7 w-24 text-xs"
+      >
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="user" className="text-xs">
+          {ROLE_LABELS.user}
+        </SelectItem>
+        <SelectItem value="admin" className="text-xs">
+          {ROLE_LABELS.admin}
+        </SelectItem>
+      </SelectContent>
+    </Select>
   )
 
-  if (!lastAdmin)
-    return (
-      <span className="relative inline-flex">
-        {select}
-        {chevron}
-      </span>
-    )
+  if (!lastAdmin) return select
 
   return (
     <Tooltip>
-      {/* A disabled select swallows pointer events, so the tooltip listens
+      {/* A disabled trigger swallows pointer events, so the tooltip listens
           on a focusable wrapper instead. */}
       <TooltipTrigger asChild>
         {/* tabIndex lets keyboard users reach the wrapper and hear why the
             control is disabled. */}
         <span
           tabIndex={0}
-          className="relative inline-flex rounded-md outline-none focus-visible:ring-ring/30 focus-visible:ring-[2px]"
+          className="rounded-md outline-none focus-visible:ring-ring/30 focus-visible:ring-[2px]"
         >
           {select}
-          {chevron}
         </span>
       </TooltipTrigger>
       <TooltipContent>The last admin can't be demoted.</TooltipContent>
