@@ -8,6 +8,7 @@ import { useDocumentTitle } from "@/lib/document-title"
 import { EmailSection } from "./-components/EmailSection"
 import { PasswordSection } from "./-components/PasswordSection"
 import { ProfileSection } from "./-components/ProfileSection"
+import { SessionsSection } from "./-components/SessionsSection"
 
 export const Route = createFileRoute("/_app/settings/")({
   component: AccountPage,
@@ -31,6 +32,8 @@ function AccountPage() {
       <EmailSection user={user} />
       <Separator />
       <PasswordSection />
+      <Separator />
+      <SessionsSection />
     </div>
   )
 }
