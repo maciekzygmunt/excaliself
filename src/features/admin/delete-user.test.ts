@@ -13,26 +13,21 @@ type Call =
 const toSql = (where: SQL) => new PgDialect().sqlToQuery(where)
 
 function fakeDb(options: {
-  target?: { role: "admin" | "user"; email: string }
-  adminIds?: string[]
-  /** The target row disappears between the role select and the delete. */
+  /** What the locking read returns: the target row plus every admin. */
+  rows?: Array<{ id: string; role: "admin" | "user" }>
+  /** Email the users-delete returns for the verifications sweep. */
+  email?: string
+  /** The target row disappears between the locking read and the delete. */
   vanishesBeforeDelete?: boolean
 }) {
   const calls: Call[] = []
-  // The engine issues two selects in order: the target row, then (for admin
-  // targets) the locked admin roster. Answer them positionally.
-  const selectResponses: unknown[][] = [
-    options.target ? [options.target] : [],
-    (options.adminIds ?? []).map((id) => ({ id })),
-  ]
-  let selectIndex = 0
+  const rows = options.rows ?? []
   const tx = {
     select: () => ({
       from: () => ({
         where: (where: SQL) => {
           const call: Call = { kind: "select", where }
           calls.push(call)
-          const rows = selectResponses[selectIndex++] ?? []
           const lockable = (result: Promise<unknown[]>) =>
             Object.assign(result, {
               for: (lock: string) => {
@@ -54,8 +49,8 @@ function fakeDb(options: {
         return Object.assign(Promise.resolve(), {
           returning: () =>
             Promise.resolve(
-              table === users && options.target && !options.vanishesBeforeDelete
-                ? [{ email: options.target.email }]
+              table === users && options.email && !options.vanishesBeforeDelete
+                ? [{ email: options.email }]
                 : [],
             ),
         })
@@ -75,7 +70,11 @@ const shape = (call: Call) =>
 
 test("deletes a regular user and sweeps their verification rows", async () => {
   const { db, calls } = fakeDb({
-    target: { role: "user", email: "bea@example.com" },
+    rows: [
+      { id: "admin-1", role: "admin" },
+      { id: "user-bea", role: "user" },
+    ],
+    email: "bea@example.com",
   })
 
   await deleteUserAccount(db, "admin-1", "user-bea")
@@ -101,29 +100,52 @@ test("deletes a regular user and sweeps their verification rows", async () => {
   ])
 })
 
+test("the role read locks the target row even for non-admin targets", async () => {
+  const { db, calls } = fakeDb({
+    rows: [
+      { id: "admin-1", role: "admin" },
+      { id: "user-bea", role: "user" },
+    ],
+    email: "bea@example.com",
+  })
+
+  await deleteUserAccount(db, "admin-1", "user-bea")
+
+  // An unlocked role read can go stale: concurrent role changes could make
+  // the target the sole admin before the delete lands, locking the instance
+  // out. The read must lock target + admin roster in one ordered set.
+  expect(calls[0]).toMatchObject({ kind: "select", lock: "update" })
+  expect(toSql((calls[0] as { where: SQL }).where).params).toEqual([
+    "admin",
+    "user-bea",
+  ])
+})
+
 test("deleting an admin is allowed while another admin remains, behind a row lock", async () => {
   const { db, calls } = fakeDb({
-    target: { role: "admin", email: "ada@example.com" },
-    adminIds: ["user-ada", "admin-1"],
+    rows: [
+      { id: "admin-1", role: "admin" },
+      { id: "user-ada", role: "admin" },
+    ],
+    email: "ada@example.com",
   })
 
   await deleteUserAccount(db, "admin-1", "user-ada")
 
   expect(calls.map(shape)).toEqual([
     { kind: "select" },
-    { kind: "select" },
     { kind: "delete", table: users },
     { kind: "delete", table: verifications },
   ])
-  // The roster read must lock the admin rows — a plain count would let two
-  // admins deleting each other concurrently both pass the guard.
-  expect(calls[1]).toMatchObject({ kind: "select", lock: "update" })
+  // The read must lock the admin rows — a plain count would let two admins
+  // deleting each other concurrently both pass the guard.
+  expect(calls[0]).toMatchObject({ kind: "select", lock: "update" })
 })
 
 test("deleting the last remaining admin is rejected", async () => {
   const { db, calls } = fakeDb({
-    target: { role: "admin", email: "ada@example.com" },
-    adminIds: ["user-ada"],
+    rows: [{ id: "user-ada", role: "admin" }],
+    email: "ada@example.com",
   })
 
   await expect(deleteUserAccount(db, "admin-1", "user-ada")).rejects.toThrow(
@@ -132,9 +154,13 @@ test("deleting the last remaining admin is rejected", async () => {
   expect(calls.some((call) => call.kind === "delete")).toBe(false)
 })
 
-test("a target that vanishes between the role select and the delete throws not-found", async () => {
+test("a target that vanishes between the locking read and the delete throws not-found", async () => {
   const { db } = fakeDb({
-    target: { role: "user", email: "bea@example.com" },
+    rows: [
+      { id: "admin-1", role: "admin" },
+      { id: "user-bea", role: "user" },
+    ],
+    email: "bea@example.com",
     vanishesBeforeDelete: true,
   })
 
@@ -145,8 +171,11 @@ test("a target that vanishes between the role select and the delete throws not-f
 
 test("self-delete through the admin path is rejected before touching the db", async () => {
   const { db, calls } = fakeDb({
-    target: { role: "admin", email: "ada@example.com" },
-    adminIds: ["admin-1", "user-ada", "user-cy"],
+    rows: [
+      { id: "admin-1", role: "admin" },
+      { id: "user-ada", role: "admin" },
+      { id: "user-cy", role: "admin" },
+    ],
   })
 
   await expect(deleteUserAccount(db, "admin-1", "admin-1")).rejects.toThrow()
@@ -158,14 +187,16 @@ test("self-delete through the admin path is rejected before touching the db", as
 
 test("hardDeleteUser lets an admin delete themselves while another admin remains", async () => {
   const { db, calls } = fakeDb({
-    target: { role: "admin", email: "ada@example.com" },
-    adminIds: ["user-ada", "user-bea"],
+    rows: [
+      { id: "user-ada", role: "admin" },
+      { id: "user-bea", role: "admin" },
+    ],
+    email: "ada@example.com",
   })
 
   await hardDeleteUser(db, "user-ada")
 
   expect(calls.map(shape)).toEqual([
-    { kind: "select" },
     { kind: "select" },
     { kind: "delete", table: users },
     { kind: "delete", table: verifications },
@@ -174,8 +205,8 @@ test("hardDeleteUser lets an admin delete themselves while another admin remains
 
 test("hardDeleteUser rejects the sole admin deleting themselves", async () => {
   const { db, calls } = fakeDb({
-    target: { role: "admin", email: "ada@example.com" },
-    adminIds: ["user-ada"],
+    rows: [{ id: "user-ada", role: "admin" }],
+    email: "ada@example.com",
   })
 
   await expect(hardDeleteUser(db, "user-ada")).rejects.toThrow("last admin")
@@ -183,7 +214,9 @@ test("hardDeleteUser rejects the sole admin deleting themselves", async () => {
 })
 
 test("an unknown user id throws not-found", async () => {
-  const { db } = fakeDb({})
+  const { db } = fakeDb({
+    rows: [{ id: "admin-1", role: "admin" }],
+  })
 
   await expect(deleteUserAccount(db, "admin-1", "nope")).rejects.toThrow(
     "User not found",

@@ -3,7 +3,7 @@
 // Kept out of server.ts — which imports the live db — so tests can drive it
 // with a fake db, mirroring trash/destroy.ts.
 
-import { count, eq } from "drizzle-orm"
+import { count, eq, or } from "drizzle-orm"
 import type { NodePgDatabase } from "drizzle-orm/node-postgres"
 import type * as schema from "@/db/schema"
 import { drawings, folders, users, verifications } from "@/db/schema"
@@ -59,28 +59,28 @@ export async function deleteUserAccount(
  */
 export async function hardDeleteUser(db: Db, userId: string): Promise<void> {
   await db.transaction(async (tx) => {
-    const [target] = await tx
-      .select({ role: users.role })
+    // One locking read over the target and every admin, mirroring
+    // setUserRole's: FOR UPDATE serializes concurrent deletes and role
+    // changes (two admins deleting each other would both read 2 admins and
+    // both succeed), and the id order keeps overlapping transactions from
+    // deadlocking. The target row must be in the locked set even when it
+    // isn't an admin — an unlocked role read can go stale while concurrent
+    // role changes make the target the sole admin, and the delete would
+    // then lock the instance out.
+    const relevant = await tx
+      .select({ id: users.id, role: users.role })
       .from(users)
-      .where(eq(users.id, userId))
+      .where(or(eq(users.role, "admin"), eq(users.id, userId)))
+      .orderBy(users.id)
+      .for("update")
 
+    const target = relevant.find((row) => row.id === userId)
     if (!target) {
       throw new Error(`User not found: ${userId}`)
     }
 
     if (target.role === "admin") {
-      // Locked headcount, not a plain count(): two admins deleting each
-      // other concurrently would both read 2 and both succeed. FOR UPDATE
-      // serializes them, so the second re-reads after the first commits
-      // and sees a single admin left. Ordered by id like setUserRole's
-      // locking read, so overlapping role/delete transactions take row
-      // locks in the same order instead of deadlocking.
-      const admins = await tx
-        .select({ id: users.id })
-        .from(users)
-        .where(eq(users.role, "admin"))
-        .orderBy(users.id)
-        .for("update")
+      const admins = relevant.filter((row) => row.role === "admin")
       if (admins.length <= 1) {
         throw new Error("Can't delete the last admin")
       }
@@ -91,8 +91,8 @@ export async function hardDeleteUser(db: Db, userId: string): Promise<void> {
       .where(eq(users.id, userId))
       .returning({ email: users.email })
 
-    // The row can vanish between the role select and here (another admin
-    // deleting the same user); surface it as not-found, not a crash.
+    // With the target row locked it can no longer vanish mid-transaction,
+    // but surface an empty delete as not-found rather than trusting that.
     if (deleted.length === 0) {
       throw new Error(`User not found: ${userId}`)
     }
