@@ -89,6 +89,25 @@ export const invites = pgTable("invites", {
     .$defaultFn(() => new Date()),
 })
 
+// Admin-generated password-reset links (issue #68) — the product's only
+// reset flow, shared out-of-band. Same single-use token model as invites,
+// but targeted at a user and short-lived (24 h).
+export const passwordResets = pgTable("password_resets", {
+  id: text("id").primaryKey(),
+  token: text("token").notNull().unique(),
+  userId: text("userId")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  createdBy: text("createdBy").references(() => users.id, {
+    onDelete: "set null",
+  }),
+  usedAt: timestamp("usedAt"),
+  expiresAt: timestamp("expiresAt").notNull(),
+  createdAt: timestamp("createdAt")
+    .notNull()
+    .$defaultFn(() => new Date()),
+})
+
 export const folders = pgTable(
   "folders",
   {

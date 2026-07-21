@@ -1,15 +1,60 @@
-import { useQuery } from "@tanstack/react-query"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { KeyRound, MoreHorizontal } from "lucide-react"
+import { toast } from "sonner"
 import { InitialsAvatar } from "@/components/initials-avatar"
+import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { Skeleton } from "@/components/ui/skeleton"
 import { userDisplayName } from "@/features/account/display-name"
 import { usersQueryOptions } from "@/features/admin/queries"
+import { pendingPasswordResetsQueryOptions } from "@/features/password-resets/queries"
+import {
+  createPasswordReset,
+  revokePasswordReset,
+} from "@/features/password-resets/server"
 import { useDelayedVisible } from "@/hooks/use-delayed-visible"
 
-// Deliberately lean (issue #64): no search, sort, pagination, or row
-// actions — role management, removal, and password resets land in
-// follow-up tickets.
+// Deliberately lean (issue #64): no search, sort, or pagination — role
+// management and removal land in follow-up tickets. Row actions carry the
+// admin-generated password-reset flow (issue #68).
 export function MembersSection() {
+  const queryClient = useQueryClient()
+  const resetsKey = pendingPasswordResetsQueryOptions().queryKey
   const { data: users, isPending } = useQuery(usersQueryOptions())
+  const { data: pendingResets } = useQuery(pendingPasswordResetsQueryOptions())
+
+  // The link is the only copy of the token the admin will ever see — it goes
+  // straight to the clipboard (same mechanic as invites) and the toast is
+  // the confirmation.
+  const { mutate: resetPassword } = useMutation({
+    mutationFn: createPasswordReset,
+    onSuccess: ({ token }) => {
+      navigator.clipboard.writeText(
+        `${window.location.origin}/reset-password?token=${token}`,
+      )
+      toast.success("Reset link copied — single-use, valid for 24 hours")
+    },
+    onError: (err) => {
+      toast.error(
+        err instanceof Error ? err.message : "Couldn't create reset link",
+      )
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: resetsKey })
+    },
+  })
+  const { mutate: revokeReset } = useMutation({
+    mutationFn: revokePasswordReset,
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: resetsKey })
+    },
+  })
+
   const showSkeleton = useDelayedVisible(isPending)
 
   if (isPending) return showSkeleton ? <MembersSkeleton /> : null
@@ -18,6 +63,7 @@ export function MembersSection() {
   const members = [...users].sort(
     (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
   )
+  const pendingByUserId = new Set(pendingResets?.map((reset) => reset.userId))
 
   return (
     <section className="animate-in fade-in-0 duration-200 motion-reduce:animate-none">
@@ -51,9 +97,43 @@ export function MembersSection() {
                 </p>
               </div>
             </div>
-            <p className="shrink-0 text-xs text-muted-foreground/60">
-              Joined {new Date(user.createdAt).toLocaleDateString()}
-            </p>
+            <div className="flex shrink-0 items-center gap-2">
+              {pendingByUserId.has(user.id) && (
+                <span className="flex items-center gap-1 text-[11px] text-muted-foreground/60">
+                  Reset link pending
+                  <button
+                    type="button"
+                    onClick={() => revokeReset({ data: { userId: user.id } })}
+                    className="rounded px-1.5 py-1 text-xs text-muted-foreground transition-all hover:bg-muted hover:text-destructive"
+                  >
+                    Revoke
+                  </button>
+                </span>
+              )}
+              <p className="text-xs text-muted-foreground/60">
+                Joined {new Date(user.createdAt).toLocaleDateString()}
+              </p>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 text-muted-foreground"
+                    aria-label={`Actions for ${userDisplayName(user)}`}
+                  >
+                    <MoreHorizontal className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem
+                    onClick={() => resetPassword({ data: { userId: user.id } })}
+                  >
+                    <KeyRound className="h-4 w-4" />
+                    Reset password
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </li>
         ))}
       </ul>

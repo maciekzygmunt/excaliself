@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SetupRouteImport } from './routes/setup'
+import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as InviteRouteImport } from './routes/invite'
 import { Route as AdminRouteImport } from './routes/admin'
@@ -30,6 +31,11 @@ import { Route as AppDrawIdRouteImport } from './routes/_app/draw/$id'
 const SetupRoute = SetupRouteImport.update({
   id: '/setup',
   path: '/setup',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ResetPasswordRoute = ResetPasswordRouteImport.update({
+  id: '/reset-password',
+  path: '/reset-password',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -117,6 +123,7 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AdminRoute
   '/invite': typeof InviteRoute
   '/login': typeof LoginRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/setup': typeof SetupRoute
   '/settings': typeof AppSettingsRouteRouteWithChildren
   '/drawings': typeof AppDrawingsRoute
@@ -135,6 +142,7 @@ export interface FileRoutesByTo {
   '/admin': typeof AdminRoute
   '/invite': typeof InviteRoute
   '/login': typeof LoginRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/setup': typeof SetupRoute
   '/drawings': typeof AppDrawingsRoute
   '/trash': typeof AppTrashRoute
@@ -154,6 +162,7 @@ export interface FileRoutesById {
   '/admin': typeof AdminRoute
   '/invite': typeof InviteRoute
   '/login': typeof LoginRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/setup': typeof SetupRoute
   '/_app/settings': typeof AppSettingsRouteRouteWithChildren
   '/_app/drawings': typeof AppDrawingsRoute
@@ -174,6 +183,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/invite'
     | '/login'
+    | '/reset-password'
     | '/setup'
     | '/settings'
     | '/drawings'
@@ -192,6 +202,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/invite'
     | '/login'
+    | '/reset-password'
     | '/setup'
     | '/drawings'
     | '/trash'
@@ -210,6 +221,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/invite'
     | '/login'
+    | '/reset-password'
     | '/setup'
     | '/_app/settings'
     | '/_app/drawings'
@@ -230,6 +242,7 @@ export interface RootRouteChildren {
   AdminRoute: typeof AdminRoute
   InviteRoute: typeof InviteRoute
   LoginRoute: typeof LoginRoute
+  ResetPasswordRoute: typeof ResetPasswordRoute
   SetupRoute: typeof SetupRoute
   ApiHealthRoute: typeof ApiHealthRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
@@ -242,6 +255,13 @@ declare module '@tanstack/react-router' {
       path: '/setup'
       fullPath: '/setup'
       preLoaderRoute: typeof SetupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reset-password': {
+      id: '/reset-password'
+      path: '/reset-password'
+      fullPath: '/reset-password'
+      preLoaderRoute: typeof ResetPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -402,6 +422,7 @@ const rootRouteChildren: RootRouteChildren = {
   AdminRoute: AdminRoute,
   InviteRoute: InviteRoute,
   LoginRoute: LoginRoute,
+  ResetPasswordRoute: ResetPasswordRoute,
   SetupRoute: SetupRoute,
   ApiHealthRoute: ApiHealthRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
@@ -409,12 +430,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { createStart } from '@tanstack/react-start'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-  }
-}

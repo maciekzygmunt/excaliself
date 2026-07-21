@@ -1,14 +1,35 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
-import { act, cleanup, render, screen } from "@testing-library/react"
-import { afterEach, expect, test, vi } from "vitest"
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react"
+import { afterEach, beforeEach, expect, test, vi } from "vitest"
 import { usersQueryOptions } from "@/features/admin/queries"
 import { getAllUsers } from "@/features/admin/server"
+import { pendingPasswordResetsQueryOptions } from "@/features/password-resets/queries"
+import {
+  createPasswordReset,
+  getPendingPasswordResets,
+  revokePasswordReset,
+} from "@/features/password-resets/server"
 import { MembersSection } from "./MembersSection"
 
-// The query module imports the server function, which imports the db — stub
-// the server-function edge (the cache is seeded, so it is never called).
+// The query modules import the server functions, which import the db — stub
+// the server-function edge (the cache is seeded, so they are never called).
 vi.mock("@/features/admin/server", () => ({
   getAllUsers: vi.fn(),
+}))
+vi.mock("@/features/password-resets/server", () => ({
+  createPasswordReset: vi.fn(),
+  getPendingPasswordResets: vi.fn(),
+  revokePasswordReset: vi.fn(),
+}))
+vi.mock("sonner", () => ({
+  toast: { success: vi.fn(), error: vi.fn() },
 }))
 
 // Deliberately out of join order: Bea (Feb) before ada (Jan) before Cy (Mar).
@@ -45,22 +66,48 @@ const members = [
   },
 ]
 
+const clipboardWriteText = vi.fn()
+
 // Auto-cleanup needs vitest globals, which this repo leaves off.
 afterEach(() => {
   cleanup()
   vi.useRealTimers()
 })
+beforeEach(() => {
+  vi.clearAllMocks()
+  Object.defineProperty(navigator, "clipboard", {
+    value: { writeText: clipboardWriteText },
+    configurable: true,
+  })
+  vi.mocked(getPendingPasswordResets).mockResolvedValue([])
+})
 
-function renderSection({ seed = true } = {}) {
+type PendingReset = { userId: string; expiresAt: Date }
+
+function renderSection({
+  seed = true,
+  pendingResets = [] as PendingReset[],
+} = {}) {
   const queryClient = new QueryClient()
   if (seed) {
     queryClient.setQueryData(usersQueryOptions().queryKey, members)
+    queryClient.setQueryData(
+      pendingPasswordResetsQueryOptions().queryKey,
+      pendingResets,
+    )
   }
   return render(
     <QueryClientProvider client={queryClient}>
       <MembersSection />
     </QueryClientProvider>,
   )
+}
+
+// Radix menus open on pointerdown, which jsdom needs fired explicitly.
+function openRowMenu(name: RegExp) {
+  const trigger = screen.getByRole("button", { name })
+  fireEvent.pointerDown(trigger)
+  fireEvent.click(trigger)
 }
 
 test("the header shows the member count", () => {
@@ -71,6 +118,7 @@ test("the header shows the member count", () => {
 test("a single member is counted in the singular", () => {
   const queryClient = new QueryClient()
   queryClient.setQueryData(usersQueryOptions().queryKey, [members[0]])
+  queryClient.setQueryData(pendingPasswordResetsQueryOptions().queryKey, [])
   render(
     <QueryClientProvider client={queryClient}>
       <MembersSection />
@@ -104,9 +152,67 @@ test("every row carries the shared initials avatar", () => {
   ).toHaveLength(3)
 })
 
-test("the lean list offers no row actions", () => {
+test("every row offers an overflow menu with Reset password — admins included", () => {
   renderSection()
-  expect(screen.queryAllByRole("button")).toHaveLength(0)
+  // One overflow trigger per member; ada is an admin and gets one too.
+  expect(screen.getAllByRole("button", { name: /actions for/i })).toHaveLength(
+    3,
+  )
+  openRowMenu(/actions for ada/i)
+  expect(
+    screen.getByRole("menuitem", { name: /reset password/i }),
+  ).not.toBeNull()
+})
+
+test("Reset password generates a link, copies it, and confirms with a toast", async () => {
+  const { toast } = await import("sonner")
+  vi.mocked(createPasswordReset).mockResolvedValue({ token: "tok-xyz" })
+  renderSection()
+
+  openRowMenu(/actions for ada/i)
+  fireEvent.click(screen.getByRole("menuitem", { name: /reset password/i }))
+
+  await waitFor(() => {
+    expect(createPasswordReset).toHaveBeenCalledWith(
+      { data: { userId: "user-ada" } },
+      // react-query passes its mutation context as a second argument.
+      expect.anything(),
+    )
+  })
+  await waitFor(() => {
+    expect(clipboardWriteText).toHaveBeenCalledWith(
+      `${window.location.origin}/reset-password?token=tok-xyz`,
+    )
+  })
+  expect(toast.success).toHaveBeenCalled()
+})
+
+test("a pending reset shows a row hint with a revoke action", async () => {
+  renderSection({
+    pendingResets: [
+      {
+        userId: "user-ada",
+        expiresAt: new Date("2026-07-22T12:00:00Z"),
+      },
+    ],
+  })
+
+  // Only ada's row hints at the outstanding link.
+  expect(screen.getAllByText("Reset link pending")).toHaveLength(1)
+
+  fireEvent.click(screen.getByRole("button", { name: /revoke/i }))
+  await waitFor(() => {
+    expect(revokePasswordReset).toHaveBeenCalledWith(
+      { data: { userId: "user-ada" } },
+      expect.anything(),
+    )
+  })
+})
+
+test("rows without a pending reset show no hint or revoke", () => {
+  renderSection()
+  expect(screen.queryByText("Reset link pending")).toBeNull()
+  expect(screen.queryByRole("button", { name: /revoke/i })).toBeNull()
 })
 
 test("the skeleton appears only after the grace period", () => {
