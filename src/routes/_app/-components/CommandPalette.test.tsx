@@ -117,9 +117,8 @@ function optionLabels() {
   return screen.getAllByRole("option").map((r) => r.textContent)
 }
 
-test("empty input shows the four Go to rows then the three Actions rows — no drawings or folders", () => {
+test("with zero drawings the recents section is absent and the launcher still shows Go to then Actions — never folders", () => {
   renderOpenPalette({
-    drawings: [makeDrawing({ id: "d1", name: "Homework" })],
     folders: [makeFolder({ id: "f1", name: "Homes" })],
   })
   expect(optionLabels()).toEqual([
@@ -132,6 +131,65 @@ test("empty input shows the four Go to rows then the three Actions rows — no d
     "Sign out",
   ])
   expect(screen.queryByText("Drawings")).toBeNull()
+})
+
+test("empty input leads with the 5 most recent drawings by last edit, then Go to, then Actions", () => {
+  renderOpenPalette({
+    drawings: [
+      makeDrawing({ id: "d1", updatedAt: new Date("2026-07-01T00:00:00Z") }),
+      makeDrawing({ id: "d2", updatedAt: new Date("2026-07-06T00:00:00Z") }),
+      makeDrawing({ id: "d3", updatedAt: new Date("2026-07-03T00:00:00Z") }),
+      makeDrawing({ id: "d4", updatedAt: new Date("2026-07-02T00:00:00Z") }),
+      makeDrawing({ id: "d5", updatedAt: new Date("2026-07-05T00:00:00Z") }),
+      makeDrawing({ id: "d6", updatedAt: new Date("2026-07-04T00:00:00Z") }),
+    ],
+  })
+  expect(optionLabels()).toEqual([
+    // d1 is the oldest edit of the six, so it falls off the 5-item launcher
+    "Drawing d2",
+    "Drawing d5",
+    "Drawing d6",
+    "Drawing d3",
+    "Drawing d4",
+    "Home",
+    "All drawings",
+    "Trash",
+    "Settings",
+    "New drawing",
+    "New folder",
+    "Sign out",
+  ])
+  expect(screen.getByText("Drawings")).toBeDefined()
+})
+
+test("Enter with empty input opens the most recently edited drawing", () => {
+  const input = renderOpenPalette({
+    drawings: [
+      makeDrawing({ id: "d1", updatedAt: new Date("2026-07-01T00:00:00Z") }),
+      makeDrawing({ id: "d2", updatedAt: new Date("2026-07-06T00:00:00Z") }),
+    ],
+  })
+  fireEvent.keyDown(input, { key: "Enter" })
+  expect(navigate).toHaveBeenCalledWith({
+    to: "/draw/$id",
+    params: { id: "d2" },
+  })
+  expect(onOpenChange).toHaveBeenCalledWith(false)
+})
+
+test("trashed drawings never appear among the recents", () => {
+  renderOpenPalette({
+    drawings: [
+      makeDrawing({ id: "d1" }),
+      makeDrawing({
+        id: "d2",
+        updatedAt: new Date("2026-07-06T00:00:00Z"),
+        deletedAt: new Date("2026-06-01T00:00:00Z"),
+      }),
+    ],
+  })
+  expect(screen.queryByRole("option", { name: "Drawing d2" })).toBeNull()
+  expect(screen.getByRole("option", { name: "Drawing d1" })).toBeDefined()
 })
 
 test("the Actions section header renders after Go to", () => {
