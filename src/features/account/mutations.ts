@@ -1,8 +1,13 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { usersQueryOptions } from "@/features/admin/queries"
-import { type CurrentUser, currentUserQueryOptions } from "./queries"
-import { updateProfile } from "./server"
+import {
+  type ActiveSession,
+  type CurrentUser,
+  currentUserQueryOptions,
+  sessionsQueryOptions,
+} from "./queries"
+import { revokeOtherSessions, revokeSessionById, updateProfile } from "./server"
 
 /**
  * Save the display name optimistically (spec §4.3): the new name lands in
@@ -43,4 +48,64 @@ export function useUpdateProfile() {
   })
 
   return (name: string) => mutation.mutate({ data: { name: name.trim() } })
+}
+
+/**
+ * Revoking a session drops its row optimistically (spec §4.3) and rolls it
+ * back with an error toast if the server call fails. Both revoke mutations
+ * share a scope so overlapping revokes settle in serial — a rollback can
+ * never resurrect a row a newer optimistic write already removed.
+ */
+export function useRevokeSession() {
+  const queryClient = useQueryClient()
+  const sessionsKey = sessionsQueryOptions().queryKey
+
+  const mutation = useMutation({
+    mutationFn: revokeSessionById,
+    scope: { id: "account-sessions" },
+    onMutate: async ({ data }) => {
+      await queryClient.cancelQueries({ queryKey: sessionsKey })
+      const previous = queryClient.getQueryData<ActiveSession[]>(sessionsKey)
+      queryClient.setQueryData<ActiveSession[]>(sessionsKey, (current) =>
+        current?.filter((session) => session.id !== data.id),
+      )
+      return { previous }
+    },
+    onError: (_err, _vars, context) => {
+      queryClient.setQueryData(sessionsKey, context?.previous)
+      toast.error("Couldn't revoke session")
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: sessionsKey })
+    },
+  })
+
+  return (id: string) => mutation.mutate({ data: { id } })
+}
+
+export function useRevokeOtherSessions() {
+  const queryClient = useQueryClient()
+  const sessionsKey = sessionsQueryOptions().queryKey
+
+  const mutation = useMutation({
+    mutationFn: () => revokeOtherSessions(),
+    scope: { id: "account-sessions" },
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: sessionsKey })
+      const previous = queryClient.getQueryData<ActiveSession[]>(sessionsKey)
+      queryClient.setQueryData<ActiveSession[]>(sessionsKey, (current) =>
+        current?.filter((session) => session.current),
+      )
+      return { previous }
+    },
+    onError: (_err, _vars, context) => {
+      queryClient.setQueryData(sessionsKey, context?.previous)
+      toast.error("Couldn't sign out other sessions")
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: sessionsKey })
+    },
+  })
+
+  return () => mutation.mutate(undefined)
 }

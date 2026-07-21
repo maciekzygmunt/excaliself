@@ -1,10 +1,12 @@
 import { useQuery } from "@tanstack/react-query"
 import { createFileRoute } from "@tanstack/react-router"
+import { Separator } from "@/components/ui/separator"
 import { Skeleton } from "@/components/ui/skeleton"
 import { currentUserQueryOptions } from "@/features/account/queries"
 import { useDelayedVisible } from "@/hooks/use-delayed-visible"
 import { useDocumentTitle } from "@/lib/document-title"
 import { ProfileSection } from "./-components/ProfileSection"
+import { SessionsSection } from "./-components/SessionsSection"
 
 export const Route = createFileRoute("/_app/settings/")({
   component: AccountPage,
@@ -24,6 +26,8 @@ function AccountPage() {
   return (
     <div className="animate-in fade-in-0 duration-200 motion-reduce:animate-none">
       <ProfileSection user={user} />
+      <Separator className="my-8" />
+      <SessionsSection />
     </div>
   )
 }
