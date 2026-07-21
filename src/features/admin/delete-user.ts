@@ -3,12 +3,34 @@
 // Kept out of server.ts — which imports the live db — so tests can drive it
 // with a fake db, mirroring trash/destroy.ts.
 
-import { eq } from "drizzle-orm"
+import { count, eq } from "drizzle-orm"
 import type { NodePgDatabase } from "drizzle-orm/node-postgres"
 import type * as schema from "@/db/schema"
-import { users, verifications } from "@/db/schema"
+import { drawings, folders, users, verifications } from "@/db/schema"
 
 type Db = NodePgDatabase<typeof schema>
+
+/**
+ * Counts everything the delete cascade would destroy — trashed rows
+ * included — so both tier-3 confirms (admin delete and the Account danger
+ * zone) can state real numbers in their danger copy.
+ */
+export async function countOwnedContent(
+  db: Db,
+  userId: string,
+): Promise<{ drawings: number; folders: number }> {
+  const [[drawingCount], [folderCount]] = await Promise.all([
+    db
+      .select({ count: count() })
+      .from(drawings)
+      .where(eq(drawings.ownerId, userId)),
+    db
+      .select({ count: count() })
+      .from(folders)
+      .where(eq(folders.ownerId, userId)),
+  ])
+  return { drawings: drawingCount.count, folders: folderCount.count }
+}
 
 /**
  * The admin members-page delete: hardDeleteUser plus one extra invariant —

@@ -3,11 +3,11 @@
 import { createServerFn } from "@tanstack/react-start"
 import { getRequestHeaders } from "@tanstack/react-start/server"
 import { APIError } from "better-auth/api"
-import { and, count, eq, ne } from "drizzle-orm"
+import { and, eq, ne } from "drizzle-orm"
 import z from "zod"
 import { db } from "@/db"
-import { drawings, folders, sessions, users } from "@/db/schema"
-import { hardDeleteUser } from "@/features/admin/delete-user"
+import { sessions, users } from "@/db/schema"
+import { countOwnedContent, hardDeleteUser } from "@/features/admin/delete-user"
 import { isLastAdmin } from "@/features/admin/roles"
 import { auth } from "@/lib/auth"
 import { authMiddleware } from "@/middleware/auth"
@@ -178,24 +178,12 @@ export const getDeleteAccountState = createServerFn({ method: "GET" })
   })
 
 // Feeds the danger zone's tier-3 confirm copy — the caller-scoped twin of
-// the admin getUserContentCounts. Counts everything owned, trashed rows
-// included, since the delete cascade destroys those too.
+// the admin getUserContentCounts.
 export const getMyContentCounts = createServerFn({ method: "GET" })
   .middleware([authMiddleware])
-  .handler(async ({ context }) => {
-    const userId = context.session.user.id
-    const [[drawingCount], [folderCount]] = await Promise.all([
-      db
-        .select({ count: count() })
-        .from(drawings)
-        .where(eq(drawings.ownerId, userId)),
-      db
-        .select({ count: count() })
-        .from(folders)
-        .where(eq(folders.ownerId, userId)),
-    ])
-    return { drawings: drawingCount.count, folders: folderCount.count }
-  })
+  .handler(async ({ context }) =>
+    countOwnedContent(db, context.session.user.id),
+  )
 
 // Self-delete behind the Account danger zone (issue #67). hardDeleteUser
 // enforces the last-admin guard server-side regardless of what the UI shows.

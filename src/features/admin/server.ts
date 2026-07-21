@@ -5,11 +5,11 @@ import { createServerFn } from "@tanstack/react-start"
 import { count, eq, or } from "drizzle-orm"
 import z from "zod"
 import { db } from "@/db"
-import { drawings, folders, sessions, users } from "@/db/schema"
+import { sessions, users } from "@/db/schema"
 import { setupFieldsSchema } from "@/features/auth/schema"
 import { auth } from "@/lib/auth"
 import { adminMiddleware } from "@/middleware/admin"
-import { deleteUserAccount } from "./delete-user"
+import { countOwnedContent, deleteUserAccount } from "./delete-user"
 import { isLastAdmin } from "./roles"
 
 export const getUserCount = createServerFn({ method: "GET" }).handler(
@@ -121,21 +121,8 @@ export const deleteUser = createServerFn({ method: "POST" })
   })
 
 // Feeds the tier-3 confirm's count-aware copy ("…and permanently delete
-// their 23 drawings and 4 folders"). Counts everything owned — trashed rows
-// included, since the delete cascade destroys those too.
+// their 23 drawings and 4 folders").
 export const getUserContentCounts = createServerFn({ method: "GET" })
   .middleware([adminMiddleware])
   .inputValidator(z.string())
-  .handler(async ({ data: userId }) => {
-    const [[drawingCount], [folderCount]] = await Promise.all([
-      db
-        .select({ count: count() })
-        .from(drawings)
-        .where(eq(drawings.ownerId, userId)),
-      db
-        .select({ count: count() })
-        .from(folders)
-        .where(eq(folders.ownerId, userId)),
-    ])
-    return { drawings: drawingCount.count, folders: folderCount.count }
-  })
+  .handler(async ({ data: userId }) => countOwnedContent(db, userId))
