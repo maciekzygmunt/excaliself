@@ -433,7 +433,7 @@ test("admins get a secondary invite action leading to the invites surface", () =
   renderHome({ drawings: [], isAdmin: true })
 
   const invite = screen.getByRole("link", { name: /invite your team/i })
-  expect(invite.getAttribute("href")).toBe("/admin")
+  expect(invite.getAttribute("href")).toBe("/settings/invites")
 
   // It joins the cascade as the last step, after the hint
   expect(invite.className).toContain("animate-in")

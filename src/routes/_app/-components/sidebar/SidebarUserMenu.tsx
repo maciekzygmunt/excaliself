@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router"
-import { LogOut, Settings, Wrench } from "lucide-react"
+import { LogOut, Settings, Users } from "lucide-react"
 import { InitialsAvatar } from "@/components/initials-avatar"
 import {
   DropdownMenu,
@@ -46,14 +46,12 @@ export function SidebarUserMenu({ user }: { user: SidebarUser }) {
         align="start"
         sideOffset={4}
       >
-        {/* Interim entry until the admin surfaces move under /settings —
-            /admin is otherwise unreachable from chrome. */}
         {user.isAdmin && (
           <>
             <DropdownMenuItem asChild>
-              <Link to="/admin">
-                <Wrench className="mr-2 h-4 w-4" />
-                Admin Settings
+              <Link to="/settings/members">
+                <Users className="mr-2 h-4 w-4" />
+                Members
               </Link>
             </DropdownMenuItem>
             <DropdownMenuSeparator />

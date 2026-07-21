@@ -46,14 +46,14 @@ function AccountSkeleton() {
       {[1, 2, 2].map((fields, section) => (
         <div key={section}>
           <div className="mb-4 flex flex-col gap-1.5">
-            <Skeleton className="h-4 w-16 motion-reduce:animate-none" />
-            <Skeleton className="h-3 w-56 motion-reduce:animate-none" />
+            <Skeleton className="h-4 w-16" />
+            <Skeleton className="h-3 w-56" />
           </div>
           <div className="flex max-w-md flex-col gap-5">
             {Array.from({ length: fields }, (_, field) => (
               <div key={field} className="flex flex-col gap-2">
-                <Skeleton className="h-3.5 w-24 motion-reduce:animate-none" />
-                <Skeleton className="h-9 w-full motion-reduce:animate-none" />
+                <Skeleton className="h-3.5 w-24" />
+                <Skeleton className="h-9 w-full" />
               </div>
             ))}
           </div>

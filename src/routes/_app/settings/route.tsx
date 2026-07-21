@@ -37,21 +37,27 @@ function SettingsLayout() {
   )
 }
 
-// Outline-style second-column sub-nav. The Instance group's entries
-// (Members, Invites, Instance) are added as those pages land — the scaffold
-// never shows dead links.
+// Outline-style second-column sub-nav. Only admins see it, so the Instance
+// group needs no per-entry gating.
 function SettingsSubNav() {
   return (
     <nav
       aria-label="Settings sections"
       className="flex shrink-0 flex-col gap-1 md:w-36"
     >
+      {/* On phones each column group becomes a row of pills above the content. */}
       <div className="px-2 pb-0.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground/70">
         Account
       </div>
-      {/* On phones the column becomes a row of pills above the content. */}
       <div className="flex flex-row gap-1 md:flex-col">
         <SettingsNavItem to="/settings" label="Account" />
+      </div>
+      <div className="px-2 pb-0.5 pt-3 text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground/70">
+        Instance
+      </div>
+      <div className="flex flex-row gap-1 md:flex-col">
+        <SettingsNavItem to="/settings/members" label="Members" />
+        <SettingsNavItem to="/settings/invites" label="Invites" />
       </div>
     </nav>
   )
