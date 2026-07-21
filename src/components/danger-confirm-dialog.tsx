@@ -28,8 +28,8 @@ export function DangerConfirmDialog({
   confirmDisabled = false,
   onConfirm,
 }: {
-  /** Rendered via asChild — must accept button props (a plain element works). */
-  trigger: React.ReactNode
+  /** Rendered via the render prop — must accept button props. */
+  trigger: React.ReactElement
   title: string
   description: React.ReactNode
   confirmLabel: string
@@ -70,7 +70,7 @@ export function DangerConfirmDialog({
         if (!pending) setOpen(next)
       }}
     >
-      <AlertDialogTrigger asChild>{trigger}</AlertDialogTrigger>
+      <AlertDialogTrigger render={trigger} />
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>{title}</AlertDialogTitle>
