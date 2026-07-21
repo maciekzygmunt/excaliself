@@ -5,6 +5,7 @@ import {
   Folder,
   House,
   LayoutGrid,
+  LogOut,
   type LucideIcon,
   Search,
   Settings,
@@ -23,33 +24,55 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { drawingsQueryOptions } from "@/features/drawings/queries"
 import { foldersQueryOptions } from "@/features/folders/queries"
 import { useCommandPaletteShortcut } from "@/hooks/use-command-palette-shortcut"
+import { authClient } from "@/lib/auth-client"
 import { cn } from "@/lib/utils"
+import { useCreateDialog } from "./CreateDialog"
 import { Kbd } from "./sidebar/Kbd"
 
 // Sections render in the fixed order Context → Drawings → Go to → Actions
-// (spec §4.1), never score-interleaved. Go to holds exactly these four
-// static rows; folder matches join it as dynamic rows while typing.
-const goToRows: { to: string; label: string; icon: LucideIcon }[] = [
-  { to: "/draw", label: "Home", icon: House },
-  { to: "/drawings", label: "All drawings", icon: LayoutGrid },
-  { to: "/trash", label: "Trash", icon: Trash2 },
-  { to: "/settings", label: "Settings", icon: Settings },
+// (spec §4.1), never score-interleaved. Go to holds exactly these four static
+// rows, joined by folder matches as dynamic rows while typing (never static);
+// Actions exactly these three — no theme row, no invite actions.
+type PaletteRow =
+  | {
+      kind: "goto"
+      id: string
+      label: string
+      icon: LucideIcon
+      to: string
+      params?: { id: string }
+    }
+  | {
+      kind: "action"
+      id: "new-drawing" | "new-folder" | "sign-out"
+      label: string
+      icon: LucideIcon
+    }
+
+const goToRows: PaletteRow[] = [
+  { kind: "goto", id: "home", label: "Home", icon: House, to: "/draw" },
+  {
+    kind: "goto",
+    id: "drawings",
+    label: "All drawings",
+    icon: LayoutGrid,
+    to: "/drawings",
+  },
+  { kind: "goto", id: "trash", label: "Trash", icon: Trash2, to: "/trash" },
+  {
+    kind: "goto",
+    id: "settings",
+    label: "Settings",
+    icon: Settings,
+    to: "/settings",
+  },
 ]
 
-type PaletteRow = {
-  key: string
-  label: string
-  icon: LucideIcon
-  go: () => void
-}
-
-type PaletteSection = {
-  title: string
-  // Index of the section's first row in the flattened row list, so the
-  // single active-row cursor can span sections
-  start: number
-  rows: PaletteRow[]
-}
+const actionRows: PaletteRow[] = [
+  { kind: "action", id: "new-drawing", label: "New drawing", icon: File },
+  { kind: "action", id: "new-folder", label: "New folder", icon: Folder },
+  { kind: "action", id: "sign-out", label: "Sign out", icon: LogOut },
+]
 
 type CommandPaletteProps = {
   open: boolean
@@ -58,6 +81,7 @@ type CommandPaletteProps = {
 
 export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
   const navigate = useNavigate()
+  const { openCreateDrawingDialog, openCreateFolderDialog } = useCreateDialog()
   const [query, setQuery] = useState("")
   const [activeIndex, setActiveIndex] = useState(0)
 
@@ -74,7 +98,8 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
   const { data: folders } = useQuery(foldersQueryOptions())
 
   const q = query.trim().toLowerCase()
-  const matches = (name: string) => name.toLowerCase().includes(q)
+  const matchesQuery = (label: string) => label.toLowerCase().includes(q)
+  const matches = (row: PaletteRow) => matchesQuery(row.label)
 
   // Drawings is a live search only — the empty-input launcher (recents) is a
   // separate slice. getDrawings already excludes trashed rows; filter again
@@ -83,12 +108,14 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
     q === ""
       ? []
       : (drawings ?? [])
-          .filter((d) => d.deletedAt === null && matches(d.name))
+          .filter((d) => d.deletedAt === null && matchesQuery(d.name))
           .map((d) => ({
-            key: `drawing-${d.id}`,
+            kind: "goto",
+            id: `drawing-${d.id}`,
             label: d.name,
             icon: File,
-            go: () => navigate({ to: "/draw/$id", params: { id: d.id } }),
+            to: "/draw/$id",
+            params: { id: d.id },
           }))
 
   // Folders are never static Go to rows — they only appear while typing
@@ -96,44 +123,46 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
     q === ""
       ? []
       : (folders ?? [])
-          .filter((f) => matches(f.name))
+          .filter((f) => matchesQuery(f.name))
           .map((f) => ({
-            key: `folder-${f.id}`,
+            kind: "goto",
+            id: `folder-${f.id}`,
             label: f.name,
             icon: Folder,
-            go: () => navigate({ to: "/folder/$id", params: { id: f.id } }),
+            to: "/folder/$id",
+            params: { id: f.id },
           }))
 
-  let start = 0
-  const sections: PaletteSection[] = [
-    { title: "Drawings", rows: drawingRows },
+  // Empty sections collapse; activeIndex runs across the remaining sections
+  // so arrow keys walk the whole list, not one section
+  const sections = [
+    { title: "Drawings", rows: drawingRows, offset: 0 },
     {
       title: "Go to",
-      rows: [
-        ...goToRows
-          .filter((row) => matches(row.label))
-          .map((row) => ({
-            key: `goto-${row.to}`,
-            label: row.label,
-            icon: row.icon,
-            go: () => navigate({ to: row.to }),
-          })),
-        ...folderRows,
-      ],
+      rows: [...goToRows.filter(matches), ...folderRows],
+      offset: 0,
     },
-  ]
-    .filter((section) => section.rows.length > 0)
-    .map((section) => {
-      const positioned = { ...section, start }
-      start += section.rows.length
-      return positioned
-    })
-
+    { title: "Actions", rows: actionRows.filter(matches), offset: 0 },
+  ].filter((section) => section.rows.length > 0)
+  for (let i = 1; i < sections.length; i++) {
+    sections[i].offset = sections[i - 1].offset + sections[i - 1].rows.length
+  }
   const rows = sections.flatMap((section) => section.rows)
 
-  const select = (row: PaletteRow) => {
+  const select = async (row: PaletteRow) => {
     onOpenChange(false)
-    row.go()
+    if (row.kind === "goto") {
+      navigate({ to: row.to, params: row.params })
+    } else if (row.id === "new-drawing") {
+      // The palette is list-only, never a form — both create rows close it
+      // into the standard create dialog (spec §4.1)
+      openCreateDrawingDialog()
+    } else if (row.id === "new-folder") {
+      openCreateFolderDialog()
+    } else {
+      await authClient.signOut()
+      window.location.href = "/login"
+    }
   }
 
   const onInputKeyDown = (e: React.KeyboardEvent) => {
@@ -179,7 +208,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
             aria-controls="command-palette-list"
             aria-activedescendant={
               rows[activeIndex]
-                ? `command-palette-row-${rows[activeIndex].key}`
+                ? `command-palette-row-${rows[activeIndex].id}`
                 : undefined
             }
             placeholder="Search…"
@@ -198,17 +227,17 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
                 <div className="px-2.5 pt-1.5 pb-1 text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground/70">
                   {section.title}
                 </div>
-                {section.rows.map((row, j) => {
-                  const i = section.start + j
-                  const isActive = i === activeIndex
+                {section.rows.map((row, i) => {
+                  const index = section.offset + i
+                  const isActive = index === activeIndex
                   return (
                     <button
-                      key={row.key}
-                      id={`command-palette-row-${row.key}`}
+                      key={row.id}
+                      id={`command-palette-row-${row.id}`}
                       type="button"
                       role="option"
                       aria-selected={isActive}
-                      onMouseEnter={() => setActiveIndex(i)}
+                      onMouseEnter={() => setActiveIndex(index)}
                       onClick={() => select(row)}
                       className={cn(
                         "flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-[13px] text-foreground",

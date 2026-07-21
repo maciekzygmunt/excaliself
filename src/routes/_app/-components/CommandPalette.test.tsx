@@ -23,11 +23,25 @@ vi.mock("@/features/folders/server", () => ({
   getFolders: vi.fn(),
 }))
 
+const openCreateDrawingDialog = vi.fn()
+const openCreateFolderDialog = vi.fn()
+vi.mock("./CreateDialog", () => ({
+  useCreateDialog: () => ({ openCreateDrawingDialog, openCreateFolderDialog }),
+}))
+
+const signOut = vi.hoisted(() => vi.fn(() => Promise.resolve()))
+vi.mock("@/lib/auth-client", () => ({
+  authClient: { signOut },
+}))
+
 const onOpenChange = vi.fn()
 
 beforeEach(() => {
   navigate.mockClear()
   onOpenChange.mockClear()
+  openCreateDrawingDialog.mockClear()
+  openCreateFolderDialog.mockClear()
+  signOut.mockClear()
 })
 
 // Auto-cleanup needs vitest globals, which this repo leaves off.
@@ -103,19 +117,35 @@ function optionLabels() {
   return screen.getAllByRole("option").map((r) => r.textContent)
 }
 
-test("empty input shows exactly the four Go to rows — no drawings or folders", () => {
+test("empty input shows the four Go to rows then the three Actions rows — no drawings or folders", () => {
   renderOpenPalette({
     drawings: [makeDrawing({ id: "d1", name: "Homework" })],
     folders: [makeFolder({ id: "f1", name: "Homes" })],
   })
-  expect(optionLabels()).toEqual(["Home", "All drawings", "Trash", "Settings"])
+  expect(optionLabels()).toEqual([
+    "Home",
+    "All drawings",
+    "Trash",
+    "Settings",
+    "New drawing",
+    "New folder",
+    "Sign out",
+  ])
   expect(screen.queryByText("Drawings")).toBeNull()
+})
+
+test("the Actions section header renders after Go to", () => {
+  renderOpenPalette()
+  const headers = screen
+    .getAllByText(/^(Go to|Actions)$/)
+    .map((el) => el.textContent)
+  expect(headers).toEqual(["Go to", "Actions"])
 })
 
 test("Enter selects the first row, navigates and closes", () => {
   const input = renderOpenPalette()
   fireEvent.keyDown(input, { key: "Enter" })
-  expect(navigate).toHaveBeenCalledWith({ to: "/draw" })
+  expect(navigate).toHaveBeenCalledWith({ to: "/draw", params: undefined })
   expect(onOpenChange).toHaveBeenCalledWith(false)
 })
 
@@ -125,22 +155,72 @@ test("arrow keys move the active row before Enter", () => {
   fireEvent.keyDown(input, { key: "ArrowDown" })
   fireEvent.keyDown(input, { key: "ArrowUp" })
   fireEvent.keyDown(input, { key: "Enter" })
-  expect(navigate).toHaveBeenCalledWith({ to: "/drawings" })
+  expect(navigate).toHaveBeenCalledWith({ to: "/drawings", params: undefined })
+})
+
+test("arrow keys cross the section boundary into Actions", () => {
+  const input = renderOpenPalette()
+  for (let i = 0; i < 4; i++) fireEvent.keyDown(input, { key: "ArrowDown" })
+  fireEvent.keyDown(input, { key: "Enter" })
+  expect(openCreateDrawingDialog).toHaveBeenCalled()
+  expect(navigate).not.toHaveBeenCalled()
 })
 
 test("clicking a row navigates and closes", () => {
   renderOpenPalette()
   fireEvent.click(screen.getByRole("option", { name: "Trash" }))
-  expect(navigate).toHaveBeenCalledWith({ to: "/trash" })
+  expect(navigate).toHaveBeenCalledWith({ to: "/trash", params: undefined })
   expect(onOpenChange).toHaveBeenCalledWith(false)
+})
+
+test("New drawing closes the palette into the create drawing dialog", () => {
+  renderOpenPalette()
+  fireEvent.click(screen.getByRole("option", { name: "New drawing" }))
+  expect(onOpenChange).toHaveBeenCalledWith(false)
+  expect(openCreateDrawingDialog).toHaveBeenCalledWith()
+  expect(openCreateFolderDialog).not.toHaveBeenCalled()
+  expect(navigate).not.toHaveBeenCalled()
+})
+
+test("New folder closes the palette into the create folder dialog", () => {
+  renderOpenPalette()
+  fireEvent.click(screen.getByRole("option", { name: "New folder" }))
+  expect(onOpenChange).toHaveBeenCalledWith(false)
+  expect(openCreateFolderDialog).toHaveBeenCalledWith()
+  expect(openCreateDrawingDialog).not.toHaveBeenCalled()
+})
+
+test("Sign out ends the session and lands on the login page", async () => {
+  const location = { href: "" }
+  vi.stubGlobal("location", location)
+  try {
+    renderOpenPalette()
+    fireEvent.click(screen.getByRole("option", { name: "Sign out" }))
+    expect(onOpenChange).toHaveBeenCalledWith(false)
+    expect(signOut).toHaveBeenCalled()
+    await vi.waitFor(() => expect(location.href).toBe("/login"))
+  } finally {
+    vi.unstubAllGlobals()
+  }
+})
+
+test("typing filters across both static sections", () => {
+  const input = renderOpenPalette()
+  fireEvent.change(input, { target: { value: "new" } })
+  expect(optionLabels()).toEqual(["New drawing", "New folder"])
+  // Go to matched nothing, so its header collapses with it
+  expect(screen.queryByText("Go to")).toBeNull()
+  fireEvent.keyDown(input, { key: "Enter" })
+  expect(openCreateDrawingDialog).toHaveBeenCalled()
 })
 
 test("typing filters within the Go to section", () => {
   const input = renderOpenPalette()
   fireEvent.change(input, { target: { value: "set" } })
   expect(optionLabels()).toEqual(["Settings"])
+  expect(screen.queryByText("Actions")).toBeNull()
   fireEvent.keyDown(input, { key: "Enter" })
-  expect(navigate).toHaveBeenCalledWith({ to: "/settings" })
+  expect(navigate).toHaveBeenCalledWith({ to: "/settings", params: undefined })
 })
 
 test("a query with no matches shows the empty state", () => {
@@ -179,14 +259,14 @@ test("selecting a drawing opens it and closes the palette", () => {
   expect(onOpenChange).toHaveBeenCalledWith(false)
 })
 
-test("arrow keys walk across section boundaries", () => {
+test("arrow keys cross from Drawings into Go to", () => {
   const input = renderOpenPalette({
     drawings: [makeDrawing({ id: "d1", name: "Settings sketch" })],
   })
   fireEvent.change(input, { target: { value: "set" } })
   fireEvent.keyDown(input, { key: "ArrowDown" })
   fireEvent.keyDown(input, { key: "Enter" })
-  expect(navigate).toHaveBeenCalledWith({ to: "/settings" })
+  expect(navigate).toHaveBeenCalledWith({ to: "/settings", params: undefined })
 })
 
 test("trashed drawings never appear, even if a stale cache holds one", () => {
@@ -233,6 +313,7 @@ test("sections with no matches collapse entirely", () => {
   fireEvent.change(input, { target: { value: "road" } })
   expect(optionLabels()).toEqual(["Roadmap"])
   expect(screen.queryByText("Go to")).toBeNull()
+  expect(screen.queryByText("Actions")).toBeNull()
 })
 
 test("Cmd+K on the provider opens the palette", () => {
