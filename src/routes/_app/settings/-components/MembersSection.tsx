@@ -344,15 +344,17 @@ function RoleSelect({
     <Tooltip>
       {/* A disabled trigger swallows pointer events, so the tooltip listens
           on a focusable wrapper instead. */}
-      <TooltipTrigger asChild>
-        {/* tabIndex lets keyboard users reach the wrapper and hear why the
-            control is disabled. */}
-        <span
-          tabIndex={0}
-          className="rounded-md outline-none focus-visible:ring-ring/30 focus-visible:ring-[2px]"
-        >
-          {select}
-        </span>
+      <TooltipTrigger
+        render={
+          // tabIndex lets keyboard users reach the wrapper and hear why the
+          // control is disabled.
+          <span
+            tabIndex={0}
+            className="rounded-md outline-none focus-visible:ring-ring/30 focus-visible:ring-[2px]"
+          />
+        }
+      >
+        {select}
       </TooltipTrigger>
       <TooltipContent>The last admin can't be demoted.</TooltipContent>
     </Tooltip>
