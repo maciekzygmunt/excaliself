@@ -4,8 +4,8 @@ import { emailPrefix } from "@/features/account/display-name"
 import { useUpdateProfile } from "@/features/account/mutations"
 import type { CurrentUser } from "@/features/account/queries"
 
-// Profile block (spec §5.12): optional display name with optimistic save,
-// email shown read-only — changing it is a later ticket's credential flow.
+// Profile block (spec §5.12): optional display name with optimistic save.
+// The sign-in email lives in the Email section below, with its change flow.
 export function ProfileSection({ user }: { user: CurrentUser }) {
   const updateProfile = useUpdateProfile()
   const currentName = user.name ?? ""
@@ -47,17 +47,6 @@ export function ProfileSection({ user }: { user: CurrentUser }) {
           <FieldDescription>
             Optional — when empty you go by your email prefix.
           </FieldDescription>
-        </Field>
-
-        <Field>
-          <FieldLabel htmlFor="account-email">Email</FieldLabel>
-          <Input
-            id="account-email"
-            readOnly
-            value={user.email}
-            className="text-muted-foreground focus-visible:ring-0 focus-visible:border-input/80"
-          />
-          <FieldDescription>This is your sign-in email.</FieldDescription>
         </Field>
       </div>
     </section>
