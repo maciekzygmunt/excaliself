@@ -1,8 +1,14 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { usersQueryOptions } from "@/features/admin/queries"
-import { type CurrentUser, currentUserQueryOptions } from "./queries"
-import { updateProfile } from "./server"
+import {
+  type ActiveSession,
+  type CurrentUser,
+  currentUserQueryOptions,
+  sessionsQueryOptions,
+} from "./queries"
+import { revokeOtherSessions, revokeSessionById, updateProfile } from "./server"
+import { compareSessions } from "./sessions"
 
 /**
  * Save the display name optimistically (spec §4.3): the new name lands in
@@ -43,4 +49,69 @@ export function useUpdateProfile() {
   })
 
   return (name: string) => mutation.mutate({ data: { name: name.trim() } })
+}
+
+/**
+ * Both revoke flavors drop rows optimistically (spec §4.3) and roll back
+ * with an error toast if the server call fails — they differ only in which
+ * rows survive. The shared scope serializes the server calls, but every
+ * onMutate still fires at click time — so a failure must not restore a
+ * whole-list snapshot, which would resurrect rows a later overlapping
+ * revoke already removed. Rollback instead re-inserts only the rows this
+ * mutation itself removed and that nothing else has since put back.
+ */
+function useRevokeMutation<TVars>(options: {
+  mutationFn: (vars: TVars) => Promise<unknown>
+  keep: (session: ActiveSession, vars: TVars) => boolean
+  errorMessage: string
+}) {
+  const queryClient = useQueryClient()
+  const sessionsKey = sessionsQueryOptions().queryKey
+
+  return useMutation({
+    mutationFn: options.mutationFn,
+    scope: { id: "account-sessions" },
+    onMutate: async (vars: TVars) => {
+      await queryClient.cancelQueries({ queryKey: sessionsKey })
+      const current = queryClient.getQueryData<ActiveSession[]>(sessionsKey)
+      const removed =
+        current?.filter((session) => !options.keep(session, vars)) ?? []
+      queryClient.setQueryData<ActiveSession[]>(sessionsKey, (list) =>
+        list?.filter((session) => options.keep(session, vars)),
+      )
+      return { removed }
+    },
+    onError: (_err, _vars, context) => {
+      queryClient.setQueryData<ActiveSession[]>(sessionsKey, (list) => {
+        if (!list) return list
+        const present = new Set(list.map((session) => session.id))
+        const resurrected = (context?.removed ?? []).filter(
+          (session) => !present.has(session.id),
+        )
+        return [...list, ...resurrected].sort(compareSessions)
+      })
+      toast.error(options.errorMessage)
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: sessionsKey })
+    },
+  })
+}
+
+export function useRevokeSession() {
+  const mutation = useRevokeMutation({
+    mutationFn: revokeSessionById,
+    keep: (session, vars) => session.id !== vars.data.id,
+    errorMessage: "Couldn't revoke session",
+  })
+  return (id: string) => mutation.mutate({ data: { id } })
+}
+
+export function useRevokeOtherSessions() {
+  const mutation = useRevokeMutation({
+    mutationFn: () => revokeOtherSessions(),
+    keep: (session) => session.current,
+    errorMessage: "Couldn't sign out all other sessions",
+  })
+  return () => mutation.mutate(undefined)
 }
