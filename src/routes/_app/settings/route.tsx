@@ -58,6 +58,7 @@ function SettingsSubNav() {
       <div className="flex flex-row gap-1 md:flex-col">
         <SettingsNavItem to="/settings/members" label="Members" />
         <SettingsNavItem to="/settings/invites" label="Invites" />
+        <SettingsNavItem to="/settings/instance" label="Instance" />
       </div>
     </nav>
   )
