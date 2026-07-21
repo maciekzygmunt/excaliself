@@ -28,8 +28,6 @@ export const getCurrentUser = createServerFn({ method: "GET" })
     return user
   })
 
-// Display name is optional (spec §5.12): an empty submission clears it back
-// to null so the email-prefix fallback takes over everywhere.
 export type ChangeEmailResult =
   | { ok: true }
   | { ok: false; error: "invalid-password" | "email-taken" }
@@ -71,13 +69,34 @@ export const changeEmail = createServerFn({ method: "POST" })
       .where(and(eq(users.email, data.newEmail), ne(users.id, userId)))
     if (taken) return { ok: false, error: "email-taken" }
 
-    await db
-      .update(users)
-      .set({ email: data.newEmail, updatedAt: new Date() })
-      .where(eq(users.id, userId))
+    try {
+      await db
+        .update(users)
+        .set({ email: data.newEmail, updatedAt: new Date() })
+        .where(eq(users.id, userId))
+    } catch (error) {
+      // The pre-check races a concurrent claim of the same email; the unique
+      // constraint is the arbiter, so map its violation to the same result.
+      if (isUniqueViolation(error)) return { ok: false, error: "email-taken" }
+      throw error
+    }
     return { ok: true }
   })
 
+// Postgres unique_violation; node-postgres surfaces the code on the error
+// itself, drizzle sometimes on its cause.
+function isUniqueViolation(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    (("code" in error && error.code === "23505") ||
+      (error.cause instanceof Error &&
+        "code" in error.cause &&
+        error.cause.code === "23505"))
+  )
+}
+
+// Display name is optional (spec §5.12): an empty submission clears it back
+// to null so the email-prefix fallback takes over everywhere.
 export const updateProfile = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
   .inputValidator(z.object({ name: z.string().trim().max(120) }))

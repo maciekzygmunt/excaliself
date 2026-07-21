@@ -98,6 +98,8 @@ export function EmailSection({ user }: { user: CurrentUser }) {
             )}
           />
         </FieldGroup>
+        {/* Unlike the auth pages' !canSubmit, disable only while in flight:
+            a server-side error must never leave the button stuck disabled. */}
         <form.Subscribe selector={(s) => s.isSubmitting}>
           {(isSubmitting) => (
             <Button

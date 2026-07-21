@@ -26,9 +26,12 @@ export function PasswordSection() {
         revokeOtherSessions: true,
       })
       if (error) {
-        // The endpoint reports a failed re-auth as this exact message; the
-        // body carries no machine code (FieldError renders `{ message }`).
-        if (error.message === "Invalid password") {
+        // better-auth reports a failed re-auth as "Invalid password"; the
+        // code check covers versions that add a machine code to the body.
+        if (
+          error.code === "INVALID_PASSWORD" ||
+          error.message === "Invalid password"
+        ) {
           formApi.setErrorMap({
             onSubmit: {
               fields: { currentPassword: { message: "Incorrect password" } },
@@ -93,6 +96,8 @@ export function PasswordSection() {
             )}
           />
         </FieldGroup>
+        {/* Unlike the auth pages' !canSubmit, disable only while in flight:
+            a server-side error must never leave the button stuck disabled. */}
         <form.Subscribe selector={(s) => s.isSubmitting}>
           {(isSubmitting) => (
             <Button
