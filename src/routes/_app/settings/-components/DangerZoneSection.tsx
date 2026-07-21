@@ -46,7 +46,7 @@ export function DangerZoneSection({ user }: { user: CurrentUser }) {
         </p>
       </div>
 
-      <div className="flex max-w-md items-center justify-between gap-4 rounded-lg border border-destructive/30 p-4">
+      <div className="flex items-center justify-between gap-4 rounded-lg border border-destructive/30 p-4">
         <div className="min-w-0">
           <p className="text-sm text-foreground">Delete account</p>
           <p className="text-xs text-muted-foreground">
