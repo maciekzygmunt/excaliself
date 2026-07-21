@@ -1,18 +1,42 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
-import { act, cleanup, render, screen } from "@testing-library/react"
-import { afterEach, expect, test, vi } from "vitest"
-import { usersQueryOptions } from "@/features/admin/queries"
-import { getAllUsers } from "@/features/admin/server"
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react"
+import { afterEach, beforeAll, beforeEach, expect, test, vi } from "vitest"
+import { currentUserQueryOptions } from "@/features/account/queries"
+import { getCurrentUser } from "@/features/account/server"
+import { type AdminUser, usersQueryOptions } from "@/features/admin/queries"
+import { getAllUsers, setUserRole } from "@/features/admin/server"
 import { MembersSection } from "./MembersSection"
 
 // The query module imports the server function, which imports the db — stub
 // the server-function edge (the cache is seeded, so it is never called).
 vi.mock("@/features/admin/server", () => ({
   getAllUsers: vi.fn(),
+  setUserRole: vi.fn(),
+}))
+vi.mock("@/features/account/server", () => ({
+  getCurrentUser: vi.fn(),
+}))
+
+const { toastMock, navigateMock, invalidateMock } = vi.hoisted(() => ({
+  toastMock: Object.assign(vi.fn(), { error: vi.fn(), success: vi.fn() }),
+  navigateMock: vi.fn(),
+  invalidateMock: vi.fn(),
+}))
+vi.mock("sonner", () => ({ toast: toastMock }))
+vi.mock("@tanstack/react-router", () => ({
+  useNavigate: () => navigateMock,
+  useRouter: () => ({ invalidate: invalidateMock }),
 }))
 
 // Deliberately out of join order: Bea (Feb) before ada (Jan) before Cy (Mar).
-const members = [
+const members: AdminUser[] = [
   {
     id: "user-bea",
     email: "bea@example.com",
@@ -45,16 +69,57 @@ const members = [
   },
 ]
 
+// Same instance with Bea promoted, so ada is no longer the last admin.
+const twoAdmins: AdminUser[] = members.map((member) =>
+  member.id === "user-bea" ? { ...member, role: "admin" as const } : member,
+)
+
+// The viewer is ada, the admin browsing /settings/members.
+const viewer = {
+  id: "user-ada",
+  email: "ada@example.com",
+  name: null,
+  role: "admin" as const,
+}
+
+// Radix's popper positions the open tooltip with ResizeObserver, which jsdom
+// doesn't implement.
+beforeAll(() => {
+  if (!("ResizeObserver" in globalThis)) {
+    Object.defineProperty(globalThis, "ResizeObserver", {
+      configurable: true,
+      value: class {
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+      },
+    })
+  }
+})
+
+beforeEach(() => {
+  vi.mocked(setUserRole).mockReset().mockResolvedValue(undefined)
+  vi.mocked(getAllUsers).mockReset()
+  vi.mocked(getCurrentUser).mockReset().mockResolvedValue(viewer)
+  navigateMock.mockReset().mockResolvedValue(undefined)
+  invalidateMock.mockReset().mockResolvedValue(undefined)
+  toastMock.error.mockReset()
+})
+
 // Auto-cleanup needs vitest globals, which this repo leaves off.
 afterEach(() => {
   cleanup()
   vi.useRealTimers()
 })
 
-function renderSection({ seed = true } = {}) {
-  const queryClient = new QueryClient()
+function renderSection({ seed = true, users = members } = {}) {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  })
   if (seed) {
-    queryClient.setQueryData(usersQueryOptions().queryKey, members)
+    queryClient.setQueryData(usersQueryOptions().queryKey, users)
+    queryClient.setQueryData(currentUserQueryOptions().queryKey, viewer)
+    vi.mocked(getAllUsers).mockResolvedValue(users)
   }
   return render(
     <QueryClientProvider client={queryClient}>
@@ -63,19 +128,18 @@ function renderSection({ seed = true } = {}) {
   )
 }
 
+const roleSelect = (displayName: string) =>
+  screen.getByRole("combobox", {
+    name: `Role for ${displayName}`,
+  }) as HTMLSelectElement
+
 test("the header shows the member count", () => {
   renderSection()
   expect(screen.getByText("3 members")).not.toBeNull()
 })
 
 test("a single member is counted in the singular", () => {
-  const queryClient = new QueryClient()
-  queryClient.setQueryData(usersQueryOptions().queryKey, [members[0]])
-  render(
-    <QueryClientProvider client={queryClient}>
-      <MembersSection />
-    </QueryClientProvider>,
-  )
+  renderSection({ users: [members[1]] })
   expect(screen.getByText("1 member")).not.toBeNull()
 })
 
@@ -104,9 +168,136 @@ test("every row carries the shared initials avatar", () => {
   ).toHaveLength(3)
 })
 
-test("the lean list offers no row actions", () => {
+test("every row shows a role select reflecting the current role", () => {
   renderSection()
-  expect(screen.queryAllByRole("button")).toHaveLength(0)
+  expect(roleSelect("ada").value).toBe("admin")
+  expect(roleSelect("Bea").value).toBe("user")
+  expect(roleSelect("Cy").value).toBe("user")
+})
+
+test("the sole admin's select is disabled with an explanation", async () => {
+  renderSection()
+  const select = roleSelect("ada")
+  expect(select.disabled).toBe(true)
+
+  // The tooltip listens on the focusable wrapper around the disabled select.
+  fireEvent.focus(select.parentElement as HTMLElement)
+  await waitFor(() =>
+    expect(
+      screen.getAllByText("The last admin can't be demoted.").length,
+    ).toBeGreaterThan(0),
+  )
+})
+
+test("an admin can be demoted while another admin remains", async () => {
+  // A never-settling call proves the flip happens before the server answers.
+  vi.mocked(setUserRole).mockReturnValue(new Promise(() => {}))
+  renderSection({ users: twoAdmins })
+  const select = roleSelect("Bea")
+  expect(select.disabled).toBe(false)
+
+  fireEvent.change(select, { target: { value: "user" } })
+  await waitFor(() => expect(roleSelect("Bea").value).toBe("user"))
+  // react-query passes a context object as a second argument.
+  await waitFor(() =>
+    expect(vi.mocked(setUserRole).mock.calls[0]?.[0]).toEqual({
+      data: { userId: "user-bea", role: "user" },
+    }),
+  )
+})
+
+test("promoting a member applies optimistically", async () => {
+  vi.mocked(setUserRole).mockReturnValue(new Promise(() => {}))
+  renderSection()
+  fireEvent.change(roleSelect("Bea"), {
+    target: { value: "admin" },
+  })
+  await waitFor(() => expect(roleSelect("Bea").value).toBe("admin"))
+  await waitFor(() =>
+    expect(vi.mocked(setUserRole).mock.calls[0]?.[0]).toEqual({
+      data: { userId: "user-bea", role: "admin" },
+    }),
+  )
+})
+
+test("a rejected role change rolls back with an error toast", async () => {
+  vi.mocked(setUserRole).mockRejectedValue(new Error("boom"))
+  renderSection()
+
+  fireEvent.change(roleSelect("Bea"), {
+    target: { value: "admin" },
+  })
+
+  await waitFor(() =>
+    expect(toastMock.error).toHaveBeenCalledWith("Couldn't change role"),
+  )
+  await waitFor(() => expect(roleSelect("Bea").value).toBe("user"))
+})
+
+test("demoting yourself asks for confirmation before anything is sent", () => {
+  renderSection({ users: twoAdmins })
+  fireEvent.change(roleSelect("ada"), {
+    target: { value: "user" },
+  })
+
+  expect(screen.getByText("Leave the admin role?")).not.toBeNull()
+  expect(setUserRole).not.toHaveBeenCalled()
+  // The select stays on Admin until the demotion is confirmed. The open
+  // modal aria-hides the page behind it, hence the hidden query.
+  const select = screen.getByRole("combobox", {
+    name: "Role for ada",
+    hidden: true,
+  }) as HTMLSelectElement
+  expect(select.value).toBe("admin")
+})
+
+test("confirming a self-demote applies it and leaves the admin area", async () => {
+  renderSection({ users: twoAdmins })
+  fireEvent.change(roleSelect("ada"), {
+    target: { value: "user" },
+  })
+  fireEvent.click(screen.getByRole("button", { name: "Demote me" }))
+
+  await waitFor(() =>
+    expect(setUserRole).toHaveBeenCalledWith({
+      data: { userId: "user-ada", role: "user" },
+    }),
+  )
+  // The members page is admin-only, so a confirmed self-demote lands on the
+  // Account page and re-runs the loaders that gate the admin chrome.
+  await waitFor(() =>
+    expect(navigateMock).toHaveBeenCalledWith({ to: "/settings" }),
+  )
+  await waitFor(() => expect(invalidateMock).toHaveBeenCalled())
+})
+
+test("cancelling a self-demote changes nothing", async () => {
+  renderSection({ users: twoAdmins })
+  fireEvent.change(roleSelect("ada"), {
+    target: { value: "user" },
+  })
+  fireEvent.click(screen.getByRole("button", { name: "Cancel" }))
+
+  await waitFor(() =>
+    expect(screen.queryByText("Leave the admin role?")).toBeNull(),
+  )
+  expect(setUserRole).not.toHaveBeenCalled()
+  expect(roleSelect("ada").value).toBe("admin")
+})
+
+test("a failed self-demote keeps the dialog open with an error toast", async () => {
+  vi.mocked(setUserRole).mockRejectedValue(new Error("boom"))
+  renderSection({ users: twoAdmins })
+  fireEvent.change(roleSelect("ada"), {
+    target: { value: "user" },
+  })
+  fireEvent.click(screen.getByRole("button", { name: "Demote me" }))
+
+  await waitFor(() =>
+    expect(toastMock.error).toHaveBeenCalledWith("Couldn't change role"),
+  )
+  expect(screen.getByText("Leave the admin role?")).not.toBeNull()
+  expect(navigateMock).not.toHaveBeenCalled()
 })
 
 test("the skeleton appears only after the grace period", () => {
