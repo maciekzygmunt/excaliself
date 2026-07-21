@@ -1,8 +1,10 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useNavigate, useRouter } from "@tanstack/react-router"
+import { MoreHorizontal, Trash2 } from "lucide-react"
 import { useState } from "react"
 import { toast } from "sonner"
 import { InitialsAvatar } from "@/components/initials-avatar"
+import { TypeToConfirmDialog } from "@/components/type-to-confirm-dialog"
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -13,6 +15,12 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
   Tooltip,
@@ -25,19 +33,24 @@ import {
   currentUserQueryOptions,
 } from "@/features/account/queries"
 import { ROLE_CHANGE_ERROR_TOAST, useSetRole } from "@/features/admin/mutations"
-import { type AdminUser, usersQueryOptions } from "@/features/admin/queries"
+import {
+  type AdminUser,
+  userContentCountsQueryOptions,
+  usersQueryOptions,
+} from "@/features/admin/queries"
 import {
   adminIds,
   isLastAdmin,
   ROLE_LABELS,
   type Role,
 } from "@/features/admin/roles"
-import { setUserRole } from "@/features/admin/server"
+import { deleteUser, setUserRole } from "@/features/admin/server"
+import { describeContents } from "@/features/trash/destroy-copy"
 import { useDelayedVisible } from "@/hooks/use-delayed-visible"
 
-// Members list with inline role management (issue #65). Removal and password
-// resets still land in follow-up tickets — deliberately, rows never offer
-// deleting yourself here.
+// Members list with inline role management (issue #65) and admin delete
+// (issue #66). Password resets still land in a follow-up ticket —
+// deliberately, rows never offer deleting yourself here.
 export function MembersSection() {
   const { data: users, isPending } = useQuery(usersQueryOptions())
   const { data: currentUser } = useQuery(currentUserQueryOptions())
@@ -109,6 +122,13 @@ export function MembersSection() {
                 lastAdmin={isLastAdmin(admins, member.id)}
                 onChange={(role) => handleRoleChange(member, role)}
               />
+              {/* No self-delete here — that lives in the Account danger
+                  zone (issue #66). This page being admin-gated, a sole
+                  admin is always the viewer, so this also blocks deleting
+                  the last admin in the UI; the server enforces both. */}
+              {member.id !== currentUser?.id && (
+                <MemberRowActions user={member} />
+              )}
             </div>
           </li>
         ))}
@@ -123,6 +143,84 @@ export function MembersSection() {
       )}
     </section>
   )
+}
+
+// The overflow menu plus the tier-3 type-to-confirm delete (issue #66).
+// Pessimistic: the dialog stays open with an in-button pending state until
+// the server answers, then the list invalidation drops the row.
+function MemberRowActions({ user }: { user: AdminUser }) {
+  const [confirmOpen, setConfirmOpen] = useState(false)
+  const queryClient = useQueryClient()
+  const displayName = userDisplayName(user)
+
+  // Fetched only once the dialog is up — the danger copy must state what
+  // will actually be destroyed, with fresh counts.
+  const { data: counts, isError: countsFailed } = useQuery({
+    ...userContentCountsQueryOptions(user.id),
+    enabled: confirmOpen,
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: () => deleteUser({ data: user.id }),
+    onSuccess: () =>
+      queryClient.invalidateQueries({
+        queryKey: usersQueryOptions().queryKey,
+      }),
+    onError: () => toast.error(`Couldn't delete ${displayName}`),
+  })
+
+  return (
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            aria-label={`Actions for ${displayName}`}
+            className="text-muted-foreground/60"
+          >
+            <MoreHorizontal className="h-4 w-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem
+            variant="destructive"
+            onSelect={() => setConfirmOpen(true)}
+          >
+            <Trash2 />
+            Delete user
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <TypeToConfirmDialog
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        title={`Delete ${displayName}?`}
+        description={deleteDescription(displayName, counts, countsFailed)}
+        challenge={user.email}
+        confirmLabel="Delete user"
+        pendingLabel="Deleting…"
+        // No confirm until the copy can state real counts.
+        confirmDisabled={!counts}
+        onConfirm={() => deleteMutation.mutateAsync()}
+      />
+    </>
+  )
+}
+
+function deleteDescription(
+  displayName: string,
+  counts: { drawings: number; folders: number } | undefined,
+  countsFailed: boolean,
+) {
+  if (countsFailed)
+    return `Couldn't load ${displayName}'s content counts. Close this dialog and try again.`
+  if (!counts)
+    return `This will delete ${displayName}'s account and permanently delete all of their content. This can't be undone.`
+  const contents = describeContents(counts.drawings, counts.folders)
+  return contents
+    ? `This will delete ${displayName}'s account and permanently delete their ${contents}. This can't be undone.`
+    : `This will delete ${displayName}'s account. They have no drawings or folders. This can't be undone.`
 }
 
 function RoleSelect({
