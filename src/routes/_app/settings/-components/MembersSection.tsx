@@ -19,6 +19,7 @@ import {
   usersQueryOptions,
 } from "@/features/admin/queries"
 import { deleteUser } from "@/features/admin/server"
+import { describeContents } from "@/features/trash/destroy-copy"
 import { useDelayedVisible } from "@/hooks/use-delayed-visible"
 
 // Deliberately lean (issue #64): no search, sort, or pagination — those can
@@ -75,13 +76,7 @@ export function MembersSection() {
                   zone (issue #66). This page being admin-gated, a sole
                   admin is always the viewer, so this also blocks deleting
                   the last admin in the UI; the server enforces both. */}
-              {user.id !== currentUser?.id && (
-                <MemberRowActions
-                  userId={user.id}
-                  email={user.email}
-                  displayName={userDisplayName(user)}
-                />
-              )}
+              {user.id !== currentUser?.id && <MemberRowActions user={user} />}
             </div>
           </li>
         ))}
@@ -94,26 +89,23 @@ export function MembersSection() {
 // Pessimistic: the dialog stays open with an in-button pending state until
 // the server answers, then the list invalidation drops the row.
 function MemberRowActions({
-  userId,
-  email,
-  displayName,
+  user,
 }: {
-  userId: string
-  email: string
-  displayName: string
+  user: { id: string; email: string; name: string | null }
 }) {
   const [confirmOpen, setConfirmOpen] = useState(false)
   const queryClient = useQueryClient()
+  const displayName = userDisplayName(user)
 
   // Fetched only once the dialog is up — the danger copy must state what
   // will actually be destroyed, with fresh counts.
-  const { data: counts } = useQuery({
-    ...userContentCountsQueryOptions(userId),
+  const { data: counts, isError: countsFailed } = useQuery({
+    ...userContentCountsQueryOptions(user.id),
     enabled: confirmOpen,
   })
 
   const deleteMutation = useMutation({
-    mutationFn: () => deleteUser({ data: userId }),
+    mutationFn: () => deleteUser({ data: user.id }),
     onSuccess: () =>
       queryClient.invalidateQueries({
         queryKey: usersQueryOptions().queryKey,
@@ -148,12 +140,8 @@ function MemberRowActions({
         open={confirmOpen}
         onOpenChange={setConfirmOpen}
         title={`Delete ${displayName}?`}
-        description={
-          counts
-            ? `This will delete ${displayName}'s account and permanently delete their ${countNoun(counts.drawings, "drawing")} and ${countNoun(counts.folders, "folder")}. This can't be undone.`
-            : `This will delete ${displayName}'s account and permanently delete all of their content. This can't be undone.`
-        }
-        challenge={email}
+        description={deleteDescription(displayName, counts, countsFailed)}
+        challenge={user.email}
         confirmLabel="Delete user"
         pendingLabel="Deleting…"
         // No confirm until the copy can state real counts.
@@ -164,8 +152,20 @@ function MemberRowActions({
   )
 }
 
-const countNoun = (count: number, noun: string) =>
-  `${count} ${noun}${count === 1 ? "" : "s"}`
+function deleteDescription(
+  displayName: string,
+  counts: { drawings: number; folders: number } | undefined,
+  countsFailed: boolean,
+) {
+  if (countsFailed)
+    return `Couldn't load ${displayName}'s content counts. Close this dialog and try again.`
+  if (!counts)
+    return `This will delete ${displayName}'s account and permanently delete all of their content. This can't be undone.`
+  const contents = describeContents(counts.drawings, counts.folders)
+  return contents
+    ? `This will delete ${displayName}'s account and permanently delete their ${contents}. This can't be undone.`
+    : `This will delete ${displayName}'s account. They have no drawings or folders. This can't be undone.`
+}
 
 // Mirrors the loaded layout: section header plus a few member rows.
 function MembersSkeleton() {

@@ -6,10 +6,10 @@ import { count, eq } from "drizzle-orm"
 import z from "zod"
 import { db } from "@/db"
 import { drawings, folders, sessions, users } from "@/db/schema"
-import { deleteUserAccount } from "@/features/admin/delete-user"
 import { setupFieldsSchema } from "@/features/auth/schema"
 import { auth } from "@/lib/auth"
 import { adminMiddleware } from "@/middleware/admin"
+import { deleteUserAccount } from "./delete-user"
 
 export const getUserCount = createServerFn({ method: "GET" }).handler(
   async () => {

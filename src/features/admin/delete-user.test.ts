@@ -5,7 +5,7 @@ import { users, verifications } from "@/db/schema"
 import { deleteUserAccount } from "./delete-user"
 
 type Call =
-  | { kind: "select"; where: SQL }
+  | { kind: "select"; where: SQL; lock?: string }
   | { kind: "delete"; table: unknown; where: SQL }
 
 // Renders a captured drizzle condition so tests can assert what the SQL
@@ -14,22 +14,31 @@ const toSql = (where: SQL) => new PgDialect().sqlToQuery(where)
 
 function fakeDb(options: {
   target?: { role: "admin" | "user"; email: string }
-  adminCount?: number
+  adminIds?: string[]
+  /** The target row disappears between the role select and the delete. */
+  vanishesBeforeDelete?: boolean
 }) {
   const calls: Call[] = []
   // The engine issues two selects in order: the target row, then (for admin
-  // targets) the admin headcount. Answer them positionally.
+  // targets) the locked admin roster. Answer them positionally.
   const selectResponses: unknown[][] = [
     options.target ? [options.target] : [],
-    [{ count: options.adminCount ?? 0 }],
+    (options.adminIds ?? []).map((id) => ({ id })),
   ]
   let selectIndex = 0
   const tx = {
     select: () => ({
       from: () => ({
         where: (where: SQL) => {
-          calls.push({ kind: "select", where })
-          return Promise.resolve(selectResponses[selectIndex++] ?? [])
+          const call: Call = { kind: "select", where }
+          calls.push(call)
+          const rows = selectResponses[selectIndex++] ?? []
+          return Object.assign(Promise.resolve(rows), {
+            for: (lock: string) => {
+              call.lock = lock
+              return Promise.resolve(rows)
+            },
+          })
         },
       }),
     }),
@@ -41,7 +50,7 @@ function fakeDb(options: {
         return Object.assign(Promise.resolve(), {
           returning: () =>
             Promise.resolve(
-              table === users && options.target
+              table === users && options.target && !options.vanishesBeforeDelete
                 ? [{ email: options.target.email }]
                 : [],
             ),
@@ -88,10 +97,10 @@ test("deletes a regular user and sweeps their verification rows", async () => {
   ])
 })
 
-test("deleting an admin is allowed while another admin remains", async () => {
+test("deleting an admin is allowed while another admin remains, behind a row lock", async () => {
   const { db, calls } = fakeDb({
     target: { role: "admin", email: "ada@example.com" },
-    adminCount: 2,
+    adminIds: ["user-ada", "admin-1"],
   })
 
   await deleteUserAccount(db, "admin-1", "user-ada")
@@ -102,12 +111,15 @@ test("deleting an admin is allowed while another admin remains", async () => {
     { kind: "delete", table: users },
     { kind: "delete", table: verifications },
   ])
+  // The roster read must lock the admin rows — a plain count would let two
+  // admins deleting each other concurrently both pass the guard.
+  expect(calls[1]).toMatchObject({ kind: "select", lock: "update" })
 })
 
 test("deleting the last remaining admin is rejected", async () => {
   const { db, calls } = fakeDb({
     target: { role: "admin", email: "ada@example.com" },
-    adminCount: 1,
+    adminIds: ["user-ada"],
   })
 
   await expect(deleteUserAccount(db, "admin-1", "user-ada")).rejects.toThrow(
@@ -116,10 +128,21 @@ test("deleting the last remaining admin is rejected", async () => {
   expect(calls.some((call) => call.kind === "delete")).toBe(false)
 })
 
+test("a target that vanishes between the role select and the delete throws not-found", async () => {
+  const { db } = fakeDb({
+    target: { role: "user", email: "bea@example.com" },
+    vanishesBeforeDelete: true,
+  })
+
+  await expect(deleteUserAccount(db, "admin-1", "user-bea")).rejects.toThrow(
+    "User not found",
+  )
+})
+
 test("self-delete through the admin path is rejected before touching the db", async () => {
   const { db, calls } = fakeDb({
     target: { role: "admin", email: "ada@example.com" },
-    adminCount: 5,
+    adminIds: ["admin-1", "user-ada", "user-cy"],
   })
 
   await expect(deleteUserAccount(db, "admin-1", "admin-1")).rejects.toThrow()

@@ -78,7 +78,10 @@ const viewer = {
 }
 
 function renderSection({ seed = true } = {}) {
-  const queryClient = new QueryClient()
+  // retry: false so a mocked query rejection reaches error state promptly.
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  })
   if (seed) {
     queryClient.setQueryData(usersQueryOptions().queryKey, members)
   }
@@ -141,9 +144,8 @@ test("every row carries the shared initials avatar", () => {
 
 test("every row except your own offers an actions menu", () => {
   renderSection()
-  // No self-delete here — that lives in the Account danger zone. And since
-  // this page is admin-gated, a sole admin is always the viewer, so hiding
-  // the self row's menu also blocks sole-admin deletion in the UI.
+  // Covers both the no-self-delete and sole-admin UI blocks — see the
+  // rationale comment in MembersSection.
   expect(screen.queryByRole("button", { name: "Actions for ada" })).toBeNull()
   expect(screen.getByRole("button", { name: "Actions for Bea" })).toBeTruthy()
   expect(screen.getByRole("button", { name: "Actions for Cy" })).toBeTruthy()
@@ -174,6 +176,25 @@ test("Delete user opens the tier-3 dialog with live content counts and an email 
     target: { value: "bea@example.com" },
   })
   expect(confirm().disabled).toBe(false)
+})
+
+test("a failed counts fetch explains itself and keeps confirm gated", async () => {
+  vi.mocked(getUserContentCounts).mockRejectedValue(new Error("boom"))
+  renderSection()
+
+  openRowMenu("Bea")
+  fireEvent.click(screen.getByRole("menuitem", { name: /delete user/i }))
+
+  expect(
+    await screen.findByText(/Couldn't load Bea's content counts/),
+  ).toBeTruthy()
+  fireEvent.change(screen.getByRole("textbox"), {
+    target: { value: "bea@example.com" },
+  })
+  expect(
+    (screen.getByRole("button", { name: "Delete user" }) as HTMLButtonElement)
+      .disabled,
+  ).toBe(true)
 })
 
 test("the confirm stays gated while the counts are still loading", async () => {

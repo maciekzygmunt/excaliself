@@ -2,7 +2,7 @@
 // spec §4.5 tier 3). Kept out of server.ts — which imports the live db — so
 // tests can drive it with a fake db, mirroring trash/destroy.ts.
 
-import { count, eq } from "drizzle-orm"
+import { eq } from "drizzle-orm"
 import type { NodePgDatabase } from "drizzle-orm/node-postgres"
 import type * as schema from "@/db/schema"
 import { users, verifications } from "@/db/schema"
@@ -38,11 +38,16 @@ export async function deleteUserAccount(
     }
 
     if (target.role === "admin") {
-      const [admins] = await tx
-        .select({ count: count() })
+      // Locked headcount, not a plain count(): two admins deleting each
+      // other concurrently would both read 2 and both succeed. FOR UPDATE
+      // serializes them, so the second re-reads after the first commits
+      // and sees a single admin left.
+      const admins = await tx
+        .select({ id: users.id })
         .from(users)
         .where(eq(users.role, "admin"))
-      if (admins.count <= 1) {
+        .for("update")
+      if (admins.length <= 1) {
         throw new Error("Can't delete the last admin")
       }
     }
@@ -51,6 +56,12 @@ export async function deleteUserAccount(
       .delete(users)
       .where(eq(users.id, userId))
       .returning({ email: users.email })
+
+    // The row can vanish between the role select and here (another admin
+    // deleting the same user); surface it as not-found, not a crash.
+    if (deleted.length === 0) {
+      throw new Error(`User not found: ${userId}`)
+    }
 
     // verifications has no FK to users — it's keyed by identifier (email)
     // for password resets, email verification, etc. Clean it up manually so
