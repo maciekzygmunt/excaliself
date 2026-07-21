@@ -23,6 +23,14 @@ Leftover scan clean.
 
 None beyond the dialog family's `onOpenChange` eventDetails argument.
 
+### Post-review fix
+
+The backdrop now animates with a transition
+(`data-starting-style`/`data-ending-style` opacity) instead of
+animate-in/out keyframes: Base UI keeps the backdrop mounted until the
+popup's exit finishes, and a finished exit keyframe reverted to full
+opacity for the remaining frames — visible as a backdrop blink on close.
+
 ## Verify by hand
 
 - Narrow the window to mobile width, open the sidebar sheet: slides in

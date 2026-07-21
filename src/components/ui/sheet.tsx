@@ -24,8 +24,11 @@ function SheetOverlay({ className, ...props }: SheetPrimitive.Backdrop.Props) {
   return (
     <SheetPrimitive.Backdrop
       data-slot="sheet-overlay"
+      // Transition, not animate-in/out: a finished exit keyframe reverts to
+      // full opacity while Base UI holds the backdrop mounted until the
+      // popup's 300/500ms slide ends, which reads as a blink
       className={cn(
-        "data-open:animate-in data-closed:animate-out data-closed:fade-out-0 data-open:fade-in-0 fixed inset-0 z-50 bg-black/20",
+        "transition-opacity data-open:duration-500 data-closed:duration-300 data-starting-style:opacity-0 data-ending-style:opacity-0 fixed inset-0 z-50 bg-black/20",
         className,
       )}
       {...props}

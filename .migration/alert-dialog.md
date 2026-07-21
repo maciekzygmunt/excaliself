@@ -31,6 +31,14 @@ Leftover scan clean.
 - Base UI AlertDialog never closes on outside press (Radix alert-dialog
   behaved the same) — no change in practice.
 
+### Post-review fix
+
+The backdrop now animates with a transition
+(`data-starting-style`/`data-ending-style` opacity) instead of
+animate-in/out keyframes: Base UI keeps the backdrop mounted until the
+popup's exit finishes, and a finished exit keyframe reverted to full
+opacity for the remaining frames — visible as a backdrop blink on close.
+
 ## Verify by hand
 
 - Delete-forever flow in trash: dialog opens, Cancel closes without

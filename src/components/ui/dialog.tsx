@@ -26,8 +26,11 @@ function DialogOverlay({
   return (
     <DialogPrimitive.Backdrop
       data-slot="dialog-overlay"
+      // Transition, not animate-in/out: a finished exit keyframe reverts to
+      // full opacity while Base UI holds the backdrop mounted until the
+      // popup's own exit ends, which reads as a blink
       className={cn(
-        "data-open:animate-in data-closed:animate-out data-closed:fade-out-0 data-open:fade-in-0 fixed inset-0 z-50 bg-black/20",
+        "transition-opacity duration-200 data-starting-style:opacity-0 data-ending-style:opacity-0 fixed inset-0 z-50 bg-black/20",
         className,
       )}
       {...props}
