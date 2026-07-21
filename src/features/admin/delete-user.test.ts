@@ -33,11 +33,15 @@ function fakeDb(options: {
           const call: Call = { kind: "select", where }
           calls.push(call)
           const rows = selectResponses[selectIndex++] ?? []
-          return Object.assign(Promise.resolve(rows), {
-            for: (lock: string) => {
-              call.lock = lock
-              return Promise.resolve(rows)
-            },
+          const lockable = (result: Promise<unknown[]>) =>
+            Object.assign(result, {
+              for: (lock: string) => {
+                call.lock = lock
+                return Promise.resolve(rows)
+              },
+            })
+          return Object.assign(lockable(Promise.resolve(rows)), {
+            orderBy: () => lockable(Promise.resolve(rows)),
           })
         },
       }),

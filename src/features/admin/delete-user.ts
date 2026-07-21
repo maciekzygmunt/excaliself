@@ -41,11 +41,14 @@ export async function deleteUserAccount(
       // Locked headcount, not a plain count(): two admins deleting each
       // other concurrently would both read 2 and both succeed. FOR UPDATE
       // serializes them, so the second re-reads after the first commits
-      // and sees a single admin left.
+      // and sees a single admin left. Ordered by id like setUserRole's
+      // locking read, so overlapping role/delete transactions take row
+      // locks in the same order instead of deadlocking.
       const admins = await tx
         .select({ id: users.id })
         .from(users)
         .where(eq(users.role, "admin"))
+        .orderBy(users.id)
         .for("update")
       if (admins.length <= 1) {
         throw new Error("Can't delete the last admin")
