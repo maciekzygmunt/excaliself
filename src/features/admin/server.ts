@@ -9,6 +9,7 @@ import { sessions, users, verifications } from "@/db/schema"
 import { setupFieldsSchema } from "@/features/auth/schema"
 import { auth } from "@/lib/auth"
 import { adminMiddleware } from "@/middleware/admin"
+import { isLastAdmin } from "./roles"
 
 export const getUserCount = createServerFn({ method: "GET" }).handler(
   async () => {
@@ -59,6 +60,41 @@ export const setupAdmin = createServerFn({ method: "POST" })
 export const getAllUsers = createServerFn({ method: "GET" })
   .middleware([adminMiddleware])
   .handler(async () => db.select().from(users))
+
+export const setUserRole = createServerFn({ method: "POST" })
+  .middleware([adminMiddleware])
+  .inputValidator(
+    z.object({ userId: z.string(), role: z.enum(["admin", "user"]) }),
+  )
+  .handler(async ({ data }) => {
+    await db.transaction(async (tx) => {
+      // Lock the admin rows so two concurrent demotions can't both pass the
+      // last-admin check and leave the instance with no admin.
+      const admins = await tx
+        .select({ id: users.id })
+        .from(users)
+        .where(eq(users.role, "admin"))
+        .for("update")
+      if (
+        data.role === "user" &&
+        isLastAdmin(
+          admins.map((admin) => admin.id),
+          data.userId,
+        )
+      ) {
+        throw new Error("The last admin can't be demoted")
+      }
+
+      const updated = await tx
+        .update(users)
+        .set({ role: data.role, updatedAt: new Date() })
+        .where(eq(users.id, data.userId))
+        .returning({ id: users.id })
+      if (updated.length === 0) {
+        throw new Error(`User not found: ${data.userId}`)
+      }
+    })
+  })
 
 export const deleteUser = createServerFn({ method: "POST" })
   .middleware([adminMiddleware])
