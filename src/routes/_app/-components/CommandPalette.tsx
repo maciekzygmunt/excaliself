@@ -1,7 +1,11 @@
+import { useQuery } from "@tanstack/react-query"
 import { useNavigate } from "@tanstack/react-router"
 import {
+  File,
+  Folder,
   House,
   LayoutGrid,
+  LogOut,
   type LucideIcon,
   Search,
   Settings,
@@ -18,8 +22,12 @@ import {
   useState,
 } from "react"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
+import { drawingsQueryOptions } from "@/features/drawings/queries"
+import { foldersQueryOptions } from "@/features/folders/queries"
 import { useCommandPaletteShortcut } from "@/hooks/use-command-palette-shortcut"
+import { authClient } from "@/lib/auth-client"
 import { cn } from "@/lib/utils"
+import { useCreateDialog } from "./CreateDialog"
 import { Kbd } from "./sidebar/Kbd"
 
 // A row inside a route-contributed context section. Selecting always closes
@@ -33,8 +41,8 @@ export type PaletteContextRow = {
   onSelect: () => void
 }
 
-// The palette's Context section (spec §4.1): rendered above Go to, it exists
-// only on the surfaces §5 lists — routes contribute it via
+// The palette's Context section (spec §4.1): rendered above Drawings and Go
+// to, it exists only on the surfaces §5 lists — routes contribute it via
 // usePaletteContextSection; everywhere else the palette shows globals only.
 export type PaletteContextSection = {
   title: string
@@ -42,22 +50,57 @@ export type PaletteContextSection = {
 }
 
 // Sections render in the fixed order Context → Drawings → Go to → Actions
-// (spec §4.1). Go to is exactly these four static rows; folders arrive later
-// as dynamic results, never static rows.
-const goToRows: { to: string; label: string; icon: LucideIcon }[] = [
-  { to: "/draw", label: "Home", icon: House },
-  { to: "/drawings", label: "All drawings", icon: LayoutGrid },
-  { to: "/trash", label: "Trash", icon: Trash2 },
-  { to: "/settings", label: "Settings", icon: Settings },
+// (spec §4.1), never score-interleaved. Go to holds exactly these four static
+// rows, joined by folder matches as dynamic rows while typing (never static);
+// Actions exactly these three — no theme row, no invite actions.
+type PaletteRow =
+  | {
+      kind: "goto"
+      id: string
+      label: string
+      icon: LucideIcon
+      to: string
+      params?: { id: string }
+    }
+  | {
+      kind: "action"
+      id: "new-drawing" | "new-folder" | "sign-out"
+      label: string
+      icon: LucideIcon
+    }
+  | {
+      kind: "context"
+      id: string
+      label: string
+      icon: LucideIcon
+      destructive?: boolean
+      onSelect: () => void
+    }
+
+const goToRows: PaletteRow[] = [
+  { kind: "goto", id: "home", label: "Home", icon: House, to: "/draw" },
+  {
+    kind: "goto",
+    id: "drawings",
+    label: "All drawings",
+    icon: LayoutGrid,
+    to: "/drawings",
+  },
+  { kind: "goto", id: "trash", label: "Trash", icon: Trash2, to: "/trash" },
+  {
+    kind: "goto",
+    id: "settings",
+    label: "Settings",
+    icon: Settings,
+    to: "/settings",
+  },
 ]
 
-type PaletteRow = {
-  id: string
-  label: string
-  icon: LucideIcon
-  destructive?: boolean
-  run: () => void
-}
+const actionRows: PaletteRow[] = [
+  { kind: "action", id: "new-drawing", label: "New drawing", icon: File },
+  { kind: "action", id: "new-folder", label: "New folder", icon: Folder },
+  { kind: "action", id: "sign-out", label: "Sign out", icon: LogOut },
+]
 
 type CommandPaletteProps = {
   open: boolean
@@ -71,6 +114,7 @@ export function CommandPalette({
   contextSection,
 }: CommandPaletteProps) {
   const navigate = useNavigate()
+  const { openCreateDrawingDialog, openCreateFolderDialog } = useCreateDialog()
   const [query, setQuery] = useState("")
   const [activeIndex, setActiveIndex] = useState(0)
 
@@ -83,58 +127,104 @@ export function CommandPalette({
     }
   }, [open])
 
-  const q = query.trim().toLowerCase()
+  const { data: drawings } = useQuery(drawingsQueryOptions())
+  const { data: folders } = useQuery(foldersQueryOptions())
 
-  // Typing filters within sections; empty sections collapse (spec §4.1)
-  const sections: { title: string; rows: PaletteRow[] }[] = [
+  const q = query.trim().toLowerCase()
+  const matchesQuery = (label: string) => label.toLowerCase().includes(q)
+  const matches = (row: PaletteRow) => matchesQuery(row.label)
+
+  const contextRows: PaletteRow[] = (contextSection?.rows ?? [])
+    .filter((row) => matchesQuery(row.label))
+    .map((row) => ({
+      kind: "context",
+      id: row.id,
+      label: row.label,
+      icon: row.icon,
+      destructive: row.destructive,
+      onSelect: row.onSelect,
+    }))
+
+  // Drawings is a live search only — the empty-input launcher (recents) is a
+  // separate slice. getDrawings already excludes trashed rows; filter again
+  // so a stale cache write can never surface one (trash is found via Trash).
+  const drawingRows: PaletteRow[] =
+    q === ""
+      ? []
+      : (drawings ?? [])
+          .filter((d) => d.deletedAt === null && matchesQuery(d.name))
+          .map((d) => ({
+            kind: "goto",
+            id: `drawing-${d.id}`,
+            label: d.name,
+            icon: File,
+            to: "/draw/$id",
+            params: { id: d.id },
+          }))
+
+  // Folders are never static Go to rows — they only appear while typing
+  const folderRows: PaletteRow[] =
+    q === ""
+      ? []
+      : (folders ?? [])
+          .filter((f) => matchesQuery(f.name))
+          .map((f) => ({
+            kind: "goto",
+            id: `folder-${f.id}`,
+            label: f.name,
+            icon: Folder,
+            to: "/folder/$id",
+            params: { id: f.id },
+          }))
+
+  // Empty sections collapse; activeIndex runs across the remaining sections
+  // so arrow keys walk the whole list, not one section
+  const sections = [
     ...(contextSection
-      ? [
-          {
-            title: contextSection.title,
-            rows: contextSection.rows.map((row) => ({
-              id: row.id,
-              label: row.label,
-              icon: row.icon,
-              destructive: row.destructive,
-              run: row.onSelect,
-            })),
-          },
-        ]
+      ? [{ title: contextSection.title, rows: contextRows, offset: 0 }]
       : []),
+    { title: "Drawings", rows: drawingRows, offset: 0 },
     {
       title: "Go to",
-      rows: goToRows.map((row) => ({
-        id: `goto:${row.to}`,
-        label: row.label,
-        icon: row.icon,
-        run: () => navigate({ to: row.to }),
-      })),
+      rows: [...goToRows.filter(matches), ...folderRows],
+      offset: 0,
     },
-  ]
-    .map((section) => ({
-      ...section,
-      rows: section.rows.filter((row) => row.label.toLowerCase().includes(q)),
-    }))
-    .filter((section) => section.rows.length > 0)
+    { title: "Actions", rows: actionRows.filter(matches), offset: 0 },
+  ].filter((section) => section.rows.length > 0)
+  for (let i = 1; i < sections.length; i++) {
+    sections[i].offset = sections[i - 1].offset + sections[i - 1].rows.length
+  }
+  const rows = sections.flatMap((section) => section.rows)
 
-  const flatRows = sections.flatMap((section) => section.rows)
-
-  const select = (row: PaletteRow) => {
+  const select = async (row: PaletteRow) => {
     onOpenChange(false)
-    row.run()
+    if (row.kind === "context") {
+      row.onSelect()
+    } else if (row.kind === "goto") {
+      navigate({ to: row.to, params: row.params })
+    } else if (row.id === "new-drawing") {
+      // The palette is list-only, never a form — both create rows close it
+      // into the standard create dialog (spec §4.1)
+      openCreateDrawingDialog()
+    } else if (row.id === "new-folder") {
+      openCreateFolderDialog()
+    } else {
+      await authClient.signOut()
+      window.location.href = "/login"
+    }
   }
 
   const onInputKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "ArrowDown") {
       e.preventDefault()
-      if (flatRows.length) setActiveIndex((i) => (i + 1) % flatRows.length)
+      if (rows.length) setActiveIndex((i) => (i + 1) % rows.length)
     } else if (e.key === "ArrowUp") {
       e.preventDefault()
-      if (flatRows.length)
-        setActiveIndex((i) => (i - 1 + flatRows.length) % flatRows.length)
+      if (rows.length)
+        setActiveIndex((i) => (i - 1 + rows.length) % rows.length)
     } else if (e.key === "Enter") {
       e.preventDefault()
-      const row = flatRows[activeIndex]
+      const row = rows[activeIndex]
       if (row) select(row)
     }
   }
@@ -166,8 +256,8 @@ export function CommandPalette({
             aria-expanded="true"
             aria-controls="command-palette-list"
             aria-activedescendant={
-              flatRows[activeIndex]
-                ? `command-palette-row-${flatRows[activeIndex].id}`
+              rows[activeIndex]
+                ? `command-palette-row-${rows[activeIndex].id}`
                 : undefined
             }
             placeholder="Search…"
@@ -180,15 +270,16 @@ export function CommandPalette({
           aria-label="Command palette results"
           className="max-h-80 overflow-y-auto p-1.5"
         >
-          {flatRows.length > 0 ? (
+          {rows.length > 0 ? (
             sections.map((section) => (
               <Fragment key={section.title}>
                 <div className="px-2.5 pt-1.5 pb-1 text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground/70">
                   {section.title}
                 </div>
-                {section.rows.map((row) => {
-                  const i = flatRows.indexOf(row)
-                  const isActive = i === activeIndex
+                {section.rows.map((row, i) => {
+                  const index = section.offset + i
+                  const isActive = index === activeIndex
+                  const destructive = row.kind === "context" && row.destructive
                   return (
                     <button
                       key={row.id}
@@ -196,27 +287,25 @@ export function CommandPalette({
                       type="button"
                       role="option"
                       aria-selected={isActive}
-                      onMouseEnter={() => setActiveIndex(i)}
+                      onMouseEnter={() => setActiveIndex(index)}
                       onClick={() => select(row)}
                       className={cn(
                         "flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-[13px]",
-                        row.destructive
-                          ? "text-destructive"
-                          : "text-foreground",
+                        destructive ? "text-destructive" : "text-foreground",
                         isActive && "bg-iris-muted",
                       )}
                     >
                       <row.icon
                         className={cn(
                           "h-3.5 w-3.5 shrink-0 transition-colors",
-                          row.destructive
+                          destructive
                             ? "text-destructive"
                             : isActive
                               ? "text-iris"
                               : "text-muted-foreground/40",
                         )}
                       />
-                      {row.label}
+                      <span className="truncate">{row.label}</span>
                     </button>
                   )
                 })}
@@ -302,9 +391,9 @@ export function useCommandPalette() {
 
 /**
  * Contribute this route's context section to the palette (spec §4.1). The
- * section renders above Go to while the caller stays mounted and unregisters
- * when it unmounts or passes null. Pass a memoized section — a fresh object
- * every render re-registers needlessly.
+ * section renders above Drawings and Go to while the caller stays mounted and
+ * unregisters when it unmounts or passes null. Pass a memoized section — a
+ * fresh object every render re-registers needlessly.
  */
 export function usePaletteContextSection(
   section: PaletteContextSection | null,

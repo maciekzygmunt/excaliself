@@ -32,6 +32,23 @@ vi.mock("@/features/drawings/server", () => ({
   restoreDrawing: vi.fn(),
 }))
 
+// The palette itself queries folders and reaches the create dialog and auth
+// client — stub those edges too (they import the db / network).
+vi.mock("@/features/folders/server", () => ({
+  getFolders: vi.fn(),
+}))
+
+vi.mock("./CreateDialog", () => ({
+  useCreateDialog: () => ({
+    openCreateDrawingDialog: vi.fn(),
+    openCreateFolderDialog: vi.fn(),
+  }),
+}))
+
+vi.mock("@/lib/auth-client", () => ({
+  authClient: { signOut: vi.fn() },
+}))
+
 function makeDrawing(overrides: Partial<Drawing> = {}): Drawing {
   return {
     id: "d1",
@@ -58,6 +75,7 @@ function setup(drawings: Drawing[]) {
     },
   })
   queryClient.setQueryData<Drawing[]>(["drawings"], drawings)
+  queryClient.setQueryData(["folders"], [])
   const wrapper = ({ children }: { children: ReactNode }) => (
     <QueryClientProvider client={queryClient}>
       <CommandPaletteProvider>{children}</CommandPaletteProvider>
@@ -94,6 +112,9 @@ test("the palette shows a This drawing section above Go to on the canvas", () =>
     "All drawings",
     "Trash",
     "Settings",
+    "New drawing",
+    "New folder",
+    "Sign out",
   ])
 })
 
@@ -101,7 +122,7 @@ test("a drawing missing from the live list contributes no section", () => {
   setup([])
   openPalette()
   expect(screen.queryByText("This drawing")).toBeNull()
-  expect(screen.getAllByRole("option")).toHaveLength(4)
+  expect(screen.getAllByRole("option")).toHaveLength(7)
 })
 
 test("the star row reads Unstar when starred and toggles optimistically", async () => {
