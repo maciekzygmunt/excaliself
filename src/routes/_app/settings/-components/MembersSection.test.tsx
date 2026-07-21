@@ -17,6 +17,12 @@ import {
   getUserContentCounts,
   setUserRole,
 } from "@/features/admin/server"
+import { pendingPasswordResetsQueryOptions } from "@/features/password-resets/queries"
+import {
+  createPasswordReset,
+  getPendingPasswordResets,
+  revokePasswordReset,
+} from "@/features/password-resets/server"
 import { MembersSection } from "./MembersSection"
 
 // The query modules import the server functions, which import the db — stub
@@ -30,6 +36,11 @@ vi.mock("@/features/admin/server", () => ({
 vi.mock("@/features/account/server", () => ({
   getCurrentUser: vi.fn(),
   listActiveSessions: vi.fn(),
+}))
+vi.mock("@/features/password-resets/server", () => ({
+  createPasswordReset: vi.fn(),
+  getPendingPasswordResets: vi.fn(),
+  revokePasswordReset: vi.fn(),
 }))
 
 const { toastMock, navigateMock, invalidateMock } = vi.hoisted(() => ({
@@ -90,8 +101,10 @@ const viewer = {
   role: "admin" as const,
 }
 
+const clipboardWriteText = vi.fn()
+
 // Radix's popper positions the open tooltip with ResizeObserver, which jsdom
-// doesn't implement.
+// doesn't implement; Radix Select additionally scrolls and pointer-captures.
 beforeAll(() => {
   if (!("ResizeObserver" in globalThis)) {
     Object.defineProperty(globalThis, "ResizeObserver", {
@@ -103,6 +116,10 @@ beforeAll(() => {
       },
     })
   }
+  Element.prototype.scrollIntoView = vi.fn()
+  Element.prototype.hasPointerCapture = vi.fn().mockReturnValue(false)
+  Element.prototype.setPointerCapture = vi.fn()
+  Element.prototype.releasePointerCapture = vi.fn()
 })
 
 beforeEach(() => {
@@ -111,9 +128,18 @@ beforeEach(() => {
   vi.mocked(deleteUser).mockReset()
   vi.mocked(getUserContentCounts).mockReset()
   vi.mocked(getCurrentUser).mockReset().mockResolvedValue(viewer)
+  vi.mocked(createPasswordReset).mockReset()
+  vi.mocked(revokePasswordReset).mockReset().mockResolvedValue(undefined)
+  vi.mocked(getPendingPasswordResets).mockReset().mockResolvedValue([])
+  clipboardWriteText.mockReset().mockResolvedValue(undefined)
+  Object.defineProperty(navigator, "clipboard", {
+    value: { writeText: clipboardWriteText },
+    configurable: true,
+  })
   navigateMock.mockReset().mockResolvedValue(undefined)
   invalidateMock.mockReset().mockResolvedValue(undefined)
   toastMock.error.mockReset()
+  toastMock.success.mockReset()
 })
 
 // Auto-cleanup needs vitest globals, which this repo leaves off.
@@ -122,7 +148,11 @@ afterEach(() => {
   vi.useRealTimers()
 })
 
-function renderSection({ seed = true, users = members } = {}) {
+function renderSection({
+  seed = true,
+  users = members,
+  pendingResets = [] as { userId: string }[],
+} = {}) {
   // retry: false so a mocked query rejection reaches error state promptly.
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
@@ -130,6 +160,10 @@ function renderSection({ seed = true, users = members } = {}) {
   if (seed) {
     queryClient.setQueryData(usersQueryOptions().queryKey, users)
     vi.mocked(getAllUsers).mockResolvedValue(users)
+    queryClient.setQueryData(
+      pendingPasswordResetsQueryOptions().queryKey,
+      pendingResets,
+    )
   }
   queryClient.setQueryData(currentUserQueryOptions().queryKey, viewer)
   return render(
@@ -147,10 +181,19 @@ function openRowMenu(name: string) {
   fireEvent.click(trigger)
 }
 
+// The role control is a Radix Select: the trigger is a combobox button
+// whose text is the current role; picking means open + click an option.
 const roleSelect = (displayName: string) =>
   screen.getByRole("combobox", {
     name: `Role for ${displayName}`,
-  }) as HTMLSelectElement
+  }) as HTMLButtonElement
+
+function chooseRole(displayName: string, label: string) {
+  const trigger = roleSelect(displayName)
+  fireEvent.pointerDown(trigger)
+  fireEvent.click(trigger)
+  fireEvent.click(screen.getByRole("option", { name: label }))
+}
 
 test("the header shows the member count", () => {
   renderSection()
@@ -194,6 +237,63 @@ test("every row except your own offers an actions menu", () => {
   expect(screen.queryByRole("button", { name: "Actions for ada" })).toBeNull()
   expect(screen.getByRole("button", { name: "Actions for Bea" })).toBeTruthy()
   expect(screen.getByRole("button", { name: "Actions for Cy" })).toBeTruthy()
+})
+
+test("Reset password generates a link, copies it, and confirms with a toast", async () => {
+  vi.mocked(createPasswordReset).mockResolvedValue({ token: "tok-xyz" })
+  renderSection()
+
+  openRowMenu("Bea")
+  fireEvent.click(screen.getByRole("menuitem", { name: /reset password/i }))
+
+  await waitFor(() => {
+    expect(createPasswordReset).toHaveBeenCalledWith({
+      data: { userId: "user-bea" },
+    })
+  })
+  await waitFor(() => {
+    expect(clipboardWriteText).toHaveBeenCalledWith(
+      `${window.location.origin}/reset-password?token=tok-xyz`,
+    )
+  })
+  await waitFor(() => expect(toastMock.success).toHaveBeenCalled())
+})
+
+test("admins can be reset too — another admin's row offers Reset password", async () => {
+  vi.mocked(createPasswordReset).mockResolvedValue({ token: "tok-adm" })
+  renderSection({ users: twoAdmins })
+
+  // Bea is an admin here; her row still carries the reset action.
+  openRowMenu("Bea")
+  fireEvent.click(screen.getByRole("menuitem", { name: /reset password/i }))
+
+  await waitFor(() => {
+    expect(createPasswordReset).toHaveBeenCalledWith({
+      data: { userId: "user-bea" },
+    })
+  })
+})
+
+test("a pending reset shows a row hint with a revoke action", async () => {
+  renderSection({ pendingResets: [{ userId: "user-bea" }] })
+
+  // Only Bea's row hints at the outstanding link.
+  expect(screen.getAllByText("Reset link pending")).toHaveLength(1)
+
+  fireEvent.click(screen.getByRole("button", { name: "Revoke" }))
+  await waitFor(() => {
+    expect(revokePasswordReset).toHaveBeenCalledWith(
+      { data: { userId: "user-bea" } },
+      // react-query passes its mutation context as a second argument.
+      expect.anything(),
+    )
+  })
+})
+
+test("rows without a pending reset show no hint or revoke", () => {
+  renderSection()
+  expect(screen.queryByText("Reset link pending")).toBeNull()
+  expect(screen.queryByRole("button", { name: "Revoke" })).toBeNull()
 })
 
 test("Delete user opens the tier-3 dialog with live content counts and an email challenge", async () => {
@@ -288,9 +388,9 @@ test("confirming deletes the user and the refreshed list drops them", async () =
 
 test("every row shows a role select reflecting the current role", () => {
   renderSection()
-  expect(roleSelect("ada").value).toBe("admin")
-  expect(roleSelect("Bea").value).toBe("user")
-  expect(roleSelect("Cy").value).toBe("user")
+  expect(roleSelect("ada").textContent).toBe("Admin")
+  expect(roleSelect("Bea").textContent).toBe("Member")
+  expect(roleSelect("Cy").textContent).toBe("Member")
 })
 
 test("the sole admin's select is disabled with an explanation", async () => {
@@ -298,7 +398,7 @@ test("the sole admin's select is disabled with an explanation", async () => {
   const select = roleSelect("ada")
   expect(select.disabled).toBe(true)
 
-  // The tooltip listens on the focusable wrapper around the disabled select.
+  // The tooltip listens on the focusable wrapper around the disabled trigger.
   fireEvent.focus(select.parentElement as HTMLElement)
   await waitFor(() =>
     expect(
@@ -314,8 +414,8 @@ test("an admin can be demoted while another admin remains", async () => {
   const select = roleSelect("Bea")
   expect(select.disabled).toBe(false)
 
-  fireEvent.change(select, { target: { value: "user" } })
-  await waitFor(() => expect(roleSelect("Bea").value).toBe("user"))
+  chooseRole("Bea", "Member")
+  await waitFor(() => expect(roleSelect("Bea").textContent).toBe("Member"))
   // react-query passes a context object as a second argument.
   await waitFor(() =>
     expect(vi.mocked(setUserRole).mock.calls[0]?.[0]).toEqual({
@@ -327,10 +427,8 @@ test("an admin can be demoted while another admin remains", async () => {
 test("promoting a member applies optimistically", async () => {
   vi.mocked(setUserRole).mockReturnValue(new Promise(() => {}))
   renderSection()
-  fireEvent.change(roleSelect("Bea"), {
-    target: { value: "admin" },
-  })
-  await waitFor(() => expect(roleSelect("Bea").value).toBe("admin"))
+  chooseRole("Bea", "Admin")
+  await waitFor(() => expect(roleSelect("Bea").textContent).toBe("Admin"))
   await waitFor(() =>
     expect(vi.mocked(setUserRole).mock.calls[0]?.[0]).toEqual({
       data: { userId: "user-bea", role: "admin" },
@@ -342,21 +440,17 @@ test("a rejected role change rolls back with an error toast", async () => {
   vi.mocked(setUserRole).mockRejectedValue(new Error("boom"))
   renderSection()
 
-  fireEvent.change(roleSelect("Bea"), {
-    target: { value: "admin" },
-  })
+  chooseRole("Bea", "Admin")
 
   await waitFor(() =>
     expect(toastMock.error).toHaveBeenCalledWith("Couldn't change role"),
   )
-  await waitFor(() => expect(roleSelect("Bea").value).toBe("user"))
+  await waitFor(() => expect(roleSelect("Bea").textContent).toBe("Member"))
 })
 
 test("demoting yourself asks for confirmation before anything is sent", () => {
   renderSection({ users: twoAdmins })
-  fireEvent.change(roleSelect("ada"), {
-    target: { value: "user" },
-  })
+  chooseRole("ada", "Member")
 
   expect(screen.getByText("Leave the admin role?")).not.toBeNull()
   expect(setUserRole).not.toHaveBeenCalled()
@@ -365,15 +459,13 @@ test("demoting yourself asks for confirmation before anything is sent", () => {
   const select = screen.getByRole("combobox", {
     name: "Role for ada",
     hidden: true,
-  }) as HTMLSelectElement
-  expect(select.value).toBe("admin")
+  })
+  expect(select.textContent).toBe("Admin")
 })
 
 test("confirming a self-demote applies it and leaves the admin area", async () => {
   renderSection({ users: twoAdmins })
-  fireEvent.change(roleSelect("ada"), {
-    target: { value: "user" },
-  })
+  chooseRole("ada", "Member")
   fireEvent.click(screen.getByRole("button", { name: "Demote me" }))
 
   await waitFor(() =>
@@ -391,24 +483,20 @@ test("confirming a self-demote applies it and leaves the admin area", async () =
 
 test("cancelling a self-demote changes nothing", async () => {
   renderSection({ users: twoAdmins })
-  fireEvent.change(roleSelect("ada"), {
-    target: { value: "user" },
-  })
+  chooseRole("ada", "Member")
   fireEvent.click(screen.getByRole("button", { name: "Cancel" }))
 
   await waitFor(() =>
     expect(screen.queryByText("Leave the admin role?")).toBeNull(),
   )
   expect(setUserRole).not.toHaveBeenCalled()
-  expect(roleSelect("ada").value).toBe("admin")
+  expect(roleSelect("ada").textContent).toBe("Admin")
 })
 
 test("a failed self-demote keeps the dialog open with an error toast", async () => {
   vi.mocked(setUserRole).mockRejectedValue(new Error("boom"))
   renderSection({ users: twoAdmins })
-  fireEvent.change(roleSelect("ada"), {
-    target: { value: "user" },
-  })
+  chooseRole("ada", "Member")
   fireEvent.click(screen.getByRole("button", { name: "Demote me" }))
 
   await waitFor(() =>

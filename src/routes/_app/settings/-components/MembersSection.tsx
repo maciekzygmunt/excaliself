@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useNavigate, useRouter } from "@tanstack/react-router"
-import { MoreHorizontal, Trash2 } from "lucide-react"
+import { KeyRound, MoreHorizontal, Trash2 } from "lucide-react"
 import { useState } from "react"
 import { toast } from "sonner"
 import { InitialsAvatar } from "@/components/initials-avatar"
@@ -19,8 +19,16 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
   Tooltip,
@@ -45,18 +53,40 @@ import {
   type Role,
 } from "@/features/admin/roles"
 import { deleteUser, setUserRole } from "@/features/admin/server"
+import { pendingPasswordResetsQueryOptions } from "@/features/password-resets/queries"
+import {
+  createPasswordReset,
+  revokePasswordReset,
+} from "@/features/password-resets/server"
 import { describeContents } from "@/features/trash/destroy-copy"
 import { useDelayedVisible } from "@/hooks/use-delayed-visible"
 
-// Members list with inline role management (issue #65) and admin delete
-// (issue #66). Password resets still land in a follow-up ticket —
-// deliberately, rows never offer deleting yourself here.
+// Members list with inline role management (issue #65), admin delete
+// (issue #66), and admin-generated password resets (issue #68).
+// Deliberately, rows never offer deleting yourself here — and resets are
+// for other people by nature, so your own row carries no actions menu;
+// your own password changes in Settings → Account.
 export function MembersSection() {
+  const queryClient = useQueryClient()
   const { data: users, isPending } = useQuery(usersQueryOptions())
   const { data: currentUser } = useQuery(currentUserQueryOptions())
+  const { data: pendingResets } = useQuery(pendingPasswordResetsQueryOptions())
   const setRole = useSetRole()
   const [confirmingSelfDemote, setConfirmingSelfDemote] = useState(false)
   const showSkeleton = useDelayedVisible(isPending)
+
+  const revokeReset = useMutation({
+    mutationFn: revokePasswordReset,
+    onError: () => {
+      // Without this a failed revoke would leave the link silently live.
+      toast.error("Couldn't revoke the reset link")
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({
+        queryKey: pendingPasswordResetsQueryOptions().queryKey,
+      })
+    },
+  })
 
   if (isPending) return showSkeleton ? <MembersSkeleton /> : null
   if (!users) return null
@@ -65,6 +95,7 @@ export function MembersSection() {
     (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
   )
   const admins = adminIds(members)
+  const pendingByUserId = new Set(pendingResets?.map((reset) => reset.userId))
 
   const handleRoleChange = (member: AdminUser, role: Role) => {
     if (role === member.role) return
@@ -114,6 +145,20 @@ export function MembersSection() {
               </div>
             </div>
             <div className="flex shrink-0 items-center gap-3">
+              {pendingByUserId.has(member.id) && (
+                <span className="flex items-center gap-1 text-[11px] text-muted-foreground/60">
+                  Reset link pending
+                  <button
+                    type="button"
+                    onClick={() =>
+                      revokeReset.mutate({ data: { userId: member.id } })
+                    }
+                    className="rounded px-1.5 py-1 text-xs text-muted-foreground transition-all hover:bg-muted hover:text-destructive"
+                  >
+                    Revoke
+                  </button>
+                </span>
+              )}
               <p className="hidden text-xs text-muted-foreground/60 sm:block">
                 Joined {new Date(member.createdAt).toLocaleDateString()}
               </p>
@@ -123,11 +168,17 @@ export function MembersSection() {
                 onChange={(role) => handleRoleChange(member, role)}
               />
               {/* No self-delete here — that lives in the Account danger
-                  zone (issue #66). This page being admin-gated, a sole
-                  admin is always the viewer, so this also blocks deleting
-                  the last admin in the UI; the server enforces both. */}
-              {member.id !== currentUser?.id && (
+                  zone (issue #66) — and no self-reset either: the reset
+                  flow exists for people who can't sign in (issue #68).
+                  This page being admin-gated, a sole admin is always the
+                  viewer, so this also blocks deleting the last admin in
+                  the UI; the server enforces both. */}
+              {member.id !== currentUser?.id ? (
                 <MemberRowActions user={member} />
+              ) : (
+                // Invisible stand-in for the menu button so the role
+                // selects and joined dates line up across rows.
+                <div aria-hidden className="size-8" />
               )}
             </div>
           </li>
@@ -145,9 +196,10 @@ export function MembersSection() {
   )
 }
 
-// The overflow menu plus the tier-3 type-to-confirm delete (issue #66).
-// Pessimistic: the dialog stays open with an in-button pending state until
-// the server answers, then the list invalidation drops the row.
+// The overflow menu: password reset (issue #68) plus the tier-3
+// type-to-confirm delete (issue #66). Delete is pessimistic: the dialog
+// stays open with an in-button pending state until the server answers,
+// then the list invalidation drops the row.
 function MemberRowActions({ user }: { user: AdminUser }) {
   const [confirmOpen, setConfirmOpen] = useState(false)
   const queryClient = useQueryClient()
@@ -158,6 +210,29 @@ function MemberRowActions({ user }: { user: AdminUser }) {
   const { data: counts, isError: countsFailed } = useQuery({
     ...userContentCountsQueryOptions(user.id),
     enabled: confirmOpen,
+  })
+
+  // The link is the only copy of the token the admin will ever see — it
+  // goes straight to the clipboard (same mechanic as invites) and the
+  // toast is the confirmation, so it must not fire if the copy failed;
+  // regenerating replaces the link, so a failed copy costs nothing.
+  const createResetLink = useMutation({
+    mutationFn: () => createPasswordReset({ data: { userId: user.id } }),
+    onSuccess: ({ token }) => {
+      navigator.clipboard
+        .writeText(`${window.location.origin}/reset-password?token=${token}`)
+        .then(
+          () =>
+            toast.success("Reset link copied — single-use, valid for 24 hours"),
+          () => toast.error("Couldn't copy the reset link — generate it again"),
+        )
+    },
+    onError: () => toast.error("Couldn't create reset link"),
+    onSettled: () => {
+      queryClient.invalidateQueries({
+        queryKey: pendingPasswordResetsQueryOptions().queryKey,
+      })
+    },
   })
 
   const deleteMutation = useMutation({
@@ -183,6 +258,11 @@ function MemberRowActions({ user }: { user: AdminUser }) {
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
+          <DropdownMenuItem onSelect={() => createResetLink.mutate()}>
+            <KeyRound />
+            Reset password
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
           <DropdownMenuItem
             variant="destructive"
             onSelect={() => setConfirmOpen(true)}
@@ -233,23 +313,36 @@ function RoleSelect({
   onChange: (role: Role) => void
 }) {
   const select = (
-    <select
+    <Select
       value={member.role}
       disabled={lastAdmin}
-      aria-label={`Role for ${userDisplayName(member)}`}
-      onChange={(event) => onChange(event.target.value as Role)}
-      className="h-7 rounded-md border border-input/80 bg-transparent pl-2 pr-6 text-xs text-foreground transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-ring/30 focus-visible:ring-[2px] disabled:cursor-not-allowed disabled:opacity-50"
+      onValueChange={(role) => onChange(role as Role)}
     >
-      <option value="user">{ROLE_LABELS.user}</option>
-      <option value="admin">{ROLE_LABELS.admin}</option>
-    </select>
+      <SelectTrigger
+        size="sm"
+        aria-label={`Role for ${userDisplayName(member)}`}
+        // Fixed width: "Admin" and "Member" render at different natural
+        // widths, which would stagger the Joined column row to row.
+        className="h-7 w-24 text-xs"
+      >
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="user" className="text-xs">
+          {ROLE_LABELS.user}
+        </SelectItem>
+        <SelectItem value="admin" className="text-xs">
+          {ROLE_LABELS.admin}
+        </SelectItem>
+      </SelectContent>
+    </Select>
   )
 
   if (!lastAdmin) return select
 
   return (
     <Tooltip>
-      {/* A disabled select swallows pointer events, so the tooltip listens
+      {/* A disabled trigger swallows pointer events, so the tooltip listens
           on a focusable wrapper instead. */}
       <TooltipTrigger asChild>
         {/* tabIndex lets keyboard users reach the wrapper and hear why the

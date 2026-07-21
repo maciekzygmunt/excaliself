@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "password_resets_one_pending_per_user" ON "password_resets" USING btree ("userId") WHERE "password_resets"."usedAt" is null;

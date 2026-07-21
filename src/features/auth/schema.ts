@@ -12,17 +12,30 @@ export const registerFieldsSchema = z.object({
 
 export const setupFieldsSchema = registerFieldsSchema
 
+const confirmPasswordMatches = (
+  { password, confirmPassword }: { password: string; confirmPassword: string },
+  ctx: z.RefinementCtx,
+) => {
+  if (password !== confirmPassword) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["confirmPassword"],
+      message: "Passwords do not match",
+    })
+  }
+}
+
 /** Account-creation form for the invite page. */
 export const registerFormSchema = registerFieldsSchema
   .extend({
     confirmPassword: z.string().min(8),
   })
-  .superRefine(({ password, confirmPassword }, ctx) => {
-    if (password !== confirmPassword) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["confirmPassword"],
-        message: "Passwords do not match",
-      })
-    }
+  .superRefine(confirmPasswordMatches)
+
+/** Set-new-password form for the password-reset page. */
+export const newPasswordFormSchema = z
+  .object({
+    password: z.string().min(8),
+    confirmPassword: z.string().min(8),
   })
+  .superRefine(confirmPasswordMatches)

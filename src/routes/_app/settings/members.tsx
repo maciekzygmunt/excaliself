@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router"
 import { usersQueryOptions } from "@/features/admin/queries"
+import { pendingPasswordResetsQueryOptions } from "@/features/password-resets/queries"
 import { useDocumentTitle } from "@/lib/document-title"
 import { adminMiddleware } from "@/middleware/admin"
 import { MembersSection } from "./-components/MembersSection"
@@ -11,7 +12,10 @@ export const Route = createFileRoute("/_app/settings/members")({
     middleware: [adminMiddleware],
   },
   loader: async ({ context }) => {
-    await context.queryClient.ensureQueryData(usersQueryOptions())
+    await Promise.all([
+      context.queryClient.ensureQueryData(usersQueryOptions()),
+      context.queryClient.ensureQueryData(pendingPasswordResetsQueryOptions()),
+    ])
   },
   component: MembersPage,
 })
