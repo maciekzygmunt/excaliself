@@ -22,15 +22,12 @@ function renderOpenCollapsible(contentProps?: { className?: string }) {
 
 test("content carries the 150ms collapse animation classes, disabled under reduced motion", () => {
   const content = renderOpenCollapsible()
-  expect(content.className).toContain(
-    "data-[state=open]:animate-collapsible-down",
-  )
-  expect(content.className).toContain(
-    "data-[state=closed]:animate-collapsible-up",
-  )
-  expect(content.className).toContain("animation-duration-150")
+  expect(content.className).toContain("h-(--collapsible-panel-height)")
+  expect(content.className).toContain("data-starting-style:h-0")
+  expect(content.className).toContain("data-ending-style:h-0")
+  expect(content.className).toContain("duration-150")
   expect(content.className).toContain("overflow-hidden")
-  expect(content.className).toContain("motion-reduce:animate-none")
+  expect(content.className).toContain("motion-reduce:transition-none")
 })
 
 test("content merges caller className with the animation classes", () => {

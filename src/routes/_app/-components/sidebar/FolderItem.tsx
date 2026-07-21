@@ -144,7 +144,7 @@ export function FolderItem({ folder, childNodes }: FolderItemProps) {
       )}
     >
       {hasChildren ? (
-        <CollapsibleTrigger asChild>{row}</CollapsibleTrigger>
+        <CollapsibleTrigger render={row} nativeButton={false} />
       ) : (
         row
       )}
@@ -166,8 +166,10 @@ export function FolderItem({ folder, childNodes }: FolderItemProps) {
   if (!hasChildren) return item
 
   return (
-    <Collapsible open={isExpanded} onOpenChange={setIsExpanded} asChild>
-      {item}
-    </Collapsible>
+    <Collapsible
+      open={isExpanded}
+      onOpenChange={setIsExpanded}
+      render={item}
+    />
   )
 }
