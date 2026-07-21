@@ -1,15 +1,31 @@
-import { useQuery } from "@tanstack/react-query"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { MoreHorizontal, Trash2 } from "lucide-react"
+import { useState } from "react"
+import { toast } from "sonner"
 import { InitialsAvatar } from "@/components/initials-avatar"
+import { TypeToConfirmDialog } from "@/components/type-to-confirm-dialog"
+import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { Skeleton } from "@/components/ui/skeleton"
 import { userDisplayName } from "@/features/account/display-name"
-import { usersQueryOptions } from "@/features/admin/queries"
+import { currentUserQueryOptions } from "@/features/account/queries"
+import {
+  userContentCountsQueryOptions,
+  usersQueryOptions,
+} from "@/features/admin/queries"
+import { deleteUser } from "@/features/admin/server"
 import { useDelayedVisible } from "@/hooks/use-delayed-visible"
 
-// Deliberately lean (issue #64): no search, sort, pagination, or row
-// actions — role management, removal, and password resets land in
-// follow-up tickets.
+// Deliberately lean (issue #64): no search, sort, or pagination — those can
+// land later if instances outgrow a single screen.
 export function MembersSection() {
   const { data: users, isPending } = useQuery(usersQueryOptions())
+  const { data: currentUser } = useQuery(currentUserQueryOptions())
   const showSkeleton = useDelayedVisible(isPending)
 
   if (isPending) return showSkeleton ? <MembersSkeleton /> : null
@@ -51,15 +67,105 @@ export function MembersSection() {
                 </p>
               </div>
             </div>
-            <p className="shrink-0 text-xs text-muted-foreground/60">
-              Joined {new Date(user.createdAt).toLocaleDateString()}
-            </p>
+            <div className="flex shrink-0 items-center gap-1">
+              <p className="text-xs text-muted-foreground/60">
+                Joined {new Date(user.createdAt).toLocaleDateString()}
+              </p>
+              {/* No self-delete here — that lives in the Account danger
+                  zone (issue #66). This page being admin-gated, a sole
+                  admin is always the viewer, so this also blocks deleting
+                  the last admin in the UI; the server enforces both. */}
+              {user.id !== currentUser?.id && (
+                <MemberRowActions
+                  userId={user.id}
+                  email={user.email}
+                  displayName={userDisplayName(user)}
+                />
+              )}
+            </div>
           </li>
         ))}
       </ul>
     </section>
   )
 }
+
+// The overflow menu plus the tier-3 type-to-confirm delete (issue #66).
+// Pessimistic: the dialog stays open with an in-button pending state until
+// the server answers, then the list invalidation drops the row.
+function MemberRowActions({
+  userId,
+  email,
+  displayName,
+}: {
+  userId: string
+  email: string
+  displayName: string
+}) {
+  const [confirmOpen, setConfirmOpen] = useState(false)
+  const queryClient = useQueryClient()
+
+  // Fetched only once the dialog is up — the danger copy must state what
+  // will actually be destroyed, with fresh counts.
+  const { data: counts } = useQuery({
+    ...userContentCountsQueryOptions(userId),
+    enabled: confirmOpen,
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: () => deleteUser({ data: userId }),
+    onSuccess: () =>
+      queryClient.invalidateQueries({
+        queryKey: usersQueryOptions().queryKey,
+      }),
+    onError: () => toast.error(`Couldn't delete ${displayName}`),
+  })
+
+  return (
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            aria-label={`Actions for ${displayName}`}
+            className="text-muted-foreground/60"
+          >
+            <MoreHorizontal className="h-4 w-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem
+            onSelect={() => setConfirmOpen(true)}
+            className="text-destructive focus:text-destructive"
+          >
+            <Trash2 className="mr-2 h-4 w-4" />
+            Delete user…
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <TypeToConfirmDialog
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        title={`Delete ${displayName}?`}
+        description={
+          counts
+            ? `This will delete ${displayName}'s account and permanently delete their ${countNoun(counts.drawings, "drawing")} and ${countNoun(counts.folders, "folder")}. This can't be undone.`
+            : `This will delete ${displayName}'s account and permanently delete all of their content. This can't be undone.`
+        }
+        challenge={email}
+        confirmLabel="Delete user"
+        pendingLabel="Deleting…"
+        // No confirm until the copy can state real counts.
+        confirmDisabled={!counts}
+        onConfirm={() => deleteMutation.mutateAsync()}
+      />
+    </>
+  )
+}
+
+const countNoun = (count: number, noun: string) =>
+  `${count} ${noun}${count === 1 ? "" : "s"}`
 
 // Mirrors the loaded layout: section header plus a few member rows.
 function MembersSkeleton() {

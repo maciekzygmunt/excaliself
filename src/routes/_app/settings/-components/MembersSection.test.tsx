@@ -1,14 +1,32 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
-import { act, cleanup, render, screen } from "@testing-library/react"
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react"
 import { afterEach, expect, test, vi } from "vitest"
+import { currentUserQueryOptions } from "@/features/account/queries"
 import { usersQueryOptions } from "@/features/admin/queries"
-import { getAllUsers } from "@/features/admin/server"
+import {
+  deleteUser,
+  getAllUsers,
+  getUserContentCounts,
+} from "@/features/admin/server"
 import { MembersSection } from "./MembersSection"
 
-// The query module imports the server function, which imports the db — stub
-// the server-function edge (the cache is seeded, so it is never called).
+// The query modules import the server functions, which import the db — stub
+// the server-function edge (the caches are seeded, so most are never called).
 vi.mock("@/features/admin/server", () => ({
   getAllUsers: vi.fn(),
+  deleteUser: vi.fn(),
+  getUserContentCounts: vi.fn(),
+}))
+vi.mock("@/features/account/server", () => ({
+  getCurrentUser: vi.fn(),
+  listActiveSessions: vi.fn(),
 }))
 
 // Deliberately out of join order: Bea (Feb) before ada (Jan) before Cy (Mar).
@@ -51,16 +69,33 @@ afterEach(() => {
   vi.useRealTimers()
 })
 
+// The viewer is ada — the (sole) admin browsing the members page.
+const viewer = {
+  id: "user-ada",
+  email: "ada@example.com",
+  name: null,
+  role: "admin" as const,
+}
+
 function renderSection({ seed = true } = {}) {
   const queryClient = new QueryClient()
   if (seed) {
     queryClient.setQueryData(usersQueryOptions().queryKey, members)
   }
+  queryClient.setQueryData(currentUserQueryOptions().queryKey, viewer)
   return render(
     <QueryClientProvider client={queryClient}>
       <MembersSection />
     </QueryClientProvider>,
   )
+}
+
+const flush = () => act(async () => {})
+
+function openRowMenu(name: string) {
+  const trigger = screen.getByRole("button", { name: `Actions for ${name}` })
+  fireEvent.pointerDown(trigger)
+  fireEvent.click(trigger)
 }
 
 test("the header shows the member count", () => {
@@ -104,9 +139,84 @@ test("every row carries the shared initials avatar", () => {
   ).toHaveLength(3)
 })
 
-test("the lean list offers no row actions", () => {
+test("every row except your own offers an actions menu", () => {
   renderSection()
-  expect(screen.queryAllByRole("button")).toHaveLength(0)
+  // No self-delete here — that lives in the Account danger zone. And since
+  // this page is admin-gated, a sole admin is always the viewer, so hiding
+  // the self row's menu also blocks sole-admin deletion in the UI.
+  expect(screen.queryByRole("button", { name: "Actions for ada" })).toBeNull()
+  expect(screen.getByRole("button", { name: "Actions for Bea" })).toBeTruthy()
+  expect(screen.getByRole("button", { name: "Actions for Cy" })).toBeTruthy()
+})
+
+test("Delete user opens the tier-3 dialog with live content counts and an email challenge", async () => {
+  vi.mocked(getUserContentCounts).mockResolvedValue({ drawings: 3, folders: 1 })
+  renderSection()
+
+  openRowMenu("Bea")
+  fireEvent.click(screen.getByRole("menuitem", { name: /delete user/i }))
+  await flush()
+
+  expect(getUserContentCounts).toHaveBeenCalledWith({ data: "user-bea" })
+  expect(
+    await screen.findByText(/permanently delete their 3 drawings and 1 folder/),
+  ).toBeTruthy()
+
+  // Armed only by typing the exact email.
+  const confirm = () =>
+    screen.getByRole("button", { name: "Delete user" }) as HTMLButtonElement
+  expect(confirm().disabled).toBe(true)
+  fireEvent.change(screen.getByRole("textbox"), {
+    target: { value: "bea@example" },
+  })
+  expect(confirm().disabled).toBe(true)
+  fireEvent.change(screen.getByRole("textbox"), {
+    target: { value: "bea@example.com" },
+  })
+  expect(confirm().disabled).toBe(false)
+})
+
+test("the confirm stays gated while the counts are still loading", async () => {
+  vi.mocked(getUserContentCounts).mockReturnValue(new Promise(() => {}))
+  renderSection()
+
+  openRowMenu("Bea")
+  fireEvent.click(screen.getByRole("menuitem", { name: /delete user/i }))
+  await flush()
+
+  fireEvent.change(screen.getByRole("textbox"), {
+    target: { value: "bea@example.com" },
+  })
+  expect(
+    (screen.getByRole("button", { name: "Delete user" }) as HTMLButtonElement)
+      .disabled,
+  ).toBe(true)
+})
+
+test("confirming deletes the user and the refreshed list drops them", async () => {
+  vi.mocked(getUserContentCounts).mockResolvedValue({ drawings: 0, folders: 0 })
+  vi.mocked(deleteUser).mockResolvedValue(undefined)
+  // The list server fn mirrors reality: Bea is gone only once the delete
+  // has landed — so the success invalidation's refetch drops her row.
+  vi.mocked(getAllUsers).mockImplementation(async () =>
+    vi.mocked(deleteUser).mock.calls.length > 0
+      ? members.filter((member) => member.id !== "user-bea")
+      : members,
+  )
+  renderSection()
+
+  openRowMenu("Bea")
+  fireEvent.click(screen.getByRole("menuitem", { name: /delete user/i }))
+  await flush()
+  fireEvent.change(screen.getByRole("textbox"), {
+    target: { value: "bea@example.com" },
+  })
+  fireEvent.click(screen.getByRole("button", { name: "Delete user" }))
+  await flush()
+
+  expect(deleteUser).toHaveBeenCalledWith({ data: "user-bea" })
+  await waitFor(() => expect(screen.queryByText("bea@example.com")).toBeNull())
+  expect(screen.queryByRole("alertdialog")).toBeNull()
 })
 
 test("the skeleton appears only after the grace period", () => {

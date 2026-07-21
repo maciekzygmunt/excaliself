@@ -5,7 +5,8 @@ import { createServerFn } from "@tanstack/react-start"
 import { count, eq } from "drizzle-orm"
 import z from "zod"
 import { db } from "@/db"
-import { sessions, users, verifications } from "@/db/schema"
+import { drawings, folders, sessions, users } from "@/db/schema"
+import { deleteUserAccount } from "@/features/admin/delete-user"
 import { setupFieldsSchema } from "@/features/auth/schema"
 import { auth } from "@/lib/auth"
 import { adminMiddleware } from "@/middleware/admin"
@@ -63,22 +64,26 @@ export const getAllUsers = createServerFn({ method: "GET" })
 export const deleteUser = createServerFn({ method: "POST" })
   .middleware([adminMiddleware])
   .inputValidator(z.string())
+  .handler(async ({ data: userId, context }) => {
+    await deleteUserAccount(db, context.session.user.id, userId)
+  })
+
+// Feeds the tier-3 confirm's count-aware copy ("…and permanently delete
+// their 23 drawings and 4 folders"). Counts everything owned — trashed rows
+// included, since the delete cascade destroys those too.
+export const getUserContentCounts = createServerFn({ method: "GET" })
+  .middleware([adminMiddleware])
+  .inputValidator(z.string())
   .handler(async ({ data: userId }) => {
-    await db.transaction(async (tx) => {
-      const deleted = await tx
-        .delete(users)
-        .where(eq(users.id, userId))
-        .returning({ email: users.email })
-
-      if (deleted.length === 0) {
-        throw new Error(`User not found: ${userId}`)
-      }
-
-      // verifications has no FK to users — it's keyed by identifier (email)
-      // for password resets, email verification, etc. Clean it up manually so
-      // orphan rows don't collide with a future re-registration of the same email.
-      await tx
-        .delete(verifications)
-        .where(eq(verifications.identifier, deleted[0].email))
-    })
+    const [[drawingCount], [folderCount]] = await Promise.all([
+      db
+        .select({ count: count() })
+        .from(drawings)
+        .where(eq(drawings.ownerId, userId)),
+      db
+        .select({ count: count() })
+        .from(folders)
+        .where(eq(folders.ownerId, userId)),
+    ])
+    return { drawings: drawingCount.count, folders: folderCount.count }
   })
