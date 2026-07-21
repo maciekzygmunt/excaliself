@@ -51,61 +51,55 @@ export function useUpdateProfile() {
 }
 
 /**
- * Revoking a session drops its row optimistically (spec §4.3) and rolls it
- * back with an error toast if the server call fails. Both revoke mutations
- * share a scope so overlapping revokes settle in serial — a rollback can
- * never resurrect a row a newer optimistic write already removed.
+ * Both revoke flavors drop rows optimistically (spec §4.3) and roll back
+ * with an error toast if the server call fails — they differ only in which
+ * rows survive. They share a mutation scope so overlapping revokes settle
+ * in serial: a rollback can never resurrect a row a newer optimistic write
+ * already removed.
  */
-export function useRevokeSession() {
+function useRevokeMutation<TVars>(options: {
+  mutationFn: (vars: TVars) => Promise<unknown>
+  keep: (session: ActiveSession, vars: TVars) => boolean
+  errorMessage: string
+}) {
   const queryClient = useQueryClient()
   const sessionsKey = sessionsQueryOptions().queryKey
 
-  const mutation = useMutation({
-    mutationFn: revokeSessionById,
+  return useMutation({
+    mutationFn: options.mutationFn,
     scope: { id: "account-sessions" },
-    onMutate: async ({ data }) => {
+    onMutate: async (vars: TVars) => {
       await queryClient.cancelQueries({ queryKey: sessionsKey })
       const previous = queryClient.getQueryData<ActiveSession[]>(sessionsKey)
       queryClient.setQueryData<ActiveSession[]>(sessionsKey, (current) =>
-        current?.filter((session) => session.id !== data.id),
+        current?.filter((session) => options.keep(session, vars)),
       )
       return { previous }
     },
     onError: (_err, _vars, context) => {
       queryClient.setQueryData(sessionsKey, context?.previous)
-      toast.error("Couldn't revoke session")
+      toast.error(options.errorMessage)
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: sessionsKey })
     },
   })
+}
 
+export function useRevokeSession() {
+  const mutation = useRevokeMutation({
+    mutationFn: revokeSessionById,
+    keep: (session, vars) => session.id !== vars.data.id,
+    errorMessage: "Couldn't revoke session",
+  })
   return (id: string) => mutation.mutate({ data: { id } })
 }
 
 export function useRevokeOtherSessions() {
-  const queryClient = useQueryClient()
-  const sessionsKey = sessionsQueryOptions().queryKey
-
-  const mutation = useMutation({
+  const mutation = useRevokeMutation({
     mutationFn: () => revokeOtherSessions(),
-    scope: { id: "account-sessions" },
-    onMutate: async () => {
-      await queryClient.cancelQueries({ queryKey: sessionsKey })
-      const previous = queryClient.getQueryData<ActiveSession[]>(sessionsKey)
-      queryClient.setQueryData<ActiveSession[]>(sessionsKey, (current) =>
-        current?.filter((session) => session.current),
-      )
-      return { previous }
-    },
-    onError: (_err, _vars, context) => {
-      queryClient.setQueryData(sessionsKey, context?.previous)
-      toast.error("Couldn't sign out other sessions")
-    },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: sessionsKey })
-    },
+    keep: (session) => session.current,
+    errorMessage: "Couldn't sign out all other sessions",
   })
-
   return () => mutation.mutate(undefined)
 }

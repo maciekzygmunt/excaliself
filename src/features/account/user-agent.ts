@@ -9,7 +9,7 @@ const BROWSERS: Array<[RegExp, string]> = [
   [/\bSafari\//, "Safari"],
 ]
 
-const SYSTEMS: Array<[RegExp, string]> = [
+const OPERATING_SYSTEMS: Array<[RegExp, string]> = [
   [/\biPhone\b|\biPad\b|\biPod\b/, "iOS"],
   [/\bAndroid\b/, "Android"],
   [/\bWindows\b/, "Windows"],
@@ -20,7 +20,7 @@ const SYSTEMS: Array<[RegExp, string]> = [
 export function describeDevice(userAgent: string | null): string {
   const ua = userAgent ?? ""
   const browser = BROWSERS.find(([pattern]) => pattern.test(ua))?.[1]
-  const system = SYSTEMS.find(([pattern]) => pattern.test(ua))?.[1]
+  const system = OPERATING_SYSTEMS.find(([pattern]) => pattern.test(ua))?.[1]
   if (browser && system) return `${browser} on ${system}`
   return browser ?? system ?? "Unknown device"
 }

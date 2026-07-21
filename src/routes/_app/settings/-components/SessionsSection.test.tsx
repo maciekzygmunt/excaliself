@@ -125,7 +125,7 @@ test("a failed revoke rolls the row back and shows an error toast", async () => 
 test("sign out other sessions revokes everything but the current one", async () => {
   renderSection([currentSession, otherSession])
   fireEvent.click(
-    screen.getByRole("button", { name: "Sign out other sessions" }),
+    screen.getByRole("button", { name: "Sign out all other sessions" }),
   )
   await waitFor(() => expect(cachedIds()).toEqual(["session-1"]))
   await waitFor(() => expect(revokeOtherSessions).toHaveBeenCalled())
@@ -134,7 +134,7 @@ test("sign out other sessions revokes everything but the current one", async () 
 test("the sign-out-others button is absent with only the current session", () => {
   renderSection([currentSession])
   expect(
-    screen.queryByRole("button", { name: "Sign out other sessions" }),
+    screen.queryByRole("button", { name: "Sign out all other sessions" }),
   ).toBeNull()
 })
 

@@ -46,7 +46,7 @@ function SessionList({ sessions }: { sessions: ActiveSession[] }) {
   const hasOthers = sessions.some((session) => !session.current)
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-4 animate-in fade-in-0 duration-200 motion-reduce:animate-none">
       <ul className="flex flex-col divide-y divide-border/60 rounded-xl border border-border/60">
         {sessions.map((session) => (
           <li
@@ -91,7 +91,7 @@ function SessionList({ sessions }: { sessions: ActiveSession[] }) {
       {hasOthers && (
         <div>
           <Button variant="outline" size="sm" onClick={() => revokeOthers()}>
-            Sign out other sessions
+            Sign out all other sessions
           </Button>
         </div>
       )}
