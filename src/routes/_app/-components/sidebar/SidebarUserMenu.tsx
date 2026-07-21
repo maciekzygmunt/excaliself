@@ -46,14 +46,12 @@ export function SidebarUserMenu({ user }: { user: SidebarUser }) {
         align="start"
         sideOffset={4}
       >
-        {/* Interim entry until the admin surfaces move under /settings —
-            /admin is otherwise unreachable from chrome. */}
         {user.isAdmin && (
           <>
             <DropdownMenuItem asChild>
-              <Link to="/admin">
+              <Link to="/settings/members">
                 <Wrench className="mr-2 h-4 w-4" />
-                Admin Settings
+                Members
               </Link>
             </DropdownMenuItem>
             <DropdownMenuSeparator />

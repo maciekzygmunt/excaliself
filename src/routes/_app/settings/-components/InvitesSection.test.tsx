@@ -1,8 +1,16 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from "@testing-library/react"
 import { afterEach, beforeEach, expect, test, vi } from "vitest"
 import { pendingInvitesQueryOptions } from "@/features/invites/queries"
-import { InvitesSection } from "./invites-card"
+import { deleteInvite } from "@/features/invites/server"
+import { InvitesSection } from "./InvitesSection"
 
 // The query module imports the server functions, which import the db — stub
 // the server-function edge (the cache is seeded, so they are never called).
@@ -54,9 +62,7 @@ function row(token: string) {
 }
 
 function clickCopy(token: string) {
-  const copyButton = row(token).querySelector("button")
-  if (!copyButton) throw new Error("copy button not found")
-  fireEvent.click(copyButton)
+  fireEvent.click(within(row(token)).getByRole("button", { name: /copy/i }))
 }
 
 test("clicking copy swaps to a check that animates in", () => {
@@ -92,4 +98,25 @@ test("copying a second invite moves the check and keeps it a full 2s", () => {
 
   act(() => vi.advanceTimersByTime(1000))
   expect(row(invites[1].token).querySelector(".lucide-check")).toBeNull()
+})
+
+test("the destructive action is labeled Revoke and revokes that invite", async () => {
+  renderSection()
+  const revoke = within(row(invites[1].token)).getByRole("button", {
+    name: /revoke/i,
+  })
+  fireEvent.click(revoke)
+  // The mutation invokes its mutationFn on a microtask — flush it.
+  await act(async () => {})
+  expect(vi.mocked(deleteInvite)).toHaveBeenCalledWith(
+    { data: invites[1].id },
+    expect.anything(),
+  )
+})
+
+test("copy is labeled as the resend affordance", () => {
+  renderSection()
+  // Copy doubles as resend — one labeled Copy action per pending row.
+  expect(screen.getAllByRole("button", { name: /copy/i })).toHaveLength(2)
+  expect(screen.queryByRole("button", { name: /resend/i })).toBeNull()
 })
