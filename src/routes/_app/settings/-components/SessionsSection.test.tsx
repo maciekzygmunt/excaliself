@@ -56,6 +56,14 @@ const otherSession: ActiveSession = {
   current: false,
 }
 
+const thirdSession: ActiveSession = {
+  id: "session-3",
+  ipAddress: "192.0.2.9",
+  userAgent: FIREFOX_WINDOWS,
+  lastActiveAt: new Date(Date.now() - 60 * 60_000),
+  current: false,
+}
+
 let queryClient: QueryClient
 
 beforeEach(() => {
@@ -129,6 +137,37 @@ test("sign out other sessions revokes everything but the current one", async () 
   )
   await waitFor(() => expect(cachedIds()).toEqual(["session-1"]))
   await waitFor(() => expect(revokeOtherSessions).toHaveBeenCalled())
+})
+
+test("a failed revoke does not resurrect rows a later overlapping revoke removed", async () => {
+  const { toast } = await import("sonner")
+  let rejectFirst!: (err: Error) => void
+  vi.mocked(revokeSessionById).mockImplementationOnce(
+    () =>
+      new Promise((_resolve, reject) => {
+        rejectFirst = reject
+      }),
+  )
+  renderSection([currentSession, otherSession, thirdSession])
+
+  // First revoke (session-2) stays in flight...
+  fireEvent.click(screen.getAllByRole("button", { name: "Revoke" })[0])
+  await waitFor(() => expect(cachedIds()).toEqual(["session-1", "session-3"]))
+
+  // ...while sign-out-others lands its optimistic removal immediately.
+  fireEvent.click(
+    screen.getByRole("button", { name: "Sign out all other sessions" }),
+  )
+  await waitFor(() => expect(cachedIds()).toEqual(["session-1"]))
+
+  // The failed revoke re-inserts only its own row — session-3 stays removed.
+  rejectFirst(new Error("boom"))
+  await waitFor(() =>
+    expect(vi.mocked(toast.error)).toHaveBeenCalledWith(
+      "Couldn't revoke session",
+    ),
+  )
+  expect(cachedIds()).toEqual(["session-1", "session-2"])
 })
 
 test("the sign-out-others button is absent with only the current session", () => {

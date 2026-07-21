@@ -8,6 +8,7 @@ import { db } from "@/db"
 import { sessions, users } from "@/db/schema"
 import { auth } from "@/lib/auth"
 import { authMiddleware } from "@/middleware/auth"
+import { compareSessions } from "./sessions"
 
 // Read the row fresh rather than trusting the session's cookie cache — a
 // just-saved profile edit must never be masked by a stale cookie snapshot.
@@ -56,12 +57,7 @@ export const listActiveSessions = createServerFn({ method: "GET" })
         lastActiveAt: session.updatedAt,
         current: session.id === currentId,
       }))
-      .sort(
-        (a, b) =>
-          Number(b.current) - Number(a.current) ||
-          new Date(b.lastActiveAt).getTime() -
-            new Date(a.lastActiveAt).getTime(),
-      )
+      .sort(compareSessions)
   })
 
 // The current session is only ever ended through sign-out, so the row action

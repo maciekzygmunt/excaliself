@@ -8,6 +8,7 @@ import {
   sessionsQueryOptions,
 } from "./queries"
 import { revokeOtherSessions, revokeSessionById, updateProfile } from "./server"
+import { compareSessions } from "./sessions"
 
 /**
  * Save the display name optimistically (spec §4.3): the new name lands in
@@ -53,9 +54,11 @@ export function useUpdateProfile() {
 /**
  * Both revoke flavors drop rows optimistically (spec §4.3) and roll back
  * with an error toast if the server call fails — they differ only in which
- * rows survive. They share a mutation scope so overlapping revokes settle
- * in serial: a rollback can never resurrect a row a newer optimistic write
- * already removed.
+ * rows survive. The shared scope serializes the server calls, but every
+ * onMutate still fires at click time — so a failure must not restore a
+ * whole-list snapshot, which would resurrect rows a later overlapping
+ * revoke already removed. Rollback instead re-inserts only the rows this
+ * mutation itself removed and that nothing else has since put back.
  */
 function useRevokeMutation<TVars>(options: {
   mutationFn: (vars: TVars) => Promise<unknown>
@@ -70,14 +73,23 @@ function useRevokeMutation<TVars>(options: {
     scope: { id: "account-sessions" },
     onMutate: async (vars: TVars) => {
       await queryClient.cancelQueries({ queryKey: sessionsKey })
-      const previous = queryClient.getQueryData<ActiveSession[]>(sessionsKey)
-      queryClient.setQueryData<ActiveSession[]>(sessionsKey, (current) =>
-        current?.filter((session) => options.keep(session, vars)),
+      const current = queryClient.getQueryData<ActiveSession[]>(sessionsKey)
+      const removed =
+        current?.filter((session) => !options.keep(session, vars)) ?? []
+      queryClient.setQueryData<ActiveSession[]>(sessionsKey, (list) =>
+        list?.filter((session) => options.keep(session, vars)),
       )
-      return { previous }
+      return { removed }
     },
     onError: (_err, _vars, context) => {
-      queryClient.setQueryData(sessionsKey, context?.previous)
+      queryClient.setQueryData<ActiveSession[]>(sessionsKey, (list) => {
+        if (!list) return list
+        const present = new Set(list.map((session) => session.id))
+        const resurrected = (context?.removed ?? []).filter(
+          (session) => !present.has(session.id),
+        )
+        return [...list, ...resurrected].sort(compareSessions)
+      })
       toast.error(options.errorMessage)
     },
     onSettled: () => {
