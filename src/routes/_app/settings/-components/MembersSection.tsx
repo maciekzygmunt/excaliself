@@ -28,9 +28,9 @@ export function MembersSection() {
         </p>
       </div>
 
-      <div>
+      <ul>
         {members.map((user, index) => (
-          <div
+          <li
             key={user.id}
             className={`flex items-center justify-between gap-3 py-2.5 ${
               index !== 0 ? "border-t border-border/60" : ""
@@ -43,10 +43,7 @@ export function MembersSection() {
                 className="h-7 w-7"
               />
               <div className="min-w-0">
-                <p
-                  data-testid="member-name"
-                  className="truncate text-sm text-foreground"
-                >
+                <p className="truncate text-sm text-foreground">
                   {userDisplayName(user)}
                 </p>
                 <p className="truncate text-xs text-muted-foreground">
@@ -57,9 +54,9 @@ export function MembersSection() {
             <p className="shrink-0 text-xs text-muted-foreground/60">
               Joined {new Date(user.createdAt).toLocaleDateString()}
             </p>
-          </div>
+          </li>
         ))}
-      </div>
+      </ul>
     </section>
   )
 }
@@ -69,8 +66,8 @@ function MembersSkeleton() {
   return (
     <div>
       <div className="mb-4 flex flex-col gap-1.5">
-        <Skeleton className="h-4 w-20 motion-reduce:animate-none" />
-        <Skeleton className="h-3 w-24 motion-reduce:animate-none" />
+        <Skeleton className="h-4 w-20" />
+        <Skeleton className="h-3 w-24" />
       </div>
       <div>
         {[0, 1, 2].map((rowIndex) => (
@@ -80,10 +77,10 @@ function MembersSkeleton() {
               rowIndex !== 0 ? "border-t border-border/60" : ""
             }`}
           >
-            <Skeleton className="h-7 w-7 rounded-full motion-reduce:animate-none" />
+            <Skeleton className="h-7 w-7 rounded-full" />
             <div className="flex flex-col gap-1.5">
-              <Skeleton className="h-3.5 w-32 motion-reduce:animate-none" />
-              <Skeleton className="h-3 w-44 motion-reduce:animate-none" />
+              <Skeleton className="h-3.5 w-32" />
+              <Skeleton className="h-3 w-44" />
             </div>
           </div>
         ))}

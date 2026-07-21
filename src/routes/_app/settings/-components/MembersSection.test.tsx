@@ -83,7 +83,9 @@ test("members are listed by join date with display name, email, and joined date"
   renderSection()
 
   // ada has no display name, so the email prefix stands in (spec §5.12).
-  const names = screen.getAllByTestId("member-name").map((el) => el.textContent)
+  const names = screen
+    .getAllByRole("listitem")
+    .map((item) => item.querySelector("p")?.textContent)
   expect(names).toEqual(["ada", "Bea", "Cy"])
 
   expect(screen.getByText("ada@example.com")).not.toBeNull()

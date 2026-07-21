@@ -141,10 +141,10 @@ function InvitesSkeleton() {
     <div>
       <div className="mb-4 flex items-center justify-between gap-3">
         <div className="flex flex-col gap-1.5">
-          <Skeleton className="h-4 w-16 motion-reduce:animate-none" />
-          <Skeleton className="h-3 w-64 motion-reduce:animate-none" />
+          <Skeleton className="h-4 w-16" />
+          <Skeleton className="h-3 w-64" />
         </div>
-        <Skeleton className="h-7 w-28 motion-reduce:animate-none" />
+        <Skeleton className="h-7 w-28" />
       </div>
       <div>
         {[0, 1].map((rowIndex) => (
@@ -154,8 +154,8 @@ function InvitesSkeleton() {
               rowIndex !== 0 ? "border-t border-border/60" : ""
             }`}
           >
-            <Skeleton className="h-3.5 w-40 motion-reduce:animate-none" />
-            <Skeleton className="h-3 w-24 motion-reduce:animate-none" />
+            <Skeleton className="h-3.5 w-40" />
+            <Skeleton className="h-3 w-24" />
           </div>
         ))}
       </div>

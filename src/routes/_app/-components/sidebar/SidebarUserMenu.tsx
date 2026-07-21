@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router"
-import { LogOut, Settings, Wrench } from "lucide-react"
+import { LogOut, Settings, Users } from "lucide-react"
 import { InitialsAvatar } from "@/components/initials-avatar"
 import {
   DropdownMenu,
@@ -50,7 +50,7 @@ export function SidebarUserMenu({ user }: { user: SidebarUser }) {
           <>
             <DropdownMenuItem asChild>
               <Link to="/settings/members">
-                <Wrench className="mr-2 h-4 w-4" />
+                <Users className="mr-2 h-4 w-4" />
                 Members
               </Link>
             </DropdownMenuItem>
