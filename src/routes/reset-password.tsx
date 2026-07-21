@@ -44,10 +44,11 @@ function DeadResetPage() {
       subtitle="This reset link has expired or was already used. Ask an admin to generate a new one."
     >
       <Button
-        asChild
+        render={<Link to="/login" />}
+        nativeButton={false}
         className="w-full bg-foreground text-background hover:bg-foreground/90"
       >
-        <Link to="/login">Go to sign in</Link>
+        Go to sign in
       </Button>
     </AuthPage>
   )
