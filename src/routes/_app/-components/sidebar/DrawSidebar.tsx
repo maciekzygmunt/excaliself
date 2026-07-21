@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query"
 import { Link } from "@tanstack/react-router"
-import { File, Folder, PanelLeft, Plus, Trash2 } from "lucide-react"
+import { File, Folder, PanelLeft, Plus, Search, Trash2 } from "lucide-react"
 import { useEffect, useMemo } from "react"
 import { Mark } from "@/components/identity"
 import {
@@ -20,6 +20,7 @@ import {
 import { type Drawing, drawingsQueryOptions } from "@/features/drawings/queries"
 import { foldersQueryOptions } from "@/features/folders/queries"
 import { cn } from "@/lib/utils"
+import { useCommandPalette } from "../CommandPalette"
 import { useCreateDialog } from "../CreateDialog"
 import { Kbd } from "./Kbd"
 import { SidebarNav, SidebarNavItem } from "./SidebarNav"
@@ -33,6 +34,7 @@ export function DrawSidebar({ user }: { user: SidebarUser }) {
   const { data: drawings = [] } = useQuery(drawingsQueryOptions())
   const { data: folders = [] } = useQuery(foldersQueryOptions())
   const { openCreateDrawingDialog, openCreateFolderDialog } = useCreateDialog()
+  const { openCommandPalette } = useCommandPalette()
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -90,6 +92,23 @@ export function DrawSidebar({ user }: { user: SidebarUser }) {
             <Plus className="h-2.75 w-2.75 text-iris" strokeWidth={2.5} />
             New drawing
             <Kbd>N</Kbd>
+          </button>
+        </div>
+
+        {/* Styled like a search field but it's a palette trigger — no inline
+            tree filter remains (spec §2.3). */}
+        <div className="px-2 pb-1">
+          <button
+            type="button"
+            onClick={openCommandPalette}
+            className="flex w-full items-center gap-2 rounded-lg bg-foreground/[0.04] px-2.5 py-2 text-[13px] text-muted-foreground/70 shadow-[inset_0_0_0_1px_rgba(25,25,50,0.06)] transition-colors hover:bg-foreground/[0.06] hover:text-muted-foreground focus-visible:bg-foreground/[0.06] focus-visible:outline-none dark:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)]"
+          >
+            <Search
+              className="h-3.25 w-3.25 shrink-0 text-muted-foreground/50"
+              strokeWidth={2.5}
+            />
+            <span className="flex-1 truncate text-left">Search</span>
+            <Kbd>⌘K</Kbd>
           </button>
         </div>
 
