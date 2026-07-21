@@ -33,7 +33,7 @@ export function InstanceSection() {
         </p>
       </div>
 
-      <dl className="max-w-md">
+      <dl>
         {rows.map((row, index) => (
           <div
             key={row.label}
@@ -71,7 +71,7 @@ function InstanceSkeleton() {
         <Skeleton className="h-4 w-16" />
         <Skeleton className="h-3 w-40" />
       </div>
-      <div className="max-w-md">
+      <div>
         {[0, 1, 2, 3].map((rowIndex) => (
           <div
             key={rowIndex}
