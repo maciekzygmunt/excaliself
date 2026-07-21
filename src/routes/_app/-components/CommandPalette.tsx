@@ -1,3 +1,4 @@
+import { useQuery } from "@tanstack/react-query"
 import { useNavigate } from "@tanstack/react-router"
 import {
   File,
@@ -20,6 +21,8 @@ import {
   useState,
 } from "react"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
+import { drawingsQueryOptions } from "@/features/drawings/queries"
+import { foldersQueryOptions } from "@/features/folders/queries"
 import { useCommandPaletteShortcut } from "@/hooks/use-command-palette-shortcut"
 import { authClient } from "@/lib/auth-client"
 import { cn } from "@/lib/utils"
@@ -27,11 +30,18 @@ import { useCreateDialog } from "./CreateDialog"
 import { Kbd } from "./sidebar/Kbd"
 
 // Sections render in the fixed order Context → Drawings → Go to → Actions
-// (spec §4.1). Go to holds exactly these four static rows (folders arrive
-// later as dynamic results, never static rows); Actions exactly these three —
-// no theme row, no invite actions.
+// (spec §4.1), never score-interleaved. Go to holds exactly these four static
+// rows, joined by folder matches as dynamic rows while typing (never static);
+// Actions exactly these three — no theme row, no invite actions.
 type PaletteRow =
-  | { kind: "goto"; id: string; label: string; icon: LucideIcon; to: string }
+  | {
+      kind: "goto"
+      id: string
+      label: string
+      icon: LucideIcon
+      to: string
+      params?: { id: string }
+    }
   | {
       kind: "action"
       id: "new-drawing" | "new-folder" | "sign-out"
@@ -84,12 +94,54 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
     }
   }, [open])
 
+  const { data: drawings } = useQuery(drawingsQueryOptions())
+  const { data: folders } = useQuery(foldersQueryOptions())
+
   const q = query.trim().toLowerCase()
-  const matches = (row: PaletteRow) => row.label.toLowerCase().includes(q)
+  const matchesQuery = (label: string) => label.toLowerCase().includes(q)
+  const matches = (row: PaletteRow) => matchesQuery(row.label)
+
+  // Drawings is a live search only — the empty-input launcher (recents) is a
+  // separate slice. getDrawings already excludes trashed rows; filter again
+  // so a stale cache write can never surface one (trash is found via Trash).
+  const drawingRows: PaletteRow[] =
+    q === ""
+      ? []
+      : (drawings ?? [])
+          .filter((d) => d.deletedAt === null && matchesQuery(d.name))
+          .map((d) => ({
+            kind: "goto",
+            id: `drawing-${d.id}`,
+            label: d.name,
+            icon: File,
+            to: "/draw/$id",
+            params: { id: d.id },
+          }))
+
+  // Folders are never static Go to rows — they only appear while typing
+  const folderRows: PaletteRow[] =
+    q === ""
+      ? []
+      : (folders ?? [])
+          .filter((f) => matchesQuery(f.name))
+          .map((f) => ({
+            kind: "goto",
+            id: `folder-${f.id}`,
+            label: f.name,
+            icon: Folder,
+            to: "/folder/$id",
+            params: { id: f.id },
+          }))
+
   // Empty sections collapse; activeIndex runs across the remaining sections
   // so arrow keys walk the whole list, not one section
   const sections = [
-    { title: "Go to", rows: goToRows.filter(matches), offset: 0 },
+    { title: "Drawings", rows: drawingRows, offset: 0 },
+    {
+      title: "Go to",
+      rows: [...goToRows.filter(matches), ...folderRows],
+      offset: 0,
+    },
     { title: "Actions", rows: actionRows.filter(matches), offset: 0 },
   ].filter((section) => section.rows.length > 0)
   for (let i = 1; i < sections.length; i++) {
@@ -100,7 +152,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
   const select = async (row: PaletteRow) => {
     onOpenChange(false)
     if (row.kind === "goto") {
-      navigate({ to: row.to })
+      navigate({ to: row.to, params: row.params })
     } else if (row.id === "new-drawing") {
       // The palette is list-only, never a form — both create rows close it
       // into the standard create dialog (spec §4.1)
@@ -198,7 +250,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
                           isActive ? "text-iris" : "text-muted-foreground/40",
                         )}
                       />
-                      {row.label}
+                      <span className="truncate">{row.label}</span>
                     </button>
                   )
                 })}
