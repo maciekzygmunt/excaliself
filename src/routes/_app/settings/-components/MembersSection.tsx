@@ -132,7 +132,7 @@ function MemberRowActions({
             onSelect={() => setConfirmOpen(true)}
           >
             <Trash2 />
-            Delete user…
+            Delete user
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
