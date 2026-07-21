@@ -9,8 +9,9 @@ import {
 import type { ReactNode } from "react"
 import { afterEach, beforeEach, expect, test, vi } from "vitest"
 
-const { navigateMock, loaderState } = vi.hoisted(() => ({
+const { navigateMock, invalidateMock, loaderState } = vi.hoisted(() => ({
   navigateMock: vi.fn(),
+  invalidateMock: vi.fn(),
   loaderState: {
     data: null as { reset: { email: string } | null } | null,
   },
@@ -23,6 +24,7 @@ vi.mock("@tanstack/react-router", () => ({
     useLoaderData: () => loaderState.data,
   }),
   useNavigate: () => navigateMock,
+  useRouter: () => ({ invalidate: invalidateMock }),
   Link: ({ to, children }: { to: string; children: ReactNode }) => (
     <a href={to}>{children}</a>
   ),
@@ -37,6 +39,7 @@ vi.mock("@/features/password-resets/server", () => ({
 afterEach(cleanup)
 beforeEach(() => {
   navigateMock.mockReset()
+  invalidateMock.mockReset()
 })
 
 async function renderResetPassword(reset: { email: string } | null) {
@@ -122,6 +125,30 @@ test("submitting sets the password and lands in the app, not the login page", as
     expect(navigateMock).toHaveBeenCalledWith({ to: "/" })
   })
   expect(navigateMock).not.toHaveBeenCalledWith({ to: "/login" })
+})
+
+test("a link that dies before submit revalidates toward the explanation state", async () => {
+  const { resetPasswordWithToken } = await import(
+    "@/features/password-resets/server"
+  )
+  vi.mocked(resetPasswordWithToken).mockRejectedValue(
+    new Error("Invalid or expired reset link"),
+  )
+
+  await renderResetPassword({ email: "ada@example.com" })
+  fireEvent.change(screen.getByLabelText(/new password/i), {
+    target: { value: "password123" },
+  })
+  fireEvent.change(screen.getByLabelText(/confirm password/i), {
+    target: { value: "password123" },
+  })
+  fireEvent.click(screen.getByRole("button", { name: "Set password" }))
+
+  // The loader reruns and, for a truly dead link, swaps in DeadResetPage.
+  await waitFor(() => {
+    expect(invalidateMock).toHaveBeenCalled()
+  })
+  expect(navigateMock).not.toHaveBeenCalled()
 })
 
 test("loader validates the token instead of redirecting", async () => {

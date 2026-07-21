@@ -30,14 +30,18 @@ export function MembersSection() {
 
   // The link is the only copy of the token the admin will ever see — it goes
   // straight to the clipboard (same mechanic as invites) and the toast is
-  // the confirmation.
-  const { mutate: resetPassword } = useMutation({
+  // the confirmation, so it must not fire if the copy failed; regenerating
+  // replaces the link, so a failed copy costs nothing.
+  const { mutate: createResetLink } = useMutation({
     mutationFn: createPasswordReset,
     onSuccess: ({ token }) => {
-      navigator.clipboard.writeText(
-        `${window.location.origin}/reset-password?token=${token}`,
-      )
-      toast.success("Reset link copied — single-use, valid for 24 hours")
+      navigator.clipboard
+        .writeText(`${window.location.origin}/reset-password?token=${token}`)
+        .then(
+          () =>
+            toast.success("Reset link copied — single-use, valid for 24 hours"),
+          () => toast.error("Couldn't copy the reset link — generate it again"),
+        )
     },
     onError: (err) => {
       toast.error(
@@ -50,6 +54,10 @@ export function MembersSection() {
   })
   const { mutate: revokeReset } = useMutation({
     mutationFn: revokePasswordReset,
+    onError: () => {
+      // Without this a failed revoke would leave the link silently live.
+      toast.error("Couldn't revoke the reset link")
+    },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: resetsKey })
     },
@@ -126,7 +134,9 @@ export function MembersSection() {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                   <DropdownMenuItem
-                    onClick={() => resetPassword({ data: { userId: user.id } })}
+                    onClick={() =>
+                      createResetLink({ data: { userId: user.id } })
+                    }
                   >
                     <KeyRound className="h-4 w-4" />
                     Reset password

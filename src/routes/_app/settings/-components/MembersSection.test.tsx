@@ -75,6 +75,7 @@ afterEach(() => {
 })
 beforeEach(() => {
   vi.clearAllMocks()
+  clipboardWriteText.mockResolvedValue(undefined)
   Object.defineProperty(navigator, "clipboard", {
     value: { writeText: clipboardWriteText },
     configurable: true,
@@ -82,11 +83,9 @@ beforeEach(() => {
   vi.mocked(getPendingPasswordResets).mockResolvedValue([])
 })
 
-type PendingReset = { userId: string; expiresAt: Date }
-
 function renderSection({
   seed = true,
-  pendingResets = [] as PendingReset[],
+  pendingResets = [] as { userId: string }[],
 } = {}) {
   const queryClient = new QueryClient()
   if (seed) {
@@ -188,14 +187,7 @@ test("Reset password generates a link, copies it, and confirms with a toast", as
 })
 
 test("a pending reset shows a row hint with a revoke action", async () => {
-  renderSection({
-    pendingResets: [
-      {
-        userId: "user-ada",
-        expiresAt: new Date("2026-07-22T12:00:00Z"),
-      },
-    ],
-  })
+  renderSection({ pendingResets: [{ userId: "user-ada" }] })
 
   // Only ada's row hints at the outstanding link.
   expect(screen.getAllByText("Reset link pending")).toHaveLength(1)

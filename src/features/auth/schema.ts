@@ -12,10 +12,8 @@ export const registerFieldsSchema = z.object({
 
 export const setupFieldsSchema = registerFieldsSchema
 
-const confirmPasswordMatches = <
-  T extends { password: string; confirmPassword: string },
->(
-  { password, confirmPassword }: T,
+const confirmPasswordMatches = (
+  { password, confirmPassword }: { password: string; confirmPassword: string },
   ctx: z.RefinementCtx,
 ) => {
   if (password !== confirmPassword) {

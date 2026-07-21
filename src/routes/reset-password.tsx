@@ -1,6 +1,11 @@
 import { useForm } from "@tanstack/react-form"
 import { useMutation } from "@tanstack/react-query"
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router"
+import {
+  createFileRoute,
+  Link,
+  useNavigate,
+  useRouter,
+} from "@tanstack/react-router"
 import { toast } from "sonner"
 import { AuthPage } from "@/components/auth-page"
 import { FormTextField } from "@/components/form-text-field"
@@ -51,6 +56,7 @@ function DeadResetPage() {
 function SetNewPasswordPage({ email }: { email: string }) {
   const { token } = Route.useSearch()
   const navigate = useNavigate()
+  const router = useRouter()
 
   // resetPasswordWithToken signs the user in on the same request (their
   // other sessions are revoked server-side), so success goes straight to
@@ -60,6 +66,10 @@ function SetNewPasswordPage({ email }: { email: string }) {
     onSuccess: () => navigate({ to: "/" }),
     onError: (err) => {
       toast.error(err instanceof Error ? err.message : "Password reset failed")
+      // The link may have died since the page loaded (revoked, regenerated,
+      // or used in another tab) — revalidate so a dead link flips to the
+      // explanation state instead of leaving a form that can never succeed.
+      router.invalidate()
     },
   })
 
@@ -67,9 +77,11 @@ function SetNewPasswordPage({ email }: { email: string }) {
     defaultValues: { password: "", confirmPassword: "" },
     validators: { onSubmit: newPasswordFormSchema },
     onSubmit: async ({ value }) => {
+      // onError owns the failure UX (toast + revalidation); swallow the
+      // rejection so it doesn't escape the form's submit handler.
       await resetPassword({
         data: { token, password: value.password },
-      })
+      }).catch(() => {})
     },
   })
 
