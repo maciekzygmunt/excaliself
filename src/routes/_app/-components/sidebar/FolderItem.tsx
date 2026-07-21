@@ -166,10 +166,6 @@ export function FolderItem({ folder, childNodes }: FolderItemProps) {
   if (!hasChildren) return item
 
   return (
-    <Collapsible
-      open={isExpanded}
-      onOpenChange={setIsExpanded}
-      render={item}
-    />
+    <Collapsible open={isExpanded} onOpenChange={setIsExpanded} render={item} />
   )
 }

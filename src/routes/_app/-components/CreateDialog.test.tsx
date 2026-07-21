@@ -150,7 +150,9 @@ test("Escape dismisses the dialog without creating anything", async () => {
   fireEvent.change(input, { target: { value: "Almost created" } })
   fireEvent.keyDown(input, { key: "Escape" })
 
-  await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false, expect.anything()))
+  await waitFor(() =>
+    expect(onOpenChange).toHaveBeenCalledWith(false, expect.anything()),
+  )
   expect(createDrawing).not.toHaveBeenCalled()
   expect(navigate).not.toHaveBeenCalled()
 })

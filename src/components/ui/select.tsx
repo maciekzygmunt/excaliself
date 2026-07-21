@@ -75,7 +75,9 @@ function SelectContent({
           {...props}
         >
           <SelectScrollUpButton />
-          <SelectPrimitive.List className="p-1">{children}</SelectPrimitive.List>
+          <SelectPrimitive.List className="p-1">
+            {children}
+          </SelectPrimitive.List>
           <SelectScrollDownButton />
         </SelectPrimitive.Popup>
       </SelectPrimitive.Positioner>
@@ -83,7 +85,10 @@ function SelectContent({
   )
 }
 
-function SelectLabel({ className, ...props }: SelectPrimitive.GroupLabel.Props) {
+function SelectLabel({
+  className,
+  ...props
+}: SelectPrimitive.GroupLabel.Props) {
   return (
     <SelectPrimitive.GroupLabel
       data-slot="select-label"

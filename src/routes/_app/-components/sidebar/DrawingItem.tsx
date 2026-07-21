@@ -83,7 +83,11 @@ export function DrawingItem({ drawing }: DrawingItemProps) {
       <SidebarMenuButton
         render={
           rename.isRenaming ? undefined : (
-            <Link to="/draw/$id" params={{ id: drawing.id }} draggable={false} />
+            <Link
+              to="/draw/$id"
+              params={{ id: drawing.id }}
+              draggable={false}
+            />
           )
         }
         isActive={isActive}
