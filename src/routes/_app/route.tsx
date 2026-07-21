@@ -9,6 +9,7 @@ import { foldersQueryOptions } from "@/features/folders/queries"
 import { useSettingsShortcut } from "@/hooks/use-settings-shortcut"
 import { authMiddleware } from "@/middleware/auth"
 import { setupMiddleware } from "@/middleware/setup"
+import { CommandPaletteProvider } from "./-components/CommandPalette"
 import { CreateDialogProvider } from "./-components/CreateDialog"
 import { SidebarReopenButton } from "./-components/SidebarReopenButton"
 import { DrawSidebar } from "./-components/sidebar"
@@ -50,17 +51,19 @@ function AppShellLayout() {
       style={{ "--sidebar-width": "240px" } as React.CSSProperties}
     >
       <CreateDialogProvider>
-        <DrawSidebar
-          user={{
-            email: currentUser?.email ?? session.user?.email ?? "",
-            name: currentUser?.name ?? null,
-            isAdmin,
-          }}
-        />
-        <SidebarInset className="overflow-clip bg-card md:peer-data-[variant=inset]:m-2.5 md:peer-data-[variant=inset]:ml-0 md:peer-data-[variant=inset]:rounded-[10px] md:peer-data-[variant=inset]:shadow-[0_0_0_1px_rgba(25,25,50,0.08),0_10px_28px_rgba(30,30,70,0.09)] md:peer-data-[variant=inset]:peer-data-[state=collapsed]:ml-2.5 dark:md:peer-data-[variant=inset]:shadow-[0_0_0_1px_rgba(255,255,255,0.08),0_10px_28px_rgba(0,0,0,0.35)]">
-          <SidebarReopenButton />
-          <Outlet />
-        </SidebarInset>
+        <CommandPaletteProvider>
+          <DrawSidebar
+            user={{
+              email: currentUser?.email ?? session.user?.email ?? "",
+              name: currentUser?.name ?? null,
+              isAdmin,
+            }}
+          />
+          <SidebarInset className="overflow-clip bg-card md:peer-data-[variant=inset]:m-2.5 md:peer-data-[variant=inset]:ml-0 md:peer-data-[variant=inset]:rounded-[10px] md:peer-data-[variant=inset]:shadow-[0_0_0_1px_rgba(25,25,50,0.08),0_10px_28px_rgba(30,30,70,0.09)] md:peer-data-[variant=inset]:peer-data-[state=collapsed]:ml-2.5 dark:md:peer-data-[variant=inset]:shadow-[0_0_0_1px_rgba(255,255,255,0.08),0_10px_28px_rgba(0,0,0,0.35)]">
+            <SidebarReopenButton />
+            <Outlet />
+          </SidebarInset>
+        </CommandPaletteProvider>
       </CreateDialogProvider>
     </SidebarProvider>
   )
