@@ -23,12 +23,16 @@ export const Route = createFileRoute("/_app")({
   },
   loader: async ({ context }) => {
     const session = await getSession()
-    await Promise.all([
+    // isAdmin comes from the currentUser query (a fresh row read), not the
+    // session, whose cookie-cached role can lag a demotion by five minutes —
+    // a self-demote updates that cache and invalidates the router, and the
+    // admin-only chrome has to disappear right then (issue #65).
+    const [user] = await Promise.all([
       context.queryClient.ensureQueryData(currentUserQueryOptions()),
       context.queryClient.ensureQueryData(drawingsQueryOptions()),
       context.queryClient.ensureQueryData(foldersQueryOptions()),
     ])
-    return { session, isAdmin: session.user.role === "admin" }
+    return { session, isAdmin: user.role === "admin" }
   },
   component: AppShellLayout,
 })

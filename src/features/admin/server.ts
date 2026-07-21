@@ -2,13 +2,15 @@
 
 import { redirect } from "@tanstack/react-router"
 import { createServerFn } from "@tanstack/react-start"
-import { count, eq } from "drizzle-orm"
+import { count, eq, or } from "drizzle-orm"
 import z from "zod"
 import { db } from "@/db"
-import { sessions, users, verifications } from "@/db/schema"
+import { drawings, folders, sessions, users } from "@/db/schema"
 import { setupFieldsSchema } from "@/features/auth/schema"
 import { auth } from "@/lib/auth"
 import { adminMiddleware } from "@/middleware/admin"
+import { deleteUserAccount } from "./delete-user"
+import { isLastAdmin } from "./roles"
 
 export const getUserCount = createServerFn({ method: "GET" }).handler(
   async () => {
@@ -60,25 +62,80 @@ export const getAllUsers = createServerFn({ method: "GET" })
   .middleware([adminMiddleware])
   .handler(async () => db.select().from(users))
 
+export const setUserRole = createServerFn({ method: "POST" })
+  .middleware([adminMiddleware])
+  .inputValidator(
+    z.object({ userId: z.string(), role: z.enum(["admin", "user"]) }),
+  )
+  .handler(async ({ data, context }) => {
+    const callerId = context.session.user.id
+    await db.transaction(async (tx) => {
+      // One locking read over the caller, the target, and every admin. The
+      // lock serializes concurrent role changes so two demotions can't both
+      // pass the last-admin check, and the deterministic id order keeps
+      // overlapping transactions from deadlocking on each other's rows.
+      const relevant = await tx
+        .select({ id: users.id, role: users.role })
+        .from(users)
+        .where(
+          or(
+            eq(users.role, "admin"),
+            eq(users.id, callerId),
+            eq(users.id, data.userId),
+          ),
+        )
+        .orderBy(users.id)
+        .for("update")
+
+      // Recheck the caller under the lock: the middleware's fresh read can
+      // go stale in the gap before this transaction, letting a just-demoted
+      // admin race their own re-promotion through.
+      const caller = relevant.find((row) => row.id === callerId)
+      if (caller?.role !== "admin") {
+        throw new Error("Only admins can change roles")
+      }
+
+      const admins = relevant
+        .filter((row) => row.role === "admin")
+        .map((row) => row.id)
+      if (data.role === "user" && isLastAdmin(admins, data.userId)) {
+        throw new Error("The last admin can't be demoted")
+      }
+
+      const updated = await tx
+        .update(users)
+        .set({ role: data.role, updatedAt: new Date() })
+        .where(eq(users.id, data.userId))
+        .returning({ id: users.id })
+      if (updated.length === 0) {
+        throw new Error(`User not found: ${data.userId}`)
+      }
+    })
+  })
+
 export const deleteUser = createServerFn({ method: "POST" })
   .middleware([adminMiddleware])
   .inputValidator(z.string())
+  .handler(async ({ data: userId, context }) => {
+    await deleteUserAccount(db, context.session.user.id, userId)
+  })
+
+// Feeds the tier-3 confirm's count-aware copy ("…and permanently delete
+// their 23 drawings and 4 folders"). Counts everything owned — trashed rows
+// included, since the delete cascade destroys those too.
+export const getUserContentCounts = createServerFn({ method: "GET" })
+  .middleware([adminMiddleware])
+  .inputValidator(z.string())
   .handler(async ({ data: userId }) => {
-    await db.transaction(async (tx) => {
-      const deleted = await tx
-        .delete(users)
-        .where(eq(users.id, userId))
-        .returning({ email: users.email })
-
-      if (deleted.length === 0) {
-        throw new Error(`User not found: ${userId}`)
-      }
-
-      // verifications has no FK to users — it's keyed by identifier (email)
-      // for password resets, email verification, etc. Clean it up manually so
-      // orphan rows don't collide with a future re-registration of the same email.
-      await tx
-        .delete(verifications)
-        .where(eq(verifications.identifier, deleted[0].email))
-    })
+    const [[drawingCount], [folderCount]] = await Promise.all([
+      db
+        .select({ count: count() })
+        .from(drawings)
+        .where(eq(drawings.ownerId, userId)),
+      db
+        .select({ count: count() })
+        .from(folders)
+        .where(eq(folders.ownerId, userId)),
+    ])
+    return { drawings: drawingCount.count, folders: folderCount.count }
   })
