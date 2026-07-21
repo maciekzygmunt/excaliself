@@ -351,10 +351,11 @@ function RoleSelect({
       <TooltipTrigger
         render={
           // tabIndex lets keyboard users reach the wrapper and hear why the
-          // control is disabled.
+          // control is disabled. inline-block so the anchor rect measured for
+          // tooltip positioning actually wraps the select.
           <span
             tabIndex={0}
-            className="rounded-md outline-none focus-visible:ring-ring/30 focus-visible:ring-[2px]"
+            className="inline-block rounded-md outline-none focus-visible:ring-ring/30 focus-visible:ring-[2px]"
           />
         }
       >

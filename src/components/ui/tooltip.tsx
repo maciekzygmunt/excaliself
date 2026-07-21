@@ -30,7 +30,8 @@ function TooltipTrigger({ ...props }: TooltipPrimitive.Trigger.Props) {
 function TooltipContent({
   className,
   side = "top",
-  sideOffset = 0,
+  // 4px leaves room for the protruding arrow between popup and trigger
+  sideOffset = 4,
   align = "center",
   alignOffset = 0,
   children,
