@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useNavigate, useRouter } from "@tanstack/react-router"
-import { KeyRound, MoreHorizontal, Trash2 } from "lucide-react"
+import { ChevronDown, KeyRound, MoreHorizontal, Trash2 } from "lucide-react"
 import { useState } from "react"
 import { toast } from "sonner"
 import { InitialsAvatar } from "@/components/initials-avatar"
@@ -313,14 +313,30 @@ function RoleSelect({
       onChange={(event) => onChange(event.target.value as Role)}
       // Fixed width: "Admin" and "Member" render at different natural
       // widths, which would stagger the Joined column row to row.
-      className="h-7 w-24 rounded-md border border-input/80 bg-transparent pl-2 pr-6 text-xs text-foreground transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-ring/30 focus-visible:ring-[2px] disabled:cursor-not-allowed disabled:opacity-50"
+      // appearance-none drops the browser's own chevron, which hugs the
+      // right edge — the ChevronDown below sits at a proper inset.
+      className="h-7 w-24 appearance-none rounded-md border border-input/80 bg-transparent pl-2 pr-6 text-xs text-foreground transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-ring/30 focus-visible:ring-[2px] disabled:cursor-not-allowed disabled:opacity-50"
     >
       <option value="user">{ROLE_LABELS.user}</option>
       <option value="admin">{ROLE_LABELS.admin}</option>
     </select>
   )
+  const chevron = (
+    <ChevronDown
+      aria-hidden
+      className={`pointer-events-none absolute top-1/2 right-2 size-3.5 -translate-y-1/2 text-muted-foreground ${
+        lastAdmin ? "opacity-50" : ""
+      }`}
+    />
+  )
 
-  if (!lastAdmin) return select
+  if (!lastAdmin)
+    return (
+      <span className="relative inline-flex">
+        {select}
+        {chevron}
+      </span>
+    )
 
   return (
     <Tooltip>
@@ -331,9 +347,10 @@ function RoleSelect({
             control is disabled. */}
         <span
           tabIndex={0}
-          className="rounded-md outline-none focus-visible:ring-ring/30 focus-visible:ring-[2px]"
+          className="relative inline-flex rounded-md outline-none focus-visible:ring-ring/30 focus-visible:ring-[2px]"
         >
           {select}
+          {chevron}
         </span>
       </TooltipTrigger>
       <TooltipContent>The last admin can't be demoted.</TooltipContent>
