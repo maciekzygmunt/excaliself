@@ -227,6 +227,36 @@ test("picking No folder moves the drawing to the root", async () => {
   ).toBeNull()
 })
 
+test("picking the current folder saves nothing", async () => {
+  setup(
+    [makeDrawing({ folderId: "f1" })],
+    [makeFolder({ id: "f1", name: "Sprint plans" })],
+  )
+  openPalette()
+
+  fireEvent.click(screen.getByRole("option", { name: "Move to folder…" }))
+  fireEvent.click(screen.getByRole("option", { name: "Sprint plans" }))
+  await flush()
+
+  // A no-op move must not hit the server: updateDrawing refreshes updatedAt,
+  // which would wrongly promote the drawing in the recency-sorted launcher
+  expect(updateDrawing).not.toHaveBeenCalled()
+  // Still a selection — the palette closes
+  expect(screen.queryByRole("combobox")).toBeNull()
+})
+
+test("an unfiled drawing picking No folder saves nothing", async () => {
+  setup([makeDrawing()])
+  openPalette()
+
+  fireEvent.click(screen.getByRole("option", { name: "Move to folder…" }))
+  fireEvent.click(screen.getByRole("option", { name: "No folder" }))
+  await flush()
+
+  expect(updateDrawing).not.toHaveBeenCalled()
+  expect(screen.queryByRole("combobox")).toBeNull()
+})
+
 test("Rename closes the palette into the rename dialog and saves optimistically", async () => {
   vi.mocked(updateDrawing).mockReturnValue(new Promise(() => {}))
   const { queryClient } = setup([makeDrawing()])

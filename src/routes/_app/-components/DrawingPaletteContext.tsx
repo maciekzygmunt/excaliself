@@ -77,8 +77,13 @@ export function DrawingPaletteContext({
           icon: FolderInput,
           // Reversible mutation, so no confirm: the move lands optimistically
           // and rolls back with an error toast on failure (spec §4.3)
-          pickFolder: (folderId) =>
-            moveMutate({ data: { id: drawing.id, updateData: { folderId } } }),
+          pickFolder: (folderId) => {
+            // Same destination is a no-op — the server refreshes updatedAt on
+            // every update, which would wrongly promote the drawing in the
+            // recency-sorted launcher (same guard as the sidebar drag-drop)
+            if (folderId === drawing.folderId) return
+            moveMutate({ data: { id: drawing.id, updateData: { folderId } } })
+          },
         },
         {
           id: "drawing:trash",
