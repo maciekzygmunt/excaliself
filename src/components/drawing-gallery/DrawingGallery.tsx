@@ -259,7 +259,10 @@ export function Preview({ name, data }: { name: string; data: string }) {
   }, [data])
 
   return (
-    <div className="relative h-full w-full">
+    // pointer-events-none: this div is positioned and DOM-later than the
+    // card's stretched link, so it would otherwise paint above the link and
+    // swallow clicks on the whole preview area.
+    <div className="pointer-events-none relative h-full w-full">
       <div
         ref={containerRef}
         role="img"

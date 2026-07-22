@@ -1,3 +1,4 @@
+import { Link } from "@tanstack/react-router"
 import { Folder as FolderIcon, Trash2 } from "lucide-react"
 import { useMemo } from "react"
 import { DangerConfirmDialog } from "@/components/danger-confirm-dialog"
@@ -19,8 +20,8 @@ const DEFAULT_SKELETON_COUNT = 8
  * The gallery grid in trash mode (spec §5.11): the same card language as
  * browse, but units instead of drawings — a trashed folder is one card with
  * a contents count, never dispersed children — and the card actions are
- * Restore / Delete forever. Cards don't link anywhere; nothing in trash is
- * editable.
+ * Restore / Delete forever. Drawing cards open the read-only trashed view
+ * at /draw/$id; folder cards don't link anywhere.
  */
 export function TrashGallery({
   drawings,
@@ -117,7 +118,20 @@ function TrashedDrawingCard({
   onDeleteForever: () => Promise<unknown>
 }) {
   return (
-    <div className={CARD_FRAME_CLASS}>
+    // Same stretched-link shape as DrawingCard: the whole card opens the
+    // drawing's read-only trashed view, footer actions layer above on z-10.
+    <div
+      className={cn(
+        CARD_FRAME_CLASS,
+        "transition-[box-shadow,scale] duration-150 hover:shadow-[0_0_0_1px_rgba(25,25,50,0.14),0_3px_8px_rgba(20,20,45,0.1)] active:scale-[0.99] dark:hover:shadow-[0_0_0_1px_rgba(255,255,255,0.16)]",
+      )}
+    >
+      <Link
+        to="/draw/$id"
+        params={{ id: drawing.id }}
+        aria-label={`View ${drawing.name}`}
+        className="absolute inset-0 rounded-xl"
+      />
       <div className="aspect-[4/3] overflow-hidden border-b border-border/60">
         <Preview name={drawing.name} data={drawing.data} />
       </div>
@@ -246,7 +260,9 @@ function CardFooter({
         </span>
         <span className="truncate text-xs text-muted-foreground">{meta}</span>
       </div>
-      <div className="-mr-1 flex shrink-0 items-center gap-0.5">
+      {/* z-10 keeps Restore / Delete forever clickable above the drawing
+          card's stretched link (no-op for folder cards, which don't link). */}
+      <div className="relative z-10 -mr-1 flex shrink-0 items-center gap-0.5">
         <button
           type="button"
           aria-label={restoreLabel}

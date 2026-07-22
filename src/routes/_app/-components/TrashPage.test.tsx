@@ -37,6 +37,26 @@ vi.mock("sonner", () => ({ toast: toastMock }))
 // router, the create dialog and the auth client — stub those edges.
 vi.mock("@tanstack/react-router", () => ({
   useNavigate: () => navigateMock,
+  Link: ({
+    to,
+    params,
+    children,
+    ...rest
+  }: {
+    to: string
+    params?: Record<string, string>
+    children: React.ReactNode
+  }) => (
+    <a
+      href={Object.entries(params ?? {}).reduce(
+        (path, [key, value]) => path.replace(`$${key}`, value),
+        to,
+      )}
+      {...rest}
+    >
+      {children}
+    </a>
+  ),
 }))
 
 vi.mock("./CreateDialog", () => ({
@@ -190,10 +210,12 @@ test("a trashed folder is one card with a contents count — children never disp
   expect(screen.getAllByRole("button", { name: /^Restore/ })).toHaveLength(2)
 })
 
-test("cards are not links — nothing in trash opens", () => {
+test("drawing cards link to the read-only view; folder cards don't link", () => {
   renderTrashPage()
 
-  expect(screen.queryAllByRole("link")).toHaveLength(0)
+  const links = screen.getAllByRole("link")
+  expect(links.map((l) => l.getAttribute("href"))).toEqual(["/draw/d1"])
+  expect(links[0].getAttribute("aria-label")).toBe("View Old sketch")
 })
 
 test("the most recently trashed unit comes first", () => {
