@@ -35,11 +35,11 @@ describe("resolveOrigin", () => {
     ).toBe("https://draw.example.com")
   })
 
-  it("uses the first entry of a multi-hop x-forwarded-proto", () => {
+  it("uses the first entry of multi-hop forwarded headers", () => {
     expect(
       resolveOrigin({
         headers: new Headers({
-          "x-forwarded-host": "draw.example.com",
+          "x-forwarded-host": "draw.example.com, gateway.internal",
           "x-forwarded-proto": "https, http",
         }),
         requestUrl: "http://internal:3000/",

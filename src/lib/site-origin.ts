@@ -15,10 +15,12 @@ export function resolveOrigin({
 }): string {
   if (baseUrl) return new URL(baseUrl).origin
   const url = new URL(requestUrl)
+  // Each proxy hop may append its own value ("public.example, gateway.internal"
+  // / "https, http") — the first entry is the client-facing one.
   const host =
-    headers.get("x-forwarded-host") ?? headers.get("host") ?? url.host
-  // Each proxy hop may append its own value ("https, http") — the first
-  // entry is the client-facing protocol.
+    headers.get("x-forwarded-host")?.split(",")[0].trim() ??
+    headers.get("host") ??
+    url.host
   const proto =
     headers.get("x-forwarded-proto")?.split(",")[0].trim() ??
     url.protocol.replace(":", "")
