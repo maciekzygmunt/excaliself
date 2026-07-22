@@ -2,6 +2,9 @@ import { useEffect } from "react"
 
 export const PRODUCT_NAME = "Excaliself"
 
+// Spec §1: the product tagline — auth panel corner and OG/share description.
+export const TAGLINE = "Your team's whiteboard, on your server."
+
 // Spec §1: content titles (drawing names) join with an em dash, chrome pages
 // (All drawings, Settings, …) with a middle dot.
 export function documentTitle(
