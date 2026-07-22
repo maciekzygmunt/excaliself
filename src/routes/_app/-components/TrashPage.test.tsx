@@ -10,8 +10,8 @@ import {
 } from "@testing-library/react"
 import { afterEach, beforeEach, expect, test, vi } from "vitest"
 import { renderPreviewSvg } from "@/components/drawing-gallery/preview"
-import { restoreDrawing } from "@/features/drawings/server"
-import { restoreFolder } from "@/features/folders/server"
+import { getDrawings, restoreDrawing } from "@/features/drawings/server"
+import { getFolders, restoreFolder } from "@/features/folders/server"
 import type {
   TrashedDrawing,
   TrashedFolder,
@@ -23,13 +23,32 @@ import {
   emptyTrash,
   getTrashItems,
 } from "@/features/trash/server"
+import { CommandPaletteProvider } from "./CommandPalette"
 import { TrashPage } from "./TrashPage"
 
-const { toastMock } = vi.hoisted(() => ({
+const { toastMock, navigateMock } = vi.hoisted(() => ({
   toastMock: Object.assign(vi.fn(), { error: vi.fn(), dismiss: vi.fn() }),
+  navigateMock: vi.fn(),
 }))
 
 vi.mock("sonner", () => ({ toast: toastMock }))
+
+// The palette provider (needed for the page's context section) pulls in the
+// router, the create dialog and the auth client — stub those edges.
+vi.mock("@tanstack/react-router", () => ({
+  useNavigate: () => navigateMock,
+}))
+
+vi.mock("./CreateDialog", () => ({
+  useCreateDialog: () => ({
+    openCreateDrawingDialog: vi.fn(),
+    openCreateFolderDialog: vi.fn(),
+  }),
+}))
+
+vi.mock("@/lib/auth-client", () => ({
+  authClient: { signOut: vi.fn() },
+}))
 
 // jsdom cannot rasterize Excalidraw scenes — assert cards, not pixels.
 vi.mock("@/components/drawing-gallery/preview", () => ({
@@ -58,6 +77,9 @@ vi.mock("@/features/folders/server", () => ({
 beforeEach(() => {
   vi.clearAllMocks()
   vi.mocked(renderPreviewSvg).mockResolvedValue(null)
+  // The palette inside the provider queries these on mount
+  vi.mocked(getDrawings).mockResolvedValue([])
+  vi.mocked(getFolders).mockResolvedValue([])
 })
 
 // Auto-cleanup needs vitest globals, which this repo leaves off.
@@ -137,10 +159,16 @@ function renderTrashPage(items: TrashItems = fixture) {
   vi.mocked(getTrashItems).mockResolvedValue(items)
   const view = render(
     <QueryClientProvider client={client}>
-      <TrashPage />
+      <CommandPaletteProvider>
+        <TrashPage />
+      </CommandPaletteProvider>
     </QueryClientProvider>,
   )
   return { ...view, client }
+}
+
+const openPalette = () => {
+  fireEvent.keyDown(window, { key: "k", metaKey: true })
 }
 
 const flush = () => act(async () => {})
@@ -397,6 +425,54 @@ test("a confirmed Empty trash clears the page once the server answers", async ()
   expect(screen.queryByRole("button", { name: "Empty trash" })).toBeNull()
 })
 
+test("the palette shows a single Empty trash context row above the globals", () => {
+  renderTrashPage()
+  openPalette()
+
+  // One context row, then the globals — no drawings here (spec §5.11)
+  expect(screen.getAllByRole("option").map((r) => r.textContent)).toEqual([
+    "Empty trash",
+    "Home",
+    "All drawings",
+    "Trash",
+    "Settings",
+    "New drawing",
+    "New folder",
+    "Sign out",
+  ])
+})
+
+test("when trash is empty the palette shows no context section", () => {
+  renderTrashPage(EMPTY_TRASH)
+  openPalette()
+
+  expect(screen.queryByRole("option", { name: "Empty trash" })).toBeNull()
+  expect(screen.getAllByRole("option")).toHaveLength(7)
+})
+
+test("the palette row closes into the count-aware dialog — nothing fires from the palette", async () => {
+  vi.mocked(emptyTrash).mockResolvedValue(undefined)
+  renderTrashPage()
+  openPalette()
+
+  fireEvent.click(screen.getByRole("option", { name: "Empty trash" }))
+  await flush()
+
+  // Palette closed into the same tier-2 danger dialog the header uses
+  expect(screen.queryByRole("combobox")).toBeNull()
+  const dialog = screen.getByRole("alertdialog")
+  expect(
+    within(dialog).getByText(
+      `This will permanently delete 3 drawings and 2 folders. This can't be undone.`,
+    ),
+  ).toBeTruthy()
+  expect(emptyTrash).not.toHaveBeenCalled()
+
+  fireEvent.click(within(dialog).getByRole("button", { name: "Empty trash" }))
+  await flush()
+  expect(emptyTrash).toHaveBeenCalledTimes(1)
+})
+
 test("the tab reads Trash · Excaliself", () => {
   renderTrashPage()
 
@@ -411,7 +487,9 @@ test("loading holds the grid with the delayed skeleton, not a spinner", () => {
   })
   render(
     <QueryClientProvider client={client}>
-      <TrashPage />
+      <CommandPaletteProvider>
+        <TrashPage />
+      </CommandPaletteProvider>
     </QueryClientProvider>,
   )
 

@@ -8,10 +8,12 @@ import {
   waitFor,
 } from "@testing-library/react"
 import { afterEach, beforeEach, expect, test, vi } from "vitest"
-import { restoreDrawing } from "@/features/drawings/server"
+import { getDrawings, restoreDrawing } from "@/features/drawings/server"
+import { getFolders } from "@/features/folders/server"
 import type { TrashItems } from "@/features/trash/queries"
 import { trashQueryOptions } from "@/features/trash/queries"
 import { deleteTrashUnitForever, getTrashItems } from "@/features/trash/server"
+import { CommandPaletteProvider } from "./CommandPalette"
 import { TrashedDrawingBanner } from "./TrashedDrawingBanner"
 
 const { toastMock, navigateMock } = vi.hoisted(() => ({
@@ -44,8 +46,24 @@ vi.mock("@/features/folders/server", () => ({
   restoreFolder: vi.fn(),
 }))
 
+// The palette provider (needed for the banner's context section) pulls in
+// the create dialog and the auth client — stub those edges.
+vi.mock("./CreateDialog", () => ({
+  useCreateDialog: () => ({
+    openCreateDrawingDialog: vi.fn(),
+    openCreateFolderDialog: vi.fn(),
+  }),
+}))
+
+vi.mock("@/lib/auth-client", () => ({
+  authClient: { signOut: vi.fn() },
+}))
+
 beforeEach(() => {
   vi.clearAllMocks()
+  // The palette inside the provider queries these on mount
+  vi.mocked(getDrawings).mockResolvedValue([])
+  vi.mocked(getFolders).mockResolvedValue([])
 })
 
 // Auto-cleanup needs vitest globals, which this repo leaves off.
@@ -75,10 +93,16 @@ function renderBanner(
   }
   const view = render(
     <QueryClientProvider client={client}>
-      <TrashedDrawingBanner drawing={drawing} />
+      <CommandPaletteProvider>
+        <TrashedDrawingBanner drawing={drawing} />
+      </CommandPaletteProvider>
     </QueryClientProvider>,
   )
   return { ...view, client }
+}
+
+const openPalette = () => {
+  fireEvent.keyDown(window, { key: "k", metaKey: true })
 }
 
 const flush = () => act(async () => {})
@@ -223,6 +247,66 @@ test("confirm stays disabled while the folder unit's counts are loading", async 
       'This drawing was trashed with its folder. "Archive" and the 2 drawings and 1 folder inside will be permanently deleted. This can\'t be undone.',
     ),
   ).toBeTruthy()
+})
+
+test("the palette shows a This drawing section with Restore and Delete forever", () => {
+  renderBanner()
+  openPalette()
+
+  expect(screen.getByText("This drawing")).toBeTruthy()
+  expect(screen.getAllByRole("option").map((r) => r.textContent)).toEqual([
+    "Restore",
+    "Delete forever",
+    "Home",
+    "All drawings",
+    "Trash",
+    "Settings",
+    "New drawing",
+    "New folder",
+    "Sign out",
+  ])
+})
+
+test("the palette Restore row restores via the standard path", async () => {
+  vi.mocked(restoreDrawing).mockResolvedValue({ originalFolderGone: false })
+  renderBanner()
+  openPalette()
+
+  fireEvent.click(screen.getByRole("option", { name: "Restore" }))
+  await flush()
+
+  expect(restoreDrawing).toHaveBeenCalledWith({ data: "d1" }, expect.anything())
+  // Selecting closed the palette; the canvas flip comes from invalidation
+  expect(screen.queryByRole("combobox")).toBeNull()
+})
+
+test("the palette Delete forever row closes into the danger dialog, then navigates Home on confirm", async () => {
+  vi.mocked(deleteTrashUnitForever).mockResolvedValue(undefined)
+  renderBanner()
+  openPalette()
+
+  fireEvent.click(screen.getByRole("option", { name: "Delete forever" }))
+  await flush()
+
+  // Palette closed into the same count-aware dialog the banner button opens
+  expect(screen.queryByRole("combobox")).toBeNull()
+  expect(
+    screen.getByText(
+      '"Old sketch" will be permanently deleted. This can\'t be undone.',
+    ),
+  ).toBeTruthy()
+  expect(deleteTrashUnitForever).not.toHaveBeenCalled()
+
+  fireEvent.click(screen.getByRole("button", { name: "Delete forever" }))
+  await flush()
+
+  expect(deleteTrashUnitForever).toHaveBeenCalledWith(
+    { data: "d1" },
+    expect.anything(),
+  )
+  await waitFor(() =>
+    expect(navigateMock).toHaveBeenCalledWith({ to: "/draw", replace: true }),
+  )
 })
 
 test("a drawing trashed with its folder deletes the whole unit, with count-aware copy", async () => {

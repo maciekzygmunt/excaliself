@@ -21,6 +21,8 @@ import { Button } from "@/components/ui/button"
  */
 export function DangerConfirmDialog({
   trigger,
+  open: openProp,
+  onOpenChange,
   title,
   description,
   confirmLabel,
@@ -29,7 +31,14 @@ export function DangerConfirmDialog({
   onConfirm,
 }: {
   /** Rendered via the render prop — must accept button props. */
-  trigger: React.ReactElement
+  trigger?: React.ReactElement
+  /**
+   * Controlled mode, for callers with a second opener besides the trigger —
+   * e.g. a palette row that closes into this dialog (spec §4.1). Pass both
+   * props; trigger clicks and dismissals flow through onOpenChange.
+   */
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
   title: string
   description: React.ReactNode
   confirmLabel: string
@@ -47,7 +56,12 @@ export function DangerConfirmDialog({
    */
   onConfirm: () => Promise<unknown>
 }) {
-  const [open, setOpen] = useState(false)
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(false)
+  const open = openProp ?? uncontrolledOpen
+  const setOpen = (next: boolean) => {
+    setUncontrolledOpen(next)
+    onOpenChange?.(next)
+  }
   const [pending, setPending] = useState(false)
 
   const confirm = async () => {
@@ -70,7 +84,7 @@ export function DangerConfirmDialog({
         if (!pending) setOpen(next)
       }}
     >
-      <AlertDialogTrigger render={trigger} />
+      {trigger && <AlertDialogTrigger render={trigger} />}
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>{title}</AlertDialogTitle>

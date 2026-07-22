@@ -1,4 +1,6 @@
 import { useQuery } from "@tanstack/react-query"
+import { Trash2 } from "lucide-react"
+import { useMemo, useState } from "react"
 import { DangerConfirmDialog } from "@/components/danger-confirm-dialog"
 import { QuietLine } from "@/components/drawing-gallery/GalleryEmpty"
 import { TrashGallery } from "@/components/drawing-gallery/TrashGallery"
@@ -12,6 +14,10 @@ import {
 } from "@/features/trash/mutations"
 import { trashQueryOptions } from "@/features/trash/queries"
 import { useDocumentTitle } from "@/lib/document-title"
+import {
+  type PaletteContextSection,
+  usePaletteContextSection,
+} from "./CommandPalette"
 
 // The trash surface (spec §5.11): the gallery grid in trash mode, owner-
 // scoped. No toolbar — trash is a holding pen, not a browse surface.
@@ -25,6 +31,28 @@ export function TrashPage() {
 
   const hasUnits =
     (data?.drawings.length ?? 0) + (data?.folders.length ?? 0) > 0
+
+  // The palette's context section here is a single row that closes into the
+  // header's count-aware danger dialog — same instance, so palette and
+  // header can never drift (spec §5.11); absent when trash is empty, like
+  // the header button.
+  const [emptyTrashOpen, setEmptyTrashOpen] = useState(false)
+  const section = useMemo<PaletteContextSection | null>(() => {
+    if (!hasUnits) return null
+    return {
+      title: "Trash",
+      rows: [
+        {
+          id: "trash:empty",
+          label: "Empty trash",
+          icon: Trash2,
+          destructive: true,
+          onSelect: () => setEmptyTrashOpen(true),
+        },
+      ],
+    }
+  }, [hasUnits])
+  usePaletteContextSection(section)
   // Every row Empty trash would destroy, subtree members included —
   // the count-aware phrasing for the tier-2 dialog (spec §4.5).
   const totalsPhrase = data
@@ -41,6 +69,8 @@ export function TrashPage() {
           {/* Absent (not disabled) when trash is empty — spec §5.11 */}
           {hasUnits && totalsPhrase && (
             <DangerConfirmDialog
+              open={emptyTrashOpen}
+              onOpenChange={setEmptyTrashOpen}
               trigger={
                 <Button
                   variant="outline"
