@@ -1,6 +1,7 @@
 import { createFileRoute, redirect } from "@tanstack/react-router"
 import { foldersQueryOptions } from "@/features/folders/queries"
 import { FolderPage } from "./-components/FolderPage"
+import { FolderPaletteContext } from "./-components/FolderPaletteContext"
 
 // The folders query is owner-scoped, so an unknown id and another owner's id
 // look identical here — both land on /drawings, never an error screen.
@@ -19,5 +20,10 @@ export const Route = createFileRoute("/_app/folder/$id")({
 function FolderRoute() {
   const { id } = Route.useParams()
   // Keyed so search/sort reset when hopping between folders
-  return <FolderPage key={id} folderId={id} />
+  return (
+    <>
+      <FolderPaletteContext folderId={id} />
+      <FolderPage key={id} folderId={id} />
+    </>
+  )
 }

@@ -11,7 +11,7 @@ import {
   type PaletteContextSection,
   usePaletteContextSection,
 } from "./CommandPalette"
-import { RenameDrawingDialog } from "./RenameDrawingDialog"
+import { RenameDialog } from "./RenameDialog"
 
 type DrawingPaletteContextProps = {
   drawingId: string
@@ -88,10 +88,10 @@ export function DrawingPaletteContext({
 
   if (!drawing) return null
   return (
-    <RenameDrawingDialog
+    <RenameDialog
       open={renameOpen}
       onOpenChange={setRenameOpen}
-      drawing={drawing}
+      target={{ kind: "drawing", id: drawing.id, name: drawing.name }}
     />
   )
 }

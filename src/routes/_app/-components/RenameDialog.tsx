@@ -2,12 +2,19 @@ import { Pencil } from "lucide-react"
 import { useEffect, useRef, useState } from "react"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { useRenameDrawing } from "@/features/drawings/mutations"
+import { useRenameFolder } from "@/features/folders/mutations"
 import { Kbd } from "./sidebar/Kbd"
 
-type RenameDrawingDialogProps = {
+export type RenameTarget = {
+  kind: "drawing" | "folder"
+  id: string
+  name: string
+}
+
+type RenameDialogProps = {
   open: boolean
   onOpenChange: (open: boolean) => void
-  drawing: { id: string; name: string }
+  target: RenameTarget
 }
 
 /**
@@ -16,31 +23,38 @@ type RenameDrawingDialogProps = {
  * the dialog closes immediately; the mutation rolls the cache back and shows
  * an error toast on failure.
  */
-export function RenameDrawingDialog({
+export function RenameDialog({
   open,
   onOpenChange,
-  drawing,
-}: RenameDrawingDialogProps) {
-  const renameMutation = useRenameDrawing()
-  const [name, setName] = useState(drawing.name)
+  target,
+}: RenameDialogProps) {
+  const renameDrawingMutation = useRenameDrawing()
+  const renameFolderMutation = useRenameFolder()
+  const [name, setName] = useState(target.name)
   const inputRef = useRef<HTMLInputElement | null>(null)
 
   // The host keeps this component mounted across opens — refill from the
   // current name on every open so a previous edit can't leak into the next
   useEffect(() => {
-    if (open) setName(drawing.name)
-  }, [open, drawing.name])
+    if (open) setName(target.name)
+  }, [open, target.name])
 
   const submit = () => {
     const trimmed = name.trim()
     if (!trimmed) return
-    if (trimmed !== drawing.name) {
-      renameMutation.mutate({
-        data: { id: drawing.id, updateData: { name: trimmed } },
-      })
+    if (trimmed !== target.name) {
+      if (target.kind === "drawing") {
+        renameDrawingMutation.mutate({
+          data: { id: target.id, updateData: { name: trimmed } },
+        })
+      } else {
+        renameFolderMutation.mutate({ data: { id: target.id, name: trimmed } })
+      }
     }
     onOpenChange(false)
   }
+
+  const title = target.kind === "drawing" ? "Rename drawing" : "Rename folder"
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -48,7 +62,7 @@ export function RenameDrawingDialog({
         showCloseButton={false}
         className="top-[30%] translate-y-0 gap-0 overflow-hidden p-0 sm:max-w-sm"
       >
-        <DialogTitle className="sr-only">Rename drawing</DialogTitle>
+        <DialogTitle className="sr-only">{title}</DialogTitle>
         <div className="flex items-center gap-2.5 px-4 py-3.5">
           <Pencil className="h-4 w-4 shrink-0 text-iris" strokeWidth={2.5} />
           <input
@@ -65,14 +79,14 @@ export function RenameDrawingDialog({
                 submit()
               }
             }}
-            placeholder="Drawing name…"
+            placeholder={
+              target.kind === "drawing" ? "Drawing name…" : "Folder name…"
+            }
             className="flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground/60"
           />
         </div>
         <div className="flex items-center justify-between border-t border-border/60 bg-muted/40 px-4 py-2">
-          <span className="text-xs text-muted-foreground/60">
-            Rename drawing
-          </span>
+          <span className="text-xs text-muted-foreground/60">{title}</span>
           <span className="flex items-center gap-1 text-xs text-muted-foreground/60">
             <Kbd>↵</Kbd> to rename
           </span>

@@ -36,6 +36,10 @@ vi.mock("@/features/drawings/server", () => ({
 // client — stub those edges too (they import the db / network).
 vi.mock("@/features/folders/server", () => ({
   getFolders: vi.fn(),
+  createFolder: vi.fn(),
+  updateFolder: vi.fn(),
+  trashFolder: vi.fn(),
+  restoreFolder: vi.fn(),
 }))
 
 vi.mock("./CreateDialog", () => ({

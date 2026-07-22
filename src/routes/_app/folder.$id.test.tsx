@@ -10,10 +10,14 @@ vi.mock("@tanstack/react-router", () => ({
   redirect,
 }))
 
-// The page component pulls in the whole app-shell tree — the loader guard
-// under test never touches it.
+// The page components pull in the whole app-shell tree — the loader guard
+// under test never touches them.
 vi.mock("./-components/FolderPage", () => ({
   FolderPage: () => null,
+}))
+
+vi.mock("./-components/FolderPaletteContext", () => ({
+  FolderPaletteContext: () => null,
 }))
 
 vi.mock("@/features/folders/server", () => ({
