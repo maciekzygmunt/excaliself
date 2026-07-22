@@ -121,7 +121,7 @@ export function CreateDialog({
             </span>
           )}
           <span className="flex items-center gap-1 text-xs text-muted-foreground/60">
-            <Kbd>↵</Kbd> to create
+            <Kbd className="h-4 min-w-4 text-[10px]">↵</Kbd> to create
           </span>
         </div>
       </DialogContent>

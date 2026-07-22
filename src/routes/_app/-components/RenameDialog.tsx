@@ -88,7 +88,7 @@ export function RenameDialog({
         <div className="flex items-center justify-between border-t border-border/60 bg-muted/40 px-4 py-2">
           <span className="text-xs text-muted-foreground/60">{title}</span>
           <span className="flex items-center gap-1 text-xs text-muted-foreground/60">
-            <Kbd>↵</Kbd> to rename
+            <Kbd className="h-4 min-w-4 text-[10px]">↵</Kbd> to rename
           </span>
         </div>
       </DialogContent>

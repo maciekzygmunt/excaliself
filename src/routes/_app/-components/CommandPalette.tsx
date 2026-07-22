@@ -395,18 +395,18 @@ export function CommandPalette({
         </div>
         <div className="flex items-center gap-3 border-t border-border/60 bg-muted/40 px-4 py-2 text-xs text-muted-foreground/60">
           <span className="flex items-center gap-1">
-            <Kbd>↑↓</Kbd> navigate
+            <Kbd className="h-4 min-w-4 text-[10px]">↑↓</Kbd> navigate
           </span>
           <span className="flex items-center gap-1">
-            <Kbd>↵</Kbd> open
+            <Kbd className="h-4 min-w-4 text-[10px]">↵</Kbd> open
           </span>
           {folderPicker && (
             <span className="flex items-center gap-1">
-              <Kbd>⌫</Kbd> back
+              <Kbd className="h-4 min-w-4 text-[10px]">⌫</Kbd> back
             </span>
           )}
           <span className="flex items-center gap-1">
-            <Kbd>esc</Kbd> close
+            <Kbd className="h-4 min-w-4 text-[10px]">esc</Kbd> close
           </span>
         </div>
       </DialogContent>
