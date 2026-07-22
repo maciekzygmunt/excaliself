@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { cleanup, fireEvent, render, screen } from "@testing-library/react"
-import { Pencil, Star, Trash2 } from "lucide-react"
+import { FolderInput, Pencil, Star, Trash2 } from "lucide-react"
 import { afterEach, beforeEach, expect, test, vi } from "vitest"
 import type { Drawing } from "@/features/drawings/queries"
 import { drawingsQueryOptions } from "@/features/drawings/queries"
@@ -492,6 +492,104 @@ test("typing filters context rows and keeps them above drawing matches", () => {
   // Matches in several sections keep the fixed section order
   expect(optionLabels()).toEqual(["Move to trash", "Trash"])
   expect(screen.queryByText("This drawing")).toBeDefined()
+})
+
+const onPickFolder = vi.fn()
+
+function makePickerSection(): PaletteContextSection {
+  return {
+    title: "This drawing",
+    rows: [
+      {
+        id: "drawing:rename",
+        label: "Rename",
+        icon: Pencil,
+        onSelect: onRename,
+      },
+      {
+        id: "drawing:move-folder",
+        label: "Move to folder…",
+        icon: FolderInput,
+        pickFolder: onPickFolder,
+      },
+    ],
+  }
+}
+
+const pickerFolders = [
+  makeFolder({ id: "f1", name: "Sprint plans" }),
+  makeFolder({ id: "f2", name: "Archive" }),
+]
+
+function enterPicker() {
+  const input = renderOpenPalette({
+    contextSection: makePickerSection(),
+    folders: pickerFolders,
+  })
+  fireEvent.click(screen.getByRole("option", { name: "Move to folder…" }))
+  return input
+}
+
+test("a pickFolder row swaps the palette to the folder list instead of closing", () => {
+  enterPicker()
+  expect(onOpenChange).not.toHaveBeenCalled()
+  expect(onPickFolder).not.toHaveBeenCalled()
+  // Root leads as "No folder", then the folders; every other section is gone
+  expect(optionLabels()).toEqual(["No folder", "Sprint plans", "Archive"])
+  expect(screen.getByText("Move to folder")).toBeDefined()
+  expect(screen.queryByText("Go to")).toBeNull()
+  expect(screen.queryByText("This drawing")).toBeNull()
+})
+
+test("entering the picker clears the query that found the row", () => {
+  const input = renderOpenPalette({
+    contextSection: makePickerSection(),
+    folders: pickerFolders,
+  })
+  fireEvent.change(input, { target: { value: "move" } })
+  fireEvent.click(screen.getByRole("option", { name: "Move to folder…" }))
+  // "move" matches neither folder — a leaked query would empty the picker
+  expect(optionLabels()).toEqual(["No folder", "Sprint plans", "Archive"])
+  expect((input as HTMLInputElement).value).toBe("")
+})
+
+test("the picker filters folders by query, including the No folder row", () => {
+  const input = enterPicker()
+  fireEvent.change(input, { target: { value: "spr" } })
+  expect(optionLabels()).toEqual(["Sprint plans"])
+
+  fireEvent.change(input, { target: { value: "no f" } })
+  expect(optionLabels()).toEqual(["No folder"])
+})
+
+test("picking a folder closes the palette and reports its id", () => {
+  enterPicker()
+  fireEvent.click(screen.getByRole("option", { name: "Sprint plans" }))
+  expect(onPickFolder).toHaveBeenCalledWith("f1")
+  expect(onOpenChange).toHaveBeenCalledWith(false)
+})
+
+test("picking No folder reports null for the root", () => {
+  const input = enterPicker()
+  fireEvent.keyDown(input, { key: "Enter" })
+  expect(onPickFolder).toHaveBeenCalledWith(null)
+  expect(onOpenChange).toHaveBeenCalledWith(false)
+})
+
+test("Backspace on empty input steps back to the main list", () => {
+  const input = enterPicker()
+  fireEvent.keyDown(input, { key: "Backspace" })
+  expect(screen.queryByText("Move to folder")).toBeNull()
+  expect(screen.getByText("This drawing")).toBeDefined()
+  expect(screen.getByRole("option", { name: "Move to folder…" })).toBeDefined()
+  expect(onOpenChange).not.toHaveBeenCalled()
+})
+
+test("Backspace with a query keeps the picker open", () => {
+  const input = enterPicker()
+  fireEvent.change(input, { target: { value: "a" } })
+  fireEvent.keyDown(input, { key: "Backspace" })
+  expect(screen.getByText("Move to folder")).toBeDefined()
 })
 
 function RegisteringChild({ section }: { section: PaletteContextSection }) {

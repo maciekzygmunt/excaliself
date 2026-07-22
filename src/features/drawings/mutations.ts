@@ -21,7 +21,7 @@ export function insertByRecency(list: Drawing[], drawing: Drawing): Drawing[] {
   )
 }
 
-type RenameVars = Parameters<typeof updateDrawing>[0]
+type UpdateVars = Parameters<typeof updateDrawing>[0]
 
 export function useCreateDrawing() {
   const queryClient = useQueryClient()
@@ -32,12 +32,24 @@ export function useCreateDrawing() {
 }
 
 export function useRenameDrawing() {
-  return useOptimisticListMutation<Drawing, RenameVars>({
+  return useOptimisticListMutation<Drawing, UpdateVars>({
     queryKey: drawingsQueryOptions().queryKey,
     mutationFn: updateDrawing,
     optimisticUpdate: (drawings, { data }) =>
       patchById(drawings, data.id, { name: data.updateData.name }),
     onRollback: () => toast.error("Failed to rename"),
+  })
+}
+
+export function useMoveDrawingToFolder() {
+  return useOptimisticListMutation<Drawing, UpdateVars>({
+    queryKey: drawingsQueryOptions().queryKey,
+    mutationFn: updateDrawing,
+    optimisticUpdate: (drawings, { data }) =>
+      patchById(drawings, data.id, {
+        folderId: data.updateData.folderId ?? null,
+      }),
+    onRollback: () => toast.error("Failed to move"),
   })
 }
 

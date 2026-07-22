@@ -8,6 +8,7 @@ import {
   trashDrawing,
   updateDrawing,
 } from "@/features/drawings/server"
+import type { Folder } from "@/features/folders/queries"
 import { CommandPaletteProvider } from "./CommandPalette"
 import { DrawingPaletteContext } from "./DrawingPaletteContext"
 
@@ -71,7 +72,20 @@ function makeDrawing(overrides: Partial<Drawing> = {}): Drawing {
   }
 }
 
-function setup(drawings: Drawing[]) {
+function makeFolder(overrides: Partial<Folder> & { id: string }): Folder {
+  return {
+    name: `Folder ${overrides.id}`,
+    ownerId: "user-1",
+    parentId: null,
+    deletedAt: null,
+    trashRootId: null,
+    createdAt: new Date("2026-01-01"),
+    updatedAt: new Date("2026-01-01"),
+    ...overrides,
+  }
+}
+
+function setup(drawings: Drawing[], folders: Folder[] = []) {
   // Fresh-forever seeded cache: no mount refetch racing the assertions
   const queryClient = new QueryClient({
     defaultOptions: {
@@ -79,7 +93,7 @@ function setup(drawings: Drawing[]) {
     },
   })
   queryClient.setQueryData<Drawing[]>(["drawings"], drawings)
-  queryClient.setQueryData(["folders"], [])
+  queryClient.setQueryData<Folder[]>(["folders"], folders)
   const wrapper = ({ children }: { children: ReactNode }) => (
     <QueryClientProvider client={queryClient}>
       <CommandPaletteProvider>{children}</CommandPaletteProvider>
@@ -111,6 +125,7 @@ test("the palette shows a This drawing section above Go to on the canvas", () =>
   expect(screen.getAllByRole("option").map((r) => r.textContent)).toEqual([
     "Rename",
     "Star",
+    "Move to folder…",
     "Move to trash",
     // The open drawing is also the most recent, so the empty-input launcher
     // lists it under Drawings between the context section and Go to
@@ -167,6 +182,83 @@ test("Move to trash prunes the cache, shows the undo toast and lands on Home", a
     }),
   )
   expect(navigate).toHaveBeenCalledWith({ to: "/draw" })
+})
+
+test("Move to folder… opens the picker and picking a folder moves optimistically", async () => {
+  vi.mocked(updateDrawing).mockReturnValue(new Promise(() => {}))
+  const { queryClient } = setup(
+    [makeDrawing()],
+    [makeFolder({ id: "f1", name: "Sprint plans" })],
+  )
+  openPalette()
+
+  fireEvent.click(screen.getByRole("option", { name: "Move to folder…" }))
+  // The palette stayed open, swapped to the picker
+  expect(screen.getByRole("combobox")).toBeDefined()
+  expect(screen.getByText("Move to folder")).toBeDefined()
+
+  fireEvent.click(screen.getByRole("option", { name: "Sprint plans" }))
+  await flush()
+
+  expect(vi.mocked(updateDrawing).mock.calls[0]?.[0]).toEqual({
+    data: { id: "d1", updateData: { folderId: "f1" } },
+  })
+  // Optimistic: the cache holds the new folder before the server answers
+  expect(queryClient.getQueryData<Drawing[]>(["drawings"])?.[0]?.folderId).toBe(
+    "f1",
+  )
+  // Picking closed the palette
+  expect(screen.queryByRole("combobox")).toBeNull()
+})
+
+test("picking No folder moves the drawing to the root", async () => {
+  vi.mocked(updateDrawing).mockReturnValue(new Promise(() => {}))
+  const { queryClient } = setup(
+    [makeDrawing({ folderId: "f1" })],
+    [makeFolder({ id: "f1", name: "Sprint plans" })],
+  )
+  openPalette()
+
+  fireEvent.click(screen.getByRole("option", { name: "Move to folder…" }))
+  fireEvent.click(screen.getByRole("option", { name: "No folder" }))
+  await flush()
+
+  expect(vi.mocked(updateDrawing).mock.calls[0]?.[0]).toEqual({
+    data: { id: "d1", updateData: { folderId: null } },
+  })
+  expect(
+    queryClient.getQueryData<Drawing[]>(["drawings"])?.[0]?.folderId,
+  ).toBeNull()
+})
+
+test("picking the current folder saves nothing", async () => {
+  setup(
+    [makeDrawing({ folderId: "f1" })],
+    [makeFolder({ id: "f1", name: "Sprint plans" })],
+  )
+  openPalette()
+
+  fireEvent.click(screen.getByRole("option", { name: "Move to folder…" }))
+  fireEvent.click(screen.getByRole("option", { name: "Sprint plans" }))
+  await flush()
+
+  // A no-op move must not hit the server: updateDrawing refreshes updatedAt,
+  // which would wrongly promote the drawing in the recency-sorted launcher
+  expect(updateDrawing).not.toHaveBeenCalled()
+  // Still a selection — the palette closes
+  expect(screen.queryByRole("combobox")).toBeNull()
+})
+
+test("an unfiled drawing picking No folder saves nothing", async () => {
+  setup([makeDrawing()])
+  openPalette()
+
+  fireEvent.click(screen.getByRole("option", { name: "Move to folder…" }))
+  fireEvent.click(screen.getByRole("option", { name: "No folder" }))
+  await flush()
+
+  expect(updateDrawing).not.toHaveBeenCalled()
+  expect(screen.queryByRole("combobox")).toBeNull()
 })
 
 test("Rename closes the palette into the rename dialog and saves optimistically", async () => {

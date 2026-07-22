@@ -2,7 +2,11 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { act, renderHook } from "@testing-library/react"
 import type { ReactNode } from "react"
 import { beforeEach, expect, test, vi } from "vitest"
-import { useRenameDrawing, useTrashDrawing } from "./mutations"
+import {
+  useMoveDrawingToFolder,
+  useRenameDrawing,
+  useTrashDrawing,
+} from "./mutations"
 import type { Drawing } from "./queries"
 
 const { toastMock, serverMocks } = vi.hoisted(() => {
@@ -124,6 +128,50 @@ test("a failed rename rolls the cache back and shows an error toast", async () =
 
   expect(queryClient.getQueryData<Drawing[]>(["drawings"])).toEqual([d1, d2])
   expect(toastMock.error).toHaveBeenCalledWith("Failed to rename")
+})
+
+test("moving to a folder patches the cache before the server answers", async () => {
+  serverMocks.updateDrawing.mockReturnValue(new Promise(() => {}))
+  const queryClient = new QueryClient()
+  queryClient.setQueryData<Drawing[]>(["drawings"], [d1, d2])
+  const wrapper = ({ children }: { children: ReactNode }) => (
+    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+  )
+  const { result } = renderHook(() => useMoveDrawingToFolder(), { wrapper })
+
+  act(() =>
+    result.current.mutate({
+      data: { id: "d1", updateData: { folderId: "f1" } },
+    }),
+  )
+  await flush()
+
+  expect(
+    queryClient
+      .getQueryData<Drawing[]>(["drawings"])
+      ?.find((d) => d.id === "d1")?.folderId,
+  ).toBe("f1")
+  expect(toastMock.error).not.toHaveBeenCalled()
+})
+
+test("a failed move rolls the cache back and shows an error toast", async () => {
+  serverMocks.updateDrawing.mockRejectedValue(new Error("boom"))
+  const queryClient = new QueryClient()
+  queryClient.setQueryData<Drawing[]>(["drawings"], [d1, d2])
+  const wrapper = ({ children }: { children: ReactNode }) => (
+    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+  )
+  const { result } = renderHook(() => useMoveDrawingToFolder(), { wrapper })
+
+  act(() =>
+    result.current.mutate({
+      data: { id: "d1", updateData: { folderId: "f1" } },
+    }),
+  )
+  await flush()
+
+  expect(queryClient.getQueryData<Drawing[]>(["drawings"])).toEqual([d1, d2])
+  expect(toastMock.error).toHaveBeenCalledWith("Failed to move")
 })
 
 test("a failed trash rolls the cache back, drops the undo toast and shows an error", async () => {

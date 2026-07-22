@@ -1,8 +1,9 @@
 import { useQuery } from "@tanstack/react-query"
 import { useNavigate } from "@tanstack/react-router"
-import { Pencil, Star, StarOff, Trash2 } from "lucide-react"
+import { FolderInput, Pencil, Star, StarOff, Trash2 } from "lucide-react"
 import { useEffect, useMemo, useRef, useState } from "react"
 import {
+  useMoveDrawingToFolder,
   useToggleStarDrawing,
   useTrashDrawing,
 } from "@/features/drawings/mutations"
@@ -20,7 +21,8 @@ type DrawingPaletteContextProps = {
 /**
  * Contributes the canvas's "This drawing" palette section (spec §5.4):
  * Rename (closes into the standard rename dialog), Star/Unstar (label follows
- * current state), Move to trash (tier-1: instant, undo toast, lands on Home).
+ * current state), Move to folder… (nested picker, optimistic move), Move to
+ * trash (tier-1: instant, undo toast, lands on Home).
  * Reads from the live drawings list, so a trashed drawing — whose section is
  * a later slice — contributes nothing.
  */
@@ -39,6 +41,8 @@ export function DrawingPaletteContext({
 
   const starMutation = useToggleStarDrawing()
   const starMutate = starMutation.mutate
+  const moveMutation = useMoveDrawingToFolder()
+  const moveMutate = moveMutation.mutate
   const trashDrawing = useTrashDrawing()
   // Latest-ref so the section memo doesn't rebuild every render just because
   // useTrashDrawing returns a fresh closure each time
@@ -68,6 +72,20 @@ export function DrawingPaletteContext({
             }),
         },
         {
+          id: "drawing:move-folder",
+          label: "Move to folder…",
+          icon: FolderInput,
+          // Reversible mutation, so no confirm: the move lands optimistically
+          // and rolls back with an error toast on failure (spec §4.3)
+          pickFolder: (folderId) => {
+            // Same destination is a no-op — the server refreshes updatedAt on
+            // every update, which would wrongly promote the drawing in the
+            // recency-sorted launcher (same guard as the sidebar drag-drop)
+            if (folderId === drawing.folderId) return
+            moveMutate({ data: { id: drawing.id, updateData: { folderId } } })
+          },
+        },
+        {
           id: "drawing:trash",
           label: "Move to trash",
           icon: Trash2,
@@ -82,7 +100,7 @@ export function DrawingPaletteContext({
         },
       ],
     }
-  }, [drawing, starMutate, navigate])
+  }, [drawing, starMutate, moveMutate, navigate])
 
   usePaletteContextSection(section)
 
