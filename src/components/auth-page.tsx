@@ -10,10 +10,10 @@ type Props = {
 }
 
 export function AuthPage({ title, subtitle, children }: Props) {
-  // Logged-out pages follow the system preference (spec §4.4) — the root
-  // bootstrap script already applied it before first paint; this keeps it
-  // tracking OS changes live while the page is open.
-  useApplyTheme("system")
+  // Logged-out pages are always light, regardless of the device's stored
+  // choice — the root bootstrap script already forced it before first
+  // paint; this covers SPA navigation in from a dark app.
+  useApplyTheme("light")
   return (
     <div className="flex min-h-screen bg-background">
       <div className="flex min-h-screen w-full flex-col items-center justify-center p-4 md:w-1/2">

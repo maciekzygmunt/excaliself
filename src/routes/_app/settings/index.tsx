@@ -37,7 +37,7 @@ function AccountPage() {
       <Separator />
       <SessionsSection />
       <Separator />
-      <AppearanceSection user={user} />
+      <AppearanceSection />
       <Separator />
       <DangerZoneSection user={user} />
     </div>

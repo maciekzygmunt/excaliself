@@ -24,7 +24,6 @@ export const getCurrentUser = createServerFn({ method: "GET" })
         email: users.email,
         name: users.name,
         role: users.role,
-        theme: users.theme,
       })
       .from(users)
       .where(eq(users.id, context.session.user.id))
@@ -108,19 +107,6 @@ export const updateProfile = createServerFn({ method: "POST" })
     await db
       .update(users)
       .set({ name: data.name === "" ? null : data.name, updatedAt: new Date() })
-      .where(eq(users.id, context.session.user.id))
-  })
-
-// Appearance preference (spec §4.4): stored per-user so it follows the
-// account across devices; the client mirrors it to localStorage for the
-// pre-paint bootstrap.
-export const updateTheme = createServerFn({ method: "POST" })
-  .middleware([authMiddleware])
-  .inputValidator(z.object({ theme: z.enum(["light", "dark", "system"]) }))
-  .handler(async ({ data, context }) => {
-    await db
-      .update(users)
-      .set({ theme: data.theme, updatedAt: new Date() })
       .where(eq(users.id, context.session.user.id))
   })
 

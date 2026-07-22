@@ -1,50 +1,39 @@
-export type ThemePreference = "light" | "dark" | "system"
-export type ResolvedTheme = "light" | "dark"
+export type ThemePreference = "light" | "dark"
 
-// The localStorage mirror of the per-user server-side preference. The key
-// follows the next-themes convention (established by the old auth-page
-// bootstrap) so existing stored values keep working.
+// The device-scoped theme choice. localStorage is the source of truth —
+// deliberately not synced to the account (owner decision): each browser
+// keeps its own choice, and it survives sign-out. The key predates this
+// module (next-themes convention), so older stored values keep working;
+// anything but "dark" (including a legacy "system") reads as unset.
 export const THEME_STORAGE_KEY = "theme"
 
-// Users who never chose get Light (spec §4.4).
+// Light unless the user explicitly chose Dark in Settings. The OS
+// preference is deliberately never consulted.
 export const DEFAULT_THEME: ThemePreference = "light"
 
 // Browser-chrome tints for the theme-color meta: the --background tokens
 // from styles.css, as hex (the dark one is oklch(0.155 0.008 60) converted).
-export const THEME_COLORS: Record<ResolvedTheme, string> = {
+export const THEME_COLORS: Record<ThemePreference, string> = {
   light: "#f2f2f6",
   dark: "#0f0b09",
 }
 
 export function isThemePreference(value: unknown): value is ThemePreference {
-  return value === "light" || value === "dark" || value === "system"
+  return value === "light" || value === "dark"
 }
 
-export function resolveTheme(
-  preference: ThemePreference,
-  systemDark: boolean,
-): ResolvedTheme {
-  if (preference === "system") return systemDark ? "dark" : "light"
-  return preference
-}
-
-// jsdom (and old browsers) lack matchMedia; treat that as a light system.
-export function systemPrefersDark(): boolean {
-  return (
-    typeof window.matchMedia === "function" &&
-    window.matchMedia("(prefers-color-scheme: dark)").matches
-  )
-}
-
-// Notifies useResolvedTheme subscribers (the Toaster) on every apply.
+// Notifies useThemePreference/useResolvedTheme subscribers (the Appearance
+// control, the Toaster) whenever the theme is applied or the choice changes.
 const listeners = new Set<() => void>()
 
-export function subscribeToResolvedTheme(listener: () => void): () => void {
+export function subscribeToTheme(listener: () => void): () => void {
   listeners.add(listener)
   return () => listeners.delete(listener)
 }
 
-export function readResolvedTheme(): ResolvedTheme {
+// The theme as currently applied to the document — on logged-out pages this
+// is light even while a dark choice sits in storage.
+export function readResolvedTheme(): ThemePreference {
   return document.documentElement.classList.contains("dark") ? "dark" : "light"
 }
 
@@ -54,7 +43,7 @@ export function readResolvedTheme(): ResolvedTheme {
  * tint. Chrome only — the Excalidraw canvas theme is deliberately not
  * touched (spec §4.4: the canvas has its own in-canvas toggle).
  */
-export function applyResolvedTheme(resolved: ResolvedTheme) {
+export function applyResolvedTheme(resolved: ThemePreference) {
   document.documentElement.classList.toggle("dark", resolved === "dark")
   document
     .querySelector('meta[name="theme-color"]')
@@ -62,12 +51,8 @@ export function applyResolvedTheme(resolved: ResolvedTheme) {
   for (const listener of listeners) listener()
 }
 
-export function applyThemePreference(preference: ThemePreference) {
-  applyResolvedTheme(resolveTheme(preference, systemPrefersDark()))
-}
-
-// localStorage can throw (privacy modes); the mirror is an optimization for
-// pre-paint correctness, so failures are swallowed everywhere.
+// localStorage can throw (privacy modes); an unreadable store means the
+// Light default everywhere, so failures are swallowed.
 export function readStoredThemePreference(): ThemePreference | null {
   try {
     const stored = window.localStorage.getItem(THEME_STORAGE_KEY)
@@ -77,36 +62,30 @@ export function readStoredThemePreference(): ThemePreference | null {
   }
 }
 
-export function storeThemePreference(preference: ThemePreference) {
+// The Appearance control's write path: persist and apply in one step.
+// Writing localStorage can't meaningfully fail, so there is no error flow.
+export function setThemePreference(preference: ThemePreference) {
   try {
     window.localStorage.setItem(THEME_STORAGE_KEY, preference)
   } catch {}
+  applyResolvedTheme(preference)
 }
 
-// Called on sign-out: the mirror belongs to the signed-in user, and the next
-// account on this browser must start from the Light default, not inherit it.
-export function clearStoredThemePreference() {
-  try {
-    window.localStorage.removeItem(THEME_STORAGE_KEY)
-  } catch {}
-}
-
-// Logged-out pages follow the system preference regardless of any stored
-// mirror (spec §4.4); these are the only routes that render logged-out.
+// Logged-out pages are always light regardless of the stored choice; these
+// are the only routes that render logged-out.
 const LOGGED_OUT_PATHS = ["/login", "/setup", "/invite", "/reset-password"]
 
 /**
  * Inlined into the document head (after the theme-color meta) so the right
  * theme is on the root element while the SSR'd HTML is still parsing — a
- * reload never flashes the wrong theme. Mirrors resolveTheme + the
- * logged-out rule; kept dependency-free because it runs before any bundle.
+ * reload never flashes the wrong theme. Dark only when explicitly stored
+ * and not on a logged-out page; kept dependency-free because it runs
+ * before any bundle.
  */
 export const themeBootstrapScript = [
   "try{",
-  `var p=localStorage.getItem(${JSON.stringify(THEME_STORAGE_KEY)});`,
-  `if(p!=="light"&&p!=="dark"&&p!=="system")p=${JSON.stringify(DEFAULT_THEME)};`,
-  `if(${JSON.stringify(LOGGED_OUT_PATHS)}.indexOf(location.pathname)>-1)p="system";`,
-  'var d=p==="dark"||(p==="system"&&matchMedia("(prefers-color-scheme: dark)").matches);',
+  `var d=localStorage.getItem(${JSON.stringify(THEME_STORAGE_KEY)})==="dark"`,
+  `&&${JSON.stringify(LOGGED_OUT_PATHS)}.indexOf(location.pathname)<0;`,
   'document.documentElement.classList.toggle("dark",d);',
   "var m=document.querySelector('meta[name=\"theme-color\"]');",
   `if(m)m.setAttribute("content",d?${JSON.stringify(THEME_COLORS.dark)}:${JSON.stringify(THEME_COLORS.light)});`,

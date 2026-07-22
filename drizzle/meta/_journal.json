@@ -50,13 +50,6 @@
       "when": 1784632142139,
       "tag": "0006_nostalgic_black_widow",
       "breakpoints": true
-    },
-    {
-      "idx": 7,
-      "version": "7",
-      "when": 1784734728636,
-      "tag": "0007_polite_gargoyle",
-      "breakpoints": true
     }
   ]
 }

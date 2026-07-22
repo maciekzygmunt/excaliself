@@ -1,51 +1,48 @@
 import { useEffect, useSyncExternalStore } from "react"
 import {
   applyResolvedTheme,
-  applyThemePreference,
-  type ResolvedTheme,
+  DEFAULT_THEME,
   readResolvedTheme,
-  storeThemePreference,
-  subscribeToResolvedTheme,
+  readStoredThemePreference,
+  subscribeToTheme,
   type ThemePreference,
 } from "@/lib/theme"
 
-/**
- * Applies a theme preference to the document for as long as the caller is
- * mounted, tracking OS changes live while the preference is "system" (an OS
- * theme flip updates the app without a reload, spec §4.4). Accepts undefined
- * as "not known yet" and leaves whatever the pre-paint bootstrap applied.
- */
-export function useApplyTheme(preference: ThemePreference | undefined) {
+// Pins the document to a fixed theme while the caller is mounted — the auth
+// pages use it to stay light regardless of the stored choice.
+export function useApplyTheme(theme: ThemePreference) {
   useEffect(() => {
-    if (!preference) return
-    applyThemePreference(preference)
-    if (preference !== "system" || typeof window.matchMedia !== "function")
-      return
-    const query = window.matchMedia("(prefers-color-scheme: dark)")
-    const onChange = () => applyResolvedTheme(query.matches ? "dark" : "light")
-    query.addEventListener("change", onChange)
-    return () => query.removeEventListener("change", onChange)
-  }, [preference])
+    applyResolvedTheme(theme)
+  }, [theme])
 }
 
 /**
- * The app shell's theme driver: applies the signed-in user's server-side
- * preference (read from the currentUser cache, so an optimistic save on
- * /settings — or its rollback — re-applies in the same render pass) and
- * mirrors it to localStorage for the next load's pre-paint bootstrap.
+ * The app shell's theme driver: applies the stored device choice on mount
+ * (the pre-paint bootstrap already did on a fresh load; this covers SPA
+ * navigation out of a forced-light auth page). Later changes go through
+ * setThemePreference, which applies as it saves.
  */
-export function useUserTheme(preference: ThemePreference | undefined) {
-  useApplyTheme(preference)
+export function useStoredTheme() {
   useEffect(() => {
-    if (preference) storeThemePreference(preference)
-  }, [preference])
+    applyResolvedTheme(readStoredThemePreference() ?? DEFAULT_THEME)
+  }, [])
 }
 
-// The resolved theme as currently applied to the document — for chrome that
-// needs it as a value (the Toaster) rather than through CSS variables.
-export function useResolvedTheme(): ResolvedTheme {
+// The stored choice as a reactive value — the Appearance control renders
+// from this so a click updates its checked state through the store.
+export function useThemePreference(): ThemePreference {
   return useSyncExternalStore(
-    subscribeToResolvedTheme,
+    subscribeToTheme,
+    () => readStoredThemePreference() ?? DEFAULT_THEME,
+    () => DEFAULT_THEME,
+  )
+}
+
+// The applied theme as a value — for chrome that needs it as data (the
+// Toaster) rather than through CSS variables.
+export function useResolvedTheme(): ThemePreference {
+  return useSyncExternalStore(
+    subscribeToTheme,
     readResolvedTheme,
     () => "light",
   )

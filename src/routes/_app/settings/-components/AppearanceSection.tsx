@@ -1,7 +1,6 @@
-import { MonitorIcon, MoonIcon, SunIcon } from "lucide-react"
-import { useUpdateTheme } from "@/features/account/mutations"
-import type { CurrentUser } from "@/features/account/queries"
-import type { ThemePreference } from "@/lib/theme"
+import { MoonIcon, SunIcon } from "lucide-react"
+import { useThemePreference } from "@/hooks/use-theme"
+import { setThemePreference, type ThemePreference } from "@/lib/theme"
 import { cn } from "@/lib/utils"
 
 const OPTIONS: Array<{
@@ -11,21 +10,20 @@ const OPTIONS: Array<{
 }> = [
   { value: "light", label: "Light", icon: SunIcon },
   { value: "dark", label: "Dark", icon: MoonIcon },
-  { value: "system", label: "System", icon: MonitorIcon },
 ]
 
-// Appearance block (spec §4.4): Light / Dark / System for the app chrome,
-// saved per-user with optimistic apply. The Excalidraw canvas keeps its own
-// in-canvas theme toggle and is deliberately not governed by this.
-export function AppearanceSection({ user }: { user: CurrentUser }) {
-  const updateTheme = useUpdateTheme()
+// Appearance block (spec §4.4): Light / Dark for the app chrome, stored on
+// this browser only — the sole way to reach dark mode. The Excalidraw
+// canvas keeps its own in-canvas theme toggle and is not governed by this.
+export function AppearanceSection() {
+  const preference = useThemePreference()
 
   return (
     <section>
       <div className="mb-4">
         <h2 className="text-sm font-medium text-foreground">Appearance</h2>
         <p className="text-xs text-muted-foreground">
-          Theme for the app — the canvas has its own theme toggle
+          Applies to this browser — the canvas has its own theme toggle
         </p>
       </div>
 
@@ -35,7 +33,7 @@ export function AppearanceSection({ user }: { user: CurrentUser }) {
         className="inline-flex rounded-lg border border-border bg-background p-0.5"
       >
         {OPTIONS.map((option) => {
-          const selected = user.theme === option.value
+          const selected = preference === option.value
           return (
             <button
               key={option.value}
@@ -43,7 +41,7 @@ export function AppearanceSection({ user }: { user: CurrentUser }) {
               role="radio"
               aria-checked={selected}
               onClick={() => {
-                if (!selected) updateTheme(option.value)
+                if (!selected) setThemePreference(option.value)
               }}
               className={cn(
                 "inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm transition-colors",

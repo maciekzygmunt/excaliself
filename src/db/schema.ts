@@ -17,11 +17,6 @@ export const users = pgTable("users", {
   role: text("role", { enum: ["admin", "user"] })
     .notNull()
     .default("user"),
-  // App-chrome theme preference (spec §4.4); "light" is the never-chose
-  // default. Governs chrome only — the Excalidraw canvas theme is separate.
-  theme: text("theme", { enum: ["light", "dark", "system"] })
-    .notNull()
-    .default("light"),
   createdAt: timestamp("createdAt")
     .notNull()
     .$defaultFn(() => new Date()),

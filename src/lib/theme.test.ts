@@ -1,12 +1,10 @@
 import { afterEach, beforeEach, expect, test, vi } from "vitest"
 import {
   applyResolvedTheme,
-  clearStoredThemePreference,
   isThemePreference,
   readStoredThemePreference,
-  resolveTheme,
-  storeThemePreference,
-  subscribeToResolvedTheme,
+  setThemePreference,
+  subscribeToTheme,
   THEME_COLORS,
   themeBootstrapScript,
 } from "./theme"
@@ -28,15 +26,6 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-// The bootstrap script calls the global bare — jsdom ships none.
-function stubSystemTheme(dark: boolean) {
-  vi.stubGlobal("matchMedia", () => ({
-    matches: dark,
-    addEventListener: () => {},
-    removeEventListener: () => {},
-  }))
-}
-
 function runBootstrap() {
   // Evaluated the way the browser runs the inlined tag: as a bare script
   // against the document globals.
@@ -47,28 +36,16 @@ function appliedDark() {
   return document.documentElement.classList.contains("dark")
 }
 
-test.each([
-  ["light", false, "light"],
-  ["light", true, "light"],
-  ["dark", false, "dark"],
-  ["dark", true, "dark"],
-  ["system", false, "light"],
-  ["system", true, "dark"],
-] as const)("resolveTheme(%s, systemDark=%s) → %s", (pref, sys, expected) => {
-  expect(resolveTheme(pref, sys)).toBe(expected)
-})
-
-test("isThemePreference accepts exactly the three preferences", () => {
+test("isThemePreference accepts exactly light and dark — no system tier", () => {
   expect(isThemePreference("light")).toBe(true)
   expect(isThemePreference("dark")).toBe(true)
-  expect(isThemePreference("system")).toBe(true)
-  expect(isThemePreference("auto")).toBe(false)
+  expect(isThemePreference("system")).toBe(false)
   expect(isThemePreference(null)).toBe(false)
 })
 
 test("applyResolvedTheme drives the root class, the theme-color meta and subscribers", () => {
   const seen: string[] = []
-  const unsubscribe = subscribeToResolvedTheme(() =>
+  const unsubscribe = subscribeToTheme(() =>
     seen.push(appliedDark() ? "dark" : "light"),
   )
   applyResolvedTheme("dark")
@@ -81,41 +58,42 @@ test("applyResolvedTheme drives the root class, the theme-color meta and subscri
   unsubscribe()
 })
 
-test("the stored mirror round-trips and rejects junk", () => {
-  expect(readStoredThemePreference()).toBeNull()
-  storeThemePreference("dark")
+test("setThemePreference persists and applies in one step — the round-trip", () => {
+  setThemePreference("dark")
+  expect(window.localStorage.getItem("theme")).toBe("dark")
+  expect(appliedDark()).toBe(true)
   expect(readStoredThemePreference()).toBe("dark")
-  clearStoredThemePreference()
+
+  setThemePreference("light")
+  expect(window.localStorage.getItem("theme")).toBe("light")
+  expect(appliedDark()).toBe(false)
+})
+
+test("junk in storage — including a legacy 'system' — reads as unset", () => {
+  window.localStorage.setItem("theme", "system")
   expect(readStoredThemePreference()).toBeNull()
   window.localStorage.setItem("theme", "banana")
   expect(readStoredThemePreference()).toBeNull()
 })
 
-test("bootstrap: no stored preference defaults to Light on app pages", () => {
-  stubSystemTheme(true)
+test("bootstrap: nothing stored means Light, and the OS is never consulted", () => {
+  const matchMediaSpy = vi.fn()
+  vi.stubGlobal("matchMedia", matchMediaSpy)
   runBootstrap()
   expect(appliedDark()).toBe(false)
   expect(meta.content).toBe(THEME_COLORS.light)
+  expect(matchMediaSpy).not.toHaveBeenCalled()
 })
 
-test("bootstrap: a stored dark mirror applies before first paint", () => {
-  stubSystemTheme(false)
+test("bootstrap: a stored dark choice applies before first paint", () => {
   window.localStorage.setItem("theme", "dark")
   runBootstrap()
   expect(appliedDark()).toBe(true)
   expect(meta.content).toBe(THEME_COLORS.dark)
 })
 
-test("bootstrap: a stored system mirror resolves against the OS", () => {
-  stubSystemTheme(true)
+test("bootstrap: a legacy 'system' value falls back to Light", () => {
   window.localStorage.setItem("theme", "system")
-  runBootstrap()
-  expect(appliedDark()).toBe(true)
-})
-
-test("bootstrap: junk in the mirror falls back to the Light default", () => {
-  stubSystemTheme(true)
-  window.localStorage.setItem("theme", "banana")
   runBootstrap()
   expect(appliedDark()).toBe(false)
 })
@@ -125,13 +103,11 @@ test.each([
   "/setup",
   "/invite",
   "/reset-password",
-])("bootstrap: %s follows the system preference, ignoring the mirror", (path) => {
+])("bootstrap: %s is always light, even with a stored dark choice", (path) => {
   window.history.replaceState({}, "", path)
   window.localStorage.setItem("theme", "dark")
-  stubSystemTheme(false)
+  document.documentElement.classList.add("dark")
   runBootstrap()
   expect(appliedDark()).toBe(false)
-  stubSystemTheme(true)
-  runBootstrap()
-  expect(appliedDark()).toBe(true)
+  expect(meta.content).toBe(THEME_COLORS.light)
 })
