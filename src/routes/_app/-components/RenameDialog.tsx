@@ -1,9 +1,9 @@
 import { Pencil } from "lucide-react"
 import { useEffect, useRef, useState } from "react"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
+import { Kbd } from "@/components/ui/kbd"
 import { useRenameDrawing } from "@/features/drawings/mutations"
 import { useRenameFolder } from "@/features/folders/mutations"
-import { Kbd } from "./sidebar/Kbd"
 
 export type RenameTarget = {
   kind: "drawing" | "folder"

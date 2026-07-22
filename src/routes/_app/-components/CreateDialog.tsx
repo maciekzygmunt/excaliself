@@ -11,9 +11,9 @@ import {
 } from "react"
 import { toast } from "sonner"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
+import { Kbd } from "@/components/ui/kbd"
 import { useCreateDrawing } from "@/features/drawings/mutations"
 import { useCreateFolder } from "@/features/folders/mutations"
-import { Kbd } from "./sidebar/Kbd"
 
 export type FolderScope = { id: string; name: string }
 

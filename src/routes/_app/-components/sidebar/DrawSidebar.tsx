@@ -9,6 +9,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { Kbd, KbdGroup } from "@/components/ui/kbd"
 import {
   Sidebar,
   SidebarContent,
@@ -19,10 +20,10 @@ import {
 } from "@/components/ui/sidebar"
 import { type Drawing, drawingsQueryOptions } from "@/features/drawings/queries"
 import { foldersQueryOptions } from "@/features/folders/queries"
+import { useIsApplePlatform } from "@/hooks/use-is-apple-platform"
 import { cn } from "@/lib/utils"
 import { useCommandPalette } from "../CommandPalette"
 import { useCreateDialog } from "../CreateDialog"
-import { Kbd } from "./Kbd"
 import { SidebarNav, SidebarNavItem } from "./SidebarNav"
 import { type SidebarUser, SidebarUserMenu } from "./SidebarUserMenu"
 import { StarredSection } from "./StarredSection"
@@ -35,6 +36,7 @@ export function DrawSidebar({ user }: { user: SidebarUser }) {
   const { data: folders = [] } = useQuery(foldersQueryOptions())
   const { openCreateDrawingDialog, openCreateFolderDialog } = useCreateDialog()
   const { openCommandPalette } = useCommandPalette()
+  const isApplePlatform = useIsApplePlatform()
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -108,7 +110,10 @@ export function DrawSidebar({ user }: { user: SidebarUser }) {
               strokeWidth={2.5}
             />
             <span className="flex-1 truncate text-left">Search</span>
-            <Kbd>⌘K</Kbd>
+            <KbdGroup>
+              <Kbd>{isApplePlatform ? "⌘" : "Ctrl"}</Kbd>
+              <Kbd>K</Kbd>
+            </KbdGroup>
           </button>
         </div>
 
