@@ -168,6 +168,18 @@ code {
     gap: 10px;
     flex-wrap: nowrap;
   }
+
+  /* The <canvas> gets its pixel size from Excalidraw state (ResizeObserver →
+     setState), so it trails the sidebar's animated width by a frame or two.
+     Excalidraw's root is transparent, so that lag showed as a strip of the
+     app chrome (near-black in dark mode) at the canvas edge. Painting the
+     root with Excalidraw's own theme-scoped canvas color makes the strip
+     read as canvas — and follows the canvas theme, not the app theme.
+     Excalidraw portals dialogs into a second `.excalidraw` root on <body>;
+     that one is a full-screen overlay and must stay transparent. */
+  .excalidraw:not(.excalidraw-modal-container) {
+    background-color: var(--default-bg-color);
+  }
 }
 
 /* A barely-there scrollbar for scrollable chrome surfaces (palette list):
