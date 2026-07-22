@@ -253,26 +253,32 @@ function CardFooter({
   deleteDialog: React.ReactNode
 }) {
   return (
-    <div className="flex items-center gap-2 px-3 py-2.5">
-      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <span className="truncate text-[13px] font-medium text-foreground">
+    // Meta gets the full footer width on its own row — the always-visible
+    // Restore / Delete actions only crowd the name line, so "Purges in N
+    // days" never truncates. Negative margins keep the taller action
+    // buttons from stretching the name row.
+    <div className="px-3 py-2.5">
+      <div className="flex items-center gap-2">
+        <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-foreground">
           {name}
         </span>
-        <span className="truncate text-xs text-muted-foreground">{meta}</span>
+        {/* z-10 keeps Restore / Delete forever clickable above the drawing
+            card's stretched link (no-op for folder cards, which don't link). */}
+        <div className="relative z-10 -my-1 -mr-1 flex shrink-0 items-center gap-0.5">
+          <button
+            type="button"
+            aria-label={restoreLabel}
+            onClick={onRestore}
+            className="shrink-0 rounded-md px-2 py-1 text-xs font-medium text-iris transition-colors duration-150 hover:bg-iris-muted hover:text-iris-strong focus-visible:bg-iris-muted focus-visible:outline-none"
+          >
+            Restore
+          </button>
+          {deleteDialog}
+        </div>
       </div>
-      {/* z-10 keeps Restore / Delete forever clickable above the drawing
-          card's stretched link (no-op for folder cards, which don't link). */}
-      <div className="relative z-10 -mr-1 flex shrink-0 items-center gap-0.5">
-        <button
-          type="button"
-          aria-label={restoreLabel}
-          onClick={onRestore}
-          className="shrink-0 rounded-md px-2 py-1 text-xs font-medium text-iris transition-colors duration-150 hover:bg-iris-muted hover:text-iris-strong focus-visible:bg-iris-muted focus-visible:outline-none"
-        >
-          Restore
-        </button>
-        {deleteDialog}
-      </div>
+      <span className="mt-0.5 block truncate text-xs text-muted-foreground">
+        {meta}
+      </span>
     </div>
   )
 }
