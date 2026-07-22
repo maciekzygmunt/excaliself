@@ -3,6 +3,7 @@ import {
   applyResolvedTheme,
   isThemePreference,
   readStoredThemePreference,
+  resolveCanvasTheme,
   setThemePreference,
   subscribeToTheme,
   THEME_COLORS,
@@ -74,6 +75,11 @@ test("junk in storage — including a legacy 'system' — reads as unset", () =>
   expect(readStoredThemePreference()).toBeNull()
   window.localStorage.setItem("theme", "banana")
   expect(readStoredThemePreference()).toBeNull()
+})
+
+test("resolveCanvasTheme: the canvas renders in the app theme, verbatim", () => {
+  expect(resolveCanvasTheme("light")).toBe("light")
+  expect(resolveCanvasTheme("dark")).toBe("dark")
 })
 
 test("bootstrap: nothing stored means Light, and the OS is never consulted", () => {

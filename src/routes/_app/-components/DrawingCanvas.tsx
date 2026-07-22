@@ -13,6 +13,7 @@ import {
   useSaveScenePayload,
 } from "@/features/drawings/scene"
 import { useAutoSave } from "@/hooks/use-auto-save"
+import { useCanvasTheme } from "@/hooks/use-theme"
 import { FooterRightPortal, SaveStatusPill } from "./SaveStatusPill"
 import { TopLeftControls, TopLeftPortal } from "./TopLeftControls"
 
@@ -31,6 +32,7 @@ type Props = {
 
 export function DrawingCanvas({ drawingId, readOnly = false }: Props) {
   const { toggleSidebar } = useSidebar()
+  const canvasTheme = useCanvasTheme()
 
   const { drawing, initialData, isDataCorrupt } = useDrawingScene(drawingId)
   const saveScenePayload = useSaveScenePayload(drawingId)
@@ -102,12 +104,18 @@ export function DrawingCanvas({ drawingId, readOnly = false }: Props) {
     <div className="size-full">
       <Excalidraw
         initialData={initialData}
+        // Controlled: the canvas renders in the app theme, and a theme baked
+        // into the saved scene state is ignored on load. With the prop set,
+        // Excalidraw disables its toggleTheme action, which also retires the
+        // Shift+Alt+D shortcut; `toggleTheme: false` pins that down.
+        theme={canvasTheme}
         viewModeEnabled={readOnly || undefined}
         onChange={readOnly ? undefined : handleSceneChange}
         UIOptions={{
           canvasActions: {
             loadScene: false,
             saveToActiveFile: false,
+            toggleTheme: false,
           },
         }}
       >
@@ -131,7 +139,6 @@ export function DrawingCanvas({ drawingId, readOnly = false }: Props) {
             <MainMenu.DefaultItems.Socials />
           </MainMenu.Group>
           <MainMenu.Separator />
-          <MainMenu.DefaultItems.ToggleTheme />
           <MainMenu.DefaultItems.ChangeCanvasBackground />
         </MainMenu>
         {/* No autosave in read-only mode, so no save status to report. */}

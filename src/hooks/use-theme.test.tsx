@@ -1,7 +1,12 @@
 import { act, cleanup, renderHook } from "@testing-library/react"
 import { afterEach, expect, test } from "vitest"
 import { setThemePreference } from "@/lib/theme"
-import { useApplyTheme, useStoredTheme, useThemePreference } from "./use-theme"
+import {
+  useApplyTheme,
+  useCanvasTheme,
+  useStoredTheme,
+  useThemePreference,
+} from "./use-theme"
 
 afterEach(cleanup)
 afterEach(() => {
@@ -31,6 +36,17 @@ test("useApplyTheme pins the document to the given theme", () => {
   document.documentElement.classList.add("dark")
   renderHook(useApplyTheme, { initialProps: "light" as const })
   expect(appliedDark()).toBe(false)
+})
+
+test("useCanvasTheme follows the applied app theme, live", () => {
+  const { result } = renderHook(useCanvasTheme)
+  expect(result.current).toBe("light")
+
+  act(() => setThemePreference("dark"))
+  expect(result.current).toBe("dark")
+
+  act(() => setThemePreference("light"))
+  expect(result.current).toBe("light")
 })
 
 test("useThemePreference tracks setThemePreference reactively — the round-trip", () => {

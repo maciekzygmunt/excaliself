@@ -4,6 +4,7 @@ import {
   DEFAULT_THEME,
   readResolvedTheme,
   readStoredThemePreference,
+  resolveCanvasTheme,
   subscribeToTheme,
   type ThemePreference,
 } from "@/lib/theme"
@@ -46,4 +47,10 @@ export function useResolvedTheme(): ThemePreference {
     readResolvedTheme,
     () => "light",
   )
+}
+
+// The drawing canvas's theme feed: switching the app theme in Settings
+// re-renders any open drawing to match, live.
+export function useCanvasTheme(): ThemePreference {
+  return resolveCanvasTheme(useResolvedTheme())
 }

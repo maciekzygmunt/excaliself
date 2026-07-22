@@ -40,8 +40,8 @@ export function readResolvedTheme(): ThemePreference {
 /**
  * The single write path for the app theme: toggles the `.dark` class on the
  * root element and keeps the theme-color meta on the matching --background
- * tint. Chrome only — the Excalidraw canvas theme is deliberately not
- * touched (spec §4.4: the canvas has its own in-canvas toggle).
+ * tint. The Excalidraw canvas follows through a subscriber (useCanvasTheme)
+ * rather than being written to here.
  */
 export function applyResolvedTheme(resolved: ThemePreference) {
   document.documentElement.classList.toggle("dark", resolved === "dark")
@@ -49,6 +49,17 @@ export function applyResolvedTheme(resolved: ThemePreference) {
     .querySelector('meta[name="theme-color"]')
     ?.setAttribute("content", THEME_COLORS[resolved])
   for (const listener of listeners) listener()
+}
+
+/**
+ * App theme → effective Excalidraw canvas theme: the app theme, verbatim.
+ * Canvas theme is a device-level viewing preference, not a per-Drawing
+ * property — the in-canvas theme controls are gone, and any theme baked
+ * into a drawing's saved scene state is ignored on load (no migration;
+ * saves may keep writing it harmlessly).
+ */
+export function resolveCanvasTheme(appTheme: ThemePreference): ThemePreference {
+  return appTheme
 }
 
 // localStorage can throw (privacy modes); an unreadable store means the
