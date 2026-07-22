@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { userDisplayName } from "@/features/account/display-name"
 import { authClient } from "@/lib/auth-client"
+import { clearStoredThemePreference } from "@/lib/theme"
 
 export type SidebarUser = {
   email: string
@@ -64,6 +65,9 @@ export function SidebarUserMenu({ user }: { user: SidebarUser }) {
         <DropdownMenuItem
           onClick={async () => {
             await authClient.signOut()
+            // The theme mirror belongs to the account that just left; the
+            // next sign-in must not inherit it before their own pref loads.
+            clearStoredThemePreference()
             window.location.href = "/login"
           }}
         >

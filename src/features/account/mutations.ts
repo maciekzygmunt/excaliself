@@ -1,13 +1,19 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { usersQueryOptions } from "@/features/admin/queries"
+import type { ThemePreference } from "@/lib/theme"
 import {
   type ActiveSession,
   type CurrentUser,
   currentUserQueryOptions,
   sessionsQueryOptions,
 } from "./queries"
-import { revokeOtherSessions, revokeSessionById, updateProfile } from "./server"
+import {
+  revokeOtherSessions,
+  revokeSessionById,
+  updateProfile,
+  updateTheme,
+} from "./server"
 import { compareSessions } from "./sessions"
 
 /**
@@ -49,6 +55,41 @@ export function useUpdateProfile() {
   })
 
   return (name: string) => mutation.mutate({ data: { name: name.trim() } })
+}
+
+/**
+ * Save the Appearance choice optimistically: the preference lands in the
+ * currentUser cache immediately — the app shell's useUserTheme reads that
+ * cache, so the chrome re-themes (and the localStorage mirror updates) in
+ * the same render pass — and rolls back with an error toast on failure,
+ * which re-themes back the same way. The shared scope serializes rapid
+ * clicks so an older save can't overwrite a newer optimistic write.
+ */
+export function useUpdateTheme() {
+  const queryClient = useQueryClient()
+  const currentUserKey = currentUserQueryOptions().queryKey
+
+  const mutation = useMutation({
+    mutationFn: updateTheme,
+    scope: { id: "account-theme" },
+    onMutate: async ({ data }) => {
+      await queryClient.cancelQueries({ queryKey: currentUserKey })
+      const previous = queryClient.getQueryData<CurrentUser>(currentUserKey)
+      queryClient.setQueryData<CurrentUser>(currentUserKey, (current) =>
+        current ? { ...current, theme: data.theme } : current,
+      )
+      return { previous }
+    },
+    onError: (_err, _vars, context) => {
+      queryClient.setQueryData(currentUserKey, context?.previous)
+      toast.error("Couldn't save theme preference")
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: currentUserKey })
+    },
+  })
+
+  return (theme: ThemePreference) => mutation.mutate({ data: { theme } })
 }
 
 /**

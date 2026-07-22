@@ -27,6 +27,7 @@ import { drawingsQueryOptions } from "@/features/drawings/queries"
 import { foldersQueryOptions } from "@/features/folders/queries"
 import { useCommandPaletteShortcut } from "@/hooks/use-command-palette-shortcut"
 import { authClient } from "@/lib/auth-client"
+import { clearStoredThemePreference } from "@/lib/theme"
 import { cn } from "@/lib/utils"
 import { useCreateDialog } from "./CreateDialog"
 import { Kbd } from "./sidebar/Kbd"
@@ -267,6 +268,9 @@ export function CommandPalette({
       openCreateFolderDialog()
     } else {
       await authClient.signOut()
+      // The theme mirror belongs to the account that just left; the next
+      // sign-in must not inherit it before their own pref loads.
+      clearStoredThemePreference()
       window.location.href = "/login"
     }
   }

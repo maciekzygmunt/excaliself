@@ -33,6 +33,7 @@ const viewer: CurrentUser = {
   email: "ada@example.com",
   name: null,
   role: "user",
+  theme: "light",
 }
 
 // jsdom doesn't implement navigation — swap in a plain object so the

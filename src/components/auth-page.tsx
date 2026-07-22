@@ -1,7 +1,7 @@
-import { type ReactNode, useState } from "react"
+import type { ReactNode } from "react"
 import { AuthIllustration } from "@/components/auth-illustration"
 import { Mark } from "@/components/identity"
-import { cn } from "@/lib/utils"
+import { useApplyTheme } from "@/hooks/use-theme"
 
 type Props = {
   title: string
@@ -9,45 +9,13 @@ type Props = {
   children: ReactNode
 }
 
-// The "theme" localStorage key follows the next-themes convention, so a
-// future in-app settings toggle can write the same key.
-const THEME_KEY = "theme"
-
-// Runs while the SSR'd HTML is still parsing, so a visitor who explicitly
-// chose dark never sees a light flash before hydration.
-const themeScript = `try{document.currentScript.parentElement.classList.toggle("dark",localStorage.getItem(${JSON.stringify(THEME_KEY)})==="dark")}catch{}`
-
-/**
- * Light by default, always — dark only when the user has explicitly chosen
- * it in settings. The OS preference is deliberately not consulted.
- */
-function useExplicitTheme() {
-  // Read once on the client's first render; auth pages have no toggle, so
-  // no subscription is needed.
-  const [dark] = useState(() => {
-    try {
-      return (
-        typeof window !== "undefined" &&
-        window.localStorage.getItem(THEME_KEY) === "dark"
-      )
-    } catch {
-      return false
-    }
-  })
-  return dark
-}
-
 export function AuthPage({ title, subtitle, children }: Props) {
-  const dark = useExplicitTheme()
+  // Logged-out pages follow the system preference (spec §4.4) — the root
+  // bootstrap script already applied it before first paint; this keeps it
+  // tracking OS changes live while the page is open.
+  useApplyTheme("system")
   return (
-    <div
-      suppressHydrationWarning
-      className={cn("flex min-h-screen bg-background", dark && "dark")}
-    >
-      <script
-        // biome-ignore lint/security/noDangerouslySetInnerHtml: static theme bootstrap, no user input
-        dangerouslySetInnerHTML={{ __html: themeScript }}
-      />
+    <div className="flex min-h-screen bg-background">
       <div className="flex min-h-screen w-full flex-col items-center justify-center p-4 md:w-1/2">
         <div className="w-full max-w-sm">
           <div className="mb-8 flex flex-col items-center gap-3">

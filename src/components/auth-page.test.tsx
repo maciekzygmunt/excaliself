@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react"
+import { act, cleanup, render, screen } from "@testing-library/react"
 import { afterEach, expect, test, vi } from "vitest"
 import { AuthPage } from "./auth-page"
 
@@ -6,7 +6,36 @@ import { AuthPage } from "./auth-page"
 afterEach(cleanup)
 afterEach(() => {
   window.localStorage.clear()
+  document.documentElement.classList.remove("dark")
+  vi.unstubAllGlobals()
 })
+
+// jsdom has no matchMedia; the stub lets a test pick the OS preference and
+// flip it live through the captured change listener.
+function stubSystemTheme(dark: boolean) {
+  let matches = dark
+  const listeners = new Set<(event: { matches: boolean }) => void>()
+  vi.stubGlobal("matchMedia", (query: string) => ({
+    get matches() {
+      return matches
+    },
+    media: query,
+    addEventListener: (
+      _type: string,
+      listener: (event: { matches: boolean }) => void,
+    ) => listeners.add(listener),
+    removeEventListener: (
+      _type: string,
+      listener: (event: { matches: boolean }) => void,
+    ) => listeners.delete(listener),
+  }))
+  return {
+    flip(nextDark: boolean) {
+      matches = nextDark
+      for (const listener of listeners) listener({ matches: nextDark })
+    },
+  }
+}
 
 function renderShell() {
   return render(
@@ -47,31 +76,34 @@ test("the illustration panel carries the tagline and hides at phone widths", () 
   expect(classes).toContain("md:flex")
 })
 
-test("light by default — the OS preference is never consulted", () => {
-  // A dark OS preference must not leak in: matchMedia is unavailable here
-  // (jsdom has none) and the shell must not need it.
-  const matchMediaSpy = vi.fn()
-  vi.stubGlobal("matchMedia", matchMediaSpy)
-  const { container } = renderShell()
-  const shell = container.firstElementChild
-  expect(shell).not.toBeNull()
-  // biome-ignore lint/style/noNonNullAssertion: asserted non-null above
-  expect(shell!.classList.contains("dark")).toBe(false)
-  expect(matchMediaSpy).not.toHaveBeenCalled()
-  vi.unstubAllGlobals()
+test("follows a light system preference — and a stored per-user mirror never leaks in", () => {
+  // A signed-out visitor may still have the previous account's "dark"
+  // mirror in localStorage; logged-out pages follow the OS, not the mirror.
+  window.localStorage.setItem("theme", "dark")
+  stubSystemTheme(false)
+  renderShell()
+  expect(document.documentElement.classList.contains("dark")).toBe(false)
 })
 
-test.each([
-  ["dark", true],
-  ["light", false],
-  ["system", false],
-])("an explicit theme setting of %s renders the shell accordingly", (setting, expectDark) => {
-  window.localStorage.setItem("theme", setting)
-  const { container } = renderShell()
-  const shell = container.firstElementChild
-  expect(shell).not.toBeNull()
-  // biome-ignore lint/style/noNonNullAssertion: asserted non-null above
-  expect(shell!.classList.contains("dark")).toBe(expectDark)
+test("follows a dark system preference", () => {
+  stubSystemTheme(true)
+  renderShell()
+  expect(document.documentElement.classList.contains("dark")).toBe(true)
+})
+
+test("tracks an OS theme change live, without a reload", () => {
+  const system = stubSystemTheme(false)
+  renderShell()
+  expect(document.documentElement.classList.contains("dark")).toBe(false)
+  act(() => system.flip(true))
+  expect(document.documentElement.classList.contains("dark")).toBe(true)
+  act(() => system.flip(false))
+  expect(document.documentElement.classList.contains("dark")).toBe(false)
+})
+
+test("without matchMedia the shell still renders, in light", () => {
+  renderShell()
+  expect(document.documentElement.classList.contains("dark")).toBe(false)
 })
 
 test("no wordmark lockup renders on auth pages — mark only", () => {

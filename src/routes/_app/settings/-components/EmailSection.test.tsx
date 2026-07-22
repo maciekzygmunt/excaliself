@@ -33,6 +33,7 @@ const user: CurrentUser = {
   email: "maciek@example.com",
   name: null,
   role: "user",
+  theme: "light",
 }
 
 let queryClient: QueryClient

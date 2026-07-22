@@ -7,6 +7,7 @@ import { currentUserQueryOptions } from "@/features/account/queries"
 import { drawingsQueryOptions } from "@/features/drawings/queries"
 import { foldersQueryOptions } from "@/features/folders/queries"
 import { useSettingsShortcut } from "@/hooks/use-settings-shortcut"
+import { useUserTheme } from "@/hooks/use-theme"
 import { authMiddleware } from "@/middleware/auth"
 import { setupMiddleware } from "@/middleware/setup"
 import { CommandPaletteProvider } from "./-components/CommandPalette"
@@ -44,6 +45,9 @@ function AppShellLayout() {
   // profile save on /settings shows up in the sidebar in the same frame.
   const { data: currentUser } = useQuery(currentUserQueryOptions())
   useSettingsShortcut()
+  // Appearance preference (spec §4.4): subscribing to the same cache makes
+  // an optimistic save (or rollback) on /settings re-theme the whole chrome.
+  useUserTheme(currentUser?.theme)
 
   return (
     <SidebarProvider

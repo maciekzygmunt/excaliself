@@ -63,6 +63,7 @@ const members: AdminUser[] = [
     name: "Bea",
     image: null,
     role: "user" as const,
+    theme: "light" as const,
     createdAt: new Date("2026-02-01T12:00:00Z"),
     updatedAt: new Date("2026-02-01T12:00:00Z"),
   },
@@ -73,6 +74,7 @@ const members: AdminUser[] = [
     name: null,
     image: null,
     role: "admin" as const,
+    theme: "light" as const,
     createdAt: new Date("2026-01-05T12:00:00Z"),
     updatedAt: new Date("2026-01-05T12:00:00Z"),
   },
@@ -83,6 +85,7 @@ const members: AdminUser[] = [
     name: "Cy",
     image: null,
     role: "user" as const,
+    theme: "light" as const,
     createdAt: new Date("2026-03-10T12:00:00Z"),
     updatedAt: new Date("2026-03-10T12:00:00Z"),
   },
@@ -99,6 +102,7 @@ const viewer = {
   email: "ada@example.com",
   name: null,
   role: "admin" as const,
+  theme: "light" as const,
 }
 
 const clipboardWriteText = vi.fn()
