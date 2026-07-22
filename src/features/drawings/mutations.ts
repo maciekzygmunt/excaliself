@@ -37,6 +37,7 @@ export function useRenameDrawing() {
     mutationFn: updateDrawing,
     optimisticUpdate: (drawings, { data }) =>
       patchById(drawings, data.id, { name: data.updateData.name }),
+    onRollback: () => toast.error("Failed to rename"),
   })
 }
 

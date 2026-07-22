@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { act, renderHook } from "@testing-library/react"
 import type { ReactNode } from "react"
 import { beforeEach, expect, test, vi } from "vitest"
-import { useTrashDrawing } from "./mutations"
+import { useRenameDrawing, useTrashDrawing } from "./mutations"
 import type { Drawing } from "./queries"
 
 const { toastMock, serverMocks } = vi.hoisted(() => {
@@ -104,6 +104,26 @@ test("undo re-adds the drawing in recency order and calls restore", async () => 
   )
   // Back exactly where it was: d1 is newer than d2, so it leads again
   expect(queryClient.getQueryData<Drawing[]>(["drawings"])).toEqual([d1, d2])
+})
+
+test("a failed rename rolls the cache back and shows an error toast", async () => {
+  serverMocks.updateDrawing.mockRejectedValue(new Error("boom"))
+  const queryClient = new QueryClient()
+  queryClient.setQueryData<Drawing[]>(["drawings"], [d1, d2])
+  const wrapper = ({ children }: { children: ReactNode }) => (
+    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+  )
+  const { result } = renderHook(() => useRenameDrawing(), { wrapper })
+
+  act(() =>
+    result.current.mutate({
+      data: { id: "d1", updateData: { name: "Renamed" } },
+    }),
+  )
+  await flush()
+
+  expect(queryClient.getQueryData<Drawing[]>(["drawings"])).toEqual([d1, d2])
+  expect(toastMock.error).toHaveBeenCalledWith("Failed to rename")
 })
 
 test("a failed trash rolls the cache back, drops the undo toast and shows an error", async () => {
