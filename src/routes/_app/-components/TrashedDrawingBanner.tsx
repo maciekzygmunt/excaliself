@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query"
 import { useNavigate } from "@tanstack/react-router"
-import { Trash2 } from "lucide-react"
+import { RotateCcw, Trash2 } from "lucide-react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { DangerConfirmDialog } from "@/components/danger-confirm-dialog"
 import { Button } from "@/components/ui/button"
 import { describeContents } from "@/features/trash/destroy-copy"
@@ -10,6 +11,10 @@ import {
 } from "@/features/trash/mutations"
 import { trashQueryOptions } from "@/features/trash/queries"
 import { daysUntilPurge } from "@/features/trash/retention"
+import {
+  type PaletteContextSection,
+  usePaletteContextSection,
+} from "./CommandPalette"
 
 type TrashedDrawingInfo = {
   id: string
@@ -40,6 +45,42 @@ export function TrashedDrawingBanner({
   const navigate = useNavigate()
   const restoreDrawing = useRestoreTrashedDrawing()
   const deleteForever = useDeleteTrashUnitForever()
+
+  // The palette's context section on this view (spec §5.11): Restore and
+  // Delete forever, mirroring the banner buttons. Delete forever closes into
+  // the banner's own danger dialog instance, so the count-aware copy and the
+  // navigate-Home-on-confirm live in one place. Keyed to the id alone (the
+  // drawing prop is a fresh object every parent render) with a latest-ref
+  // for the mutation closure — a fresh section each render would re-register
+  // in a loop.
+  const [deleteForeverOpen, setDeleteForeverOpen] = useState(false)
+  const restoreDrawingRef = useRef(restoreDrawing)
+  useEffect(() => {
+    restoreDrawingRef.current = restoreDrawing
+  })
+  const drawingId = drawing.id
+  const section = useMemo<PaletteContextSection>(
+    () => ({
+      title: "This drawing",
+      rows: [
+        {
+          id: "trashed-drawing:restore",
+          label: "Restore",
+          icon: RotateCcw,
+          onSelect: () => restoreDrawingRef.current({ id: drawingId }),
+        },
+        {
+          id: "trashed-drawing:delete-forever",
+          label: "Delete forever",
+          icon: Trash2,
+          destructive: true,
+          onSelect: () => setDeleteForeverOpen(true),
+        },
+      ],
+    }),
+    [drawingId],
+  )
+  usePaletteContextSection(section)
 
   // Delete forever destroys the whole trash *unit* (spec §5.11) — for a
   // drawing swept along by a folder trashing that's the folder subtree, so
@@ -92,6 +133,8 @@ export function TrashedDrawingBanner({
           Restore
         </Button>
         <DangerConfirmDialog
+          open={deleteForeverOpen}
+          onOpenChange={setDeleteForeverOpen}
           trigger={
             <Button
               variant="outline"
