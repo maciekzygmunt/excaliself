@@ -44,6 +44,13 @@ pnpm dev
 2. You'll be redirected to `/setup` to create the admin account
 3. After setup, sign in and visit `/admin` to invite new users
 
+## Admin lockout recovery
+
+Lost passwords are normally recovered with an admin-generated reset link
+(Settings → Members). If no admin can sign in — the sole admin lost their
+password — follow the
+[break-glass recovery recipe](./docs/break-glass-recovery.md).
+
 ## Environment variables
 
 | Variable | Required | Default | Description |
