@@ -1,9 +1,12 @@
 import { afterEach, beforeEach, expect, test, vi } from "vitest"
 import {
   applyResolvedTheme,
+  isCanvasThemePreference,
   isThemePreference,
+  readStoredCanvasThemePreference,
   readStoredThemePreference,
   resolveCanvasTheme,
+  setCanvasThemePreference,
   setThemePreference,
   subscribeToTheme,
   THEME_COLORS,
@@ -77,9 +80,56 @@ test("junk in storage — including a legacy 'system' — reads as unset", () =>
   expect(readStoredThemePreference()).toBeNull()
 })
 
-test("resolveCanvasTheme: the canvas renders in the app theme, verbatim", () => {
-  expect(resolveCanvasTheme("light")).toBe("light")
-  expect(resolveCanvasTheme("dark")).toBe("dark")
+test("resolveCanvasTheme: Match app follows the app theme", () => {
+  expect(resolveCanvasTheme("light", "match")).toBe("light")
+  expect(resolveCanvasTheme("dark", "match")).toBe("dark")
+})
+
+test("resolveCanvasTheme: a Light or Dark override wins over the app theme", () => {
+  expect(resolveCanvasTheme("dark", "light")).toBe("light")
+  expect(resolveCanvasTheme("light", "dark")).toBe("dark")
+  expect(resolveCanvasTheme("light", "light")).toBe("light")
+  expect(resolveCanvasTheme("dark", "dark")).toBe("dark")
+})
+
+test("isCanvasThemePreference accepts exactly match, light and dark", () => {
+  expect(isCanvasThemePreference("match")).toBe(true)
+  expect(isCanvasThemePreference("light")).toBe(true)
+  expect(isCanvasThemePreference("dark")).toBe(true)
+  expect(isCanvasThemePreference("system")).toBe(false)
+  expect(isCanvasThemePreference(null)).toBe(false)
+})
+
+test("setCanvasThemePreference persists, notifies subscribers, and never touches the document", () => {
+  const seen: string[] = []
+  const unsubscribe = subscribeToTheme(() =>
+    seen.push(readStoredCanvasThemePreference()),
+  )
+  setCanvasThemePreference("dark")
+  expect(window.localStorage.getItem("canvas-theme")).toBe("dark")
+  expect(readStoredCanvasThemePreference()).toBe("dark")
+  expect(appliedDark()).toBe(false)
+
+  setCanvasThemePreference("match")
+  expect(readStoredCanvasThemePreference()).toBe("match")
+  expect(seen).toEqual(["dark", "match"])
+  unsubscribe()
+})
+
+test("nothing stored, junk, or a legacy value reads as Match app", () => {
+  expect(readStoredCanvasThemePreference()).toBe("match")
+  window.localStorage.setItem("canvas-theme", "system")
+  expect(readStoredCanvasThemePreference()).toBe("match")
+  window.localStorage.setItem("canvas-theme", "banana")
+  expect(readStoredCanvasThemePreference()).toBe("match")
+})
+
+test("changing the app theme never alters the stored canvas preference", () => {
+  setCanvasThemePreference("light")
+  setThemePreference("dark")
+  expect(readStoredCanvasThemePreference()).toBe("light")
+  setThemePreference("light")
+  expect(readStoredCanvasThemePreference()).toBe("light")
 })
 
 test("bootstrap: nothing stored means Light, and the OS is never consulted", () => {

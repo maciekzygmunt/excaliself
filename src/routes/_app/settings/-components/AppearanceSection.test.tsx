@@ -1,4 +1,10 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react"
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from "@testing-library/react"
 import { afterEach, expect, test } from "vitest"
 import { AppearanceSection } from "./AppearanceSection"
 
@@ -9,33 +15,78 @@ afterEach(() => {
   window.localStorage.clear()
 })
 
-function checked(name: string) {
-  return screen.getByRole("radio", { name }).getAttribute("aria-checked")
+function group(name: string) {
+  return within(screen.getByRole("radiogroup", { name }))
 }
 
-test("offers Light and Dark only — a user who never chose has Light selected", () => {
+function checked(groupName: string, name: string) {
+  return group(groupName)
+    .getByRole("radio", { name })
+    .getAttribute("aria-checked")
+}
+
+test("Theme offers Light and Dark only — a user who never chose has Light selected", () => {
   render(<AppearanceSection />)
-  expect(checked("Light")).toBe("true")
-  expect(checked("Dark")).toBe("false")
-  expect(screen.queryByRole("radio", { name: "System" })).toBeNull()
+  expect(checked("Theme", "Light")).toBe("true")
+  expect(checked("Theme", "Dark")).toBe("false")
+  expect(group("Theme").queryByRole("radio", { name: "System" })).toBeNull()
 })
 
 test("a stored dark choice renders with Dark selected", () => {
   window.localStorage.setItem("theme", "dark")
   render(<AppearanceSection />)
-  expect(checked("Dark")).toBe("true")
+  expect(checked("Theme", "Dark")).toBe("true")
 })
 
 test("picking Dark applies and persists immediately, and the control follows", () => {
   render(<AppearanceSection />)
-  fireEvent.click(screen.getByRole("radio", { name: "Dark" }))
+  fireEvent.click(group("Theme").getByRole("radio", { name: "Dark" }))
   expect(document.documentElement.classList.contains("dark")).toBe(true)
   expect(window.localStorage.getItem("theme")).toBe("dark")
-  expect(checked("Dark")).toBe("true")
-  expect(checked("Light")).toBe("false")
+  expect(checked("Theme", "Dark")).toBe("true")
+  expect(checked("Theme", "Light")).toBe("false")
 
-  fireEvent.click(screen.getByRole("radio", { name: "Light" }))
+  fireEvent.click(group("Theme").getByRole("radio", { name: "Light" }))
   expect(document.documentElement.classList.contains("dark")).toBe(false)
   expect(window.localStorage.getItem("theme")).toBe("light")
-  expect(checked("Light")).toBe("true")
+  expect(checked("Theme", "Light")).toBe("true")
+})
+
+test("Canvas offers Match app, Light and Dark — Match app selected by default", () => {
+  render(<AppearanceSection />)
+  expect(checked("Canvas", "Match app")).toBe("true")
+  expect(checked("Canvas", "Light")).toBe("false")
+  expect(checked("Canvas", "Dark")).toBe("false")
+})
+
+test("a stored canvas override renders selected; junk falls back to Match app", () => {
+  window.localStorage.setItem("canvas-theme", "dark")
+  render(<AppearanceSection />)
+  expect(checked("Canvas", "Dark")).toBe("true")
+  cleanup()
+
+  window.localStorage.setItem("canvas-theme", "system")
+  render(<AppearanceSection />)
+  expect(checked("Canvas", "Match app")).toBe("true")
+})
+
+test("picking a canvas theme persists without touching the app theme", () => {
+  render(<AppearanceSection />)
+  fireEvent.click(group("Canvas").getByRole("radio", { name: "Dark" }))
+  expect(window.localStorage.getItem("canvas-theme")).toBe("dark")
+  expect(checked("Canvas", "Dark")).toBe("true")
+  expect(document.documentElement.classList.contains("dark")).toBe(false)
+  expect(checked("Theme", "Light")).toBe("true")
+
+  fireEvent.click(group("Canvas").getByRole("radio", { name: "Match app" }))
+  expect(window.localStorage.getItem("canvas-theme")).toBe("match")
+  expect(checked("Canvas", "Match app")).toBe("true")
+})
+
+test("changing the app theme leaves the canvas selection alone", () => {
+  render(<AppearanceSection />)
+  fireEvent.click(group("Canvas").getByRole("radio", { name: "Light" }))
+  fireEvent.click(group("Theme").getByRole("radio", { name: "Dark" }))
+  expect(checked("Canvas", "Light")).toBe("true")
+  expect(window.localStorage.getItem("canvas-theme")).toBe("light")
 })

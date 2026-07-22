@@ -1,8 +1,11 @@
 import { useEffect, useSyncExternalStore } from "react"
 import {
   applyResolvedTheme,
+  type CanvasThemePreference,
+  DEFAULT_CANVAS_THEME,
   DEFAULT_THEME,
   readResolvedTheme,
+  readStoredCanvasThemePreference,
   readStoredThemePreference,
   resolveCanvasTheme,
   subscribeToTheme,
@@ -49,8 +52,18 @@ export function useResolvedTheme(): ThemePreference {
   )
 }
 
-// The drawing canvas's theme feed: switching the app theme in Settings
-// re-renders any open drawing to match, live.
+// The stored canvas override as a reactive value — the Canvas control in
+// Settings renders its checked state from this.
+export function useCanvasThemePreference(): CanvasThemePreference {
+  return useSyncExternalStore(
+    subscribeToTheme,
+    readStoredCanvasThemePreference,
+    () => DEFAULT_CANVAS_THEME,
+  )
+}
+
+// The drawing canvas's theme feed: switching the app theme or the canvas
+// override in Settings re-renders any open drawing to match, live.
 export function useCanvasTheme(): ThemePreference {
-  return resolveCanvasTheme(useResolvedTheme())
+  return resolveCanvasTheme(useResolvedTheme(), useCanvasThemePreference())
 }
