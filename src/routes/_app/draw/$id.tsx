@@ -1,8 +1,8 @@
 import { useQuery } from "@tanstack/react-query"
 import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router"
-import { Pencil } from "lucide-react"
 import { lazy, Suspense, useEffect } from "react"
 import { toast } from "sonner"
+import { Mark } from "@/components/identity"
 import {
   drawingQueryOptions,
   drawingsQueryOptions,
@@ -13,10 +13,15 @@ import { TrashedDrawingBanner } from "../-components/TrashedDrawingBanner"
 
 const DrawingCanvas = lazy(() => import("../-components/DrawingCanvas"))
 
+// The branded canvas loader (spec §4.3): the iris spark mark alone, gently
+// pulsing — no text, static under reduced motion.
 const LoadingState = () => (
-  <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-card text-muted-foreground">
-    <Pencil className="h-8 w-8 animate-pulse" />
-    <span className="text-sm">Loading drawing...</span>
+  <div
+    role="status"
+    aria-label="Loading drawing"
+    className="absolute inset-0 z-10 flex items-center justify-center bg-card"
+  >
+    <Mark className="h-8 w-8 animate-pulse text-iris motion-reduce:animate-none" />
   </div>
 )
 
