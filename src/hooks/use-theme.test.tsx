@@ -1,9 +1,10 @@
 import { act, cleanup, renderHook } from "@testing-library/react"
 import { afterEach, expect, test } from "vitest"
-import { setThemePreference } from "@/lib/theme"
+import { setCanvasThemePreference, setThemePreference } from "@/lib/theme"
 import {
   useApplyTheme,
   useCanvasTheme,
+  useCanvasThemePreference,
   useStoredTheme,
   useThemePreference,
 } from "./use-theme"
@@ -47,6 +48,38 @@ test("useCanvasTheme follows the applied app theme, live", () => {
 
   act(() => setThemePreference("light"))
   expect(result.current).toBe("light")
+})
+
+test("useCanvasTheme: a pinned canvas theme wins over the app theme, live", () => {
+  const { result } = renderHook(useCanvasTheme)
+
+  act(() => setCanvasThemePreference("dark"))
+  expect(result.current).toBe("dark")
+
+  act(() => setThemePreference("dark"))
+  act(() => setCanvasThemePreference("light"))
+  expect(result.current).toBe("light")
+})
+
+test("useCanvasTheme: Match app returns the canvas to following the app theme", () => {
+  window.localStorage.setItem("theme", "dark")
+  renderHook(useStoredTheme)
+  const { result } = renderHook(useCanvasTheme)
+
+  act(() => setCanvasThemePreference("light"))
+  expect(result.current).toBe("light")
+
+  act(() => setCanvasThemePreference("match"))
+  expect(result.current).toBe("dark")
+})
+
+test("useCanvasThemePreference tracks setCanvasThemePreference reactively", () => {
+  const { result } = renderHook(useCanvasThemePreference)
+  expect(result.current).toBe("match")
+
+  act(() => setCanvasThemePreference("dark"))
+  expect(result.current).toBe("dark")
+  expect(window.localStorage.getItem("canvas-theme")).toBe("dark")
 })
 
 test("useThemePreference tracks setThemePreference reactively — the round-trip", () => {

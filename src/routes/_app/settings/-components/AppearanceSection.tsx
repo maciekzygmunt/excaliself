@@ -1,39 +1,51 @@
-import { MoonIcon, SunIcon } from "lucide-react"
-import { useThemePreference } from "@/hooks/use-theme"
-import { setThemePreference, type ThemePreference } from "@/lib/theme"
+import { MonitorIcon, MoonIcon, SunIcon } from "lucide-react"
+import { useCanvasThemePreference, useThemePreference } from "@/hooks/use-theme"
+import {
+  type CanvasThemePreference,
+  setCanvasThemePreference,
+  setThemePreference,
+  type ThemePreference,
+} from "@/lib/theme"
 import { cn } from "@/lib/utils"
 
-const OPTIONS: Array<{
-  value: ThemePreference
+type Option<T extends string> = {
+  value: T
   label: string
   icon: typeof SunIcon
-}> = [
+}
+
+const THEME_OPTIONS: Array<Option<ThemePreference>> = [
   { value: "light", label: "Light", icon: SunIcon },
   { value: "dark", label: "Dark", icon: MoonIcon },
 ]
 
-// Appearance block (spec §4.4): Light / Dark for the whole app — chrome and
-// the Excalidraw canvas alike — stored on this browser only. This is the
-// sole theme control; the canvas has none of its own.
-export function AppearanceSection() {
-  const preference = useThemePreference()
+const CANVAS_OPTIONS: Array<Option<CanvasThemePreference>> = [
+  { value: "match", label: "Match app", icon: MonitorIcon },
+  { value: "light", label: "Light", icon: SunIcon },
+  { value: "dark", label: "Dark", icon: MoonIcon },
+]
 
+function ChoiceGroup<T extends string>({
+  label,
+  options,
+  value,
+  onSelect,
+}: {
+  label: string
+  options: Array<Option<T>>
+  value: T
+  onSelect: (value: T) => void
+}) {
   return (
-    <section>
-      <div className="mb-4">
-        <h2 className="text-sm font-medium text-foreground">Appearance</h2>
-        <p className="text-xs text-muted-foreground">
-          Applies to this browser, drawing canvas included
-        </p>
-      </div>
-
+    <div>
+      <p className="mb-1.5 text-xs font-medium text-foreground">{label}</p>
       <div
         role="radiogroup"
-        aria-label="Theme"
+        aria-label={label}
         className="inline-flex rounded-lg border border-border bg-background p-0.5"
       >
-        {OPTIONS.map((option) => {
-          const selected = preference === option.value
+        {options.map((option) => {
+          const selected = value === option.value
           return (
             <button
               key={option.value}
@@ -41,7 +53,7 @@ export function AppearanceSection() {
               role="radio"
               aria-checked={selected}
               onClick={() => {
-                if (!selected) setThemePreference(option.value)
+                if (!selected) onSelect(option.value)
               }}
               className={cn(
                 "inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm transition-colors",
@@ -55,6 +67,41 @@ export function AppearanceSection() {
             </button>
           )
         })}
+      </div>
+    </div>
+  )
+}
+
+// Appearance block (spec §4.4): Theme picks Light / Dark for the app
+// chrome; Canvas either follows it (Match app, the default) or pins the
+// drawing canvas to a theme of its own (#111). Both stored on this browser
+// only — these are the sole theme controls; the canvas has none of its own.
+export function AppearanceSection() {
+  const preference = useThemePreference()
+  const canvasPreference = useCanvasThemePreference()
+
+  return (
+    <section>
+      <div className="mb-4">
+        <h2 className="text-sm font-medium text-foreground">Appearance</h2>
+        <p className="text-xs text-muted-foreground">
+          Applies to this browser only
+        </p>
+      </div>
+
+      <div className="space-y-4">
+        <ChoiceGroup
+          label="Theme"
+          options={THEME_OPTIONS}
+          value={preference}
+          onSelect={setThemePreference}
+        />
+        <ChoiceGroup
+          label="Canvas"
+          options={CANVAS_OPTIONS}
+          value={canvasPreference}
+          onSelect={setCanvasThemePreference}
+        />
       </div>
     </section>
   )

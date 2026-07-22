@@ -22,8 +22,24 @@ export function isThemePreference(value: unknown): value is ThemePreference {
   return value === "light" || value === "dark"
 }
 
-// Notifies useThemePreference/useResolvedTheme subscribers (the Appearance
-// control, the Toaster) whenever the theme is applied or the choice changes.
+// The canvas override: "match" follows the app theme; "light"/"dark" pin
+// the canvas regardless of it. Device-scoped like the app theme — stored
+// beside it, never synced to the account, survives sign-out.
+export type CanvasThemePreference = "match" | ThemePreference
+
+export const CANVAS_THEME_STORAGE_KEY = "canvas-theme"
+
+export const DEFAULT_CANVAS_THEME: CanvasThemePreference = "match"
+
+export function isCanvasThemePreference(
+  value: unknown,
+): value is CanvasThemePreference {
+  return value === "match" || isThemePreference(value)
+}
+
+// Notifies useThemePreference/useResolvedTheme/useCanvasTheme subscribers
+// (the Appearance control, the Toaster, an open drawing) whenever a theme
+// is applied or either stored choice changes.
 const listeners = new Set<() => void>()
 
 export function subscribeToTheme(listener: () => void): () => void {
@@ -52,14 +68,18 @@ export function applyResolvedTheme(resolved: ThemePreference) {
 }
 
 /**
- * App theme → effective Excalidraw canvas theme: the app theme, verbatim.
- * Canvas theme is a device-level viewing preference, not a per-Drawing
- * property — the in-canvas theme controls are gone, and any theme baked
- * into a drawing's saved scene state is ignored on load (no migration;
- * saves may keep writing it harmlessly).
+ * App theme + canvas override → effective Excalidraw canvas theme: the app
+ * theme unless the override pins Light or Dark. Canvas theme is a
+ * device-level viewing preference, not a per-Drawing property — the
+ * in-canvas theme controls are gone, and any theme baked into a drawing's
+ * saved scene state is ignored on load (no migration; saves may keep
+ * writing it harmlessly).
  */
-export function resolveCanvasTheme(appTheme: ThemePreference): ThemePreference {
-  return appTheme
+export function resolveCanvasTheme(
+  appTheme: ThemePreference,
+  canvasPreference: CanvasThemePreference,
+): ThemePreference {
+  return canvasPreference === "match" ? appTheme : canvasPreference
 }
 
 // localStorage can throw (privacy modes); an unreadable store means the
@@ -80,6 +100,26 @@ export function setThemePreference(preference: ThemePreference) {
     window.localStorage.setItem(THEME_STORAGE_KEY, preference)
   } catch {}
   applyResolvedTheme(preference)
+}
+
+// Invalid or legacy stored values read as Match app, per spec (#111).
+export function readStoredCanvasThemePreference(): CanvasThemePreference {
+  try {
+    const stored = window.localStorage.getItem(CANVAS_THEME_STORAGE_KEY)
+    return isCanvasThemePreference(stored) ? stored : DEFAULT_CANVAS_THEME
+  } catch {
+    return DEFAULT_CANVAS_THEME
+  }
+}
+
+// Persists the canvas override and notifies subscribers so an open
+// drawing re-renders — nothing to apply to the document, the canvas is
+// the only consumer.
+export function setCanvasThemePreference(preference: CanvasThemePreference) {
+  try {
+    window.localStorage.setItem(CANVAS_THEME_STORAGE_KEY, preference)
+  } catch {}
+  for (const listener of listeners) listener()
 }
 
 // Logged-out pages are always light regardless of the stored choice; these
