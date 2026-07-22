@@ -304,7 +304,9 @@ export function CommandPalette({
                       onMouseEnter={() => setActiveIndex(index)}
                       onClick={() => select(row)}
                       className={cn(
-                        "flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-[13px]",
+                        // scroll-my keeps keyboard scrollIntoView from
+                        // flushing the row against the scrollport edge
+                        "flex w-full scroll-my-1.5 items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-[13px]",
                         destructive ? "text-destructive" : "text-foreground",
                         isActive && "bg-iris-muted",
                       )}
