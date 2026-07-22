@@ -267,9 +267,15 @@ export function Preview({ name, data }: { name: string; data: string }) {
         ref={containerRef}
         role="img"
         aria-label={state === "ready" ? `Preview of ${name}` : undefined}
-        // Reduced-motion keeps the fade: opacity-only is already the gentle form
+        // Reduced-motion keeps the fade: opacity-only is already the gentle form.
+        //
+        // In dark chrome, element colors assume a light canvas (default stroke
+        // is near-black), so the export is re-tinted with Excalidraw's own
+        // THEME_FILTER — the same filter its dark canvas and
+        // exportWithDarkMode apply.
         className={cn(
           "h-full w-full p-2 transition-opacity duration-200 ease-out [&_svg]:h-full [&_svg]:w-full [&_svg]:object-contain",
+          "dark:[filter:invert(93%)_hue-rotate(180deg)]",
           state === "ready" ? "opacity-100" : "opacity-0",
         )}
       />
