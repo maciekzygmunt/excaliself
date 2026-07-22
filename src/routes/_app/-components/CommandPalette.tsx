@@ -282,7 +282,7 @@ export function CommandPalette({
           id="command-palette-list"
           role="listbox"
           aria-label="Command palette results"
-          className="max-h-80 overflow-y-auto p-1.5"
+          className="scrollbar-subtle max-h-80 overflow-y-auto p-1.5"
         >
           {rows.length > 0 ? (
             sections.map((section) => (

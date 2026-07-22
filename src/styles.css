@@ -167,6 +167,26 @@ code {
   }
 }
 
+/* A barely-there scrollbar for scrollable chrome surfaces (palette list):
+   thin trackless thumb on the border token, so it follows the theme. */
+@utility scrollbar-subtle {
+  /* Firefox + Chromium ≥ 121; Chromium then ignores the -webkit rules */
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+
+  /* Safari */
+  &::-webkit-scrollbar {
+    width: 6px;
+  }
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  &::-webkit-scrollbar-thumb {
+    background-color: var(--border);
+    border-radius: 9999px;
+  }
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
