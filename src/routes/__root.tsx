@@ -7,8 +7,12 @@ import {
   Scripts,
 } from "@tanstack/react-router"
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools"
+import { createServerFn } from "@tanstack/react-start"
+import { getRequest } from "@tanstack/react-start/server"
 import { Toaster } from "@/components/ui/sonner"
-import { PRODUCT_NAME } from "@/lib/document-title"
+import { env } from "@/env"
+import { PRODUCT_NAME, TAGLINE } from "@/lib/document-title"
+import { resolveOrigin } from "@/lib/site-origin"
 import { THEME_COLORS, themeBootstrapScript } from "@/lib/theme"
 import appCss from "../styles.css?url"
 
@@ -16,58 +20,127 @@ interface MyRouterContext {
   queryClient: QueryClient
 }
 
+const getSiteOrigin = createServerFn({ method: "GET" }).handler(async () => {
+  const request = getRequest()
+  return resolveOrigin({
+    baseUrl: env.BASE_URL,
+    headers: request.headers,
+    requestUrl: request.url,
+  })
+})
+
 export const Route = createRootRouteWithContext<MyRouterContext>()({
-  head: () => ({
-    meta: [
-      {
-        charSet: "utf-8",
-      },
-      {
-        name: "viewport",
-        content: "width=device-width, initial-scale=1",
-      },
-      {
-        name: "theme-color",
-        content: THEME_COLORS.light,
-      },
-      {
-        title: PRODUCT_NAME,
-      },
-    ],
-    links: [
-      {
-        rel: "icon",
-        href: "/favicon.ico",
-        sizes: "48x48",
-      },
-      {
-        rel: "icon",
-        type: "image/svg+xml",
-        href: "/favicon.svg",
-      },
-      {
-        rel: "manifest",
-        href: "/manifest.json",
-      },
-      {
-        rel: "preconnect",
-        href: "https://fonts.googleapis.com",
-      },
-      {
-        rel: "preconnect",
-        href: "https://fonts.gstatic.com",
-        crossOrigin: "anonymous",
-      },
-      {
-        rel: "stylesheet",
-        href: "https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400..700&family=IBM+Plex+Mono:wght@400;500&display=swap",
-      },
-      {
-        rel: "stylesheet",
-        href: appCss,
-      },
-    ],
-  }),
+  // Crawlers only see the SSR pass, where the origin comes from the request;
+  // on the client the loader stays local so navigations never RPC for it.
+  loader: async () => {
+    if (typeof window !== "undefined") {
+      return { origin: window.location.origin }
+    }
+    return { origin: await getSiteOrigin() }
+  },
+  head: ({ loaderData }) => {
+    // og:image must be absolute to resolve in link previews (spec §1).
+    const ogImage = `${loaderData?.origin ?? ""}/og.png`
+    return {
+      meta: [
+        {
+          charSet: "utf-8",
+        },
+        {
+          name: "viewport",
+          content: "width=device-width, initial-scale=1",
+        },
+        {
+          name: "theme-color",
+          content: THEME_COLORS.light,
+        },
+        {
+          title: PRODUCT_NAME,
+        },
+        {
+          name: "description",
+          content: TAGLINE,
+        },
+        {
+          property: "og:type",
+          content: "website",
+        },
+        {
+          property: "og:site_name",
+          content: PRODUCT_NAME,
+        },
+        {
+          property: "og:title",
+          content: PRODUCT_NAME,
+        },
+        {
+          property: "og:description",
+          content: TAGLINE,
+        },
+        {
+          property: "og:image",
+          content: ogImage,
+        },
+        {
+          property: "og:image:width",
+          content: "1200",
+        },
+        {
+          property: "og:image:height",
+          content: "630",
+        },
+        {
+          name: "twitter:card",
+          content: "summary_large_image",
+        },
+        {
+          name: "twitter:title",
+          content: PRODUCT_NAME,
+        },
+        {
+          name: "twitter:description",
+          content: TAGLINE,
+        },
+        {
+          name: "twitter:image",
+          content: ogImage,
+        },
+      ],
+      links: [
+        {
+          rel: "icon",
+          href: "/favicon.ico",
+          sizes: "48x48",
+        },
+        {
+          rel: "icon",
+          type: "image/svg+xml",
+          href: "/favicon.svg",
+        },
+        {
+          rel: "manifest",
+          href: "/manifest.json",
+        },
+        {
+          rel: "preconnect",
+          href: "https://fonts.googleapis.com",
+        },
+        {
+          rel: "preconnect",
+          href: "https://fonts.gstatic.com",
+          crossOrigin: "anonymous",
+        },
+        {
+          rel: "stylesheet",
+          href: "https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400..700&family=IBM+Plex+Mono:wght@400;500&display=swap",
+        },
+        {
+          rel: "stylesheet",
+          href: appCss,
+        },
+      ],
+    }
+  },
   errorComponent: () => (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
       <div className="text-center">
