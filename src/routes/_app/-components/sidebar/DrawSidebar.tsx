@@ -31,6 +31,9 @@ import { TreeNodeItem } from "./TreeNodeItem"
 import { buildTree, treeNodeKey } from "./tree"
 import { SidebarDnDProvider, useSidebarDnD } from "./use-sidebar-dnd"
 
+const SEARCH_KBD =
+  "bg-card shadow-[0_0_0_1px_rgba(25,25,50,0.08),0_1px_2px_rgba(20,20,45,0.05)] dark:shadow-[0_0_0_1px_rgba(255,255,255,0.1)]"
+
 export function DrawSidebar({ user }: { user: SidebarUser }) {
   const { data: drawings = [] } = useQuery(drawingsQueryOptions())
   const { data: folders = [] } = useQuery(foldersQueryOptions())
@@ -110,9 +113,11 @@ export function DrawSidebar({ user }: { user: SidebarUser }) {
               strokeWidth={2.5}
             />
             <span className="flex-1 truncate text-left">Search</span>
+            {/* bg-muted vanishes against the trigger's own tint — card caps
+                with the sidebar's hairline shadow read as keys. */}
             <KbdGroup>
-              <Kbd>{isApplePlatform ? "⌘" : "Ctrl"}</Kbd>
-              <Kbd>K</Kbd>
+              <Kbd className={SEARCH_KBD}>{isApplePlatform ? "⌘" : "Ctrl"}</Kbd>
+              <Kbd className={SEARCH_KBD}>K</Kbd>
             </KbdGroup>
           </button>
         </div>
