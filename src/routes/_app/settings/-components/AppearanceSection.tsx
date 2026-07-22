@@ -12,9 +12,9 @@ const OPTIONS: Array<{
   { value: "dark", label: "Dark", icon: MoonIcon },
 ]
 
-// Appearance block (spec §4.4): Light / Dark for the app chrome, stored on
-// this browser only — the sole way to reach dark mode. The Excalidraw
-// canvas keeps its own in-canvas theme toggle and is not governed by this.
+// Appearance block (spec §4.4): Light / Dark for the whole app — chrome and
+// the Excalidraw canvas alike — stored on this browser only. This is the
+// sole theme control; the canvas has none of its own.
 export function AppearanceSection() {
   const preference = useThemePreference()
 
@@ -23,7 +23,7 @@ export function AppearanceSection() {
       <div className="mb-4">
         <h2 className="text-sm font-medium text-foreground">Appearance</h2>
         <p className="text-xs text-muted-foreground">
-          Applies to this browser — the canvas has its own theme toggle
+          Applies to this browser, drawing canvas included
         </p>
       </div>
 
