@@ -79,8 +79,11 @@ code {
   --muted-foreground: oklch(0.65 0.01 60);
   --accent: oklch(0.24 0.008 60);
   --accent-foreground: oklch(0.93 0.005 75);
-  --destructive: oklch(0.396 0.141 25.723);
-  --destructive-foreground: oklch(0.637 0.237 25.331);
+  /* Light enough for AA as text on the dark popover/background (~6.5:1);
+     the components' dark:bg-destructive/60 button and /20 focus washes are
+     written against a red of this weight. */
+  --destructive: oklch(0.704 0.191 22.216);
+  --destructive-foreground: oklch(0.704 0.191 22.216);
   --border: oklch(0.26 0.008 60);
   --input: oklch(0.26 0.008 60);
   --ring: oklch(0.4 0.01 60);
