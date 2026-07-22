@@ -13,6 +13,7 @@ import { Toaster } from "@/components/ui/sonner"
 import { env } from "@/env"
 import { PRODUCT_NAME, TAGLINE } from "@/lib/document-title"
 import { resolveOrigin } from "@/lib/site-origin"
+import { THEME_COLORS, themeBootstrapScript } from "@/lib/theme"
 import appCss from "../styles.css?url"
 
 interface MyRouterContext {
@@ -51,7 +52,7 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
         },
         {
           name: "theme-color",
-          content: "#f2f2f6",
+          content: THEME_COLORS.light,
         },
         {
           title: PRODUCT_NAME,
@@ -171,9 +172,17 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 
 function RootDocument({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    // The bootstrap script may add .dark before hydration; the class is
+    // client-only state, so the mismatch with the SSR'd markup is expected.
+    <html lang="en" suppressHydrationWarning>
       <head>
         <HeadContent />
+        {/* After HeadContent so the theme-color meta it renders already
+            exists; blocks parsing, so the theme is set before first paint. */}
+        <script
+          // biome-ignore lint/security/noDangerouslySetInnerHtml: static theme bootstrap, no user input
+          dangerouslySetInnerHTML={{ __html: themeBootstrapScript }}
+        />
       </head>
       <body className="min-h-screen bg-background font-sans antialiased">
         {children}

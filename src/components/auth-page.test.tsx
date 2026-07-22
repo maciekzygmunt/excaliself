@@ -6,6 +6,8 @@ import { AuthPage } from "./auth-page"
 afterEach(cleanup)
 afterEach(() => {
   window.localStorage.clear()
+  document.documentElement.classList.remove("dark")
+  vi.unstubAllGlobals()
 })
 
 function renderShell() {
@@ -47,31 +49,23 @@ test("the illustration panel carries the tagline and hides at phone widths", () 
   expect(classes).toContain("md:flex")
 })
 
-test("light by default — the OS preference is never consulted", () => {
+test("always light — the OS preference is never consulted", () => {
   // A dark OS preference must not leak in: matchMedia is unavailable here
   // (jsdom has none) and the shell must not need it.
   const matchMediaSpy = vi.fn()
   vi.stubGlobal("matchMedia", matchMediaSpy)
-  const { container } = renderShell()
-  const shell = container.firstElementChild
-  expect(shell).not.toBeNull()
-  // biome-ignore lint/style/noNonNullAssertion: asserted non-null above
-  expect(shell!.classList.contains("dark")).toBe(false)
+  renderShell()
+  expect(document.documentElement.classList.contains("dark")).toBe(false)
   expect(matchMediaSpy).not.toHaveBeenCalled()
-  vi.unstubAllGlobals()
 })
 
-test.each([
-  ["dark", true],
-  ["light", false],
-  ["system", false],
-])("an explicit theme setting of %s renders the shell accordingly", (setting, expectDark) => {
-  window.localStorage.setItem("theme", setting)
-  const { container } = renderShell()
-  const shell = container.firstElementChild
-  expect(shell).not.toBeNull()
-  // biome-ignore lint/style/noNonNullAssertion: asserted non-null above
-  expect(shell!.classList.contains("dark")).toBe(expectDark)
+test("always light — the device's stored dark choice is ignored too", () => {
+  // SPA-navigating in from a dark app: the shell must strip the class the
+  // app applied, whatever localStorage says.
+  window.localStorage.setItem("theme", "dark")
+  document.documentElement.classList.add("dark")
+  renderShell()
+  expect(document.documentElement.classList.contains("dark")).toBe(false)
 })
 
 test("no wordmark lockup renders on auth pages — mark only", () => {

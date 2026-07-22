@@ -7,6 +7,7 @@ import { currentUserQueryOptions } from "@/features/account/queries"
 import { drawingsQueryOptions } from "@/features/drawings/queries"
 import { foldersQueryOptions } from "@/features/folders/queries"
 import { useSettingsShortcut } from "@/hooks/use-settings-shortcut"
+import { useStoredTheme } from "@/hooks/use-theme"
 import { authMiddleware } from "@/middleware/auth"
 import { setupMiddleware } from "@/middleware/setup"
 import { CommandPaletteProvider } from "./-components/CommandPalette"
@@ -44,6 +45,8 @@ function AppShellLayout() {
   // profile save on /settings shows up in the sidebar in the same frame.
   const { data: currentUser } = useQuery(currentUserQueryOptions())
   useSettingsShortcut()
+  // Applies this browser's stored theme choice (spec §4.4, device-scoped).
+  useStoredTheme()
 
   return (
     <SidebarProvider
