@@ -1,6 +1,7 @@
 import { type ReactNode, useState } from "react"
 import { AuthIllustration } from "@/components/auth-illustration"
 import { Mark } from "@/components/identity"
+import { TAGLINE } from "@/lib/document-title"
 import { cn } from "@/lib/utils"
 
 type Props = {
@@ -70,7 +71,7 @@ export function AuthPage({ title, subtitle, children }: Props) {
             no cropping at narrow panel widths. */}
         <AuthIllustration className="absolute inset-0 m-auto h-[82%] w-[82%] text-iris" />
         <p className="absolute inset-x-0 bottom-8 text-center text-sm text-muted-foreground">
-          Your team's whiteboard, on your server.
+          {TAGLINE}
         </p>
       </div>
     </div>
