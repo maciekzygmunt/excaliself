@@ -145,22 +145,31 @@ export function CommandPalette({
       onSelect: row.onSelect,
     }))
 
-  // Drawings is a live search only — the empty-input launcher (recents) is a
-  // separate slice. getDrawings already excludes trashed rows; filter again
-  // so a stale cache write can never surface one (trash is found via Trash).
-  const drawingRows: PaletteRow[] =
+  // getDrawings already excludes trashed rows; filter again so a stale cache
+  // write can never surface one (trash is found via Trash).
+  const visibleDrawings = (drawings ?? []).filter((d) => d.deletedAt === null)
+
+  // Empty input is the launcher: the 5 most recent drawings lead the list, so
+  // ⌘K → Enter reopens the last-edited drawing from anywhere (spec §3.2).
+  // Sorted here rather than trusting cache order, since only updatedAt defines
+  // "most recent". Typing swaps the section to a live search over everything.
+  const drawingRows: PaletteRow[] = (
     q === ""
-      ? []
-      : (drawings ?? [])
-          .filter((d) => d.deletedAt === null && matchesQuery(d.name))
-          .map((d) => ({
-            kind: "goto",
-            id: `drawing-${d.id}`,
-            label: d.name,
-            icon: File,
-            to: "/draw/$id",
-            params: { id: d.id },
-          }))
+      ? [...visibleDrawings]
+          .sort(
+            (a, b) =>
+              new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
+          )
+          .slice(0, 5)
+      : visibleDrawings.filter((d) => matchesQuery(d.name))
+  ).map((d) => ({
+    kind: "goto",
+    id: `drawing-${d.id}`,
+    label: d.name,
+    icon: File,
+    to: "/draw/$id",
+    params: { id: d.id },
+  }))
 
   // Folders are never static Go to rows — they only appear while typing
   const folderRows: PaletteRow[] =

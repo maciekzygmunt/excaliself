@@ -108,6 +108,9 @@ test("the palette shows a This drawing section above Go to on the canvas", () =>
     "Rename",
     "Star",
     "Move to trash",
+    // The open drawing is also the most recent, so the empty-input launcher
+    // lists it under Drawings between the context section and Go to
+    "Retro board",
     "Home",
     "All drawings",
     "Trash",
