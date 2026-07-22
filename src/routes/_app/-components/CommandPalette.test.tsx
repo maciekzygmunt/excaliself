@@ -345,6 +345,30 @@ test("typing lists matching drawings under Drawings, above Go to — never inter
   expect(screen.getByText("Go to")).toBeDefined()
 })
 
+test("a fuzzy subsequence finds a drawing without typing it exactly", () => {
+  const input = renderOpenPalette({
+    drawings: [
+      makeDrawing({ id: "d1", name: "Roadmap" }),
+      makeDrawing({ id: "d2", name: "Sprint retro" }),
+    ],
+  })
+  fireEvent.change(input, { target: { value: "rdmap" } })
+  expect(optionLabels()).toEqual(["Roadmap"])
+})
+
+test("drawing matches rank best match first, not cache order", () => {
+  const input = renderOpenPalette({
+    drawings: [
+      makeDrawing({ id: "d1", name: "Roadmap sketches" }),
+      makeDrawing({ id: "d2", name: "Map" }),
+    ],
+  })
+  fireEvent.change(input, { target: { value: "map" } })
+  // The exact-name match beats the weaker mid-word match despite coming
+  // second in the cache
+  expect(optionLabels()).toEqual(["Map", "Roadmap sketches"])
+})
+
 test("selecting a drawing opens it and closes the palette", () => {
   const input = renderOpenPalette({
     drawings: [makeDrawing({ id: "d1", name: "Roadmap" })],

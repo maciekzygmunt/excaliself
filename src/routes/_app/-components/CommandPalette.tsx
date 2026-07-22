@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query"
 import { useNavigate } from "@tanstack/react-router"
+import fuzzysort from "fuzzysort"
 import {
   File,
   Folder,
@@ -150,9 +151,18 @@ export function CommandPalette({
   const { data: drawings } = useQuery(drawingsQueryOptions())
   const { data: folders } = useQuery(foldersQueryOptions())
 
-  const q = query.trim().toLowerCase()
-  const matchesQuery = (label: string) => label.toLowerCase().includes(q)
+  // Fuzzy matching: "rdmap" finds "Roadmap". Static sections (Context, Go to,
+  // Actions) only filter — their fixed order is muscle memory, so a score
+  // must never reshuffle them. Dynamic lists (drawings, folders, the picker)
+  // rank best match first via rankedByFuzzy.
+  const q = query.trim()
+  const matchesQuery = (label: string) =>
+    q === "" || fuzzysort.single(q, label) !== null
   const matches = (row: PaletteRow) => matchesQuery(row.label)
+  const rankedByFuzzy = <T,>(items: T[], name: (item: T) => string): T[] =>
+    q === ""
+      ? items
+      : fuzzysort.go(q, items, { key: name }).map((result) => result.obj)
 
   const contextRows: PaletteRow[] = (contextSection?.rows ?? [])
     .filter((row) => matchesQuery(row.label))
@@ -165,7 +175,8 @@ export function CommandPalette({
   // Empty input is the launcher: the 5 most recent drawings lead the list, so
   // ⌘K → Enter reopens the last-edited drawing from anywhere (spec §3.2).
   // Sorted here rather than trusting cache order, since only updatedAt defines
-  // "most recent". Typing swaps the section to a live search over everything.
+  // "most recent". Typing swaps the section to a fuzzy search over everything,
+  // best match first.
   const drawingRows: PaletteRow[] = (
     q === ""
       ? [...visibleDrawings]
@@ -174,7 +185,7 @@ export function CommandPalette({
               new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
           )
           .slice(0, 5)
-      : visibleDrawings.filter((d) => matchesQuery(d.name))
+      : rankedByFuzzy(visibleDrawings, (d) => d.name)
   ).map((d) => ({
     kind: "goto",
     id: `drawing-${d.id}`,
@@ -188,36 +199,37 @@ export function CommandPalette({
   const folderRows: PaletteRow[] =
     q === ""
       ? []
-      : (folders ?? [])
-          .filter((f) => matchesQuery(f.name))
-          .map((f) => ({
-            kind: "goto",
-            id: `folder-${f.id}`,
-            label: f.name,
-            icon: Folder,
-            to: "/folder/$id",
-            params: { id: f.id },
-          }))
+      : rankedByFuzzy(folders ?? [], (f) => f.name).map((f) => ({
+          kind: "goto",
+          id: `folder-${f.id}`,
+          label: f.name,
+          icon: Folder,
+          to: "/folder/$id",
+          params: { id: f.id },
+        }))
 
   // The nested picker replaces every section with one filterable folder list,
-  // root first as "No folder" (spec §4.1) — filtered like any other row so
-  // typing a folder name doesn't pin an unmatched root above the matches
-  const folderPickerRows: PaletteRow[] = [
-    {
-      kind: "pick-folder" as const,
-      id: "move-root",
-      label: "No folder",
-      icon: FolderX,
-      folderId: null,
-    },
-    ...(folders ?? []).map((f) => ({
-      kind: "pick-folder" as const,
-      id: `move-folder-${f.id}`,
-      label: f.name,
-      icon: Folder,
-      folderId: f.id,
-    })),
-  ].filter(matches)
+  // root first as "No folder" (spec §4.1) — ranked like any other row so
+  // typing a folder name doesn't pin a barely-matched root above the matches
+  const folderPickerRows: PaletteRow[] = rankedByFuzzy(
+    [
+      {
+        kind: "pick-folder" as const,
+        id: "move-root",
+        label: "No folder",
+        icon: FolderX,
+        folderId: null,
+      },
+      ...(folders ?? []).map((f) => ({
+        kind: "pick-folder" as const,
+        id: `move-folder-${f.id}`,
+        label: f.name,
+        icon: Folder,
+        folderId: f.id,
+      })),
+    ],
+    (row) => row.label,
+  )
 
   // Empty sections collapse; activeIndex runs across the remaining sections
   // so arrow keys walk the whole list, not one section
