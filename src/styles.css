@@ -65,41 +65,45 @@ code {
 }
 
 .dark {
-  --background: oklch(0.155 0.008 60);
-  --foreground: oklch(0.93 0.005 75);
-  --card: oklch(0.155 0.008 60);
-  --card-foreground: oklch(0.93 0.005 75);
-  --popover: oklch(0.18 0.008 60);
-  --popover-foreground: oklch(0.93 0.005 75);
-  --primary: oklch(0.93 0.005 75);
-  --primary-foreground: oklch(0.18 0.008 60);
-  --secondary: oklch(0.24 0.008 60);
-  --secondary-foreground: oklch(0.93 0.005 75);
-  --muted: oklch(0.24 0.008 60);
-  --muted-foreground: oklch(0.65 0.01 60);
-  --accent: oklch(0.24 0.008 60);
-  --accent-foreground: oklch(0.93 0.005 75);
-  /* Light enough for AA as text on the dark popover/background (~6.5:1);
-     the components' dark:bg-destructive/60 button and /20 focus washes are
+  /* Deep ink — the OG-card tone (#191926 family), iris lifted for AA (§4.4).
+     Designed against the porcelain/iris identity, not an inversion: the
+     sidebar shares the ink base the way porcelain does in light, and cards
+     and popovers step up from it the way porcelain steps up to white. */
+  --background: #191926;
+  --foreground: #e9e9f4;
+  --card: #20202f;
+  --card-foreground: #e9e9f4;
+  --popover: #242435;
+  --popover-foreground: #e9e9f4;
+  --primary: #8d85d6;
+  --primary-foreground: #191926;
+  --secondary: #282839;
+  --secondary-foreground: #e9e9f4;
+  --muted: #282839;
+  --muted-foreground: #a3a3b8;
+  --accent: #282839;
+  --accent-foreground: #e9e9f4;
+  /* Light enough for AA as text on the deep-ink surfaces (≥5:1); the
+     components' dark:bg-destructive/60 button and /20 focus washes are
      written against a red of this weight. */
-  --destructive: oklch(0.704 0.191 22.216);
-  --destructive-foreground: oklch(0.704 0.191 22.216);
-  --border: oklch(0.26 0.008 60);
-  --input: oklch(0.26 0.008 60);
-  --ring: oklch(0.4 0.01 60);
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.18 0.008 60);
-  --sidebar-foreground: oklch(0.93 0.005 75);
-  --sidebar-primary: oklch(0.62 0.16 30);
-  --sidebar-primary-foreground: oklch(0.93 0.005 75);
-  --sidebar-accent: oklch(0.24 0.008 60);
-  --sidebar-accent-foreground: oklch(0.93 0.005 75);
-  --sidebar-border: oklch(0.26 0.008 60);
-  --sidebar-ring: oklch(0.4 0.01 60);
+  --destructive: #ff6467;
+  --destructive-foreground: #ff6467;
+  --border: rgba(235, 235, 255, 0.11);
+  --input: rgba(235, 235, 255, 0.14);
+  --ring: rgba(141, 133, 214, 0.55);
+  --chart-1: #8d85d6;
+  --chart-2: #5fb3c9;
+  --chart-3: #d9a662;
+  --chart-4: #d97b93;
+  --chart-5: #7fbf8e;
+  --sidebar: #191926;
+  --sidebar-foreground: #c2c2d4;
+  --sidebar-primary: #8d85d6;
+  --sidebar-primary-foreground: #191926;
+  --sidebar-accent: rgba(235, 235, 255, 0.06);
+  --sidebar-accent-foreground: #e9e9f4;
+  --sidebar-border: rgba(235, 235, 255, 0.09);
+  --sidebar-ring: rgba(141, 133, 214, 0.55);
   --iris: #8d85d6;
   --iris-strong: #b6b0e8;
   --iris-muted: rgba(141, 133, 214, 0.14);
