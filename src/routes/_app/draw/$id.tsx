@@ -8,6 +8,7 @@ import {
   drawingsQueryOptions,
 } from "@/features/drawings/queries"
 import { useDocumentTitle } from "@/lib/document-title"
+import { DrawingPaletteContext } from "../-components/DrawingPaletteContext"
 import { TrashedDrawingBanner } from "../-components/TrashedDrawingBanner"
 
 const DrawingCanvas = lazy(() => import("../-components/DrawingCanvas"))
@@ -82,6 +83,7 @@ function DrawingPage() {
   // instead of toggling Excalidraw's view mode in place.
   return (
     <div className="flex h-full min-h-0 flex-col">
+      <DrawingPaletteContext drawingId={id} />
       {trashedAt && drawing && (
         <TrashedDrawingBanner drawing={{ ...drawing, deletedAt: trashedAt }} />
       )}

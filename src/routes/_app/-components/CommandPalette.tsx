@@ -18,6 +18,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useState,
 } from "react"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
@@ -28,6 +29,25 @@ import { authClient } from "@/lib/auth-client"
 import { cn } from "@/lib/utils"
 import { useCreateDialog } from "./CreateDialog"
 import { Kbd } from "./sidebar/Kbd"
+
+// A row inside a route-contributed context section. Selecting always closes
+// the palette first, then runs onSelect — the palette is list-only, so text
+// entry and confirmations happen in the standard dialogs it closes into.
+export type PaletteContextRow = {
+  id: string
+  label: string
+  icon: LucideIcon
+  destructive?: boolean
+  onSelect: () => void
+}
+
+// The palette's Context section (spec §4.1): rendered above Drawings and Go
+// to, it exists only on the surfaces §5 lists — routes contribute it via
+// usePaletteContextSection; everywhere else the palette shows globals only.
+export type PaletteContextSection = {
+  title: string
+  rows: PaletteContextRow[]
+}
 
 // Sections render in the fixed order Context → Drawings → Go to → Actions
 // (spec §4.1), never score-interleaved. Go to holds exactly these four static
@@ -47,6 +67,14 @@ type PaletteRow =
       id: "new-drawing" | "new-folder" | "sign-out"
       label: string
       icon: LucideIcon
+    }
+  | {
+      kind: "context"
+      id: string
+      label: string
+      icon: LucideIcon
+      destructive?: boolean
+      onSelect: () => void
     }
 
 const goToRows: PaletteRow[] = [
@@ -77,9 +105,14 @@ const actionRows: PaletteRow[] = [
 type CommandPaletteProps = {
   open: boolean
   onOpenChange: (open: boolean) => void
+  contextSection?: PaletteContextSection | null
 }
 
-export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
+export function CommandPalette({
+  open,
+  onOpenChange,
+  contextSection,
+}: CommandPaletteProps) {
   const navigate = useNavigate()
   const { openCreateDrawingDialog, openCreateFolderDialog } = useCreateDialog()
   const [query, setQuery] = useState("")
@@ -100,6 +133,17 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
   const q = query.trim().toLowerCase()
   const matchesQuery = (label: string) => label.toLowerCase().includes(q)
   const matches = (row: PaletteRow) => matchesQuery(row.label)
+
+  const contextRows: PaletteRow[] = (contextSection?.rows ?? [])
+    .filter((row) => matchesQuery(row.label))
+    .map((row) => ({
+      kind: "context",
+      id: row.id,
+      label: row.label,
+      icon: row.icon,
+      destructive: row.destructive,
+      onSelect: row.onSelect,
+    }))
 
   // Drawings is a live search only — the empty-input launcher (recents) is a
   // separate slice. getDrawings already excludes trashed rows; filter again
@@ -136,6 +180,9 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
   // Empty sections collapse; activeIndex runs across the remaining sections
   // so arrow keys walk the whole list, not one section
   const sections = [
+    ...(contextSection
+      ? [{ title: contextSection.title, rows: contextRows, offset: 0 }]
+      : []),
     { title: "Drawings", rows: drawingRows, offset: 0 },
     {
       title: "Go to",
@@ -151,7 +198,9 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
 
   const select = async (row: PaletteRow) => {
     onOpenChange(false)
-    if (row.kind === "goto") {
+    if (row.kind === "context") {
+      row.onSelect()
+    } else if (row.kind === "goto") {
       navigate({ to: row.to, params: row.params })
     } else if (row.id === "new-drawing") {
       // The palette is list-only, never a form — both create rows close it
@@ -165,14 +214,25 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
     }
   }
 
+  // Keyboard moves must keep the active row visible in the scrollable list.
+  // Only keyboard: scrolling on hover would yank the list under the cursor.
+  // The rows are all rendered, so the target exists before React re-renders.
+  const moveActive = (delta: number) => {
+    if (!rows.length) return
+    const next = (activeIndex + delta + rows.length) % rows.length
+    setActiveIndex(next)
+    document
+      .getElementById(`command-palette-row-${rows[next].id}`)
+      ?.scrollIntoView?.({ block: "nearest" })
+  }
+
   const onInputKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "ArrowDown") {
       e.preventDefault()
-      if (rows.length) setActiveIndex((i) => (i + 1) % rows.length)
+      moveActive(1)
     } else if (e.key === "ArrowUp") {
       e.preventDefault()
-      if (rows.length)
-        setActiveIndex((i) => (i - 1 + rows.length) % rows.length)
+      moveActive(-1)
     } else if (e.key === "Enter") {
       e.preventDefault()
       const row = rows[activeIndex]
@@ -201,6 +261,9 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
             onChange={(e) => {
               setQuery(e.target.value)
               setActiveIndex(0)
+              // The active row is the first again — start the list at the top
+              const list = document.getElementById("command-palette-list")
+              if (list) list.scrollTop = 0
             }}
             onKeyDown={onInputKeyDown}
             role="combobox"
@@ -219,7 +282,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
           id="command-palette-list"
           role="listbox"
           aria-label="Command palette results"
-          className="max-h-80 overflow-y-auto p-1.5"
+          className="scrollbar-subtle max-h-80 overflow-y-auto p-1.5"
         >
           {rows.length > 0 ? (
             sections.map((section) => (
@@ -230,6 +293,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
                 {section.rows.map((row, i) => {
                   const index = section.offset + i
                   const isActive = index === activeIndex
+                  const destructive = row.kind === "context" && row.destructive
                   return (
                     <button
                       key={row.id}
@@ -240,14 +304,21 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
                       onMouseEnter={() => setActiveIndex(index)}
                       onClick={() => select(row)}
                       className={cn(
-                        "flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-[13px] text-foreground",
+                        // scroll-my keeps keyboard scrollIntoView from
+                        // flushing the row against the scrollport edge
+                        "flex w-full scroll-my-1.5 items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-[13px]",
+                        destructive ? "text-destructive" : "text-foreground",
                         isActive && "bg-iris-muted",
                       )}
                     >
                       <row.icon
                         className={cn(
                           "h-3.5 w-3.5 shrink-0 transition-colors",
-                          isActive ? "text-iris" : "text-muted-foreground/40",
+                          destructive
+                            ? "text-destructive"
+                            : isActive
+                              ? "text-iris"
+                              : "text-muted-foreground/40",
                         )}
                       />
                       <span className="truncate">{row.label}</span>
@@ -280,6 +351,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
 
 type CommandPaletteContextValue = {
   openCommandPalette: () => void
+  registerContextSection: (section: PaletteContextSection) => () => void
 }
 
 const CommandPaletteContext = createContext<CommandPaletteContextValue | null>(
@@ -288,13 +360,38 @@ const CommandPaletteContext = createContext<CommandPaletteContextValue | null>(
 
 export function CommandPaletteProvider({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false)
+  const [contextSection, setContextSection] =
+    useState<PaletteContextSection | null>(null)
   const openCommandPalette = useCallback(() => setOpen(true), [])
   useCommandPaletteShortcut(openCommandPalette)
 
+  const registerContextSection = useCallback(
+    (section: PaletteContextSection) => {
+      setContextSection(section)
+      return () => {
+        // Only clear our own registration — on a route change the incoming
+        // route may have registered before this cleanup runs
+        setContextSection((current) => (current === section ? null : current))
+      }
+    },
+    [],
+  )
+
+  // Memoized so a section registration doesn't re-render every consumer —
+  // a consumer that rebuilds its section on render would loop otherwise
+  const value = useMemo(
+    () => ({ openCommandPalette, registerContextSection }),
+    [openCommandPalette, registerContextSection],
+  )
+
   return (
-    <CommandPaletteContext.Provider value={{ openCommandPalette }}>
+    <CommandPaletteContext.Provider value={value}>
       {children}
-      <CommandPalette open={open} onOpenChange={setOpen} />
+      <CommandPalette
+        open={open}
+        onOpenChange={setOpen}
+        contextSection={contextSection}
+      />
     </CommandPaletteContext.Provider>
   )
 }
@@ -306,4 +403,20 @@ export function useCommandPalette() {
       "useCommandPalette must be used within CommandPaletteProvider",
     )
   return ctx
+}
+
+/**
+ * Contribute this route's context section to the palette (spec §4.1). The
+ * section renders above Drawings and Go to while the caller stays mounted and
+ * unregisters when it unmounts or passes null. Pass a memoized section — a
+ * fresh object every render re-registers needlessly.
+ */
+export function usePaletteContextSection(
+  section: PaletteContextSection | null,
+) {
+  const { registerContextSection } = useCommandPalette()
+  useEffect(() => {
+    if (!section) return
+    return registerContextSection(section)
+  }, [section, registerContextSection])
 }

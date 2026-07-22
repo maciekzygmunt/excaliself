@@ -1,0 +1,97 @@
+import { useQuery } from "@tanstack/react-query"
+import { useNavigate } from "@tanstack/react-router"
+import { Pencil, Star, StarOff, Trash2 } from "lucide-react"
+import { useEffect, useMemo, useRef, useState } from "react"
+import {
+  useToggleStarDrawing,
+  useTrashDrawing,
+} from "@/features/drawings/mutations"
+import { drawingsQueryOptions } from "@/features/drawings/queries"
+import {
+  type PaletteContextSection,
+  usePaletteContextSection,
+} from "./CommandPalette"
+import { RenameDrawingDialog } from "./RenameDrawingDialog"
+
+type DrawingPaletteContextProps = {
+  drawingId: string
+}
+
+/**
+ * Contributes the canvas's "This drawing" palette section (spec §5.4):
+ * Rename (closes into the standard rename dialog), Star/Unstar (label follows
+ * current state), Move to trash (tier-1: instant, undo toast, lands on Home).
+ * Reads from the live drawings list, so a trashed drawing — whose section is
+ * a later slice — contributes nothing.
+ */
+export function DrawingPaletteContext({
+  drawingId,
+}: DrawingPaletteContextProps) {
+  const navigate = useNavigate()
+  const [renameOpen, setRenameOpen] = useState(false)
+
+  // The list cache, not the detail query: renames and star toggles patch the
+  // list optimistically, so row labels track them in the same frame
+  const { data: drawing } = useQuery({
+    ...drawingsQueryOptions(),
+    select: (drawings) => drawings.find((d) => d.id === drawingId),
+  })
+
+  const starMutation = useToggleStarDrawing()
+  const starMutate = starMutation.mutate
+  const trashDrawing = useTrashDrawing()
+  // Latest-ref so the section memo doesn't rebuild every render just because
+  // useTrashDrawing returns a fresh closure each time
+  const trashDrawingRef = useRef(trashDrawing)
+  useEffect(() => {
+    trashDrawingRef.current = trashDrawing
+  })
+
+  const section = useMemo<PaletteContextSection | null>(() => {
+    if (!drawing) return null
+    return {
+      title: "This drawing",
+      rows: [
+        {
+          id: "drawing:rename",
+          label: "Rename",
+          icon: Pencil,
+          onSelect: () => setRenameOpen(true),
+        },
+        {
+          id: "drawing:star",
+          label: drawing.starred ? "Unstar" : "Star",
+          icon: drawing.starred ? StarOff : Star,
+          onSelect: () =>
+            starMutate({
+              data: { id: drawing.id, starred: !drawing.starred },
+            }),
+        },
+        {
+          id: "drawing:trash",
+          label: "Move to trash",
+          icon: Trash2,
+          destructive: true,
+          onSelect: () => {
+            // Instant, no confirm — the mutation shows the undo toast itself.
+            // The viewed drawing was just trashed, so land on Home, not on a
+            // read-only canvas under a purge banner.
+            trashDrawingRef.current(drawing)
+            navigate({ to: "/draw" })
+          },
+        },
+      ],
+    }
+  }, [drawing, starMutate, navigate])
+
+  usePaletteContextSection(section)
+
+  if (!drawing) return null
+  return (
+    <RenameDrawingDialog
+      open={renameOpen}
+      onOpenChange={setRenameOpen}
+      drawing={drawing}
+    />
+  )
+}

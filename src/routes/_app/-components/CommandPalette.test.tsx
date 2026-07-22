@@ -1,11 +1,17 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { cleanup, fireEvent, render, screen } from "@testing-library/react"
+import { Pencil, Star, Trash2 } from "lucide-react"
 import { afterEach, beforeEach, expect, test, vi } from "vitest"
 import type { Drawing } from "@/features/drawings/queries"
 import { drawingsQueryOptions } from "@/features/drawings/queries"
 import type { Folder } from "@/features/folders/queries"
 import { foldersQueryOptions } from "@/features/folders/queries"
-import { CommandPalette, CommandPaletteProvider } from "./CommandPalette"
+import {
+  CommandPalette,
+  CommandPaletteProvider,
+  type PaletteContextSection,
+  usePaletteContextSection,
+} from "./CommandPalette"
 
 const navigate = vi.fn()
 vi.mock("@tanstack/react-router", () => ({
@@ -37,11 +43,7 @@ vi.mock("@/lib/auth-client", () => ({
 const onOpenChange = vi.fn()
 
 beforeEach(() => {
-  navigate.mockClear()
-  onOpenChange.mockClear()
-  openCreateDrawingDialog.mockClear()
-  openCreateFolderDialog.mockClear()
-  signOut.mockClear()
+  vi.clearAllMocks()
 })
 
 // Auto-cleanup needs vitest globals, which this repo leaves off.
@@ -77,14 +79,12 @@ function makeFolder(overrides: Partial<Folder> & { id: string }): Folder {
   }
 }
 
-function renderPalette({
+function makeClient({
   drawings = [],
   folders = [],
-  provider = false,
 }: {
   drawings?: Drawing[]
   folders?: Folder[]
-  provider?: boolean
 } = {}) {
   // Seeded data is the fixture — keep react-query from refetching it through
   // the stubbed server functions.
@@ -93,21 +93,43 @@ function renderPalette({
   })
   client.setQueryData(drawingsQueryOptions().queryKey, drawings)
   client.setQueryData(foldersQueryOptions().queryKey, folders)
+  return client
+}
+
+function renderPalette({
+  drawings = [],
+  folders = [],
+  contextSection = null,
+  provider = false,
+}: {
+  drawings?: Drawing[]
+  folders?: Folder[]
+  contextSection?: PaletteContextSection | null
+  provider?: boolean
+} = {}) {
   render(
-    <QueryClientProvider client={client}>
+    <QueryClientProvider client={makeClient({ drawings, folders })}>
       {provider ? (
         <CommandPaletteProvider>
           <div />
         </CommandPaletteProvider>
       ) : (
-        <CommandPalette open onOpenChange={onOpenChange} />
+        <CommandPalette
+          open
+          onOpenChange={onOpenChange}
+          contextSection={contextSection}
+        />
       )}
     </QueryClientProvider>,
   )
 }
 
 function renderOpenPalette(
-  fixtures: { drawings?: Drawing[]; folders?: Folder[] } = {},
+  fixtures: {
+    drawings?: Drawing[]
+    folders?: Folder[]
+    contextSection?: PaletteContextSection | null
+  } = {},
 ) {
   renderPalette(fixtures)
   return screen.getByRole("combobox")
@@ -156,6 +178,25 @@ test("arrow keys move the active row before Enter", () => {
   fireEvent.keyDown(input, { key: "ArrowUp" })
   fireEvent.keyDown(input, { key: "Enter" })
   expect(navigate).toHaveBeenCalledWith({ to: "/drawings", params: undefined })
+})
+
+// The list scrolls (max-h + overflow) while jsdom doesn't, so assert the
+// scroll calls themselves: keyboard moves keep the active row visible, hover
+// must not scroll or the list would yank under the cursor.
+test("arrow keys scroll the newly active row into view; hover does not", () => {
+  const scrollIntoView = vi.fn()
+  window.HTMLElement.prototype.scrollIntoView = scrollIntoView
+  try {
+    const input = renderOpenPalette()
+    fireEvent.keyDown(input, { key: "ArrowDown" })
+    expect(scrollIntoView).toHaveBeenCalledWith({ block: "nearest" })
+
+    scrollIntoView.mockClear()
+    fireEvent.mouseEnter(screen.getByRole("option", { name: "Settings" }))
+    expect(scrollIntoView).not.toHaveBeenCalled()
+  } finally {
+    delete (window.HTMLElement.prototype as Partial<HTMLElement>).scrollIntoView
+  }
 })
 
 test("arrow keys cross the section boundary into Actions", () => {
@@ -321,4 +362,103 @@ test("Cmd+K on the provider opens the palette", () => {
   expect(screen.queryByRole("combobox")).toBeNull()
   fireEvent.keyDown(window, { key: "k", metaKey: true })
   expect(screen.getByRole("combobox")).toBeDefined()
+})
+
+const onRename = vi.fn()
+const onStar = vi.fn()
+const onTrash = vi.fn()
+
+function makeSection(): PaletteContextSection {
+  return {
+    title: "This drawing",
+    rows: [
+      {
+        id: "drawing:rename",
+        label: "Rename",
+        icon: Pencil,
+        onSelect: onRename,
+      },
+      { id: "drawing:star", label: "Star", icon: Star, onSelect: onStar },
+      {
+        id: "drawing:trash",
+        label: "Move to trash",
+        icon: Trash2,
+        destructive: true,
+        onSelect: onTrash,
+      },
+    ],
+  }
+}
+
+test("the context section renders above every other section", () => {
+  renderOpenPalette({ contextSection: makeSection() })
+  expect(optionLabels()).toEqual([
+    "Rename",
+    "Star",
+    "Move to trash",
+    "Home",
+    "All drawings",
+    "Trash",
+    "Settings",
+    "New drawing",
+    "New folder",
+    "Sign out",
+  ])
+  expect(screen.getByText("This drawing")).toBeDefined()
+})
+
+test("selecting a context row runs its action and closes the palette", () => {
+  renderOpenPalette({ contextSection: makeSection() })
+  fireEvent.click(screen.getByRole("option", { name: "Rename" }))
+  expect(onRename).toHaveBeenCalled()
+  expect(onOpenChange).toHaveBeenCalledWith(false)
+  expect(navigate).not.toHaveBeenCalled()
+})
+
+test("Enter lands on the first context row, not a Go to row", () => {
+  const input = renderOpenPalette({ contextSection: makeSection() })
+  fireEvent.keyDown(input, { key: "Enter" })
+  expect(onRename).toHaveBeenCalled()
+  expect(navigate).not.toHaveBeenCalled()
+})
+
+test("typing filters context rows and keeps them above drawing matches", () => {
+  const input = renderOpenPalette({
+    contextSection: makeSection(),
+    drawings: [makeDrawing({ id: "d1", name: "Star chart" })],
+  })
+  fireEvent.change(input, { target: { value: "star" } })
+  expect(optionLabels()).toEqual(["Star", "Star chart"])
+
+  fireEvent.change(input, { target: { value: "trash" } })
+  // Matches in several sections keep the fixed section order
+  expect(optionLabels()).toEqual(["Move to trash", "Trash"])
+  expect(screen.queryByText("This drawing")).toBeDefined()
+})
+
+function RegisteringChild({ section }: { section: PaletteContextSection }) {
+  usePaletteContextSection(section)
+  return null
+}
+
+test("a route-registered section appears and unregisters on unmount", () => {
+  const client = makeClient()
+  const section = makeSection()
+  const { rerender } = render(
+    <QueryClientProvider client={client}>
+      <CommandPaletteProvider>
+        <RegisteringChild section={section} />
+      </CommandPaletteProvider>
+    </QueryClientProvider>,
+  )
+  fireEvent.keyDown(window, { key: "k", metaKey: true })
+  expect(screen.getAllByRole("option")).toHaveLength(10)
+
+  rerender(
+    <QueryClientProvider client={client}>
+      <CommandPaletteProvider>{null}</CommandPaletteProvider>
+    </QueryClientProvider>,
+  )
+  expect(screen.getAllByRole("option")).toHaveLength(7)
+  expect(screen.queryByText("This drawing")).toBeNull()
 })
