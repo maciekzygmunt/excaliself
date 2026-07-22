@@ -23,13 +23,13 @@ import {
   useState,
 } from "react"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
+import { Kbd } from "@/components/ui/kbd"
 import { drawingsQueryOptions } from "@/features/drawings/queries"
 import { foldersQueryOptions } from "@/features/folders/queries"
 import { useCommandPaletteShortcut } from "@/hooks/use-command-palette-shortcut"
 import { authClient } from "@/lib/auth-client"
 import { cn } from "@/lib/utils"
 import { useCreateDialog } from "./CreateDialog"
-import { Kbd } from "./sidebar/Kbd"
 
 // A row inside a route-contributed context section. An onSelect row closes
 // the palette first, then runs — the palette is list-only, so text entry and

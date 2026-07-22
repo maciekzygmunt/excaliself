@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router"
 import { Plus } from "lucide-react"
 import { AuthIllustration } from "@/components/auth-illustration"
+import { Kbd } from "@/components/ui/kbd"
 import { INVITES_ROUTE } from "@/lib/routes"
 import { cn } from "@/lib/utils"
 
@@ -57,11 +58,7 @@ export function IllustratedEmptyState({
           "text-[13px] text-muted-foreground",
         )}
       >
-        or press{" "}
-        <kbd className="rounded border border-border bg-card px-1 py-px font-sans text-xs text-foreground/80 shadow-[0_1px_0_var(--border)]">
-          N
-        </kbd>{" "}
-        anytime
+        or press <Kbd>N</Kbd> anytime
       </p>
       {isAdmin && (
         <Link
