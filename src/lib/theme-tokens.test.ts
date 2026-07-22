@@ -1,0 +1,107 @@
+import { readFileSync } from "node:fs"
+import { join } from "node:path"
+import { describe, expect, test } from "vitest"
+import { THEME_COLORS } from "./theme"
+
+// Guards the deep-ink dark token table (spec §4.4): the .dark block must be
+// designed hex/rgba values (no generated oklch leftovers), key text/accent
+// pairs must hold WCAG AA on the ink surfaces, and the theme-color meta
+// tints in theme.ts must match the CSS --background tokens.
+
+const css = readFileSync(join(__dirname, "../styles.css"), "utf8")
+
+function tokensOf(block: string): Record<string, string> {
+  const body = css.match(new RegExp(`${block}\\s*\\{([^}]*)\\}`))?.[1]
+  if (!body) throw new Error(`no ${block} block in styles.css`)
+  const tokens: Record<string, string> = {}
+  for (const [, name, value] of body.matchAll(/(--[\w-]+):\s*([^;]+);/g)) {
+    tokens[name] = value.trim()
+  }
+  return tokens
+}
+
+const dark = tokensOf("\\.dark")
+const root = tokensOf(":root")
+
+type Rgb = [number, number, number]
+
+// Parses #rrggbb directly; rgba(r, g, b, a) is composited over `base`,
+// since a wash only has a contrast once it sits on a surface.
+function toRgb(value: string, base?: Rgb): Rgb {
+  const hex = value.match(/^#([0-9a-f]{6})$/i)?.[1]
+  if (hex) {
+    return [0, 2, 4].map((i) => parseInt(hex.slice(i, i + 2), 16)) as Rgb
+  }
+  const rgba = value.match(/^rgba\((\d+),\s*(\d+),\s*(\d+),\s*([\d.]+)\)$/)
+  if (rgba && base) {
+    const alpha = Number(rgba[4])
+    return base.map((b, i) =>
+      Math.round(Number(rgba[i + 1]) * alpha + b * (1 - alpha)),
+    ) as Rgb
+  }
+  throw new Error(`unparseable color: ${value}`)
+}
+
+function luminance([r, g, b]: Rgb): number {
+  const f = (v: number) => {
+    const c = v / 255
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4
+  }
+  return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b)
+}
+
+function contrast(fg: Rgb, bg: Rgb): number {
+  const [hi, lo] = [luminance(fg), luminance(bg)].sort((a, b) => b - a)
+  return (hi + 0.05) / (lo + 0.05)
+}
+
+test("the .dark block is fully designed — no generated oklch values remain", () => {
+  for (const [name, value] of Object.entries(dark)) {
+    expect(value, name).not.toContain("oklch(")
+  }
+})
+
+test("theme-color meta tints match the CSS --background tokens", () => {
+  expect(THEME_COLORS.light).toBe(root["--background"])
+  expect(THEME_COLORS.dark).toBe(dark["--background"])
+})
+
+describe("dark AA contrast", () => {
+  const on = (fg: string, bg: string, base?: string) =>
+    contrast(
+      toRgb(dark[fg], base ? toRgb(dark[base]) : undefined),
+      toRgb(dark[bg], base ? toRgb(dark[base]) : undefined),
+    )
+
+  test.each([
+    ["--foreground", "--background"],
+    ["--card-foreground", "--card"],
+    ["--popover-foreground", "--popover"],
+    ["--secondary-foreground", "--secondary"],
+    ["--accent-foreground", "--accent"],
+    ["--muted-foreground", "--background"],
+    ["--muted-foreground", "--card"],
+    ["--muted-foreground", "--popover"],
+    ["--muted-foreground", "--secondary"],
+    ["--sidebar-foreground", "--sidebar"],
+    ["--primary-foreground", "--primary"],
+    ["--sidebar-primary-foreground", "--sidebar-primary"],
+    ["--destructive", "--background"],
+    ["--destructive", "--popover"],
+    ["--iris", "--background"],
+    ["--iris", "--card"],
+    ["--iris", "--popover"],
+    ["--iris-strong", "--background"],
+    ["--iris-strong", "--card"],
+  ])("%s on %s is AA text (≥ 4.5:1)", (fg, bg) => {
+    expect(on(fg, bg)).toBeGreaterThanOrEqual(4.5)
+  })
+
+  test("sidebar-accent-foreground holds AA on the composited hover wash", () => {
+    const sidebar = toRgb(dark["--sidebar"])
+    const hover = toRgb(dark["--sidebar-accent"], sidebar)
+    expect(
+      contrast(toRgb(dark["--sidebar-accent-foreground"]), hover),
+    ).toBeGreaterThanOrEqual(4.5)
+  })
+})
