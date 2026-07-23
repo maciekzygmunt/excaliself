@@ -3,13 +3,14 @@ import { Link } from "@tanstack/react-router"
 import { File, Folder, PanelLeft, Plus, Search, Trash2 } from "lucide-react"
 import { useEffect, useMemo } from "react"
 import { Mark } from "@/components/identity"
+import { KEYCAP_CLASS } from "@/components/ui/button"
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Kbd, KbdGroup } from "@/components/ui/kbd"
+import { Kbd } from "@/components/ui/kbd"
 import {
   Sidebar,
   SidebarContent,
@@ -30,9 +31,6 @@ import { StarredSection } from "./StarredSection"
 import { TreeNodeItem } from "./TreeNodeItem"
 import { buildTree, treeNodeKey } from "./tree"
 import { SidebarDnDProvider, useSidebarDnD } from "./use-sidebar-dnd"
-
-const SEARCH_KBD =
-  "bg-card shadow-[0_0_0_1px_rgba(25,25,50,0.08),0_1px_2px_rgba(20,20,45,0.05)] dark:shadow-[0_0_0_1px_rgba(255,255,255,0.1)]"
 
 export function DrawSidebar({ user }: { user: SidebarUser }) {
   const { data: drawings = [] } = useQuery(drawingsQueryOptions())
@@ -72,12 +70,16 @@ export function DrawSidebar({ user }: { user: SidebarUser }) {
 
   return (
     <SidebarDnDProvider drawings={drawings} foldersById={foldersById}>
-      <Sidebar collapsible="offcanvas" variant="inset">
-        <SidebarHeader className="gap-0 px-2 pt-2 pb-1">
+      {/* p-0 drops the inset variant's outer padding so the sidebar content
+          spans the full 240px, flush with the chrome — per the prototype. */}
+      <Sidebar collapsible="offcanvas" variant="inset" className="p-0">
+        <SidebarHeader className="gap-0 px-2 pt-2 pb-0.5">
+          {/* The link's and toggle's click-target padding is pulled out of
+              the layout flow (-my) so the header keeps the mockup's height. */}
           <div className="flex items-center px-2 py-1.5">
             <Link
               to="/draw"
-              className="-mx-1 flex items-center gap-2.5 rounded-md px-1 py-0.5 focus-visible:bg-sidebar-accent focus-visible:outline-none"
+              className="-mx-1 -my-0.5 flex items-center gap-2.5 rounded-md px-1 py-0.5 focus-visible:bg-sidebar-accent focus-visible:outline-none"
             >
               <Mark className="h-5 w-auto shrink-0 text-iris" />
               <span className="text-sm font-semibold tracking-[-0.01em] text-foreground">
@@ -92,9 +94,12 @@ export function DrawSidebar({ user }: { user: SidebarUser }) {
           <button
             type="button"
             onClick={() => openCreateDrawingDialog()}
-            className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-card py-2 text-[13px] font-medium text-foreground shadow-[0_0_0_1px_rgba(25,25,50,0.08),0_1px_2px_rgba(20,20,45,0.05),inset_0_1px_0_rgba(255,255,255,0.9)] transition-[box-shadow,scale] duration-150 hover:shadow-[0_0_0_1px_rgba(25,25,50,0.14),0_2px_5px_rgba(20,20,45,0.08),inset_0_1px_0_rgba(255,255,255,0.9)] active:scale-[0.98] dark:shadow-[0_0_0_1px_rgba(255,255,255,0.1)] dark:hover:shadow-[0_0_0_1px_rgba(255,255,255,0.16)]"
+            className={cn(
+              KEYCAP_CLASS,
+              "flex w-full items-center justify-center gap-1.5 py-2 text-[13px] font-medium",
+            )}
           >
-            <Plus className="h-2.75 w-2.75 text-iris" strokeWidth={2.5} />
+            <Plus className="h-3 w-3 text-iris" strokeWidth={2.5} />
             New drawing
             <Kbd>N</Kbd>
           </button>
@@ -106,19 +111,14 @@ export function DrawSidebar({ user }: { user: SidebarUser }) {
           <button
             type="button"
             onClick={openCommandPalette}
-            className="flex w-full items-center gap-2 rounded-lg bg-foreground/[0.04] px-2.5 py-2 text-[13px] text-muted-foreground/70 shadow-[inset_0_0_0_1px_rgba(25,25,50,0.06)] transition-colors hover:bg-foreground/[0.06] hover:text-muted-foreground focus-visible:bg-foreground/[0.06] focus-visible:outline-none dark:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)]"
+            className="flex w-full items-center gap-2 rounded-md bg-well px-2.5 py-2 text-[13px] text-muted-foreground/70 shadow-well transition-colors hover:bg-well-hover hover:text-muted-foreground focus-visible:bg-well-hover focus-visible:outline-none"
           >
             <Search
               className="h-3.25 w-3.25 shrink-0 text-muted-foreground/50"
               strokeWidth={2.5}
             />
             <span className="flex-1 truncate text-left">Search</span>
-            {/* bg-muted vanishes against the trigger's own tint — card caps
-                with the sidebar's hairline shadow read as keys. */}
-            <KbdGroup>
-              <Kbd className={SEARCH_KBD}>{isApplePlatform ? "⌘" : "Ctrl"}</Kbd>
-              <Kbd className={SEARCH_KBD}>K</Kbd>
-            </KbdGroup>
+            <Kbd>{isApplePlatform ? "⌘K" : "Ctrl K"}</Kbd>
           </button>
         </div>
 
@@ -134,7 +134,7 @@ export function DrawSidebar({ user }: { user: SidebarUser }) {
         <SidebarFooter className="gap-0 p-2">
           {/* Pinned below the scroll region — Trash stays reachable no
               matter how tall the tree grows (spec §2.3). */}
-          <SidebarMenu className="gap-0 pb-1">
+          <SidebarMenu className="gap-0">
             <SidebarNavItem to="/trash" label="Trash" icon={Trash2} />
           </SidebarMenu>
           <SidebarUserMenu user={user} />
@@ -151,7 +151,7 @@ function SidebarToggle() {
       type="button"
       onClick={toggleSidebar}
       aria-label="Toggle Sidebar"
-      className="ml-auto rounded-md p-1.5 text-muted-foreground/70 transition-colors hover:bg-sidebar-accent hover:text-muted-foreground focus-visible:bg-sidebar-accent focus-visible:outline-none"
+      className="-m-1.5 ml-auto rounded-md p-1.5 text-muted-foreground/70 transition-colors hover:bg-sidebar-accent hover:text-muted-foreground focus-visible:bg-sidebar-accent focus-visible:outline-none"
     >
       <PanelLeft className="h-3.5 w-3.5" />
     </button>
@@ -178,7 +178,7 @@ function TreeBody({
       <StarredSection drawings={drawings} />
 
       <div className="flex items-center justify-between pt-2 pb-0.5 pr-3 pl-4">
-        <span className="text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground/70">
+        <span className="text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground/60">
           Drawings
         </span>
         <div className="flex items-center gap-1">
@@ -227,7 +227,7 @@ function CreateMenu({
         render={
           <button
             type="button"
-            className="rounded-md p-1 text-muted-foreground/40 transition-colors hover:bg-sidebar-accent hover:text-muted-foreground focus-visible:bg-sidebar-accent focus-visible:text-muted-foreground focus-visible:outline-none"
+            className="-m-1 rounded-md p-1 text-muted-foreground/40 transition-colors hover:bg-sidebar-accent hover:text-muted-foreground focus-visible:bg-sidebar-accent focus-visible:text-muted-foreground focus-visible:outline-none"
           />
         }
       >

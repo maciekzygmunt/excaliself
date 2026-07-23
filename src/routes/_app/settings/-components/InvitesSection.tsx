@@ -104,7 +104,7 @@ export function InvitesSection() {
               >
                 {copiedToken === invite.token ? (
                   <>
-                    <Check className="h-3.5 w-3.5 text-notion-terracotta animate-in zoom-in-50 fade-in-0 duration-150 ease-out motion-reduce:animate-none" />
+                    <Check className="h-3.5 w-3.5 text-iris animate-in zoom-in-50 fade-in-0 duration-150 ease-out motion-reduce:animate-none" />
                     Copied
                   </>
                 ) : (

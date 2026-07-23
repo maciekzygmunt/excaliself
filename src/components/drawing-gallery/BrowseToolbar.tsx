@@ -136,7 +136,7 @@ function FolderChip({
       className={cn(
         "h-7 max-w-[12rem] truncate rounded-full border px-3 text-[13px] font-medium transition-[color,border-color,background-color,scale] duration-150 outline-none focus-visible:ring-[2px] focus-visible:ring-ring/30 active:scale-[0.98]",
         selected
-          ? "border-transparent bg-iris-muted text-iris-strong shadow-[inset_0_0_0_1px_var(--iris-ring)]"
+          ? "border-transparent bg-iris-muted text-iris-strong shadow-row-active"
           : "border-border/80 text-muted-foreground hover:border-border hover:text-foreground",
       )}
     >

@@ -46,13 +46,13 @@ function SettingsSubNav() {
       className="flex shrink-0 flex-col gap-1 md:w-36"
     >
       {/* On phones each column group becomes a row of pills above the content. */}
-      <div className="px-2 pb-0.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground/70">
+      <div className="px-2 pb-0.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground/60">
         Account
       </div>
       <div className="flex flex-row gap-1 md:flex-col">
         <SettingsNavItem to="/settings" label="Account" />
       </div>
-      <div className="px-2 pb-0.5 pt-3 text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground/70">
+      <div className="px-2 pb-0.5 pt-3 text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground/60">
         Instance
       </div>
       <div className="flex flex-row gap-1 md:flex-col">
@@ -79,8 +79,8 @@ function SettingsNavItem({
       className={cn(
         "rounded-md px-2 py-1 text-[13px] transition-colors",
         isActive
-          ? "bg-iris-muted font-medium text-iris-strong shadow-[inset_0_0_0_1px_var(--iris-ring)]"
-          : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
+          ? "bg-iris-muted font-medium text-iris-strong shadow-row-active"
+          : "text-muted-foreground hover:bg-accent hover:text-foreground",
       )}
     >
       {label}

@@ -324,7 +324,8 @@ export function CommandPalette({
         className="top-[30%] translate-y-0 gap-0 overflow-hidden p-0 sm:max-w-md motion-reduce:animate-none!"
       >
         <DialogTitle className="sr-only">Command palette</DialogTitle>
-        <div className="flex items-center gap-2.5 border-b border-border/60 px-4 py-3.5">
+        {/* The sunken input well — the palette's place-to-type. */}
+        <div className="flex items-center gap-2.5 rounded-md bg-well px-3 py-2.5 shadow-well m-2 mb-0">
           <Search
             className="h-4 w-4 shrink-0 text-muted-foreground/50"
             strokeWidth={2.5}
@@ -359,7 +360,7 @@ export function CommandPalette({
           {rows.length > 0 ? (
             sections.map((section) => (
               <Fragment key={section.title}>
-                <div className="px-2.5 pt-1.5 pb-1 text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground/70">
+                <div className="px-2.5 pt-1.5 pb-1 text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground/60">
                   {section.title}
                 </div>
                 {section.rows.map((row, i) => {
@@ -405,7 +406,7 @@ export function CommandPalette({
             </p>
           )}
         </div>
-        <div className="flex items-center gap-3 border-t border-border/60 bg-muted/40 px-4 py-2 text-xs text-muted-foreground/60">
+        <div className="flex items-center gap-3 border-t border-hairline bg-muted/40 px-4 py-2 text-xs text-muted-foreground/60">
           <span className="flex items-center gap-1">
             <Kbd className="h-4 min-w-4 text-[10px]">↑↓</Kbd> navigate
           </span>

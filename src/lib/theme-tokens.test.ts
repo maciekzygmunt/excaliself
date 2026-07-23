@@ -3,10 +3,12 @@ import { join } from "node:path"
 import { describe, expect, test } from "vitest"
 import { THEME_COLORS } from "./theme"
 
-// Guards the deep-ink dark token table (spec §4.4): the .dark block must be
-// designed hex/rgba values (no generated oklch leftovers), key text/accent
-// pairs must hold WCAG AA on the ink surfaces, and the theme-color meta
-// tints in theme.ts must match the CSS --background tokens.
+// Guards the Etched token table (.scratch/etched-redesign/spec.md): both
+// blocks must be designed hex/rgba values (no generated oklch leftovers in
+// dark), every Etched surface-recipe token must exist in both modes, key
+// text/accent pairs must hold WCAG AA on the surfaces they actually sit
+// on, and the theme-color meta tints in theme.ts must match the CSS
+// --background tokens.
 
 const css = readFileSync(join(__dirname, "../styles.css"), "utf8")
 
@@ -66,20 +68,62 @@ test("theme-color meta tints match the CSS --background tokens", () => {
   expect(THEME_COLORS.dark).toBe(dark["--background"])
 })
 
+test("the legacy notion-* aliases are gone", () => {
+  expect(css).not.toContain("notion-")
+})
+
+// The Etched surface recipes are encoded once as tokens; every recipe slot
+// must be designed in both modes, never derived or defaulted.
+const ETCHED_TOKENS = [
+  "--panel",
+  "--panel-shadow",
+  "--keycap-from",
+  "--keycap-to",
+  "--keycap-to-active",
+  "--keycap-border",
+  "--keycap-border-hover",
+  "--keycap-shadow",
+  "--card-from",
+  "--card-to",
+  "--card-border",
+  "--card-border-hover",
+  "--card-shadow",
+  "--card-hover-shadow",
+  "--well",
+  "--well-hover",
+  "--well-shadow",
+  "--kbd-shadow",
+  "--hairline",
+  "--popover-shadow",
+]
+
+test.each(ETCHED_TOKENS)("%s is defined in both modes", (token) => {
+  expect(root[token], `:root ${token}`).toBeTruthy()
+  expect(dark[token], `.dark ${token}`).toBeTruthy()
+})
+
+function pairContrast(
+  tokens: Record<string, string>,
+  fg: string,
+  bg: string,
+  base?: string,
+) {
+  const baseRgb = base ? toRgb(tokens[base]) : undefined
+  return contrast(toRgb(tokens[fg], baseRgb), toRgb(tokens[bg], baseRgb))
+}
+
 describe("dark AA contrast", () => {
   const on = (fg: string, bg: string, base?: string) =>
-    contrast(
-      toRgb(dark[fg], base ? toRgb(dark[base]) : undefined),
-      toRgb(dark[bg], base ? toRgb(dark[base]) : undefined),
-    )
+    pairContrast(dark, fg, bg, base)
 
   test.each([
     ["--foreground", "--background"],
+    ["--foreground", "--panel"],
     ["--card-foreground", "--card"],
     ["--popover-foreground", "--popover"],
     ["--secondary-foreground", "--secondary"],
-    ["--accent-foreground", "--accent"],
     ["--muted-foreground", "--background"],
+    ["--muted-foreground", "--panel"],
     ["--muted-foreground", "--card"],
     ["--muted-foreground", "--popover"],
     ["--muted-foreground", "--secondary"],
@@ -87,6 +131,7 @@ describe("dark AA contrast", () => {
     ["--primary-foreground", "--primary"],
     ["--sidebar-primary-foreground", "--sidebar-primary"],
     ["--destructive", "--background"],
+    ["--destructive", "--panel"],
     ["--destructive", "--popover"],
     ["--iris", "--background"],
     ["--iris", "--card"],
@@ -97,11 +142,49 @@ describe("dark AA contrast", () => {
     expect(on(fg, bg)).toBeGreaterThanOrEqual(4.5)
   })
 
+  test("accent-foreground holds AA on the hover wash over the panel", () => {
+    expect(
+      on("--accent-foreground", "--accent", "--panel"),
+    ).toBeGreaterThanOrEqual(4.5)
+  })
+
+  test("iris active text holds AA on the iris tint over the panel", () => {
+    expect(
+      on("--iris-strong", "--iris-muted", "--panel"),
+    ).toBeGreaterThanOrEqual(4.5)
+  })
+
   test("sidebar-accent-foreground holds AA on the composited hover wash", () => {
     const sidebar = toRgb(dark["--sidebar"])
     const hover = toRgb(dark["--sidebar-accent"], sidebar)
     expect(
       contrast(toRgb(dark["--sidebar-accent-foreground"]), hover),
+    ).toBeGreaterThanOrEqual(4.5)
+  })
+})
+
+describe("light AA contrast", () => {
+  const on = (fg: string, bg: string, base?: string) =>
+    pairContrast(root, fg, bg, base)
+
+  test.each([
+    ["--foreground", "--background"],
+    ["--foreground", "--panel"],
+    ["--card-foreground", "--card"],
+    ["--popover-foreground", "--popover"],
+    ["--muted-foreground", "--panel"],
+    ["--muted-foreground", "--background"],
+    ["--primary-foreground", "--primary"],
+    ["--destructive", "--panel"],
+    ["--iris-strong", "--panel"],
+    ["--iris-strong", "--background"],
+  ])("%s on %s is AA text (≥ 4.5:1)", (fg, bg) => {
+    expect(on(fg, bg)).toBeGreaterThanOrEqual(4.5)
+  })
+
+  test("iris active text holds AA on the iris tint over the panel", () => {
+    expect(
+      on("--iris-strong", "--iris-muted", "--panel"),
     ).toBeGreaterThanOrEqual(4.5)
   })
 })

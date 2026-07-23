@@ -12,10 +12,10 @@ export const THEME_STORAGE_KEY = "theme"
 export const DEFAULT_THEME: ThemePreference = "light"
 
 // Browser-chrome tints for the theme-color meta: the --background tokens
-// from styles.css (porcelain / deep ink).
+// from styles.css (the Etched chrome, light / dark).
 export const THEME_COLORS: Record<ThemePreference, string> = {
-  light: "#f2f2f6",
-  dark: "#191926",
+  light: "#ebebee",
+  dark: "#131316",
 }
 
 export function isThemePreference(value: unknown): value is ThemePreference {

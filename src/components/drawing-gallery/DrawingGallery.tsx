@@ -24,9 +24,14 @@ import { compareDrawings, DEFAULT_SORT, type SortOrder } from "./browse"
 export const GRID_CLASS =
   "grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-4"
 
-/** The card's resting frame; interactive cards layer hover/active on top. */
+/** The card's resting frame (the Etched card recipe: top-lit gradient over
+ * a hairline border); interactive cards layer hover/active on top. */
 export const CARD_FRAME_CLASS =
-  "relative flex flex-col overflow-hidden rounded-xl bg-card shadow-[0_0_0_1px_rgba(25,25,50,0.08),0_1px_2px_rgba(20,20,45,0.05)] dark:shadow-[0_0_0_1px_rgba(255,255,255,0.1)]"
+  "relative flex flex-col overflow-hidden rounded-card border border-card-border bg-gradient-to-b from-card-from to-card-to shadow-card"
+
+/** The interactive lift: the border sharpens and the shadow grows. */
+export const CARD_HOVER_CLASS =
+  "transition-[box-shadow,border-color,scale] duration-150 hover:border-card-border-hover hover:shadow-card-hover"
 
 const DEFAULT_SKELETON_COUNT = 8
 
@@ -123,9 +128,9 @@ export function LoadingGrid({
         <div
           // Static list — index keys are fine
           key={i}
-          className="flex flex-col overflow-hidden rounded-xl bg-card shadow-[0_0_0_1px_rgba(25,25,50,0.08),0_1px_2px_rgba(20,20,45,0.05)] dark:shadow-[0_0_0_1px_rgba(255,255,255,0.1)]"
+          className={CARD_FRAME_CLASS}
         >
-          <Skeleton className="aspect-[4/3] rounded-none border-b border-border/60 motion-reduce:animate-none" />
+          <Skeleton className="aspect-[4/3] rounded-none border-b border-hairline motion-reduce:animate-none" />
           <div className="flex flex-col gap-1.5 px-3 py-2.5">
             <Skeleton className="h-3.5 w-24 motion-reduce:animate-none" />
             <Skeleton className="h-3 w-16 motion-reduce:animate-none" />
@@ -152,16 +157,17 @@ function DrawingCard({
     <div
       className={cn(
         CARD_FRAME_CLASS,
-        "group transition-[box-shadow,scale] duration-150 hover:shadow-[0_0_0_1px_rgba(25,25,50,0.14),0_3px_8px_rgba(20,20,45,0.1)] active:scale-[0.99] dark:hover:shadow-[0_0_0_1px_rgba(255,255,255,0.16)]",
+        CARD_HOVER_CLASS,
+        "group active:scale-[0.99]",
       )}
     >
       <Link
         to="/draw/$id"
         params={{ id: drawing.id }}
         aria-label={drawing.name}
-        className="absolute inset-0 rounded-xl"
+        className="absolute inset-0 rounded-card"
       />
-      <div className="aspect-[4/3] overflow-hidden border-b border-border/60">
+      <div className="aspect-[4/3] overflow-hidden border-b border-hairline">
         <Preview name={drawing.name} data={drawing.data} />
       </div>
       <div className="flex items-center gap-2 px-3 py-2.5">

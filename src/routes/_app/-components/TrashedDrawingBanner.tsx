@@ -141,7 +141,7 @@ export function TrashedDrawingBanner({
               size="sm"
               className="text-destructive hover:bg-destructive/5 hover:text-destructive"
             >
-              Delete forever…
+              Delete forever
             </Button>
           }
           title="Delete forever?"

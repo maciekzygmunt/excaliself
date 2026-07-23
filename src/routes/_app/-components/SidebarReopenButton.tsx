@@ -1,6 +1,8 @@
 import { useMatchRoute } from "@tanstack/react-router"
 import { PanelLeft } from "lucide-react"
+import { KEYCAP_CLASS } from "@/components/ui/button"
 import { useSidebar } from "@/components/ui/sidebar"
+import { cn } from "@/lib/utils"
 
 // Floating panel toggle in the content area's top-left, shown only while the
 // sidebar is collapsed — once it's open, closing is handled from the sidebar
@@ -29,7 +31,10 @@ export function SidebarReopenButton() {
       onClick={toggleSidebar}
       aria-label="Open Sidebar"
       title="Open Sidebar"
-      className="absolute top-1.5 left-1.5 z-20 flex size-7 items-center justify-center rounded-lg bg-card text-muted-foreground shadow-[0_0_0_1px_rgba(25,25,50,0.08),0_1px_2px_rgba(20,20,45,0.05),inset_0_1px_0_rgba(255,255,255,0.9)] transition-[box-shadow,scale,color] duration-150 hover:text-foreground hover:shadow-[0_0_0_1px_rgba(25,25,50,0.14),0_2px_5px_rgba(20,20,45,0.08),inset_0_1px_0_rgba(255,255,255,0.9)] active:scale-[0.98] dark:shadow-[0_0_0_1px_rgba(255,255,255,0.1)] dark:hover:shadow-[0_0_0_1px_rgba(255,255,255,0.16)]"
+      className={cn(
+        KEYCAP_CLASS,
+        "absolute top-1.5 left-1.5 z-20 flex size-7 items-center justify-center text-muted-foreground transition-[border-color,scale,color] hover:text-foreground",
+      )}
     >
       <PanelLeft className="h-4 w-4" />
     </button>

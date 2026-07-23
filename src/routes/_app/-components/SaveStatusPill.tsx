@@ -26,7 +26,7 @@ type Props = {
 export function SaveStatusPill({ saving, saved }: Props) {
   if (!saving && !saved) return null
   return (
-    <div className="order-first mr-2 flex items-center gap-1.5 self-stretch rounded-(--border-radius-lg) bg-(--color-surface-low) px-2.5 text-xs font-(--ui-font) text-(--color-on-surface) shadow-[0_0_0_1px_var(--color-surface-lowest)] animate-in fade-in-0 duration-200 motion-reduce:animate-none">
+    <div className="order-first mr-2 flex items-center gap-1.5 self-stretch rounded-(--border-radius-lg) bg-(--color-surface-low) px-2.5 text-xs font-(--ui-font) text-(--color-on-surface) ring-1 ring-(--color-surface-lowest) animate-in fade-in-0 duration-200 motion-reduce:animate-none">
       {saving ? (
         <>
           <Loader2 className="h-3.5 w-3.5 animate-spin" />

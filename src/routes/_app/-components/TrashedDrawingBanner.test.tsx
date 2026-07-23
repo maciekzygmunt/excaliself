@@ -114,7 +114,7 @@ test("states the days-until-purge count with Restore and Delete forever", () => 
     screen.getByText(/This drawing will be permanently deleted in 25 days\./),
   ).toBeTruthy()
   expect(screen.getByRole("button", { name: "Restore" })).toBeTruthy()
-  expect(screen.getByRole("button", { name: "Delete forever…" })).toBeTruthy()
+  expect(screen.getByRole("button", { name: "Delete forever" })).toBeTruthy()
 })
 
 test("countdown copy collapses at the boundaries", () => {
@@ -155,7 +155,7 @@ test("Delete forever confirms via the danger dialog, then navigates Home", async
   vi.mocked(deleteTrashUnitForever).mockResolvedValue(undefined)
   renderBanner()
 
-  fireEvent.click(screen.getByRole("button", { name: "Delete forever…" }))
+  fireEvent.click(screen.getByRole("button", { name: "Delete forever" }))
   expect(
     screen.getByText(
       '"Old sketch" will be permanently deleted. This can\'t be undone.',
@@ -179,7 +179,7 @@ test("Delete forever confirms via the danger dialog, then navigates Home", async
 test("cancelling the danger dialog destroys nothing and stays put", async () => {
   renderBanner()
 
-  fireEvent.click(screen.getByRole("button", { name: "Delete forever…" }))
+  fireEvent.click(screen.getByRole("button", { name: "Delete forever" }))
   fireEvent.click(screen.getByRole("button", { name: "Cancel" }))
   await flush()
 
@@ -191,7 +191,7 @@ test("a failed delete keeps the dialog open with an error toast, no navigation",
   vi.mocked(deleteTrashUnitForever).mockRejectedValue(new Error("boom"))
   renderBanner()
 
-  fireEvent.click(screen.getByRole("button", { name: "Delete forever…" }))
+  fireEvent.click(screen.getByRole("button", { name: "Delete forever" }))
   fireEvent.click(screen.getByRole("button", { name: "Delete forever" }))
   await flush()
 
@@ -231,7 +231,7 @@ test("confirm stays disabled while the folder unit's counts are loading", async 
   // No seeded cache — the counts fetch is genuinely in flight.
   renderBanner({ ...soloDrawing, trashRootId: "f1" })
 
-  fireEvent.click(screen.getByRole("button", { name: "Delete forever…" }))
+  fireEvent.click(screen.getByRole("button", { name: "Delete forever" }))
   const confirm = screen.getByRole("button", {
     name: "Delete forever",
   }) as HTMLButtonElement
@@ -332,7 +332,7 @@ test("a drawing trashed with its folder deletes the whole unit, with count-aware
   vi.mocked(getTrashItems).mockResolvedValue(trashItems)
   renderBanner({ ...soloDrawing, trashRootId: "f1" }, trashItems)
 
-  fireEvent.click(screen.getByRole("button", { name: "Delete forever…" }))
+  fireEvent.click(screen.getByRole("button", { name: "Delete forever" }))
   expect(
     screen.getByText(
       'This drawing was trashed with its folder. "Archive" and the 2 drawings and 1 folder inside will be permanently deleted. This can\'t be undone.',

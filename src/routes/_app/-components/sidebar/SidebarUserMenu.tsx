@@ -21,26 +21,22 @@ export function SidebarUserMenu({ user }: { user: SidebarUser }) {
   const displayName = userDisplayName(user)
   return (
     <DropdownMenu>
+      {/* A quiet avatar row, not a card — per the prototype; the wash on
+          hover is the only added affordance for the menu it opens. */}
       <DropdownMenuTrigger
         render={
           <button
             type="button"
-            className="flex w-full items-center gap-2.5 rounded-[10px] bg-card px-2.5 py-2 shadow-[0_0_0_1px_rgba(25,25,50,0.08),0_1px_2px_rgba(20,20,45,0.05),inset_0_1px_0_rgba(255,255,255,0.9)] transition-[box-shadow,scale] duration-150 hover:shadow-[0_0_0_1px_rgba(25,25,50,0.14),0_2px_5px_rgba(20,20,45,0.08),inset_0_1px_0_rgba(255,255,255,0.9)] focus-visible:outline-none active:scale-[0.98] dark:shadow-[0_0_0_1px_rgba(255,255,255,0.1)] dark:hover:shadow-[0_0_0_1px_rgba(255,255,255,0.16)]"
+            className="flex w-full items-center gap-2 rounded-md px-2 pt-1.5 pb-1 transition-colors hover:bg-sidebar-accent focus-visible:bg-sidebar-accent focus-visible:outline-none"
           />
         }
       >
-        <InitialsAvatar name={user.name} email={user.email} />
-        <div className="min-w-0 flex-1 text-left">
-          <div className="truncate text-xs font-medium leading-tight text-foreground">
-            {displayName}
-          </div>
-          {user.isAdmin && (
-            <div className="font-mono text-[10px] leading-snug text-muted-foreground">
-              admin
-            </div>
-          )}
-        </div>
-        <Settings className="h-[13px] w-[13px] shrink-0 text-muted-foreground/60" />
+        <InitialsAvatar
+          name={user.name}
+          email={user.email}
+          className="h-5.5 w-5.5"
+        />
+        <span className="truncate text-[12px] opacity-60">{displayName}</span>
       </DropdownMenuTrigger>
       <DropdownMenuContent
         className="w-(--anchor-width) min-w-56 rounded-lg"

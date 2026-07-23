@@ -9,6 +9,7 @@ import { useDelayedVisible } from "@/hooks/use-delayed-visible"
 import { cn } from "@/lib/utils"
 import {
   CARD_FRAME_CLASS,
+  CARD_HOVER_CLASS,
   GRID_CLASS,
   LoadingGrid,
   Preview,
@@ -121,18 +122,15 @@ function TrashedDrawingCard({
     // Same stretched-link shape as DrawingCard: the whole card opens the
     // drawing's read-only trashed view, footer actions layer above on z-10.
     <div
-      className={cn(
-        CARD_FRAME_CLASS,
-        "transition-[box-shadow,scale] duration-150 hover:shadow-[0_0_0_1px_rgba(25,25,50,0.14),0_3px_8px_rgba(20,20,45,0.1)] active:scale-[0.99] dark:hover:shadow-[0_0_0_1px_rgba(255,255,255,0.16)]",
-      )}
+      className={cn(CARD_FRAME_CLASS, CARD_HOVER_CLASS, "active:scale-[0.99]")}
     >
       <Link
         to="/draw/$id"
         params={{ id: drawing.id }}
         aria-label={`View ${drawing.name}`}
-        className="absolute inset-0 rounded-xl"
+        className="absolute inset-0 rounded-card"
       />
-      <div className="aspect-[4/3] overflow-hidden border-b border-border/60">
+      <div className="aspect-[4/3] overflow-hidden border-b border-hairline">
         <Preview name={drawing.name} data={drawing.data} />
       </div>
       <CardFooter
@@ -178,7 +176,7 @@ function TrashedFolderCard({
   )
   return (
     <div className={CARD_FRAME_CLASS}>
-      <div className="flex aspect-[4/3] items-center justify-center border-b border-border/60">
+      <div className="flex aspect-[4/3] items-center justify-center border-b border-hairline">
         <FolderIcon
           className="h-9 w-9 fill-iris/15 text-iris/60"
           strokeWidth={1.25}

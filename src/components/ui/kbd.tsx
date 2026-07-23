@@ -5,9 +5,11 @@ function Kbd({ className, ...props }: React.ComponentProps<"kbd">) {
     <kbd
       data-slot="kbd"
       className={cn(
-        "pointer-events-none inline-flex h-5 w-fit min-w-5 items-center justify-center gap-1 rounded-sm bg-muted px-1 font-sans text-xs font-medium text-muted-foreground select-none",
+        // A keycap in miniature: lifted face with a crisp bottom edge, so
+        // it reads as a key on any Etched surface. Deliberately quiet —
+        // small, regular weight, faded text — it's a hint, not a control.
+        "pointer-events-none inline-flex h-4.5 w-fit min-w-4.5 items-center justify-center gap-1 rounded border border-border bg-keycap-from px-1 font-sans text-[10px] font-normal text-muted-foreground/70 shadow-kbd select-none dark:border-white/10",
         "[&_svg:not([class*='size-'])]:size-3",
-        "[[data-slot=tooltip-content]_&]:bg-background/20 [[data-slot=tooltip-content]_&]:text-background dark:[[data-slot=tooltip-content]_&]:bg-background/10",
         className,
       )}
       {...props}
