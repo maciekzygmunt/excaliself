@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router"
 import { Plus } from "lucide-react"
 import { AuthIllustration } from "@/components/auth-illustration"
+import { KEYCAP_CLASS } from "@/components/ui/button"
 import { Kbd } from "@/components/ui/kbd"
 import { INVITES_ROUTE } from "@/lib/routes"
 import { cn } from "@/lib/utils"
@@ -45,10 +46,13 @@ export function IllustratedEmptyState({
         className={cn(
           CASCADE,
           "[--tw-animation-delay:75ms]",
-          "flex items-center gap-1.5 rounded-lg bg-iris px-3.5 py-2 text-[13px] font-medium text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.2),0_1px_2px_rgba(20,20,45,0.2)] transition-[filter,scale] duration-150 hover:brightness-105 active:scale-[0.98]",
+          // The Etched keycap with the iris + — a solid iris primary was a
+          // rejected round-4 variant; the accent stays on the icon.
+          KEYCAP_CLASS,
+          "flex items-center gap-1.5 px-3.5 py-2 text-[13px] font-medium",
         )}
       >
-        <Plus className="h-3.5 w-3.5" strokeWidth={2.5} />
+        <Plus className="h-3.5 w-3.5 text-iris" strokeWidth={2.5} />
         Create your first drawing
       </button>
       <p

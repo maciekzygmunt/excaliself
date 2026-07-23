@@ -38,7 +38,7 @@ function DeadInvitePage() {
       <Button
         render={<Link to="/login" />}
         nativeButton={false}
-        className="w-full bg-foreground text-background hover:bg-foreground/90"
+        className="w-full"
       >
         Go to sign in
       </Button>
@@ -133,11 +133,7 @@ function RegisterPage({ inviterName }: { inviterName: string | null }) {
           selector={(s) => [s.canSubmit, s.isSubmitting] as const}
         >
           {([canSubmit, isSubmitting]) => (
-            <Button
-              type="submit"
-              className="w-full bg-foreground text-background hover:bg-foreground/90"
-              disabled={!canSubmit}
-            >
+            <Button type="submit" className="w-full" disabled={!canSubmit}>
               {isSubmitting ? "Creating account..." : "Create account"}
             </Button>
           )}

@@ -89,7 +89,7 @@ export function CreateDialog({
         <DialogTitle className="sr-only">
           {target.kind === "drawing" ? "Create drawing" : "Create folder"}
         </DialogTitle>
-        <div className="flex items-center gap-2.5 px-4 py-3.5">
+        <div className="m-2 flex items-center gap-2.5 rounded-md bg-well px-3 py-2.5 shadow-well">
           <Plus className="h-4 w-4 shrink-0 text-iris" strokeWidth={2.5} />
           <input
             // The whole dialog exists to type a name into — focus it on open
@@ -109,7 +109,7 @@ export function CreateDialog({
             className="flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground/60 disabled:opacity-50"
           />
         </div>
-        <div className="flex items-center justify-between border-t border-border/60 bg-muted/40 px-4 py-2">
+        <div className="flex items-center justify-between border-t border-hairline bg-muted/40 px-4 py-2">
           {folder ? (
             <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <Folder className="h-3 w-3 shrink-0 fill-iris/70 text-iris" />

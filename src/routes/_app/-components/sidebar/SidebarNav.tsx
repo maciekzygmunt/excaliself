@@ -42,25 +42,16 @@ export function SidebarNavItem({
         isActive={isActive}
         className={cn(
           "h-auto cursor-pointer gap-1.5 px-2 py-1.5 text-[13px] [&>svg]:size-auto",
-          "data-[active=true]:bg-iris-muted data-[active=true]:shadow-[inset_0_0_0_1px_var(--iris-ring)]",
+          "data-[active=true]:bg-iris-muted data-[active=true]:font-medium data-[active=true]:text-iris-strong data-[active=true]:shadow-row-active",
         )}
       >
         <Icon
           className={cn(
             "h-3.25! w-3.25! shrink-0 transition-colors",
-            isActive ? "text-iris" : "text-muted-foreground/40",
+            isActive ? "text-iris" : "text-muted-foreground/60",
           )}
         />
-        <span
-          className={cn(
-            "truncate transition-colors",
-            isActive
-              ? "font-medium text-iris-strong"
-              : "text-sidebar-foreground/60",
-          )}
-        >
-          {label}
-        </span>
+        <span className="truncate transition-colors">{label}</span>
       </SidebarMenuButton>
     </SidebarMenuItem>
   )

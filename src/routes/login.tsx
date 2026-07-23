@@ -83,11 +83,7 @@ function LoginPage() {
           selector={(s) => [s.canSubmit, s.isSubmitting] as const}
         >
           {([canSubmit, isSubmitting]) => (
-            <Button
-              type="submit"
-              className="w-full bg-foreground text-background hover:bg-foreground/90"
-              disabled={!canSubmit}
-            >
+            <Button type="submit" className="w-full" disabled={!canSubmit}>
               {isSubmitting ? "Signing in..." : "Sign in"}
             </Button>
           )}

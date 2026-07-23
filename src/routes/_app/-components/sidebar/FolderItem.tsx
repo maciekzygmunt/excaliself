@@ -107,21 +107,23 @@ export function FolderItem({ folder, childNodes }: FolderItemProps) {
           rename.isRenaming && "pr-3!",
         )}
       >
-        <ChevronRight
-          className={cn(
-            "h-3! w-3! shrink-0 text-muted-foreground/40 transition-transform duration-150 ease-out",
-            isExpanded && "rotate-90",
-            !hasChildren && "opacity-0",
-          )}
-        />
-        <Folder className="h-3.5! w-3.5! shrink-0 fill-iris/70 text-iris" />
+        <Folder className="h-3.5! w-3.5! shrink-0 text-muted-foreground/60" />
         {rename.isRenaming ? (
           <Input {...rename.inputProps} className="h-5 rounded px-1 text-sm" />
         ) : (
-          <span className="truncate text-sidebar-foreground/70">
-            {folder.name}
-          </span>
+          <span className="truncate transition-colors">{folder.name}</span>
         )}
+        {/* Trailing disclosure per the prototype — shown on every folder,
+            empty ones included; it yields to the hover-revealed row actions,
+            which appear in the same right-edge slot. */}
+        <ChevronRight
+          className={cn(
+            "ml-auto h-3! w-3! shrink-0 text-muted-foreground/60 transition-transform duration-150 ease-out",
+            "group-focus-within/tree-row:opacity-0 group-hover/tree-row:opacity-0",
+            isExpanded && "rotate-90",
+            rename.isRenaming && "opacity-0",
+          )}
+        />
       </SidebarMenuButton>
 
       <TreeRowActions

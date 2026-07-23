@@ -42,7 +42,9 @@ function ChoiceGroup<T extends string>({
       <div
         role="radiogroup"
         aria-label={label}
-        className="inline-flex rounded-lg border border-border bg-background p-0.5"
+        // A sunken well holding one raised keycap — the Etched form of a
+        // segmented control.
+        className="inline-flex rounded-md bg-well p-0.5 shadow-well"
       >
         {options.map((option) => {
           const selected = value === option.value
@@ -56,10 +58,10 @@ function ChoiceGroup<T extends string>({
                 if (!selected) onSelect(option.value)
               }}
               className={cn(
-                "inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm transition-colors",
+                "inline-flex items-center gap-1.5 rounded-[5px] border px-3 py-1.5 text-[13px] transition-colors",
                 selected
-                  ? "bg-secondary text-foreground"
-                  : "text-muted-foreground hover:text-foreground",
+                  ? "border-keycap-border bg-gradient-to-b from-keycap-from to-keycap-to font-medium text-foreground shadow-keycap"
+                  : "border-transparent text-muted-foreground hover:text-foreground",
               )}
             >
               <option.icon aria-hidden className="size-3.5" />

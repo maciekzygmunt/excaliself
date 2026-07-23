@@ -49,26 +49,16 @@ export function DrawingItem({ drawing }: DrawingItemProps) {
 
   const content = (
     <>
-      <span className="h-3! w-3! shrink-0" />
       <File
         className={cn(
           "h-3.25! w-3.25! shrink-0 transition-colors",
-          isActive ? "text-iris" : "text-muted-foreground/40",
+          isActive ? "text-iris" : "text-muted-foreground/60",
         )}
       />
       {rename.isRenaming ? (
         <Input {...rename.inputProps} className="h-5 rounded px-1 text-sm" />
       ) : (
-        <span
-          className={cn(
-            "truncate transition-colors",
-            isActive
-              ? "font-medium text-iris-strong"
-              : "text-sidebar-foreground/60",
-          )}
-        >
-          {drawing.name}
-        </span>
+        <span className="truncate transition-colors">{drawing.name}</span>
       )}
     </>
   )
@@ -93,7 +83,7 @@ export function DrawingItem({ drawing }: DrawingItemProps) {
         isActive={isActive}
         className={cn(
           "h-auto cursor-pointer gap-1.5 px-2 py-1.5 pr-2! text-[13px] active:cursor-grabbing [&>svg]:size-auto",
-          "data-[active=true]:bg-iris-muted data-[active=true]:shadow-[inset_0_0_0_1px_var(--iris-ring)]",
+          "data-[active=true]:bg-iris-muted data-[active=true]:font-medium data-[active=true]:text-iris-strong data-[active=true]:shadow-row-active",
           rename.isRenaming && "pr-3!",
         )}
       >

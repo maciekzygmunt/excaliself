@@ -62,7 +62,8 @@ function AppShellLayout() {
               isAdmin,
             }}
           />
-          <SidebarInset className="overflow-clip bg-card md:peer-data-[variant=inset]:m-2.5 md:peer-data-[variant=inset]:ml-0 md:peer-data-[variant=inset]:rounded-[10px] md:peer-data-[variant=inset]:shadow-[0_0_0_1px_rgba(25,25,50,0.08),0_10px_28px_rgba(30,30,70,0.09)] md:peer-data-[variant=inset]:peer-data-[state=collapsed]:ml-2.5 dark:md:peer-data-[variant=inset]:shadow-[0_0_0_1px_rgba(255,255,255,0.08),0_10px_28px_rgba(0,0,0,0.35)]">
+          {/* The Etched panel look lives in the SidebarInset primitive. */}
+          <SidebarInset className="overflow-clip">
             <SidebarReopenButton />
             <Outlet />
           </SidebarInset>

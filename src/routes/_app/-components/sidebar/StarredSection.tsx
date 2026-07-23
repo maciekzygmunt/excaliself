@@ -18,7 +18,7 @@ export function StarredSection({ drawings }: { drawings: Drawing[] }) {
   return (
     <div className="pt-1">
       <div className="pt-1 pb-0.5 pl-4">
-        <span className="text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground/70">
+        <span className="text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground/60">
           Starred
         </span>
       </div>
@@ -44,27 +44,17 @@ function StarredItem({ drawing }: { drawing: Drawing }) {
         isActive={isActive}
         className={cn(
           "h-auto cursor-pointer gap-1.5 px-2 py-1.5 pr-2! text-[13px] [&>svg]:size-auto",
-          "data-[active=true]:bg-iris-muted data-[active=true]:shadow-[inset_0_0_0_1px_var(--iris-ring)]",
+          "data-[active=true]:bg-iris-muted data-[active=true]:font-medium data-[active=true]:text-iris-strong data-[active=true]:shadow-row-active",
         )}
       >
         <Star
           className={cn(
             "h-3.25! w-3.25! shrink-0 transition-colors",
-            isActive
-              ? "fill-iris text-iris"
-              : "fill-muted-foreground/40 text-muted-foreground/40",
+            // Stars wear the accent even at rest — one of iris's few jobs.
+            "fill-iris text-iris",
           )}
         />
-        <span
-          className={cn(
-            "truncate transition-colors",
-            isActive
-              ? "font-medium text-iris-strong"
-              : "text-sidebar-foreground/60",
-          )}
-        >
-          {drawing.name}
-        </span>
+        <span className="truncate transition-colors">{drawing.name}</span>
       </SidebarMenuButton>
 
       <SidebarMenuAction

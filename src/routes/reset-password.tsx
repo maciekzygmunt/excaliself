@@ -46,7 +46,7 @@ function DeadResetPage() {
       <Button
         render={<Link to="/login" />}
         nativeButton={false}
-        className="w-full bg-foreground text-background hover:bg-foreground/90"
+        className="w-full"
       >
         Go to sign in
       </Button>
@@ -127,11 +127,7 @@ function SetNewPasswordPage({ email }: { email: string }) {
           selector={(s) => [s.canSubmit, s.isSubmitting] as const}
         >
           {([canSubmit, isSubmitting]) => (
-            <Button
-              type="submit"
-              className="w-full bg-foreground text-background hover:bg-foreground/90"
-              disabled={!canSubmit}
-            >
+            <Button type="submit" className="w-full" disabled={!canSubmit}>
               {isSubmitting ? "Setting password..." : "Set password"}
             </Button>
           )}

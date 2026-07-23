@@ -40,7 +40,7 @@ export function TopLeftControls({
       <button
         type="button"
         onClick={onToggleSidebar}
-        className="dropdown-menu-button [--button-bg:var(--color-surface-low)] [--button-width:var(--lg-button-size)] [--button-height:var(--lg-button-size)] shadow-[0_0_0_1px_var(--color-surface-lowest)] active:shadow-[0_0_0_1px_var(--color-brand-active)]"
+        className="dropdown-menu-button [--button-bg:var(--color-surface-low)] [--button-width:var(--lg-button-size)] [--button-height:var(--lg-button-size)] ring-1 ring-(--color-surface-lowest) active:ring-(--color-brand-active)"
         aria-label="Toggle Sidebar"
         title="Toggle Sidebar"
       >

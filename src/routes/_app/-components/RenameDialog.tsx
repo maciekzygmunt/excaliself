@@ -63,7 +63,7 @@ export function RenameDialog({
         className="top-[30%] translate-y-0 gap-0 overflow-hidden p-0 sm:max-w-sm"
       >
         <DialogTitle className="sr-only">{title}</DialogTitle>
-        <div className="flex items-center gap-2.5 px-4 py-3.5">
+        <div className="m-2 flex items-center gap-2.5 rounded-md bg-well px-3 py-2.5 shadow-well">
           <Pencil className="h-4 w-4 shrink-0 text-iris" strokeWidth={2.5} />
           <input
             ref={inputRef}
@@ -85,7 +85,7 @@ export function RenameDialog({
             className="flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground/60"
           />
         </div>
-        <div className="flex items-center justify-between border-t border-border/60 bg-muted/40 px-4 py-2">
+        <div className="flex items-center justify-between border-t border-hairline bg-muted/40 px-4 py-2">
           <span className="text-xs text-muted-foreground/60">{title}</span>
           <span className="flex items-center gap-1 text-xs text-muted-foreground/60">
             <Kbd className="h-4 min-w-4 text-[10px]">↵</Kbd> to rename
