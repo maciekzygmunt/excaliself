@@ -21,6 +21,12 @@ const { openCreateDrawingDialog, openCreateFolderDialog } = vi.hoisted(() => ({
   openCreateFolderDialog: vi.fn(),
 }))
 
+// Cards and rows poll for live sessions (spec §1.5); these tests are not
+// about the badge, so the poll answers "nobody".
+vi.mock("@/features/collab/server", () => ({
+  getLiveDrawings: vi.fn(async () => []),
+}))
+
 vi.mock("../CreateDialog", () => ({
   useCreateDialog: () => ({ openCreateDrawingDialog, openCreateFolderDialog }),
 }))

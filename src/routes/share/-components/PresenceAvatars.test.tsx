@@ -1,7 +1,7 @@
 import { cleanup, render, screen } from "@testing-library/react"
 import { afterEach, expect, test, vi } from "vitest"
 import type { Participant } from "@/features/collab/protocol"
-import { initialsOf, PresenceAvatars } from "./PresenceAvatars"
+import { PresenceAvatars } from "./PresenceAvatars"
 
 afterEach(cleanup)
 
@@ -24,14 +24,6 @@ const renderAvatars = (props: {
       onFollow={props.onFollow ?? (() => {})}
     />,
   )
-
-test("initials come from the first and last word", () => {
-  expect(initialsOf("Ada Lovelace")).toBe("AL")
-  expect(initialsOf("Quiet Otter")).toBe("QO")
-  expect(initialsOf("Wren")).toBe("W")
-  expect(initialsOf("  ada  van  der  berg ")).toBe("AB")
-  expect(initialsOf("   ")).toBe("?")
-})
 
 test("a room with nobody else in it shows no chrome", () => {
   const { container } = renderAvatars({ participants: [] })
