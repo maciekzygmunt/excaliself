@@ -34,8 +34,6 @@ function isSyncableElement(element: SceneElement, now: number): boolean {
     : true
 }
 
-export type SceneBroadcaster = ReturnType<typeof createSceneBroadcaster>
-
 export function createSceneBroadcaster(now: () => number = () => Date.now()) {
   /** The version of each element as the room last saw it, from either side. */
   const roomElementVersions = new Map<string, number>()

@@ -65,6 +65,8 @@ export function useRoom(options: {
 
   const socketRef = useRef<WebSocket | null>(null)
   const broadcasterRef = useRef(createSceneBroadcaster())
+  /** False until SCENE_INIT lands — this tab has nothing to broadcast against. */
+  const sceneInitializedRef = useRef(false)
   const fullSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const pointersRef = useRef(new Map<string, PointerUpdate>())
   const participantsRef = useRef<Participant[]>([])
@@ -138,9 +140,15 @@ export function useRoom(options: {
    * Excalidraw's `onChange` — the one thing that puts local edits on the
    * wire. It fires on pointer moves and selections too, which is why the
    * broadcaster's scene-version gate comes first.
+   *
+   * Nothing is offered to the broadcaster until SCENE_INIT has landed. Asking
+   * it before then would mark those elements as "the room has seen these"
+   * while the socket was still opening, and the catch-up below — the one
+   * thing that would have carried them — would then skip every one of them.
    */
   const onChange = useCallback(
     (elements: readonly OrderedExcalidrawElement[]) => {
+      if (!sceneInitializedRef.current) return
       const delta = broadcasterRef.current.delta(elements)
       if (delta && sendScene(delta)) queueFullSync()
     },
@@ -209,11 +217,14 @@ export function useRoom(options: {
       }
       if (message.type === "SCENE_INIT") {
         const merged = applyRemoteScene(message.payload.elements)
+        if (!merged) return
+        sceneInitializedRef.current = true
         // Anything this tab was holding that the room's scene didn't have —
         // an edit the owner saved between this page's fetch and the room's
-        // load — goes up now, so the room converges on the union of the two
-        // rather than quietly dropping one side.
-        if (merged) sendScene(broadcasterRef.current.catchUp(merged))
+        // load, or a stroke drawn while the socket was still opening — goes
+        // up now, so the room converges on the union of the two rather than
+        // quietly dropping one side.
+        if (sendScene(broadcasterRef.current.catchUp(merged))) queueFullSync()
         return
       }
       if (message.type === "SCENE_UPDATE") {
@@ -253,12 +264,14 @@ export function useRoom(options: {
       }
       // What the old socket had told the room means nothing to the next one.
       broadcasterRef.current = createSceneBroadcaster()
+      sceneInitializedRef.current = false
     }
   }, [
     token,
     canvasReady,
     send,
     sendScene,
+    queueFullSync,
     setRoster,
     pushCollaborators,
     applyRemoteScene,

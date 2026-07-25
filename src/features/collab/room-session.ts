@@ -47,12 +47,6 @@ export type Room = {
   participants: Map<string, Participant>
   /** Resolves when the stored scene has been read (or failed to read). */
   loaded: Promise<void>
-  /**
-   * False while the load is in flight, and permanently false if it failed.
-   * The persistence slice must not flush a Room that never read its scene —
-   * it would write an empty drawing over a real one.
-   */
-  sceneLoaded: boolean
   /** The authoritative scene, in fractional-index order. */
   elements: SceneElement[]
   sceneVersion: number
@@ -85,7 +79,6 @@ function ensureRoom(registry: RoomRegistry, roomId: string): Room {
   const room: Room = {
     participants: new Map(),
     loaded: Promise.resolve(),
-    sceneLoaded: false,
     elements: [],
     sceneVersion: 0,
     ownerId: null,
@@ -96,12 +89,15 @@ function ensureRoom(registry: RoomRegistry, roomId: string): Room {
       room.elements = stored.elements
       room.sceneVersion = getSceneVersion(stored.elements)
       room.ownerId = stored.ownerId
-      room.sceneLoaded = true
     },
     (error) => {
       // The Room stays open on an empty scene: cursors and presence still
       // work, and a client's own copy survives reconciliation untouched (an
       // empty SCENE_INIT adds nothing and deletes nothing).
+      //
+      // Whoever adds the flush of spec §2.3 must give this arm a way to say
+      // so — flushing a Room that never read its drawing would write an
+      // empty scene over a real one.
       console.error(`[collab] could not load scene for room ${roomId}`, error)
     },
   )
@@ -197,6 +193,9 @@ function applySceneUpdate(
   room.elements = reconcileElements(room.elements, incoming, {})
   room.sceneVersion = getSceneVersion(room.elements)
 
+  // Reconciliation keeps whichever object won by reference, so `winner ===
+  // element` is exactly "the Room accepted what this peer sent" — no need to
+  // re-run the version comparison to find out.
   const authoritative = new Map(room.elements.map((el) => [el.id, el]))
   const winners: SceneElement[] = []
   const corrections: SceneElement[] = []

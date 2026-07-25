@@ -140,7 +140,7 @@ function parsePointerUpdate(payload: unknown): PointerUpdate | null {
  * One bad entry rejects the whole payload. A half-applied delta would leave
  * the Room holding a scene no client ever had.
  */
-export function parseSceneElements(value: unknown): SceneElement[] | null {
+function parseSceneElements(value: unknown): SceneElement[] | null {
   if (!Array.isArray(value)) return null
   const elements: SceneElement[] = []
   for (const entry of value) {

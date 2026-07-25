@@ -415,7 +415,7 @@ test("an edit that arrives before the scene has loaded still merges into it", as
   ])
 })
 
-test("a Room whose drawing cannot be read still opens, and is marked unloaded", async () => {
+test("a Room whose drawing cannot be read still opens, on an empty scene", async () => {
   const registry = createRoomRegistry(async () => {
     throw new Error("database is down")
   })
@@ -423,8 +423,10 @@ test("a Room whose drawing cannot be read still opens, and is marked unloaded", 
 
   await joinRoom(registry, ROOM, ada, member("Ada"))
 
+  // Cursors and presence keep working; an empty SCENE_INIT reconciles into a
+  // client's own copy without adding or deleting anything.
   expect(elementsOf(framesOf(ada, "SCENE_INIT")[0])).toEqual([])
-  expect(registry.rooms.get(ROOM)?.sceneLoaded).toBe(false)
+  expect(registry.rooms.get(ROOM)?.participants.size).toBe(1)
 })
 
 test("a peer that left mid-load is not sent a scene", async () => {
