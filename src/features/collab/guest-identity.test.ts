@@ -1,5 +1,9 @@
 import { expect, test } from "vitest"
-import { GUEST_NAME_STORAGE_KEY, getOrCreateGuestName } from "./guest-identity"
+import {
+  GUEST_NAME_STORAGE_KEY,
+  getOrCreateGuestName,
+  rememberGuestName,
+} from "./guest-identity"
 
 const A_NAME = /^[A-Z][a-z]+ [A-Z][a-z]+$/
 
@@ -64,4 +68,37 @@ test("storage that throws on use still yields a usable name", () => {
 test("a host without storage at all — server render, or a locked-down embed", () => {
   expect(getOrCreateGuestName({})).toMatch(A_NAME)
   expect(getOrCreateGuestName(null)).toMatch(A_NAME)
+})
+
+test("a renamed guest is remembered for the next visit", () => {
+  const localStorage = fakeStorage()
+  getOrCreateGuestName({ localStorage })
+
+  expect(rememberGuestName("Wren", { localStorage })).toBe("Wren")
+  expect(getOrCreateGuestName({ localStorage })).toBe("Wren")
+})
+
+test("a name is sanitized on the way in, and unusable ones are refused", () => {
+  const localStorage = fakeStorage({ [GUEST_NAME_STORAGE_KEY]: "Wren" })
+
+  expect(rememberGuestName("  Ada\nLovelace  ", { localStorage })).toBe(
+    "Ada Lovelace",
+  )
+  // Nothing left after trimming: the stored name stays what it was.
+  expect(rememberGuestName("   ", { localStorage })).toBeNull()
+  expect(localStorage.getItem(GUEST_NAME_STORAGE_KEY)).toBe("Ada Lovelace")
+})
+
+test("an unwritable store still hands back the name for this page load", () => {
+  const hostile = {
+    localStorage: {
+      getItem: () => null,
+      setItem: () => {
+        throw new Error("blocked")
+      },
+    } as unknown as Storage,
+  }
+
+  expect(rememberGuestName("Wren", hostile)).toBe("Wren")
+  expect(rememberGuestName("Wren", null)).toBe("Wren")
 })

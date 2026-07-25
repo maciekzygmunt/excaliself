@@ -178,6 +178,14 @@ export function useRoom(options: {
     () => participants.filter((p) => p.connectionId !== selfConnectionId),
     [participants, selfConnectionId],
   )
+  // And the other half of that split: how the room sees this tab — which
+  // color its cursor wears, whether it joined as a guest. Null until the
+  // join lands. Computed here so no caller has to re-walk the roster and
+  // reach a different answer than `others` did.
+  const self = useMemo(
+    () => participants.find((p) => p.connectionId === selfConnectionId) ?? null,
+    [participants, selfConnectionId],
+  )
 
-  return { participants, others, selfConnectionId, onPointerUpdate }
+  return { self, others, onPointerUpdate }
 }
