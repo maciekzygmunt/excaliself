@@ -16,7 +16,13 @@ const config = defineConfig({
   plugins: [
     tailwindcss(),
     devtools(),
-    nitro(),
+    // `serverDir` turns on nitro's own file-based routing for the room
+    // websocket (the app's pages stay with TanStack Start); `features.websocket`
+    // wires the upgrade onto the app's existing port — no new ports, no new
+    // env vars. Do NOT upgrade TanStack Start past this pinned nitro plugin
+    // without re-running docs/collab-websocket-smoke-test.md in both dev and
+    // the built container.
+    nitro({ serverDir: "server", features: { websocket: true } }),
     viteTsConfigPaths({
       projects: ["./tsconfig.json"],
     }),

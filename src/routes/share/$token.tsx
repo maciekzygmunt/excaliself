@@ -41,6 +41,8 @@ export const Route = createFileRoute("/share/$token")({
 
 function SharePage() {
   const resolution = Route.useLoaderData()
+  // The token is also the room's dial string — the canvas joins on it.
+  const { token } = Route.useParams()
   const { full } = Route.useSearch()
   const router = useRouter()
   const navigate = useNavigate({ from: "/share/$token" })
@@ -77,7 +79,11 @@ function SharePage() {
 
   return (
     <Suspense fallback={<LoadingState />}>
-      <SharedCanvas drawing={resolution.drawing} files={resolution.files} />
+      <SharedCanvas
+        drawing={resolution.drawing}
+        files={resolution.files}
+        token={token}
+      />
     </Suspense>
   )
 }

@@ -8,6 +8,7 @@ import {
   mintShareToken,
   regenerateShareLink,
   resolveShareByToken,
+  resolveShareForRoom,
   resolveShareVisit,
   setShareLinkAudience,
   stopSharingDrawing,
@@ -302,4 +303,22 @@ test("anyone link opens without ever consulting the session", async () => {
 
   expect(result.status).toBe("ok")
   expect(hasSession).not.toHaveBeenCalled()
+})
+
+test("resolveShareForRoom reads by token and leaves the scene JSON on the server", async () => {
+  const row = {
+    audience: "anyone" as const,
+    drawing: { id: "d1", deletedAt: null },
+  }
+  const { db, calls } = fakeDb({ shareRows: [row] })
+
+  await expect(resolveShareForRoom(db, "live-token")).resolves.toEqual(row)
+  const read = calls[0] as Extract<Call, { kind: "select" }>
+  expect(read.table).toBe(shares)
+  expect(toSql(read.where)).toContain(`"shares"."token" =`)
+})
+
+test("resolveShareForRoom returns null for an unknown token", async () => {
+  const { db } = fakeDb({ shareRows: [] })
+  await expect(resolveShareForRoom(db, "no-such-token")).resolves.toBeNull()
 })

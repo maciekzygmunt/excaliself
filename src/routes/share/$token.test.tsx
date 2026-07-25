@@ -9,6 +9,7 @@ import type { ReactNode } from "react"
 import { afterEach, beforeEach, expect, test, vi } from "vitest"
 import type { ShareResolution } from "@/features/shares/store"
 
+const TOKEN = "a-share-token"
 const invalidate = vi.fn()
 const navigate = vi.fn()
 let loaderData: ShareResolution
@@ -19,6 +20,8 @@ vi.mock("@tanstack/react-router", () => ({
     options,
     useLoaderData: () => loaderData,
     useSearch: () => search,
+    // The canvas joins the room on the token, so the page reads the param.
+    useParams: () => ({ token: TOKEN }),
   }),
   useRouter: () => ({ invalidate }),
   useNavigate: () => navigate,
@@ -34,7 +37,9 @@ vi.mock("@/features/shares/server", () => ({ resolveShareToken: vi.fn() }))
 // The real one drags Excalidraw into jsdom; this slice is about the states
 // around the canvas, not the canvas.
 vi.mock("./-components/SharedCanvas", () => ({
-  default: () => <div data-testid="shared-canvas" />,
+  default: ({ token }: { token: string }) => (
+    <div data-testid="shared-canvas" data-token={token} />
+  ),
 }))
 
 const signInEmail = vi.fn()
@@ -169,6 +174,12 @@ test("bad credentials on the gate leave the visitor on the gate", async () => {
 test("a live link renders the canvas", async () => {
   await renderShare(OK)
   expect(await screen.findByTestId("shared-canvas")).toBeDefined()
+})
+
+test("the canvas gets the token — it is what the room socket dials", async () => {
+  await renderShare(OK)
+  const canvas = await screen.findByTestId("shared-canvas")
+  expect(canvas.getAttribute("data-token")).toBe(TOKEN)
 })
 
 test("the ?full flag renders the room-full state on a live link", async () => {

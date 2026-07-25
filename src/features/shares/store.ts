@@ -145,6 +145,24 @@ export async function resolveShareByToken(db: Db, token: string) {
   return row ?? null
 }
 
+/**
+ * Token → the bare minimum the websocket upgrade needs: the audience to
+ * check, the drawing's id (which is the room), and whether it is trashed.
+ * Deliberately not `resolveShareByToken` — that carries the whole scene JSON,
+ * and an upgrade runs on every (re)connect.
+ */
+export async function resolveShareForRoom(db: Db, token: string) {
+  const [row] = await db
+    .select({
+      audience: shares.audience,
+      drawing: { id: drawings.id, deletedAt: drawings.deletedAt },
+    })
+    .from(shares)
+    .innerJoin(drawings, eq(shares.drawingId, drawings.id))
+    .where(eq(shares.token, token))
+  return row ?? null
+}
+
 export type ShareResolution =
   /** Every dead token — unknown, stopped, regenerated-away, trashed. */
   | { status: "dead" }
