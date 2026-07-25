@@ -28,3 +28,6 @@ The Gallery's filter chrome on All drawings: on-page search (the app's only inli
 
 ### Preview
 A non-interactive visual rendering of a Drawing's scene, shown on Gallery cards so drawings are recognizable by shape rather than name.
+
+### Room
+The live collaboration session around one shared Drawing. Exists only while at least one participant (owner or guest) is connected; holds the authoritative scene while live. There is at most one Room per Drawing.
