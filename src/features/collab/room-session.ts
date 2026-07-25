@@ -293,12 +293,18 @@ export async function receiveFromPeer(
   peer: RoomPeer,
   raw: string,
 ) {
+  const message = parseClientMessage(raw)
+  if (!message) return
+
+  // Answered ahead of the room lookup, so the heartbeat works in the window
+  // between the socket opening and the join landing (spec §5.3). A beat that
+  // went unanswered there would be read as a dead socket, and the client
+  // would drop a connection that was only still reading its scene.
+  if (message.type === "PING") return peer.send({ type: "PONG", payload: {} })
+
   const room = registry.rooms.get(roomId)
   const participant = room?.participants.get(peer.id)
   if (!room || !participant) return
-
-  const message = parseClientMessage(raw)
-  if (!message) return
 
   if (message.type === "JOIN") {
     // Only guests name themselves. A member's name is whatever the session

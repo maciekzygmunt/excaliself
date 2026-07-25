@@ -13,6 +13,7 @@
  */
 
 import type { SceneElement } from "./protocol"
+import { MAX_FRAME_BYTES, utf8ByteLength } from "./protocol"
 import { getSceneVersion } from "./reconcile"
 
 /** Upstream's `SYNC_FULL_SCENE_INTERVAL_MS` — the safety-net cadence. */
@@ -32,6 +33,52 @@ function isSyncableElement(element: SceneElement, now: number): boolean {
   return typeof element.updated === "number"
     ? element.updated > now - DELETED_ELEMENT_TIMEOUT_MS
     : true
+}
+
+/** Room enough for `{"type":"SCENE_UPDATE","payload":{"elements":[]}}`, and then some. */
+const FRAME_ENVELOPE_BYTES = 128
+
+/**
+ * Cut a selection into frames the server will accept (spec §5.4). The cap is
+ * enforced there by closing the socket with 1009, and a client that healed by
+ * reconnecting and re-sending the same oversized frame would close it again —
+ * a loop the drawing never escapes. So the one side that can avoid tripping
+ * it does: a big enough scene goes out as several frames instead of one.
+ *
+ * Whole-scene syncs are what get near the cap at all; ordinary deltas are a
+ * handful of elements and take the fast path without measuring anything.
+ */
+export function splitSceneFrames(
+  elements: readonly SceneElement[],
+  maxBytes: number = MAX_FRAME_BYTES,
+): SceneElement[][] {
+  if (elements.length === 0) return []
+  const budget = maxBytes - FRAME_ENVELOPE_BYTES
+
+  // Three bytes per UTF-16 code unit is the worst UTF-8 can do, so a payload
+  // that clears the budget at that rate needs no per-element accounting.
+  const serialized = JSON.stringify(elements)
+  if (serialized.length * 3 <= budget) return [[...elements]]
+
+  const frames: SceneElement[][] = []
+  let frame: SceneElement[] = []
+  let frameBytes = 0
+  for (const element of elements) {
+    const bytes = utf8ByteLength(JSON.stringify(element)) + 1 // the comma
+    // A single element over the cap cannot be split, and sending it would
+    // close the socket on arrival. Dropping it loses that one element's sync
+    // until it is edited again; keeping it would lose the session.
+    if (bytes > budget) continue
+    if (frame.length > 0 && frameBytes + bytes > budget) {
+      frames.push(frame)
+      frame = []
+      frameBytes = 0
+    }
+    frame.push(element)
+    frameBytes += bytes
+  }
+  if (frame.length > 0) frames.push(frame)
+  return frames
 }
 
 export function createSceneBroadcaster(now: () => number = () => Date.now()) {

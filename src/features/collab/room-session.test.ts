@@ -718,3 +718,30 @@ test("a full room does not keep anyone out of a different drawing", async () => 
     await joinRoom(registry, "drawing-2", fakePeer("peer-late"), guest),
   ).toEqual({ status: "ok" })
 })
+
+test("a PING is answered, and never fans out to the room", async () => {
+  const registry = emptyRegistry()
+  const peer = fakePeer("peer-a")
+  await joinRoom(registry, ROOM, peer, guest)
+  peer.sent.length = 0
+  peer.published.length = 0
+
+  await receiveFromPeer(registry, ROOM, peer, '{"type":"PING","payload":{}}')
+
+  expect(peer.sent).toEqual([{ type: "PONG", payload: {} }])
+  expect(peer.published).toEqual([])
+})
+
+test("a PING is answered while the room is still reading its scene", async () => {
+  // The heartbeat starts the moment the socket opens, and a slow scene read
+  // must not make the very first beat look like a dead connection.
+  const registry = createRoomRegistry(
+    () => new Promise(() => {}) as Promise<never>,
+  )
+  const peer = fakePeer("peer-a")
+  void joinRoom(registry, ROOM, peer, guest)
+
+  await receiveFromPeer(registry, ROOM, peer, '{"type":"PING","payload":{}}')
+
+  expect(peer.sent.at(-1)).toEqual({ type: "PONG", payload: {} })
+})

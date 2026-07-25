@@ -12,6 +12,11 @@
  * broadcast: a follower tells the server who it is trailing (`USER_FOLLOW`),
  * and the followed peer — told it has an audience by `FOLLOWED_BY` — relays
  * its viewport (`USER_VISIBLE_SCENE_BOUNDS`) to exactly those followers.
+ *
+ * `PING`/`PONG` are the app-level heartbeat of spec §5.3. They are here
+ * rather than at the transport level because a browser cannot send websocket
+ * ping frames from JavaScript at all — only the server side of a connection
+ * can, and it is the client that needs to know its socket has gone quiet.
  */
 
 /** The single pub/sub topic every peer in a room subscribes to. */
@@ -25,6 +30,28 @@ export const ROOM_TOPIC = "room"
  * number echoes HTTP 429: too many, come back later.
  */
 export const ROOM_FULL_CLOSE_CODE = 4029
+
+/**
+ * Close code for a socket whose token no longer checks out (spec §5.3). Same
+ * reasoning as the cap's code: the upgrade *could* simply be refused, but a
+ * refused handshake is an opaque 1006 the client cannot tell from a server
+ * that is merely down — and "down" means retry forever, which is exactly the
+ * loop a killed link must not spin in. Accepting the socket only to close it
+ * with a code the page can read is what routes it to the dead-link state
+ * instead. The number echoes HTTP 410 Gone.
+ */
+export const LINK_DEAD_CLOSE_CODE = 4010
+
+/**
+ * Every frame this protocol will accept, in bytes (spec §5.4). Anything
+ * larger closes the socket with the standard 1009 (message too big); the
+ * client self-heals through the same reconnect + `SCENE_INIT` resync as any
+ * other drop, so there is no error channel for it.
+ */
+export const MAX_FRAME_BYTES = 4 * 1024 * 1024
+
+/** WebSocket's own "message too big" code — what an oversized frame closes with. */
+export const FRAME_TOO_LARGE_CLOSE_CODE = 1009
 
 /** Cursor and avatar color, in Excalidraw's `Collaborator["color"]` shape. */
 export type ParticipantColor = { background: string; stroke: string }
@@ -80,6 +107,13 @@ export type ClientMessage =
   | { type: "USER_FOLLOW"; payload: { followedConnectionId: string | null } }
   /** Sent only while someone is following this tab. */
   | { type: "USER_VISIBLE_SCENE_BOUNDS"; payload: { bounds: SceneBounds } }
+  /**
+   * Heartbeat (spec §5.3). It carries nothing — its whole job is to be
+   * traffic — but it carries an empty payload rather than none, so every
+   * message in the protocol has the same shape and nothing downstream has to
+   * ask whether this one does.
+   */
+  | { type: "PING"; payload: Record<string, never> }
 
 export type ServerMessage =
   /** First frame back: who you are in this room, and who else is here. */
@@ -107,12 +141,56 @@ export type ServerMessage =
       type: "USER_VISIBLE_SCENE_BOUNDS"
       payload: { connectionId: string; bounds: SceneBounds }
     }
+  /**
+   * The answer to a `PING`. Traffic in the other direction matters as much as
+   * the ping itself: an idle timeout that only watches one direction would
+   * still fire on a socket the client alone is keeping warm.
+   */
+  | { type: "PONG"; payload: Record<string, never> }
 
 /** Longest display name accepted from a peer, in code points. */
 export const MAX_NAME_LENGTH = 40
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value)
+}
+
+const encoder = new TextEncoder()
+
+/**
+ * Exact UTF-8 size of a string. Allocates a copy, so callers keep it off the
+ * hot path — {@link exceedsFrameCap} only reaches for it in the narrow band
+ * where the cheap bounds cannot decide.
+ */
+export function utf8ByteLength(text: string): number {
+  return encoder.encode(text).length
+}
+
+/**
+ * Whether a frame is over the cap of spec §5.4, given whatever the transport
+ * handed over — a string, a Buffer, an ArrayBuffer.
+ *
+ * The string path is written around the two bounds that need no work:
+ * UTF-8 never spends fewer bytes than there are UTF-16 code units, and never
+ * more than three per unit. Every real frame — a cursor at 30 Hz, a
+ * one-element delta — is decided by a comparison against `.length`, and only
+ * a payload in the megabyte band is actually measured.
+ */
+export function exceedsFrameCap(
+  raw: unknown,
+  maxBytes: number = MAX_FRAME_BYTES,
+): boolean {
+  if (typeof raw === "string") {
+    if (raw.length * 3 <= maxBytes) return false
+    if (raw.length > maxBytes) return true
+    return utf8ByteLength(raw) > maxBytes
+  }
+  // Buffer is a Uint8Array, so the view check covers the node adapter too.
+  if (ArrayBuffer.isView(raw)) return raw.byteLength > maxBytes
+  if (raw instanceof ArrayBuffer) return raw.byteLength > maxBytes
+  // Anything else is a shape this protocol does not speak; the parser will
+  // drop it, and refusing to guess its size is not the cap's job.
+  return false
 }
 
 function isFiniteNumber(value: unknown): value is number {
@@ -204,6 +282,8 @@ export function parseClientMessage(raw: string): ClientMessage | null {
   }
   if (!isRecord(decoded)) return null
 
+  if (decoded.type === "PING") return { type: "PING", payload: {} }
+
   if (decoded.type === "JOIN") {
     if (!isRecord(decoded.payload)) return null
     const name = sanitizeName(decoded.payload.name)
@@ -279,8 +359,11 @@ export function parseServerMessage(raw: string): ServerMessage | null {
   } catch {
     return null
   }
-  if (!isRecord(decoded) || !isRecord(decoded.payload)) return null
+  if (!isRecord(decoded)) return null
+  if (!isRecord(decoded.payload)) return null
   const payload = decoded.payload
+
+  if (decoded.type === "PONG") return { type: "PONG", payload: {} }
 
   if (decoded.type === "ROOM_JOINED" || decoded.type === "PARTICIPANTS") {
     const participants = parseParticipants(payload.participants)

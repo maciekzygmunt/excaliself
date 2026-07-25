@@ -8,8 +8,12 @@
 
 import { act, cleanup, render } from "@testing-library/react"
 import { afterEach, beforeEach, expect, test, vi } from "vitest"
+import { RECONNECT_MAX_DELAY_MS } from "./backoff"
+import { HEARTBEAT_INTERVAL_MS, HEARTBEAT_TIMEOUT_MS } from "./heartbeat"
 import type { SceneElement, ServerMessage } from "./protocol"
+import { LINK_DEAD_CLOSE_CODE, ROOM_FULL_CLOSE_CODE } from "./protocol"
 import { reconcileElements } from "./reconcile"
+import type { ConnectionStatus } from "./use-room"
 import { useRoom } from "./use-room"
 
 // `@excalidraw/excalidraw` can't be loaded outside the browser build — the
@@ -52,8 +56,15 @@ class FakeSocket {
   send(data: string) {
     this.sent.push(data)
   }
-  close() {
+  /**
+   * Both halves of a real close: the state flips and the event fires. The
+   * hook's reconnect hangs off that event, so a `close()` that only set the
+   * state would let every retry test pass without a retry happening.
+   */
+  close(code = 1005) {
+    if (this.readyState === 3) return
     this.readyState = 3
+    this.emit("close", { code })
   }
 
   private emit(type: string, event: unknown) {
@@ -74,6 +85,10 @@ class FakeSocket {
       .map((raw) => JSON.parse(raw))
       .filter((message) => message.type === "SCENE_UPDATE")
       .map((message) => message.payload.elements as SceneElement[])
+  }
+
+  get typesSent() {
+    return this.sent.map((raw) => JSON.parse(raw).type as string)
   }
 }
 
@@ -105,6 +120,10 @@ function fakeExcalidraw(initial: SceneElement[] = []) {
   let scene = initial
   const api = {
     scene: () => scene,
+    /** What a local edit does before Excalidraw announces it. */
+    setScene: (next: SceneElement[]) => {
+      scene = next
+    },
     onChange: (_elements: readonly SceneElement[]) => {},
     getSceneElementsIncludingDeleted: () => scene,
     getAppState: () => ({ collaborators: new Map() }),
@@ -124,16 +143,20 @@ function fakeExcalidraw(initial: SceneElement[] = []) {
 
 function renderRoom(api: ReturnType<typeof fakeExcalidraw>) {
   let onChange: ((elements: readonly SceneElement[]) => void) | null = null
+  let status: ConnectionStatus = "connecting"
+  const onRoomFull = vi.fn()
+  const onLinkDead = vi.fn()
   function Harness() {
     const room = useRoom({
       token: TOKEN,
       name: "Ada",
       // The hook only ever reaches for the handful of methods above.
       excalidrawAPI: api as never,
-      // The participant cap is #125's; nothing here trips it.
-      onRoomFull: () => {},
+      onRoomFull,
+      onLinkDead,
     })
     onChange = room.onChange as never
+    status = room.connectionStatus
     return null
   }
   render(<Harness />)
@@ -143,16 +166,35 @@ function renderRoom(api: ReturnType<typeof fakeExcalidraw>) {
   act(() => socket.open())
   return {
     socket,
-    change: (elements: SceneElement[]) => act(() => onChange?.(elements)),
+    onRoomFull,
+    onLinkDead,
+    status: () => status,
+    /** The socket the hook is on now — a reconnect makes a new one. */
+    latest: () => sockets[sockets.length - 1],
+    change: (elements: SceneElement[]) =>
+      act(() => {
+        // The canvas holds the edit before it announces it — which is what
+        // makes an edit survive a disconnect the hook heard nothing about.
+        api.setScene(elements)
+        onChange?.(elements)
+      }),
   }
 }
 
+/** Let every scheduled retry fire, whatever the jitter drew. */
+const waitOutBackoff = () =>
+  act(() => {
+    vi.advanceTimersByTime(RECONNECT_MAX_DELAY_MS)
+  })
+
 beforeEach(() => {
   sockets = []
+  vi.useFakeTimers()
   vi.stubGlobal("WebSocket", FakeSocket)
 })
 afterEach(() => {
   cleanup()
+  vi.useRealTimers()
   vi.unstubAllGlobals()
 })
 
@@ -233,4 +275,165 @@ test("nothing is sent while the socket is closed", () => {
   change([element("a", 1)])
 
   expect(socket.scenesSent).toEqual([])
+})
+
+// --- reconnect, heartbeat, and the closes that end the loop --------------
+
+/** The one frame that says "the room accepted this socket". */
+const joined = (): ServerMessage => ({
+  type: "ROOM_JOINED",
+  payload: { connectionId: "self", participants: [] },
+})
+
+test("a dropped socket is dialed again, and again", () => {
+  const { socket, latest } = renderRoom(fakeExcalidraw())
+  act(() => socket.receive(joined()))
+
+  act(() => socket.close(1006))
+  waitOutBackoff()
+  expect(sockets).toHaveLength(2)
+
+  act(() => latest().close(1006))
+  waitOutBackoff()
+  expect(sockets).toHaveLength(3)
+})
+
+test("a disconnected tab says so, and stops once it is back in the room", () => {
+  const { socket, status, latest } = renderRoom(fakeExcalidraw())
+  act(() => socket.receive(joined()))
+  expect(status()).toBe("connected")
+
+  act(() => socket.close(1006))
+  expect(status()).toBe("reconnecting")
+
+  waitOutBackoff()
+  act(() => latest().open())
+  // The socket is open but the room has not answered yet — still reconnecting.
+  expect(status()).toBe("reconnecting")
+  act(() => latest().receive(joined()))
+  expect(status()).toBe("connected")
+})
+
+test("the first dial is not called a reconnection", () => {
+  // The page is already showing its own loader; a second indicator saying
+  // the same thing would read as a fault.
+  const { status } = renderRoom(fakeExcalidraw())
+  expect(status()).toBe("connecting")
+})
+
+test("work done while disconnected reaches the room on rejoin", () => {
+  const api = fakeExcalidraw()
+  const { socket, change, latest } = renderRoom(api)
+  act(() =>
+    socket.receive({
+      type: "SCENE_INIT",
+      payload: { elements: [element("from-room", 1)] },
+    }),
+  )
+
+  act(() => socket.close(1006))
+  // The canvas is still live: this is the edit made during the outage.
+  change([element("from-room", 1), element("drawn-offline", 1)])
+
+  waitOutBackoff()
+  const next = latest()
+  act(() => next.open())
+  act(() =>
+    next.receive({
+      type: "SCENE_INIT",
+      payload: { elements: [element("from-room", 1)] },
+    }),
+  )
+
+  expect(next.scenesSent.map((els) => els.map((e) => e.id))).toEqual([
+    ["drawn-offline"],
+  ])
+})
+
+test("a restarted server is re-told everything, not just the newest edits", () => {
+  // The room flushes on an interval, so a crash loses the tail of a session.
+  // The reconnect's catch-up is the only thing that puts it back, and it can
+  // only do that if the previous socket's "the room has seen this" is gone.
+  const api = fakeExcalidraw()
+  const { socket, change, latest } = renderRoom(api)
+  act(() => socket.receive({ type: "SCENE_INIT", payload: { elements: [] } }))
+  change([element("drawn-before-crash", 1)])
+  expect(socket.scenesSent.map((els) => els.map((e) => e.id))).toEqual([
+    ["drawn-before-crash"],
+  ])
+
+  act(() => socket.close(1006))
+  waitOutBackoff()
+  const next = latest()
+  act(() => next.open())
+  // The restarted room came back without that element.
+  act(() => next.receive({ type: "SCENE_INIT", payload: { elements: [] } }))
+
+  expect(next.scenesSent.map((els) => els.map((e) => e.id))).toEqual([
+    ["drawn-before-crash"],
+  ])
+})
+
+test("a link that died is reported, not retried", () => {
+  const { socket, onLinkDead } = renderRoom(fakeExcalidraw())
+  act(() => socket.receive(joined()))
+
+  act(() => socket.close(LINK_DEAD_CLOSE_CODE))
+  waitOutBackoff()
+
+  expect(onLinkDead).toHaveBeenCalledTimes(1)
+  expect(sockets).toHaveLength(1)
+})
+
+test("a full room is reported, not retried", () => {
+  const { socket, onRoomFull } = renderRoom(fakeExcalidraw())
+
+  act(() => socket.close(ROOM_FULL_CLOSE_CODE))
+  waitOutBackoff()
+
+  expect(onRoomFull).toHaveBeenCalledTimes(1)
+  expect(sockets).toHaveLength(1)
+})
+
+test("a quiet session is kept warm by the heartbeat", () => {
+  const { socket } = renderRoom(fakeExcalidraw())
+  act(() => socket.receive(joined()))
+
+  act(() => {
+    vi.advanceTimersByTime(HEARTBEAT_INTERVAL_MS)
+  })
+  expect(socket.typesSent).toContain("PING")
+
+  // Answered, so the socket is left alone.
+  act(() => socket.receive({ type: "PONG", payload: {} }))
+  act(() => {
+    vi.advanceTimersByTime(HEARTBEAT_TIMEOUT_MS * 2)
+  })
+  expect(socket.readyState).not.toBe(3)
+})
+
+test("a socket that stops answering is dropped and dialed again", () => {
+  // The half-open connection: still OPEN, delivering nothing. Without the
+  // heartbeat nothing would ever notice, and the tab would sit there dead.
+  const { socket } = renderRoom(fakeExcalidraw())
+  act(() => socket.receive(joined()))
+
+  act(() => {
+    vi.advanceTimersByTime(HEARTBEAT_INTERVAL_MS + HEARTBEAT_TIMEOUT_MS)
+  })
+  expect(socket.readyState).toBe(3)
+
+  waitOutBackoff()
+  expect(sockets).toHaveLength(2)
+})
+
+test("unmounting ends the retries", () => {
+  const { socket } = renderRoom(fakeExcalidraw())
+  act(() => socket.receive(joined()))
+
+  cleanup()
+  act(() => socket.close(1006))
+  waitOutBackoff()
+
+  expect(sockets).toHaveLength(1)
 })

@@ -11,7 +11,12 @@
 import { defineWebSocketHandler } from "nitro"
 import { db } from "@/db"
 import { resolveRoomJoin } from "@/features/collab/join"
-import { ROOM_FULL_CLOSE_CODE } from "@/features/collab/protocol"
+import {
+  exceedsFrameCap,
+  FRAME_TOO_LARGE_CLOSE_CODE,
+  LINK_DEAD_CLOSE_CODE,
+  ROOM_FULL_CLOSE_CODE,
+} from "@/features/collab/protocol"
 import type {
   ParticipantIdentity,
   RoomPeer,
@@ -34,8 +39,6 @@ import { auth } from "@/lib/auth"
  */
 const rooms = createRoomRegistry((roomId) => loadRoomScene(db, roomId))
 
-type PeerContext = { roomId: string; identity: ParticipantIdentity }
-
 /**
  * crossws derives the namespace from the pathname by default, which would
  * key rooms by token — regenerating a link would then split one drawing
@@ -43,6 +46,13 @@ type PeerContext = { roomId: string; identity: ParticipantIdentity }
  * pub/sub group and the Room are the same thing.
  */
 const namespaceFor = (roomId: string) => `room:${roomId}`
+
+/**
+ * Where a refused socket lands for the moment it stays open. Its own
+ * namespace, shared with no room: nothing is published into it, and its
+ * peers never subscribe to a topic before being closed.
+ */
+const REFUSED_NAMESPACE = "room:refused"
 
 /** crossws peers already carry a random per-socket id — the connection id. */
 function toRoomPeer(peer: {
@@ -65,8 +75,17 @@ function toRoomPeer(peer: {
   }
 }
 
+/**
+ * What the upgrade decided about this socket: which room it belongs in, or
+ * that it belongs in none and exists only to be told so.
+ */
 function contextOf(peer: { context: Record<string, unknown> }) {
-  const context = peer.context as Partial<PeerContext>
+  const context = peer.context as Partial<{
+    roomId: string
+    identity: ParticipantIdentity
+    refused: true
+  }>
+  if (context.refused) return { refused: true } as const
   return context.roomId && context.identity
     ? { roomId: context.roomId, identity: context.identity }
     : null
@@ -99,10 +118,14 @@ export default defineWebSocketHandler({
     ])
 
     const join = resolveRoomJoin({ share, user: session?.user ?? null })
-    // One generic refusal for every reason, like the dead-link page: a
-    // rejected upgrade never reveals whether the drawing exists.
+    // One generic refusal for every reason, like the dead-link page: nothing
+    // here reveals whether the drawing exists. The socket is accepted anyway
+    // and closed in `open` with a code the client can read — a rejected
+    // handshake would arrive as an opaque 1006, which a client reconnecting
+    // through an outage (spec §5.3) cannot tell from a server that is down,
+    // and would retry against forever.
     if (join.status !== "ok")
-      throw new Response("Unauthorized", { status: 401 })
+      return { namespace: REFUSED_NAMESPACE, context: { refused: true } }
 
     return {
       namespace: namespaceFor(join.roomId),
@@ -117,6 +140,11 @@ export default defineWebSocketHandler({
   async open(peer) {
     const context = contextOf(peer)
     if (!context) return peer.close(1011, "Room unavailable")
+    // The dead-link answer of spec §5.3, and the one close the reconnect loop
+    // treats as final: retrying a link that is gone would spin forever.
+    if ("refused" in context)
+      return peer.close(LINK_DEAD_CLOSE_CODE, "Link no longer active")
+
     const join = await joinRoom(
       rooms,
       context.roomId,
@@ -131,7 +159,15 @@ export default defineWebSocketHandler({
 
   async message(peer, message) {
     const context = contextOf(peer)
-    if (!context) return
+    if (!context || "refused" in context) return
+
+    // The frame cap of spec §5.4, measured off the raw frame before it is
+    // decoded — a 4 MB payload should not also cost a 4 MB string. The client
+    // needs no error channel for it: the close looks like any other drop, and
+    // the reconnect's SCENE_INIT puts the session back together.
+    if (exceedsFrameCap(message.rawData))
+      return peer.close(FRAME_TOO_LARGE_CLOSE_CODE, "Frame too large")
+
     await receiveFromPeer(
       rooms,
       context.roomId,
@@ -142,7 +178,7 @@ export default defineWebSocketHandler({
 
   close(peer) {
     const context = contextOf(peer)
-    if (!context) return
+    if (!context || "refused" in context) return
     leaveRoom(rooms, context.roomId, toRoomPeer(peer))
   },
 })
