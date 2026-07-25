@@ -15,6 +15,7 @@ import {
 import { useAutoSave } from "@/hooks/use-auto-save"
 import { useCanvasTheme } from "@/hooks/use-theme"
 import { FooterRightPortal, SaveStatusPill } from "./SaveStatusPill"
+import { ShareButton } from "./ShareDialog"
 import { TopLeftControls, TopLeftPortal } from "./TopLeftControls"
 
 import "@excalidraw/excalidraw/index.css"
@@ -111,6 +112,11 @@ export function DrawingCanvas({ drawingId, readOnly = false }: Props) {
         theme={canvasTheme}
         viewModeEnabled={readOnly || undefined}
         onChange={readOnly ? undefined : handleSceneChange}
+        // Trashed drawings can't be shared (their links go dark), so the
+        // read-only view hides the button rather than opening a dead dialog.
+        renderTopRightUI={
+          readOnly ? undefined : () => <ShareButton drawingId={drawingId} />
+        }
         UIOptions={{
           canvasActions: {
             loadScene: false,

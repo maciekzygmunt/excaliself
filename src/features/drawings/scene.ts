@@ -107,7 +107,7 @@ function parseSceneData(raw: string | undefined | null): {
   }
 }
 
-function buildInitialSceneData(
+export function buildInitialSceneData(
   drawing: { data: string; files?: PersistedFile[] | null } | null | undefined,
 ): { initialData: ExcalidrawInitialDataState; isDataCorrupt: boolean } {
   const files = toBinaryFiles(drawing?.files)

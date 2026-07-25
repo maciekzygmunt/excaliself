@@ -162,7 +162,6 @@ export const drawings = pgTable("drawings", {
   ownerId: text("ownerId")
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
-  isPublic: boolean("isPublic").notNull().default(false),
   starred: boolean("starred").notNull().default(false),
   // Soft delete — see folders.deletedAt/trashRootId for the model.
   deletedAt: timestamp("deletedAt"),
@@ -183,6 +182,24 @@ export const drawingFiles = pgTable("drawing_files", {
   fileId: text("fileId").notNull(),
   mimeType: text("mimeType").notNull(),
   dataUrl: text("dataUrl").notNull(),
+  createdAt: timestamp("createdAt")
+    .notNull()
+    .$defaultFn(() => new Date()),
+})
+
+// One live edit link per drawing. "Shared" means a row exists here — there is
+// no flag on drawings. Trashed drawings keep their row (restore revives the
+// link); hard delete cleans up via the FK cascade.
+export const shares = pgTable("shares", {
+  id: text("id").primaryKey(),
+  token: text("token").notNull().unique(),
+  drawingId: text("drawingId")
+    .notNull()
+    .unique()
+    .references(() => drawings.id, { onDelete: "cascade" }),
+  audience: text("audience", { enum: ["members", "anyone"] })
+    .notNull()
+    .default("members"),
   createdAt: timestamp("createdAt")
     .notNull()
     .$defaultFn(() => new Date()),

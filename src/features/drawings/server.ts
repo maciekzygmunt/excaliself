@@ -67,7 +67,6 @@ export const createDrawing = createServerFn({ method: "POST" })
       data: JSON.stringify({ elements: [], appState: {} }),
       folderId: data.folderId ?? null,
       ownerId: userId,
-      isPublic: false,
       createdAt: now,
       updatedAt: now,
     })
