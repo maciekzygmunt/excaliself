@@ -76,6 +76,51 @@ export async function getRoomFile({
   })
 }
 
+/**
+ * Reads the body with a hard ceiling on the bytes taken in, rather than
+ * trusting `content-length` — that header is optional, and a chunked upload
+ * omits it entirely. Without this, a token holder could stream an unbounded
+ * body straight into memory and the per-image cap would never get to rule on
+ * it, because the cap can only read a body that has already been buffered.
+ *
+ * Decoded as it arrives so the bytes are never held twice.
+ */
+const parseJson = (text: string): unknown => {
+  try {
+    return JSON.parse(text)
+  } catch {
+    return null
+  }
+}
+
+async function readCappedBody(
+  request: Request,
+  maxBytes: number,
+): Promise<{ status: "ok"; text: string } | { status: "too-large" | "empty" }> {
+  const stream = request.body
+  if (!stream) return { status: "empty" }
+
+  const reader = stream.getReader()
+  const decoder = new TextDecoder()
+  let text = ""
+  let total = 0
+  try {
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      total += value.byteLength
+      // Hangs up on the sender rather than draining what is left of it.
+      if (total > maxBytes) return { status: "too-large" }
+      text += decoder.decode(value, { stream: true })
+    }
+  } catch {
+    return { status: "empty" }
+  } finally {
+    await reader.cancel().catch(() => {})
+  }
+  return { status: "ok", text: text + decoder.decode() }
+}
+
 export async function postRoomFile({
   request,
   params,
@@ -83,10 +128,10 @@ export async function postRoomFile({
   request: Request
   params: { token: string; fileId: string }
 }): Promise<Response> {
-  // Cheapest refusal first: a body that can't possibly hold a legal image is
-  // over the cap whatever it turns out to contain, and reading it would be
-  // paying for the attack. A missing content-length falls through to the
-  // exact check below.
+  // Cheapest refusal first: a body that *declares* it can't hold a legal image
+  // is over the cap whatever it turns out to contain, so it is refused before
+  // the token is even looked up. The stream is capped again below, for the
+  // senders that declare nothing.
   const declaredLength = Number(request.headers.get("content-length") ?? "")
   if (Number.isFinite(declaredLength) && declaredLength > MAX_UPLOAD_BODY_BYTES)
     return new Response("Payload Too Large", { status: 413 })
@@ -105,7 +150,13 @@ export async function postRoomFile({
   )
     return new Response("Too Many Requests", { status: 429 })
 
-  const body = await request.json().catch(() => null)
+  const read = await readCappedBody(request, MAX_UPLOAD_BODY_BYTES)
+  if (read.status === "too-large")
+    return new Response("Payload Too Large", { status: 413 })
+
+  // Unparseable is just another malformed body — `parseFileUpload` turns the
+  // resulting null into the 400 below.
+  const body = read.status === "ok" ? parseJson(read.text) : null
   const parsed = parseFileUpload(decodeURIComponent(params.fileId), body)
   if (parsed.status === "too-large")
     return new Response("Payload Too Large", { status: 413 })

@@ -45,6 +45,14 @@ import type { SceneElement } from "./protocol"
 const MAX_FETCH_ATTEMPTS = 3
 
 /**
+ * How long a missed fetch waits before trying again. The retry is scheduled
+ * rather than left to the next scene frame, because a room where everyone has
+ * stopped drawing sends none — and a late joiner whose one GET blipped would
+ * otherwise stare at an image with no bytes for the rest of the session.
+ */
+const FETCH_RETRY_MS = 2_000
+
+/**
  * How many times a blob is offered before the tab stops carrying it. Only
  * unanswered attempts count — a refusal is final on the first one — and each
  * retry waits for the next `onChange`, so this is a bound on a burst rather
@@ -105,8 +113,14 @@ export function useRoomFiles(options: {
   const uploadAttemptsRef = useRef<Map<string, number>>(new Map())
   const inFlightFetchRef = useRef<Set<string>>(new Set())
   const fetchAttemptsRef = useRef<Map<string, number>>(new Map())
+  const retryTimersRef = useRef<Set<ReturnType<typeof setTimeout>>>(new Set())
   /** The token everything above was seeded for. */
   const seededForRef = useRef(token)
+
+  const cancelRetries = useCallback(() => {
+    for (const timer of retryTimersRef.current) clearTimeout(timer)
+    retryTimersRef.current.clear()
+  }, [])
 
   useEffect(() => {
     // A different token is a different drawing, so every judgement these hold
@@ -117,9 +131,13 @@ export function useRoomFiles(options: {
       uploadAttemptsRef.current = new Map()
       inFlightFetchRef.current = new Set()
       fetchAttemptsRef.current = new Map()
+      cancelRetries()
     }
     for (const fileId of storedFileIds) skipUploadRef.current.add(fileId)
-  }, [token, storedFileIds])
+  }, [token, storedFileIds, cancelRetries])
+
+  // A pending retry outlives the canvas it would inject into otherwise.
+  useEffect(() => cancelRetries, [cancelRetries])
 
   /**
    * Called from `onChange`, and deliberately not gated on SCENE_INIT the way
@@ -163,6 +181,37 @@ export function useRoomFiles(options: {
     [],
   )
 
+  /**
+   * One attempt at one blob, carrying its own retry. Held in a ref rather
+   * than a `useCallback` so it can schedule itself, and so the scheduled
+   * attempt runs against the token this tab holds *then*, not now.
+   */
+  const requestFileRef = useRef<(token: string, fileId: string) => void>(
+    () => {},
+  )
+  requestFileRef.current = (token, fileId) => {
+    if (inFlightFetchRef.current.has(fileId)) return
+    const attempts = fetchAttemptsRef.current.get(fileId) ?? 0
+    if (attempts >= MAX_FETCH_ATTEMPTS) return
+
+    fetchAttemptsRef.current.set(fileId, attempts + 1)
+    inFlightFetchRef.current.add(fileId)
+    void fetchRoomFile(token, fileId).then((file) => {
+      inFlightFetchRef.current.delete(fileId)
+      // A tab that uploaded this blob itself already has the bytes, so
+      // addFiles is only ever additive here — and re-adding is harmless.
+      if (file) return apiRef.current?.addFiles([file])
+
+      const timer = setTimeout(() => {
+        retryTimersRef.current.delete(timer)
+        // A token change means a different room, whose scene will ask for
+        // whatever it needs on its own.
+        if (tokenRef.current === token) requestFileRef.current(token, fileId)
+      }, FETCH_RETRY_MS)
+      retryTimersRef.current.add(timer)
+    })
+  }
+
   /** Called with every scene the room hands this tab — SCENE_INIT included. */
   const fetchMissing = useCallback((elements: readonly SceneElement[]) => {
     const token = tokenRef.current
@@ -171,18 +220,7 @@ export function useRoomFiles(options: {
 
     const known = new Set(Object.keys(api.getFiles()))
     for (const fileId of selectMissingFileIds(elements, known)) {
-      if (inFlightFetchRef.current.has(fileId)) continue
-      const attempts = fetchAttemptsRef.current.get(fileId) ?? 0
-      if (attempts >= MAX_FETCH_ATTEMPTS) continue
-
-      fetchAttemptsRef.current.set(fileId, attempts + 1)
-      inFlightFetchRef.current.add(fileId)
-      void fetchRoomFile(token, fileId).then((file) => {
-        inFlightFetchRef.current.delete(fileId)
-        // A tab that uploaded this blob itself already has the bytes, so
-        // addFiles is only ever additive here — and re-adding is harmless.
-        if (file) apiRef.current?.addFiles([file])
-      })
+      requestFileRef.current(token, fileId)
     }
   }, [])
 

@@ -16,12 +16,20 @@ type Db = NodePgDatabase<typeof schema>
  * allowed to flip to `status: "saved"`, so a peer reacting to that flip always
  * finds bytes waiting (spec §2.4).
  *
- * `fileId` is a content hash upstream, so an id the drawing already holds is
- * the same image and the existing row stands. Two peers pasting the same
- * picture at the same instant can race the check and leave a duplicate row;
- * both read back identically, and the solo save path's delete-by-fileId
- * removes them together. A unique index would be the tighter fix, and the
- * price is a migration for a collision that changes nothing.
+ * `fileId` is upstream's hash of the file the user picked, so an id the
+ * drawing already holds came from the same picture and the existing row
+ * stands. Note it is *not* a hash of what gets stored, and cannot be checked
+ * against it: upstream generates the id from the original file and only then
+ * downscales it, so the stored data URL is the resized image. Nothing here
+ * can verify that a participant uploaded the bytes their id names — but a
+ * participant already holds an edit link, and someone who can replace an
+ * image outright gains nothing by doing it under someone else's id.
+ *
+ * Two peers pasting the same picture at the same instant can race the check
+ * and leave a duplicate row; both read back identically, and the solo save
+ * path's delete-by-fileId removes them together. A unique index would be the
+ * tighter fix, and the price is a migration for a collision that changes
+ * nothing.
  */
 export async function saveRoomFile(
   db: Db,

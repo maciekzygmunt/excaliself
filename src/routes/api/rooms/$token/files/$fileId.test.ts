@@ -181,3 +181,48 @@ test("a fileId this drawing doesn't hold is a 404", async () => {
 
   expect(response.status).toBe(404)
 })
+
+test("an undeclared body is capped while it is read, not after", async () => {
+  // A chunked upload sends no content-length, so the header pre-check can't
+  // see it coming. Without a ceiling on the stream itself, this would buffer
+  // in full before the per-image cap got to rule on it.
+  admits()
+  let pushed = 0
+  const flood = new ReadableStream<Uint8Array>({
+    pull(controller) {
+      pushed += 1
+      controller.enqueue(new Uint8Array(1024 * 1024))
+    },
+  })
+
+  const response = await postRoomFile({
+    request: new Request("https://example.test/api/rooms/tok/files/file-1", {
+      method: "POST",
+      headers: { "x-forwarded-for": `198.51.100.${++nextIp}` },
+      body: flood,
+      // @ts-expect-error — node requires this for a streaming body.
+      duplex: "half",
+    }),
+    params,
+  })
+
+  expect(response.status).toBe(413)
+  expect(saveRoomFile).not.toHaveBeenCalled()
+  // It hung up rather than draining an endless sender.
+  expect(pushed * 1024 * 1024).toBeLessThan(4 * MAX_IMAGE_BYTES)
+})
+
+test("an unparseable body is a 400", async () => {
+  admits()
+
+  const response = await postRoomFile({
+    request: new Request("https://example.test/api/rooms/tok/files/file-1", {
+      method: "POST",
+      headers: { "x-forwarded-for": `198.51.100.${++nextIp}` },
+      body: "{not json",
+    }),
+    params,
+  })
+
+  expect(response.status).toBe(400)
+})

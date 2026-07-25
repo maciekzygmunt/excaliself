@@ -196,6 +196,7 @@ beforeEach(() => {
 })
 afterEach(() => {
   cleanup()
+  vi.useRealTimers()
   vi.unstubAllGlobals()
 })
 
@@ -464,21 +465,31 @@ test("a peer's pending or errored image is never fetched", async () => {
   expect(calls).toEqual([])
 })
 
-test("a missed fetch is retried, but not for the whole session", async () => {
+test("a missed fetch retries itself, in a room that has gone quiet", async () => {
+  // Nothing else would ask again: fetchMissing only runs when a frame
+  // arrives, and a room where everyone stopped drawing sends none.
+  vi.useFakeTimers()
   const calls = stubFetch({ ok: false })
   const api = fakeExcalidraw()
   const { socket } = renderRoom(api)
 
-  for (let i = 0; i < 6; i++) {
-    act(() =>
-      socket.receive({
-        type: "SCENE_UPDATE",
-        payload: { elements: [image("img", i + 1, "file-1", "saved")] },
-      }),
-    )
-    await settle()
-  }
+  act(() =>
+    socket.receive({
+      type: "SCENE_INIT",
+      payload: { elements: [image("img", 1, "file-1", "saved")] },
+    }),
+  )
+  await act(async () => {})
+  expect(calls).toHaveLength(1)
 
+  // No further frames — only the clock moves.
+  await act(() => vi.advanceTimersByTimeAsync(2_000))
+  expect(calls).toHaveLength(2)
+  await act(() => vi.advanceTimersByTimeAsync(2_000))
+  expect(calls).toHaveLength(3)
+
+  // And then it gives up rather than hammering a 404 all session.
+  await act(() => vi.advanceTimersByTimeAsync(30_000))
   expect(calls).toHaveLength(3)
 })
 
