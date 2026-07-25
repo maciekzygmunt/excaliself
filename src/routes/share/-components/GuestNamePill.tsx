@@ -17,6 +17,7 @@ import {
   sanitizeName,
 } from "@/features/collab/protocol"
 import { useDebounceCallback } from "@/hooks/use-debounce-callback"
+import { cn } from "@/lib/utils"
 
 /**
  * Long enough that a name lands as one edit rather than one broadcast per
@@ -32,6 +33,8 @@ type Props = {
   /** False for signed-in members, whose name the server takes from the session. */
   editable?: boolean
   onNameChange: (name: string) => void
+  /** Lets a host hide the pill, or drop its island styling inside a menu. */
+  className?: string
 }
 
 export function GuestNamePill({
@@ -39,11 +42,17 @@ export function GuestNamePill({
   color,
   editable = true,
   onNameChange,
+  className,
 }: Props) {
   return (
     // No pointer-events of its own: Excalidraw hands them to the top-right
     // row's children and takes them back while the canvas is being drawn on.
-    <div className="flex h-(--lg-button-size) max-w-56 items-center gap-2 rounded-(--border-radius-lg) bg-(--island-bg-color) px-3 shadow-(--shadow-island)">
+    <div
+      className={cn(
+        "flex h-(--lg-button-size) max-w-56 items-center gap-2 rounded-(--border-radius-lg) bg-(--island-bg-color) px-3 shadow-(--shadow-island)",
+        className,
+      )}
+    >
       <span
         data-testid="guest-color-dot"
         className="h-2 w-2 shrink-0 rounded-full bg-(--color-gray-40)"
