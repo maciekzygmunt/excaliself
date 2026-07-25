@@ -311,6 +311,48 @@ test("two peers following each other don't drag each other around", () => {
   })
 })
 
+test("a ring of three doesn't chase itself around the room", () => {
+  const { rooms, ada, grace } = twoPeerRoom()
+  const wren = fakePeer("peer-wren")
+  joinRoom(rooms, ROOM, wren, member("Wren"))
+
+  // ada → grace → wren → ada. Relaying any edge of this would hand each peer
+  // bounds that move its canvas, which publishes bounds of its own, forever.
+  receiveFromPeer(rooms, ROOM, ada, follow("peer-grace"))
+  receiveFromPeer(rooms, ROOM, grace, follow("peer-wren"))
+  receiveFromPeer(rooms, ROOM, wren, follow("peer-ada"))
+  for (const peer of [ada, grace, wren]) peer.sent.length = 0
+
+  for (const peer of [ada, grace, wren])
+    receiveFromPeer(rooms, ROOM, peer, viewport([0, 0, 100, 50]))
+
+  for (const peer of [ada, grace, wren])
+    expect(
+      peer.sent.filter((m) => m.type === "USER_VISIBLE_SCENE_BOUNDS"),
+    ).toHaveLength(0)
+})
+
+test("a chain of follows is not a ring, and keeps relaying", () => {
+  const { rooms, ada, grace } = twoPeerRoom()
+  const wren = fakePeer("peer-wren")
+  joinRoom(rooms, ROOM, wren, member("Wren"))
+
+  // wren → ada → grace: nobody closes the loop, so both hops carry.
+  receiveFromPeer(rooms, ROOM, ada, follow("peer-grace"))
+  receiveFromPeer(rooms, ROOM, wren, follow("peer-ada"))
+  for (const peer of [ada, grace, wren]) peer.sent.length = 0
+
+  receiveFromPeer(rooms, ROOM, grace, viewport([0, 0, 100, 50]))
+  receiveFromPeer(rooms, ROOM, ada, viewport([5, 5, 105, 55]))
+
+  expect(ada.sent.at(-1)).toMatchObject({
+    payload: { connectionId: "peer-grace" },
+  })
+  expect(wren.sent.at(-1)).toMatchObject({
+    payload: { connectionId: "peer-ada" },
+  })
+})
+
 test("a viewport nobody is following is relayed to nobody", () => {
   const { rooms, ada, grace } = twoPeerRoom()
 

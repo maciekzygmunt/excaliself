@@ -111,6 +111,27 @@ const followersOf = (room: Room, followedId: string) =>
     .map(([follower]) => follower)
 
 /**
+ * Everyone this peer is trailing, directly or down the chain. A viewport
+ * must never be relayed back into it: A→B→C→A would hand each peer bounds
+ * that move its canvas, which publishes bounds of its own, forever. Walking
+ * the whole chain rather than checking the one reciprocal edge is what makes
+ * that true for rings of any size.
+ *
+ * A chain is at most as long as the room, and the visited set means a cycle
+ * already in the map (one built before this guard existed, say) terminates
+ * the walk rather than hanging it.
+ */
+function upstreamOf(room: Room, peerId: string): Set<string> {
+  const upstream = new Set<string>()
+  let cursor = room.follows.get(peerId)
+  while (cursor && !upstream.has(cursor)) {
+    upstream.add(cursor)
+    cursor = room.follows.get(cursor)
+  }
+  return upstream
+}
+
+/**
  * Tell one peer who is currently trailing it. That list is what decides
  * whether it relays its viewport at all, so a peer nobody follows stays
  * silent.
@@ -175,11 +196,12 @@ export function receiveFromPeer(
   }
 
   if (message.type === "USER_VISIBLE_SCENE_BOUNDS") {
+    const upstream = upstreamOf(room, peer.id)
     for (const followerId of followersOf(room, peer.id)) {
-      // Two peers following each other would drag one another's canvas back
-      // and forth forever. Dropping just that one edge breaks the loop while
-      // everyone else trailing this peer still gets the viewport.
-      if (room.follows.get(peer.id) === followerId) continue
+      // Only the edges that would close a loop are dropped; anyone else
+      // trailing this peer still gets the viewport. A plain chain — C follows
+      // A, A follows B — is not a loop and keeps working.
+      if (upstream.has(followerId)) continue
       room.peers.get(followerId)?.send({
         type: "USER_VISIBLE_SCENE_BOUNDS",
         payload: { connectionId: peer.id, bounds: message.payload.bounds },
