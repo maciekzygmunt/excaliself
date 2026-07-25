@@ -1,7 +1,11 @@
 "use server"
 
 import { createServerFn } from "@tanstack/react-start"
-import { getRequestHeaders } from "@tanstack/react-start/server"
+import {
+  getRequestHeaders,
+  getRequestIP,
+  setResponseStatus,
+} from "@tanstack/react-start/server"
 import { z } from "zod"
 import { db } from "@/db"
 import { auth } from "@/lib/auth"
@@ -11,9 +15,11 @@ import {
   getShareLink,
   regenerateShareLink,
   resolveShareVisit,
+  type ShareResolution,
   setShareLinkAudience,
   stopSharingDrawing,
 } from "./store"
+import { allowTokenValidation } from "./token-rate-limit"
 
 const audienceSchema = z.enum(["members", "anyone"])
 
@@ -58,17 +64,32 @@ export const setShareAudience = createServerFn({ method: "POST" })
   )
 
 /**
+ * What the /share/$token loader gets back. `throttled` is the limiter's
+ * answer and never comes out of resolveShareVisit — it is decided before the
+ * database is touched at all.
+ */
+export type ShareVisit = ShareResolution | { status: "throttled" }
+
+/**
  * Public (pre-auth) resolution of a share token, called by the /share/$token
  * loader on every visit. All decisions live in resolveShareVisit; this
- * wrapper only supplies the live db and the cookie-derived session check.
+ * wrapper only supplies the live db, the cookie-derived session check, and
+ * the per-IP validation limit of spec §4.5.
  */
 export const resolveShareToken = createServerFn({ method: "GET" })
   .inputValidator(z.string())
-  .handler(({ data: token }) =>
-    resolveShareVisit(
+  .handler(async ({ data: token }): Promise<ShareVisit> => {
+    const headers = getRequestHeaders()
+    // Counted before the token lookup, so a flood costs the database nothing.
+    // The real 429 goes on the wire; the loader data drives the page.
+    if (!allowTokenValidation({ headers, socketIp: getRequestIP() })) {
+      setResponseStatus(429)
+      return { status: "throttled" }
+    }
+
+    return resolveShareVisit(
       db,
       token,
-      async () =>
-        (await auth.api.getSession({ headers: getRequestHeaders() })) !== null,
-    ),
-  )
+      async () => (await auth.api.getSession({ headers })) !== null,
+    )
+  })

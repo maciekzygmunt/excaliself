@@ -21,9 +21,11 @@ type Props = {
   files: PersistedFile[]
   /** The share token this visitor arrived on; also the room's dial string. */
   token: string
+  /** The room refused this visitor at its participant cap (spec §4.5). */
+  onRoomFull: () => void
 }
 
-export function SharedCanvas({ drawing, files, token }: Props) {
+export function SharedCanvas({ drawing, files, token, onRoomFull }: Props) {
   const initialData = useMemo(
     () => buildInitialSceneData({ data: drawing.data, files }).initialData,
     [drawing.data, files],
@@ -36,7 +38,12 @@ export function SharedCanvas({ drawing, files, token }: Props) {
   // the session's display name instead.
   const [name] = useState(() => getOrCreateGuestName())
 
-  const { others, onPointerUpdate } = useRoom({ token, name, excalidrawAPI })
+  const { others, onPointerUpdate } = useRoom({
+    token,
+    name,
+    excalidrawAPI,
+    onRoomFull,
+  })
 
   return (
     <div className="h-dvh w-full">

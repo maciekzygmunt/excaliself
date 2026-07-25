@@ -63,13 +63,30 @@ function broadcastRoster(peer: RoomPeer, room: Room) {
   peer.publish(ROOM_TOPIC, message)
 }
 
+/**
+ * Concurrent sockets one Room accepts (spec §4.5). Far above any real
+ * trusted-circle session — what it stops is a script holding sockets open
+ * until the process runs out of them.
+ */
+export const MAX_ROOM_PARTICIPANTS = 25
+
+export type RoomJoinResult =
+  | { status: "ok" }
+  /** The Room is at its cap; the visitor gets the "drawing full" page. */
+  | { status: "full" }
+
 export function joinRoom(
   rooms: RoomRegistry,
   roomId: string,
   peer: RoomPeer,
   identity: ParticipantIdentity,
-) {
+): RoomJoinResult {
   let room = rooms.get(roomId)
+  // Checked before the Room is created, so a refused join never leaves an
+  // empty one behind — and the room being knocked on hears nothing about it.
+  if (room && room.participants.size >= MAX_ROOM_PARTICIPANTS)
+    return { status: "full" }
+
   if (!room) {
     room = { participants: new Map() }
     rooms.set(roomId, room)
@@ -92,6 +109,7 @@ export function joinRoom(
     payload: { connectionId: peer.id, participants: rosterOf(room) },
   })
   peer.publish(ROOM_TOPIC, rosterMessage(room))
+  return { status: "ok" }
 }
 
 export function receiveFromPeer(
