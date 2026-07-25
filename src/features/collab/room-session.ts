@@ -30,7 +30,7 @@ export interface RoomPeer {
  * guests — the one thing that decides whether a name from the wire is
  * believed.
  */
-export type PeerIdentity = {
+export type ParticipantIdentity = {
   userId: string | null
   displayName: string | null
 }
@@ -51,12 +51,14 @@ function rosterOf(room: Room): Participant[] {
   return [...room.participants.values()]
 }
 
-/** To the joiner directly, and to everyone else via the room topic. */
+const rosterMessage = (room: Room): ServerMessage => ({
+  type: "PARTICIPANTS",
+  payload: { participants: rosterOf(room) },
+})
+
+/** To the peer itself, and to everyone else via the room topic. */
 function broadcastRoster(peer: RoomPeer, room: Room) {
-  const message: ServerMessage = {
-    type: "PARTICIPANTS",
-    payload: { participants: rosterOf(room) },
-  }
+  const message = rosterMessage(room)
   peer.send(message)
   peer.publish(ROOM_TOPIC, message)
 }
@@ -65,7 +67,7 @@ export function joinRoom(
   rooms: RoomRegistry,
   roomId: string,
   peer: RoomPeer,
-  identity: PeerIdentity,
+  identity: ParticipantIdentity,
 ) {
   let room = rooms.get(roomId)
   if (!room) {
@@ -89,10 +91,7 @@ export function joinRoom(
     type: "ROOM_JOINED",
     payload: { connectionId: peer.id, participants: rosterOf(room) },
   })
-  peer.publish(ROOM_TOPIC, {
-    type: "PARTICIPANTS",
-    payload: { participants: rosterOf(room) },
-  })
+  peer.publish(ROOM_TOPIC, rosterMessage(room))
 }
 
 export function receiveFromPeer(
@@ -137,8 +136,5 @@ export function leaveRoom(rooms: RoomRegistry, roomId: string, peer: RoomPeer) {
     rooms.delete(roomId)
     return
   }
-  peer.publish(ROOM_TOPIC, {
-    type: "PARTICIPANTS",
-    payload: { participants: rosterOf(room) },
-  })
+  peer.publish(ROOM_TOPIC, rosterMessage(room))
 }

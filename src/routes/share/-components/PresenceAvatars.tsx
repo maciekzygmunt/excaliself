@@ -43,10 +43,7 @@ export function PresenceAvatars({
           key={participant.connectionId}
           title={participant.name}
           className="flex h-7 w-7 items-center justify-center rounded-full text-[0.625rem] font-semibold text-white ring-2 ring-(--island-bg-color)"
-          style={{
-            backgroundColor: participant.color.background,
-            color: "#fff",
-          }}
+          style={{ backgroundColor: participant.color.background }}
         >
           {initialsOf(participant.name)}
         </span>

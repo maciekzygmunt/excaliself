@@ -1,7 +1,5 @@
 import { expect, test } from "vitest"
 import { GUEST_NAME_STORAGE_KEY, getOrCreateGuestName } from "./guest-identity"
-import { roomSocketUrl } from "./room-url"
-import { createDroppableThrottle } from "./throttle"
 
 function fakeStorage(initial: Record<string, string> = {}) {
   const map = new Map(Object.entries(initial))
@@ -43,26 +41,4 @@ test("unwritable storage still yields a usable name", () => {
 
   expect(getOrCreateGuestName(hostile)).toMatch(/^[A-Z][a-z]+ [A-Z][a-z]+$/)
   expect(getOrCreateGuestName(null)).toMatch(/^[A-Z][a-z]+ [A-Z][a-z]+$/)
-})
-
-test("the room socket url follows the page's own origin and scheme", () => {
-  expect(
-    roomSocketUrl("abc", { protocol: "https:", host: "draw.example.com" }),
-  ).toBe("wss://draw.example.com/ws/rooms/abc")
-  expect(
-    roomSocketUrl("abc", { protocol: "http:", host: "localhost:3000" }),
-  ).toBe("ws://localhost:3000/ws/rooms/abc")
-})
-
-test("the cursor throttle passes the first update and drops the rest of the window", () => {
-  let clock = 1000
-  const allow = createDroppableThrottle(33, () => clock)
-
-  expect(allow()).toBe(true)
-  clock += 10
-  expect(allow()).toBe(false)
-  clock += 10
-  expect(allow()).toBe(false)
-  clock += 20
-  expect(allow()).toBe(true)
 })

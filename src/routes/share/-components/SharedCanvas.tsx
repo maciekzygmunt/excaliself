@@ -40,12 +40,7 @@ export function SharedCanvas({ drawing, files, token }: Props) {
     ),
   )
 
-  const { participants, selfId, onPointerUpdate } = useRoom({
-    token,
-    name,
-    excalidrawAPI,
-  })
-  const others = participants.filter((p) => p.connectionId !== selfId)
+  const { others, onPointerUpdate } = useRoom({ token, name, excalidrawAPI })
 
   return (
     <div className="h-dvh w-full">

@@ -13,7 +13,7 @@ import {
   type ShareAudience,
 } from "@/features/shares/access"
 import { memberDisplayName } from "./identity"
-import type { PeerIdentity } from "./room-session"
+import type { ParticipantIdentity } from "./room-session"
 
 export type SessionUser = {
   id: string
@@ -22,7 +22,7 @@ export type SessionUser = {
 }
 
 export type RoomJoin =
-  | { status: "ok"; roomId: string; identity: PeerIdentity }
+  | { status: "ok"; roomId: string; identity: ParticipantIdentity }
   /**
    * Every refusal reason collapses to this one value, matching the share
    * page's single dead-link state — a rejected upgrade tells the caller

@@ -19,7 +19,7 @@ test("a peer's cursor is rendered under its connection id, with its name and col
   const collaborators = toCollaborators({
     participants: [participant("peer-a", "Wren")],
     pointers: new Map([["peer-a", cursor]]),
-    selfId: "peer-self",
+    selfConnectionId: "peer-self",
   })
 
   expect(collaborators.get("peer-a" as never)).toEqual({
@@ -40,7 +40,7 @@ test("your own tab is never drawn as a collaborator", () => {
       participant("peer-a", "Wren"),
     ],
     pointers: new Map(),
-    selfId: "peer-self",
+    selfConnectionId: "peer-self",
   })
 
   expect([...collaborators.keys()]).toEqual(["peer-a"])
@@ -50,7 +50,7 @@ test("a peer that hasn't moved yet appears without a cursor", () => {
   const collaborators = toCollaborators({
     participants: [participant("peer-a", "Wren")],
     pointers: new Map(),
-    selfId: null,
+    selfConnectionId: null,
   })
 
   expect(collaborators.get("peer-a" as never)?.pointer).toBeUndefined()
@@ -61,7 +61,7 @@ test("a departed peer's cursor goes with them", () => {
   const collaborators = toCollaborators({
     participants: [],
     pointers,
-    selfId: null,
+    selfConnectionId: null,
   })
 
   expect(collaborators.size).toBe(0)

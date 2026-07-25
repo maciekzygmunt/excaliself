@@ -13,7 +13,7 @@
  */
 
 import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types"
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { toCollaborators } from "./collaborators"
 import type { ClientMessage, Participant, PointerUpdate } from "./protocol"
 import { parseServerMessage } from "./protocol"
@@ -27,7 +27,8 @@ import { CURSOR_INTERVAL_MS, createDroppableThrottle } from "./throttle"
  */
 const CURSOR_BACKPRESSURE_BYTES = 8 * 1024
 
-export type RoomStatus = "connecting" | "open" | "closed"
+/** What Excalidraw's `onPointerUpdate` hands us; selection comes from appState. */
+type PointerMove = Omit<PointerUpdate, "selectedElementIds">
 
 export function useRoom(options: {
   /** The share token from the URL; null keeps the socket closed. */
@@ -39,15 +40,12 @@ export function useRoom(options: {
   const { token, name, excalidrawAPI } = options
 
   const [participants, setParticipants] = useState<Participant[]>([])
-  const [selfId, setSelfId] = useState<string | null>(null)
-  const [status, setStatus] = useState<RoomStatus>(
-    token ? "connecting" : "closed",
-  )
+  const [selfConnectionId, setSelfConnectionId] = useState<string | null>(null)
 
   const socketRef = useRef<WebSocket | null>(null)
   const pointersRef = useRef(new Map<string, PointerUpdate>())
   const participantsRef = useRef<Participant[]>([])
-  const selfIdRef = useRef<string | null>(null)
+  const selfConnectionIdRef = useRef<string | null>(null)
   // Read through refs inside the socket callbacks so the connection effect
   // depends on the token alone — a rename or a late-arriving API must not
   // tear the socket down and rejoin the room.
@@ -61,7 +59,7 @@ export function useRoom(options: {
       collaborators: toCollaborators({
         participants: participantsRef.current,
         pointers: pointersRef.current,
-        selfId: selfIdRef.current,
+        selfConnectionId: selfConnectionIdRef.current,
       }),
     })
   }, [])
@@ -71,7 +69,7 @@ export function useRoom(options: {
       participantsRef.current = roster
       setParticipants(roster)
       // Drop cursors belonging to connections that are gone, so a departed
-      // peer's pointer can't be resurrected by a stale entry.
+      // participant's pointer can't be resurrected by a stale entry.
       const present = new Set(roster.map((p) => p.connectionId))
       for (const id of pointersRef.current.keys()) {
         if (!present.has(id)) pointersRef.current.delete(id)
@@ -81,20 +79,21 @@ export function useRoom(options: {
     [pushCollaborators],
   )
 
+  /** Every outbound frame goes through here, so the union stays enforced. */
+  const send = useCallback((message: ClientMessage) => {
+    const socket = socketRef.current
+    if (socket?.readyState !== WebSocket.OPEN) return false
+    socket.send(JSON.stringify(message))
+    return true
+  }, [])
+
   useEffect(() => {
     if (!token) return
 
     const socket = new WebSocket(roomSocketUrl(token, window.location))
     socketRef.current = socket
-    setStatus("connecting")
-
-    const send = (message: ClientMessage) => {
-      if (socket.readyState === WebSocket.OPEN)
-        socket.send(JSON.stringify(message))
-    }
 
     socket.addEventListener("open", () => {
-      setStatus("open")
       send({ type: "JOIN", payload: { name: nameRef.current } })
     })
 
@@ -104,8 +103,8 @@ export function useRoom(options: {
       if (!message) return
 
       if (message.type === "ROOM_JOINED") {
-        selfIdRef.current = message.payload.connectionId
-        setSelfId(message.payload.connectionId)
+        selfConnectionIdRef.current = message.payload.connectionId
+        setSelfConnectionId(message.payload.connectionId)
         setRoster(message.payload.participants)
         return
       }
@@ -120,9 +119,8 @@ export function useRoom(options: {
     })
 
     const handleClosed = () => {
-      setStatus("closed")
-      selfIdRef.current = null
-      setSelfId(null)
+      selfConnectionIdRef.current = null
+      setSelfConnectionId(null)
       pointersRef.current.clear()
       setRoster([])
     }
@@ -137,42 +135,42 @@ export function useRoom(options: {
       socketRef.current = null
       pointersRef.current.clear()
       participantsRef.current = []
-      selfIdRef.current = null
+      selfConnectionIdRef.current = null
     }
-  }, [token, setRoster, pushCollaborators])
+  }, [token, send, setRoster, pushCollaborators])
 
   // Rejoining is what re-announces a name, so this only matters while the
   // socket is already open (the guest name pill lands in a later slice).
   useEffect(() => {
-    const socket = socketRef.current
-    if (socket?.readyState !== WebSocket.OPEN) return
-    socket.send(JSON.stringify({ type: "JOIN", payload: { name } }))
-  }, [name])
+    send({ type: "JOIN", payload: { name } })
+  }, [name, send])
 
   const allowCursor = useRef(createDroppableThrottle(CURSOR_INTERVAL_MS))
   const onPointerUpdate = useCallback(
-    (payload: {
-      pointer: { x: number; y: number; tool: "pointer" | "laser" }
-      button: "down" | "up"
-    }) => {
+    (move: PointerMove) => {
       const socket = socketRef.current
       if (socket?.readyState !== WebSocket.OPEN) return
       if (socket.bufferedAmount > CURSOR_BACKPRESSURE_BYTES) return
       if (!allowCursor.current()) return
-      socket.send(
-        JSON.stringify({
-          type: "MOUSE_LOCATION",
-          payload: {
-            pointer: payload.pointer,
-            button: payload.button,
-            selectedElementIds:
-              apiRef.current?.getAppState().selectedElementIds ?? {},
-          },
-        }),
-      )
+      send({
+        type: "MOUSE_LOCATION",
+        payload: {
+          pointer: move.pointer,
+          button: move.button,
+          selectedElementIds:
+            apiRef.current?.getAppState().selectedElementIds ?? {},
+        },
+      })
     },
-    [],
+    [send],
   )
 
-  return { participants, selfId, status, onPointerUpdate }
+  // Who else is here — the same exclusion the collaborator map makes, so the
+  // avatars and the cursors can never disagree about who is remote.
+  const others = useMemo(
+    () => participants.filter((p) => p.connectionId !== selfConnectionId),
+    [participants, selfConnectionId],
+  )
+
+  return { participants, others, selfConnectionId, onPointerUpdate }
 }

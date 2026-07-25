@@ -15,11 +15,11 @@ export function toCollaborators(input: {
   /** Last cursor seen per connection id. */
   pointers: ReadonlyMap<string, PointerUpdate>
   /** This tab's own connection id, which Excalidraw must not draw. */
-  selfId: string | null
+  selfConnectionId: string | null
 }): Map<SocketId, Collaborator> {
   const collaborators = new Map<SocketId, Collaborator>()
   for (const participant of input.participants) {
-    if (participant.connectionId === input.selfId) continue
+    if (participant.connectionId === input.selfConnectionId) continue
     const socketId = participant.connectionId as SocketId
     const cursor = input.pointers.get(participant.connectionId)
     collaborators.set(socketId, {

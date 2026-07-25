@@ -11,7 +11,10 @@
 import { defineWebSocketHandler } from "nitro"
 import { db } from "@/db"
 import { resolveRoomJoin } from "@/features/collab/join"
-import type { PeerIdentity, RoomPeer } from "@/features/collab/room-session"
+import type {
+  ParticipantIdentity,
+  RoomPeer,
+} from "@/features/collab/room-session"
 import {
   createRoomRegistry,
   joinRoom,
@@ -27,7 +30,7 @@ import { auth } from "@/lib/auth"
  */
 const rooms = createRoomRegistry()
 
-type PeerContext = { roomId: string; identity: PeerIdentity }
+type PeerContext = { roomId: string; identity: ParticipantIdentity }
 
 /**
  * crossws derives the namespace from the pathname by default, which would
