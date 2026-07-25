@@ -1,6 +1,6 @@
 import { expect, test } from "vitest"
 import { guestNameForConnection } from "./identity"
-import type { ServerMessage } from "./protocol"
+import type { SceneElement, ServerMessage } from "./protocol"
 import { ROOM_TOPIC } from "./protocol"
 import {
   createRoomRegistry,
@@ -8,7 +8,9 @@ import {
   leaveRoom,
   MAX_ROOM_PARTICIPANTS,
   type RoomPeer,
+  type RoomRegistry,
   receiveFromPeer,
+  type SceneLoader,
 } from "./room-session"
 
 const ROOM = "drawing-1"
@@ -40,6 +42,10 @@ function fakePeer(id: string) {
   return peer
 }
 
+/** A registry over an empty stored drawing — the presence tests' default. */
+const emptyRegistry = (load?: SceneLoader) =>
+  createRoomRegistry(load ?? (async () => ({ elements: [], ownerId: null })))
+
 const member = (displayName: string) => ({
   userId: `u:${displayName}`,
   displayName,
@@ -51,10 +57,29 @@ const rosterOf = (message: ServerMessage | undefined) =>
     ? message.payload.participants.map((p) => p.name)
     : undefined
 
-test("the joiner learns its own connection id and the room it walked into", () => {
-  const rooms = createRoomRegistry()
+const framesOf = (peer: ReturnType<typeof fakePeer>, type: string) =>
+  peer.sent.filter((message) => message.type === type)
+
+const elementsOf = (message: ServerMessage | undefined) =>
+  message && "elements" in message.payload
+    ? message.payload.elements
+    : undefined
+
+function element(
+  id: string,
+  version: number,
+  extra: Partial<SceneElement> = {},
+): SceneElement {
+  return { id, version, versionNonce: 1, index: "a0", ...extra }
+}
+
+const sceneUpdate = (elements: SceneElement[]) =>
+  JSON.stringify({ type: "SCENE_UPDATE", payload: { elements } })
+
+test("the joiner learns its own connection id and the room it walked into", async () => {
+  const registry = emptyRegistry()
   const ada = fakePeer("peer-ada")
-  joinRoom(rooms, ROOM, ada, member("Ada"))
+  await joinRoom(registry, ROOM, ada, member("Ada"))
 
   expect(ada.topics).toEqual([ROOM_TOPIC])
   expect(ada.sent[0]).toMatchObject({
@@ -64,12 +89,12 @@ test("the joiner learns its own connection id and the room it walked into", () =
   expect(rosterOf(ada.sent[0])).toEqual(["Ada"])
 })
 
-test("a second peer sees the first, and the first is told about the second", () => {
-  const rooms = createRoomRegistry()
+test("a second peer sees the first, and the first is told about the second", async () => {
+  const registry = emptyRegistry()
   const ada = fakePeer("peer-ada")
   const grace = fakePeer("peer-grace")
-  joinRoom(rooms, ROOM, ada, member("Ada"))
-  joinRoom(rooms, ROOM, grace, member("Grace"))
+  await joinRoom(registry, ROOM, ada, member("Ada"))
+  await joinRoom(registry, ROOM, grace, member("Grace"))
 
   expect(rosterOf(grace.sent[0])).toEqual(["Ada", "Grace"])
   // Grace's join fans the new roster out to everyone else in the room.
@@ -79,12 +104,12 @@ test("a second peer sees the first, and the first is told about the second", () 
   expect(rosterOf(grace.published[0].data)).toEqual(["Ada", "Grace"])
 })
 
-test("members arrive under their display name; guests under a pseudonym", () => {
-  const rooms = createRoomRegistry()
+test("members arrive under their display name; guests under a pseudonym", async () => {
+  const registry = emptyRegistry()
   const ada = fakePeer("peer-ada")
   const visitor = fakePeer("peer-visitor")
-  joinRoom(rooms, ROOM, ada, member("Ada"))
-  joinRoom(rooms, ROOM, visitor, guest)
+  await joinRoom(registry, ROOM, ada, member("Ada"))
+  await joinRoom(registry, ROOM, visitor, guest)
 
   expect(rosterOf(visitor.sent[0])).toEqual([
     "Ada",
@@ -92,15 +117,15 @@ test("members arrive under their display name; guests under a pseudonym", () => 
   ])
 })
 
-test("a guest's JOIN adopts the name it kept locally", () => {
-  const rooms = createRoomRegistry()
+test("a guest's JOIN adopts the name it kept locally", async () => {
+  const registry = emptyRegistry()
   const visitor = fakePeer("peer-visitor")
   const ada = fakePeer("peer-ada")
-  joinRoom(rooms, ROOM, visitor, guest)
-  joinRoom(rooms, ROOM, ada, member("Ada"))
+  await joinRoom(registry, ROOM, visitor, guest)
+  await joinRoom(registry, ROOM, ada, member("Ada"))
 
-  receiveFromPeer(
-    rooms,
+  await receiveFromPeer(
+    registry,
     ROOM,
     visitor,
     JSON.stringify({ type: "JOIN", payload: { name: "Wren" } }),
@@ -110,14 +135,14 @@ test("a guest's JOIN adopts the name it kept locally", () => {
   expect(rosterOf(visitor.sent.at(-1))).toEqual(["Wren", "Ada"])
 })
 
-test("a member cannot rename itself over the wire — the session name stands", () => {
-  const rooms = createRoomRegistry()
+test("a member cannot rename itself over the wire — the session name stands", async () => {
+  const registry = emptyRegistry()
   const ada = fakePeer("peer-ada")
-  joinRoom(rooms, ROOM, ada, member("Ada"))
+  await joinRoom(registry, ROOM, ada, member("Ada"))
   ada.published.length = 0
 
-  receiveFromPeer(
-    rooms,
+  await receiveFromPeer(
+    registry,
     ROOM,
     ada,
     JSON.stringify({ type: "JOIN", payload: { name: "Administrator" } }),
@@ -127,25 +152,25 @@ test("a member cannot rename itself over the wire — the session name stands", 
   expect(rosterOf(ada.sent[0])).toEqual(["Ada"])
 })
 
-test("everyone in a room wears a different color", () => {
-  const rooms = createRoomRegistry()
+test("everyone in a room wears a different color", async () => {
+  const registry = emptyRegistry()
   const peers = ["a", "b", "c"].map((id) => fakePeer(id))
-  for (const peer of peers) joinRoom(rooms, ROOM, peer, guest)
+  for (const peer of peers) await joinRoom(registry, ROOM, peer, guest)
 
-  const roster = rooms.get(ROOM)
+  const roster = registry.rooms.get(ROOM)
   const colors = [...(roster?.participants.values() ?? [])].map(
     (p) => p.color.background,
   )
   expect(new Set(colors).size).toBe(3)
 })
 
-test("a cursor is relayed to the rest of the room, stamped with its sender", () => {
-  const rooms = createRoomRegistry()
+test("a cursor is relayed to the rest of the room, stamped with its sender", async () => {
+  const registry = emptyRegistry()
   const ada = fakePeer("peer-ada")
-  joinRoom(rooms, ROOM, ada, member("Ada"))
+  await joinRoom(registry, ROOM, ada, member("Ada"))
 
-  receiveFromPeer(
-    rooms,
+  await receiveFromPeer(
+    registry,
     ROOM,
     ada,
     JSON.stringify({
@@ -158,8 +183,6 @@ test("a cursor is relayed to the rest of the room, stamped with its sender", () 
     }),
   )
 
-  // publish() never echoes to the sender, so nothing lands back in ada.sent.
-  expect(ada.sent).toHaveLength(1)
   expect(ada.published.at(-1)).toEqual({
     topic: ROOM_TOPIC,
     data: {
@@ -174,128 +197,333 @@ test("a cursor is relayed to the rest of the room, stamped with its sender", () 
   })
 })
 
-test("garbage from a peer is dropped, not relayed", () => {
-  const rooms = createRoomRegistry()
+test("garbage from a peer is dropped, not relayed", async () => {
+  const registry = emptyRegistry()
   const ada = fakePeer("peer-ada")
-  joinRoom(rooms, ROOM, ada, guest)
+  await joinRoom(registry, ROOM, ada, guest)
   ada.published.length = 0
 
-  receiveFromPeer(rooms, ROOM, ada, "}{")
-  receiveFromPeer(rooms, ROOM, ada, '{"type":"SCENE_UPDATE","payload":{}}')
+  await receiveFromPeer(registry, ROOM, ada, "}{")
+  await receiveFromPeer(registry, ROOM, ada, '{"type":"SCENE_UPDATE"}')
+  await receiveFromPeer(
+    registry,
+    ROOM,
+    ada,
+    sceneUpdate([{ id: "x" } as never]),
+  )
 
   expect(ada.published).toHaveLength(0)
 })
 
-test("a message from a peer that never joined is ignored", () => {
-  const rooms = createRoomRegistry()
+test("a message from a peer that never joined is ignored", async () => {
+  const registry = emptyRegistry()
   const stranger = fakePeer("peer-stranger")
 
-  receiveFromPeer(
-    rooms,
+  await receiveFromPeer(
+    registry,
     ROOM,
     stranger,
     JSON.stringify({ type: "JOIN", payload: { name: "Wren" } }),
   )
 
   expect(stranger.published).toHaveLength(0)
-  expect(rooms.has(ROOM)).toBe(false)
+  expect(registry.rooms.has(ROOM)).toBe(false)
 })
 
-test("leaving drops the participant and tells the rest", () => {
-  const rooms = createRoomRegistry()
+test("leaving drops the participant and tells the rest", async () => {
+  const registry = emptyRegistry()
   const ada = fakePeer("peer-ada")
   const grace = fakePeer("peer-grace")
-  joinRoom(rooms, ROOM, ada, member("Ada"))
-  joinRoom(rooms, ROOM, grace, member("Grace"))
+  await joinRoom(registry, ROOM, ada, member("Ada"))
+  await joinRoom(registry, ROOM, grace, member("Grace"))
 
-  leaveRoom(rooms, ROOM, grace)
+  leaveRoom(registry, ROOM, grace)
 
   expect(rosterOf(grace.published.at(-1)?.data)).toEqual(["Ada"])
-  expect(rooms.get(ROOM)?.participants.size).toBe(1)
+  expect(registry.rooms.get(ROOM)?.participants.size).toBe(1)
 })
 
-test("the last peer out takes the room with it", () => {
-  const rooms = createRoomRegistry()
+test("the last peer out takes the room with it", async () => {
+  const registry = emptyRegistry()
   const ada = fakePeer("peer-ada")
-  joinRoom(rooms, ROOM, ada, member("Ada"))
+  await joinRoom(registry, ROOM, ada, member("Ada"))
 
-  leaveRoom(rooms, ROOM, ada)
+  leaveRoom(registry, ROOM, ada)
 
-  expect(rooms.has(ROOM)).toBe(false)
+  expect(registry.rooms.has(ROOM)).toBe(false)
 })
 
-test("leaving twice is harmless", () => {
-  const rooms = createRoomRegistry()
+test("leaving twice is harmless", async () => {
+  const registry = emptyRegistry()
   const ada = fakePeer("peer-ada")
-  joinRoom(rooms, ROOM, ada, member("Ada"))
+  await joinRoom(registry, ROOM, ada, member("Ada"))
 
-  leaveRoom(rooms, ROOM, ada)
-  expect(() => leaveRoom(rooms, ROOM, ada)).not.toThrow()
+  leaveRoom(registry, ROOM, ada)
+  expect(() => leaveRoom(registry, ROOM, ada)).not.toThrow()
 })
 
-test("rooms are isolated — a peer only ever sees its own drawing's roster", () => {
-  const rooms = createRoomRegistry()
+test("rooms are isolated — a peer only ever sees its own drawing's roster", async () => {
+  const registry = emptyRegistry()
   const ada = fakePeer("peer-ada")
   const grace = fakePeer("peer-grace")
-  joinRoom(rooms, "drawing-1", ada, member("Ada"))
-  joinRoom(rooms, "drawing-2", grace, member("Grace"))
+  await joinRoom(registry, "drawing-1", ada, member("Ada"))
+  await joinRoom(registry, "drawing-2", grace, member("Grace"))
 
   expect(rosterOf(grace.sent[0])).toEqual(["Grace"])
-  expect(rooms.get("drawing-1")?.participants.size).toBe(1)
-  expect(rooms.get("drawing-2")?.participants.size).toBe(1)
+  expect(registry.rooms.get("drawing-1")?.participants.size).toBe(1)
+  expect(registry.rooms.get("drawing-2")?.participants.size).toBe(1)
+})
+
+// --- the authoritative scene -------------------------------------------
+
+test("a joiner is handed the stored scene", async () => {
+  const stored = [element("rect", 3)]
+  const registry = createRoomRegistry(async () => ({
+    elements: stored,
+    ownerId: "owner-1",
+  }))
+  const ada = fakePeer("peer-ada")
+  await joinRoom(registry, ROOM, ada, member("Ada"))
+
+  expect(elementsOf(framesOf(ada, "SCENE_INIT")[0])).toEqual(stored)
+  expect(registry.rooms.get(ROOM)?.sceneVersion).toBe(3)
+  // Cached for the live badge, which the badge slice will read.
+  expect(registry.rooms.get(ROOM)?.ownerId).toBe("owner-1")
+})
+
+test("the drawing is read once however many peers pile in at the same moment", async () => {
+  let reads = 0
+  const registry = createRoomRegistry(async () => {
+    reads += 1
+    return { elements: [element("rect", 1)], ownerId: null }
+  })
+  const peers = ["a", "b", "c"].map((id) => fakePeer(id))
+
+  await Promise.all(peers.map((peer) => joinRoom(registry, ROOM, peer, guest)))
+
+  expect(reads).toBe(1)
+  for (const peer of peers) {
+    expect(elementsOf(framesOf(peer, "SCENE_INIT")[0])).toHaveLength(1)
+  }
+})
+
+test("a late joiner gets the scene as edited, not as stored", async () => {
+  const registry = createRoomRegistry(async () => ({
+    elements: [element("rect", 1)],
+    ownerId: null,
+  }))
+  const ada = fakePeer("peer-ada")
+  await joinRoom(registry, ROOM, ada, member("Ada"))
+  await receiveFromPeer(registry, ROOM, ada, sceneUpdate([element("rect", 4)]))
+
+  const grace = fakePeer("peer-grace")
+  await joinRoom(registry, ROOM, grace, member("Grace"))
+
+  expect(elementsOf(framesOf(grace, "SCENE_INIT")[0])).toEqual([
+    element("rect", 4),
+  ])
+})
+
+test("an edit is relayed to the rest of the room and merged into the Room's copy", async () => {
+  const registry = emptyRegistry()
+  const ada = fakePeer("peer-ada")
+  await joinRoom(registry, ROOM, ada, member("Ada"))
+  ada.published.length = 0
+
+  await receiveFromPeer(registry, ROOM, ada, sceneUpdate([element("rect", 1)]))
+
+  expect(ada.published).toEqual([
+    {
+      topic: ROOM_TOPIC,
+      data: {
+        type: "SCENE_UPDATE",
+        payload: { elements: [element("rect", 1)] },
+      },
+    },
+  ])
+  expect(registry.rooms.get(ROOM)?.elements).toEqual([element("rect", 1)])
+})
+
+test("a stale edit is refused, and its sender is handed the version that won", async () => {
+  const registry = emptyRegistry()
+  const ada = fakePeer("peer-ada")
+  const grace = fakePeer("peer-grace")
+  await joinRoom(registry, ROOM, ada, member("Ada"))
+  await joinRoom(registry, ROOM, grace, member("Grace"))
+  await receiveFromPeer(
+    registry,
+    ROOM,
+    ada,
+    sceneUpdate([element("rect", 9, { text: "winner" })]),
+  )
+  grace.published.length = 0
+
+  await receiveFromPeer(
+    registry,
+    ROOM,
+    grace,
+    sceneUpdate([element("rect", 2, { text: "loser" })]),
+  )
+
+  // The room hears the winner, not the stale claim...
+  expect(elementsOf(grace.published.at(-1)?.data)).toEqual([
+    element("rect", 9, { text: "winner" }),
+  ])
+  // ...and so does the peer that sent it, which is how it converges.
+  expect(elementsOf(framesOf(grace, "SCENE_UPDATE").at(-1))).toEqual([
+    element("rect", 9, { text: "winner" }),
+  ])
+  expect(registry.rooms.get(ROOM)?.elements).toEqual([
+    element("rect", 9, { text: "winner" }),
+  ])
+})
+
+test("an accepted edit needs no correction back to its sender", async () => {
+  const registry = emptyRegistry()
+  const ada = fakePeer("peer-ada")
+  await joinRoom(registry, ROOM, ada, member("Ada"))
+
+  await receiveFromPeer(registry, ROOM, ada, sceneUpdate([element("rect", 1)]))
+
+  expect(framesOf(ada, "SCENE_UPDATE")).toHaveLength(0)
+})
+
+test("an edit that arrives before the scene has loaded still merges into it", async () => {
+  let release = () => {}
+  const opened = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  const registry = createRoomRegistry(async () => {
+    await opened
+    return { elements: [element("stored", 1, { index: "a0" })], ownerId: null }
+  })
+  const ada = fakePeer("peer-ada")
+
+  const joined = joinRoom(registry, ROOM, ada, member("Ada"))
+  const edited = receiveFromPeer(
+    registry,
+    ROOM,
+    ada,
+    sceneUpdate([element("drawn", 1, { index: "a1" })]),
+  )
+  release()
+  await Promise.all([joined, edited])
+
+  expect(registry.rooms.get(ROOM)?.elements.map((e) => e.id)).toEqual([
+    "stored",
+    "drawn",
+  ])
+})
+
+test("a Room whose drawing cannot be read still opens, on an empty scene", async () => {
+  const registry = createRoomRegistry(async () => {
+    throw new Error("database is down")
+  })
+  const ada = fakePeer("peer-ada")
+
+  await joinRoom(registry, ROOM, ada, member("Ada"))
+
+  // Cursors and presence keep working; an empty SCENE_INIT reconciles into a
+  // client's own copy without adding or deleting anything.
+  expect(elementsOf(framesOf(ada, "SCENE_INIT")[0])).toEqual([])
+  expect(registry.rooms.get(ROOM)?.participants.size).toBe(1)
+})
+
+test("a peer that left mid-load is not sent a scene", async () => {
+  let release = () => {}
+  const opened = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  const registry = createRoomRegistry(async () => {
+    await opened
+    return { elements: [], ownerId: null }
+  })
+  const ada = fakePeer("peer-ada")
+  const grace = fakePeer("peer-grace")
+
+  const joined = Promise.all([
+    joinRoom(registry, ROOM, ada, member("Ada")),
+    joinRoom(registry, ROOM, grace, member("Grace")),
+  ])
+  leaveRoom(registry, ROOM, ada)
+  release()
+  await joined
+
+  expect(framesOf(ada, "SCENE_INIT")).toHaveLength(0)
+  expect(framesOf(grace, "SCENE_INIT")).toHaveLength(1)
 })
 
 /** Seats the cap's worth of sockets, so the next join is the one refused. */
-const fillRoom = (rooms: ReturnType<typeof createRoomRegistry>) => {
-  for (let i = 0; i < MAX_ROOM_PARTICIPANTS; i++) {
-    joinRoom(rooms, ROOM, fakePeer(`peer-${i}`), guest)
-  }
-}
+const fillRoom = (registry: RoomRegistry) =>
+  Promise.all(
+    Array.from({ length: MAX_ROOM_PARTICIPANTS }, (_, i) =>
+      joinRoom(registry, ROOM, fakePeer(`peer-${i}`), guest),
+    ),
+  )
 
-test("a room fills up to the cap", () => {
-  const rooms = createRoomRegistry()
-  fillRoom(rooms)
+test("a room fills up to the cap", async () => {
+  const registry = emptyRegistry()
+  await fillRoom(registry)
 
-  expect(rooms.get(ROOM)?.participants.size).toBe(MAX_ROOM_PARTICIPANTS)
+  expect(registry.rooms.get(ROOM)?.participants.size).toBe(
+    MAX_ROOM_PARTICIPANTS,
+  )
 })
 
-test("the socket past the cap is refused and joins nothing", () => {
-  const rooms = createRoomRegistry()
-  fillRoom(rooms)
+test("the socket past the cap is refused and joins nothing", async () => {
+  const registry = emptyRegistry()
+  await fillRoom(registry)
   const late = fakePeer("peer-late")
 
-  expect(joinRoom(rooms, ROOM, late, guest)).toEqual({ status: "full" })
+  expect(await joinRoom(registry, ROOM, late, guest)).toEqual({
+    status: "full",
+  })
   expect(late.sent).toEqual([])
   expect(late.topics).toEqual([])
-  expect(rooms.get(ROOM)?.participants.size).toBe(MAX_ROOM_PARTICIPANTS)
+  expect(registry.rooms.get(ROOM)?.participants.size).toBe(
+    MAX_ROOM_PARTICIPANTS,
+  )
 })
 
-test("the room the refused socket knocked on is not told about it", () => {
-  const rooms = createRoomRegistry()
-  fillRoom(rooms)
+test("the room the refused socket knocked on is not told about it", async () => {
+  const registry = emptyRegistry()
+  await fillRoom(registry)
   const late = fakePeer("peer-late")
 
-  joinRoom(rooms, ROOM, late, guest)
+  await joinRoom(registry, ROOM, late, guest)
 
   expect(late.published).toEqual([])
 })
 
-test("a departure frees the slot", () => {
-  const rooms = createRoomRegistry()
-  fillRoom(rooms)
-  const leaving = fakePeer("peer-0")
-  leaveRoom(rooms, ROOM, leaving)
+test("a refused join does not start a scene read", async () => {
+  let reads = 0
+  const registry = createRoomRegistry(async () => {
+    reads += 1
+    return { elements: [], ownerId: null }
+  })
+  await fillRoom(registry)
 
-  expect(joinRoom(rooms, ROOM, fakePeer("peer-late"), guest)).toEqual({
+  await joinRoom(registry, ROOM, fakePeer("peer-late"), guest)
+
+  // One read for the Room itself, and none on the way back out.
+  expect(reads).toBe(1)
+})
+
+test("a departure frees the slot", async () => {
+  const registry = emptyRegistry()
+  await fillRoom(registry)
+  leaveRoom(registry, ROOM, fakePeer("peer-0"))
+
+  expect(await joinRoom(registry, ROOM, fakePeer("peer-late"), guest)).toEqual({
     status: "ok",
   })
 })
 
-test("a full room does not keep anyone out of a different drawing", () => {
-  const rooms = createRoomRegistry()
-  fillRoom(rooms)
+test("a full room does not keep anyone out of a different drawing", async () => {
+  const registry = emptyRegistry()
+  await fillRoom(registry)
 
-  expect(joinRoom(rooms, "drawing-2", fakePeer("peer-late"), guest)).toEqual({
-    status: "ok",
-  })
+  expect(
+    await joinRoom(registry, "drawing-2", fakePeer("peer-late"), guest),
+  ).toEqual({ status: "ok" })
 })

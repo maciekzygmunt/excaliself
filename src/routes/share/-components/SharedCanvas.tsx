@@ -1,7 +1,8 @@
 // The canvas a share-link visitor lands on. It joins the drawing's room on
-// open, so everyone here sees each other's cursors and presence (canvas
-// sharing #118). Scene edits are still local — sync and persistence are the
-// next slices. Always light, per the logged-out pages convention (spec §1.3).
+// open, so everyone here sees each other's cursors, presence and edits
+// (canvas sharing #118, #119). Flushing those edits back to the database is
+// the next slice. Always light, per the logged-out pages convention
+// (spec §1.3).
 //
 // The chrome is all in-canvas (spec §1.3, prototype variant A): no app shell,
 // no sidebar, no gallery. The drawing's title portals into Excalidraw's own
@@ -54,7 +55,7 @@ export function SharedCanvas({ drawing, files, token, onRoomFull }: Props) {
   const [name, setName] = useState(getOrCreateGuestName)
 
   // `self` is how the room sees this tab — null until the join lands.
-  const { self, others, onPointerUpdate } = useRoom({
+  const { self, others, onChange, onPointerUpdate } = useRoom({
     token,
     name,
     excalidrawAPI,
@@ -89,6 +90,7 @@ export function SharedCanvas({ drawing, files, token, onRoomFull }: Props) {
         initialData={initialData}
         excalidrawAPI={setExcalidrawAPI}
         theme="light"
+        onChange={onChange}
         onPointerUpdate={onPointerUpdate}
         renderTopRightUI={() => (
           <>

@@ -1,23 +1,42 @@
 /**
  * The client half of the room socket (canvas sharing spec §2.1–§2.2): dial
- * the room, announce a name, publish this tab's cursor, and hand remote
- * presence to Excalidraw.
+ * the room, announce a name, publish this tab's cursor and edits, and hand
+ * what comes back to Excalidraw.
  *
  * Cursors deliberately never touch React state — a room of five peers at
  * ~30 Hz would re-render the canvas host 150 times a second. Incoming
  * pointers land in a ref and go straight to `updateScene({ collaborators })`;
  * only the roster (which changes when someone joins or leaves) is state.
  *
+ * Scene traffic is the same shape: `onChange` fires on every pointer move
+ * over the canvas, so nothing about it may cause a render either. What to
+ * send is decided in `scene-sync.ts`; this file is the plumbing around it.
+ *
  * Reconnection, heartbeats, and the frame cap are a later slice; a dropped
  * socket here stays dropped until the page is reloaded.
  */
 
+import {
+  CaptureUpdateAction,
+  reconcileElements,
+  restoreElements,
+} from "@excalidraw/excalidraw"
+import type { OrderedExcalidrawElement } from "@excalidraw/excalidraw/element/types"
 import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { toCollaborators } from "./collaborators"
-import type { ClientMessage, Participant, PointerUpdate } from "./protocol"
+import type {
+  ClientMessage,
+  Participant,
+  PointerUpdate,
+  SceneElement,
+} from "./protocol"
 import { parseServerMessage, ROOM_FULL_CLOSE_CODE } from "./protocol"
 import { roomSocketUrl } from "./room-url"
+import {
+  createSceneBroadcaster,
+  SYNC_FULL_SCENE_INTERVAL_MS,
+} from "./scene-sync"
 import { CURSOR_INTERVAL_MS, createDroppableThrottle } from "./throttle"
 
 /**
@@ -45,11 +64,15 @@ export function useRoom(options: {
   const [selfConnectionId, setSelfConnectionId] = useState<string | null>(null)
 
   const socketRef = useRef<WebSocket | null>(null)
+  const broadcasterRef = useRef(createSceneBroadcaster())
+  /** False until SCENE_INIT lands — this tab has nothing to broadcast against. */
+  const sceneInitializedRef = useRef(false)
+  const fullSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const pointersRef = useRef(new Map<string, PointerUpdate>())
   const participantsRef = useRef<Participant[]>([])
   const selfConnectionIdRef = useRef<string | null>(null)
   // Read through refs inside the socket callbacks so the connection effect
-  // depends on the token alone — a rename or a late-arriving API must not
+  // depends on the token and nothing else that changes — a rename must not
   // tear the socket down and rejoin the room.
   const apiRef = useRef(excalidrawAPI)
   apiRef.current = excalidrawAPI
@@ -91,8 +114,91 @@ export function useRoom(options: {
     return true
   }, [])
 
+  /** An empty selection is nothing for the room to rule on — don't send it. */
+  const sendScene = useCallback(
+    (elements: SceneElement[]) =>
+      elements.length > 0 &&
+      send({ type: "SCENE_UPDATE", payload: { elements } }),
+    [send],
+  )
+
+  /**
+   * The safety net of spec §2.2: 20 s after a broadcast, re-send the whole
+   * scene once, repairing any peer that missed a frame. Queued by a broadcast
+   * and nothing else, so a room where nobody is drawing goes quiet.
+   */
+  const queueFullSync = useCallback(() => {
+    if (fullSyncTimerRef.current !== null) return
+    fullSyncTimerRef.current = setTimeout(() => {
+      fullSyncTimerRef.current = null
+      const elements = apiRef.current?.getSceneElementsIncludingDeleted()
+      if (elements) sendScene(broadcasterRef.current.full(elements))
+    }, SYNC_FULL_SCENE_INTERVAL_MS)
+  }, [sendScene])
+
+  /**
+   * Excalidraw's `onChange` — the one thing that puts local edits on the
+   * wire. It fires on pointer moves and selections too, which is why the
+   * broadcaster's scene-version gate comes first.
+   *
+   * Nothing is offered to the broadcaster until SCENE_INIT has landed. Asking
+   * it before then would mark those elements as "the room has seen these"
+   * while the socket was still opening, and the catch-up below — the one
+   * thing that would have carried them — would then skip every one of them.
+   *
+   * Excalidraw also hands `onChange` the scene's `files`, and they are
+   * deliberately dropped: image bytes never travel on the socket (spec §2.4).
+   * An image element syncs like any other element, but its blob rides a
+   * room-scoped HTTP endpoint that peers GET and inject with `addFiles()` —
+   * until that lands (#124), an image added mid-session reaches peers as an
+   * element they have no bytes for.
+   */
+  const onChange = useCallback(
+    (elements: readonly OrderedExcalidrawElement[]) => {
+      if (!sceneInitializedRef.current) return
+      const delta = broadcasterRef.current.delta(elements)
+      if (delta && sendScene(delta)) queueFullSync()
+    },
+    [sendScene, queueFullSync],
+  )
+
+  /**
+   * Apply a frame from the room: restore it (a wire payload is plain JSON,
+   * and Excalidraw's invariants are not), reconcile it against what this tab
+   * holds, then apply it with `CaptureUpdateAction.NEVER` so a peer's work
+   * never lands in this tab's undo stack (spec §2.2). Returns the scene as
+   * merged, for the callers that need to answer it.
+   */
+  const applyRemoteScene = useCallback((remote: SceneElement[]) => {
+    const api = apiRef.current
+    if (!api) return null
+    // Both casts cross the same gap: a `SceneElement` is an element the type
+    // system has no proof about, and `restoreElements` is precisely the call
+    // that establishes it — after which the branded remote/reconciled types
+    // are bookkeeping upstream does for its own callers.
+    const restored = restoreElements(remote as never, null)
+    const reconciled = reconcileElements(
+      api.getSceneElementsIncludingDeleted(),
+      restored as never,
+      api.getAppState(),
+    )
+    // Ahead of updateScene, which re-triggers onChange synchronously — after
+    // it, this merge would go straight back out as if it were a local edit.
+    broadcasterRef.current.received(remote, reconciled)
+    api.updateScene({
+      elements: reconciled,
+      captureUpdate: CaptureUpdateAction.NEVER,
+    })
+    return reconciled
+  }, [])
+
+  // The socket waits for the canvas: a SCENE_INIT with nowhere to put it
+  // would leave this tab holding a scene the room has moved past. The API
+  // arrives once and never changes, so this is one connect, not a reconnect.
+  const canvasReady = excalidrawAPI !== null
+
   useEffect(() => {
-    if (!token) return
+    if (!token || !canvasReady) return
 
     const socket = new WebSocket(roomSocketUrl(token, window.location))
     socketRef.current = socket
@@ -114,6 +220,22 @@ export function useRoom(options: {
       }
       if (message.type === "PARTICIPANTS") {
         setRoster(message.payload.participants)
+        return
+      }
+      if (message.type === "SCENE_INIT") {
+        const merged = applyRemoteScene(message.payload.elements)
+        if (!merged) return
+        sceneInitializedRef.current = true
+        // Anything this tab was holding that the room's scene didn't have —
+        // an edit the owner saved between this page's fetch and the room's
+        // load, or a stroke drawn while the socket was still opening — goes
+        // up now, so the room converges on the union of the two rather than
+        // quietly dropping one side.
+        if (sendScene(broadcasterRef.current.catchUp(merged))) queueFullSync()
+        return
+      }
+      if (message.type === "SCENE_UPDATE") {
+        applyRemoteScene(message.payload.elements)
         return
       }
 
@@ -143,8 +265,24 @@ export function useRoom(options: {
       pointersRef.current.clear()
       participantsRef.current = []
       selfConnectionIdRef.current = null
+      if (fullSyncTimerRef.current !== null) {
+        clearTimeout(fullSyncTimerRef.current)
+        fullSyncTimerRef.current = null
+      }
+      // What the old socket had told the room means nothing to the next one.
+      broadcasterRef.current = createSceneBroadcaster()
+      sceneInitializedRef.current = false
     }
-  }, [token, send, setRoster, pushCollaborators])
+  }, [
+    token,
+    canvasReady,
+    send,
+    sendScene,
+    queueFullSync,
+    setRoster,
+    pushCollaborators,
+    applyRemoteScene,
+  ])
 
   // Rejoining is what re-announces a name, so this only matters while the
   // socket is already open (the guest name pill lands in a later slice).
@@ -187,5 +325,5 @@ export function useRoom(options: {
     [participants, selfConnectionId],
   )
 
-  return { self, others, onPointerUpdate }
+  return { self, others, onChange, onPointerUpdate }
 }

@@ -143,3 +143,67 @@ test("a malformed frame is ignored rather than thrown out of a socket callback",
     ),
   ).toBeNull()
 })
+
+test("a scene delta keeps every element property, not just the ones it validates", () => {
+  const element = {
+    id: "rect",
+    version: 4,
+    versionNonce: 77,
+    index: "a1",
+    type: "rectangle",
+    x: 10,
+    strokeColor: "#1e1e1e",
+    boundElements: null,
+  }
+  const raw = JSON.stringify({
+    type: "SCENE_UPDATE",
+    payload: { elements: [element] },
+  })
+
+  expect(parseClientMessage(raw)).toEqual({
+    type: "SCENE_UPDATE",
+    payload: { elements: [element] },
+  })
+  expect(parseServerMessage(raw)).toEqual({
+    type: "SCENE_UPDATE",
+    payload: { elements: [element] },
+  })
+})
+
+test("SCENE_INIT parses on the client and has no client-side counterpart", () => {
+  const raw = '{"type":"SCENE_INIT","payload":{"elements":[]}}'
+  expect(parseServerMessage(raw)).toEqual({
+    type: "SCENE_INIT",
+    payload: { elements: [] },
+  })
+  // The server never accepts one: a peer cannot declare the room's scene.
+  expect(parseClientMessage(raw)).toBeNull()
+})
+
+test("an element missing what the merge rule reads rejects the whole delta", () => {
+  const bad = (element: unknown) =>
+    JSON.stringify({ type: "SCENE_UPDATE", payload: { elements: [element] } })
+
+  expect(parseClientMessage('{"type":"SCENE_UPDATE","payload":{}}')).toBeNull()
+  expect(parseClientMessage(bad({ id: "rect", version: 1 }))).toBeNull()
+  expect(parseClientMessage(bad({ version: 1, versionNonce: 1 }))).toBeNull()
+  expect(
+    parseClientMessage(bad({ id: "rect", version: "1", versionNonce: 1 })),
+  ).toBeNull()
+  expect(
+    parseClientMessage(
+      bad({ id: "rect", version: 1, versionNonce: 1, index: 3 }),
+    ),
+  ).toBeNull()
+  // A partly-valid delta is refused outright — half-applied is worse than none.
+  expect(
+    parseClientMessage(
+      JSON.stringify({
+        type: "SCENE_UPDATE",
+        payload: {
+          elements: [{ id: "a", version: 1, versionNonce: 1 }, { id: "b" }],
+        },
+      }),
+    ),
+  ).toBeNull()
+})

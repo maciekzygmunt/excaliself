@@ -21,6 +21,11 @@ instance:
    and closing one socket updates the other's roster.
 4. The socket past the room's participant cap is closed with the room-full
    code (spec §4.5), and a departure reopens the slot.
+5. A joiner is handed the room's scene as `SCENE_INIT`.
+6. An edit by one peer reaches the other, is never echoed back to its sender,
+   and is what a third peer joining afterwards is initialized from.
+7. An edit that loses reconciliation is refused, and the room hands its sender
+   the version that won.
 
 ## Running it
 
@@ -74,3 +79,6 @@ port, so it exercises the same path a browser takes.
   run spends about thirty token validations, so two back-to-back runs from one
   host trip the 60/min per-IP limit of spec §4.5. Wait out the minute; the
   limiter is working.
+- **Presence works but no `SCENE_INIT` arrives** — the Room could not read its
+  drawing. It stays open on an empty scene by design; the reason is logged as
+  `[collab] could not load scene for room <id>`.

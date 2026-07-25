@@ -1,19 +1,24 @@
 /**
- * Room presence: who is connected to a shared drawing right now, and the
- * relaying of their cursors (canvas sharing spec §2.1–§2.2).
+ * The Room: who is connected to a shared drawing right now, and the
+ * authoritative scene they are all editing (canvas sharing spec §2.1–§2.3).
  *
  * Deliberately free of crossws and nitro imports — it talks to a {@link RoomPeer}
- * interface the websocket route adapts a real peer to. That keeps the whole
- * join/relay/leave cycle drivable from unit tests, which is the only place
- * multi-peer behavior can be checked without standing up a server.
+ * interface the websocket route adapts a real peer to, and reads the stored
+ * scene through an injected {@link SceneLoader}. That keeps the whole
+ * join/reconcile/relay/leave cycle drivable from unit tests, which is the only
+ * place multi-peer behavior can be checked without standing up a server.
  *
- * The authoritative scene and its flush to the database are the next slices;
- * a Room here holds nothing but its participants.
+ * The server is the authority, not a relay: every incoming delta is merged
+ * into the Room's own copy first, and what goes back out is the Room's ruling
+ * rather than the sender's claim. Flushing that scene to the database is the
+ * next slice; a Room here lives and dies in memory.
  */
 
 import { guestNameForConnection, pickParticipantColor } from "./identity"
-import type { Participant, ServerMessage } from "./protocol"
+import type { Participant, SceneElement, ServerMessage } from "./protocol"
 import { parseClientMessage, ROOM_TOPIC } from "./protocol"
+import { getSceneVersion, reconcileElements } from "./reconcile"
+import type { StoredScene } from "./scene-store"
 
 /** The slice of a crossws `Peer` the room logic uses. */
 export interface RoomPeer {
@@ -35,16 +40,68 @@ export type ParticipantIdentity = {
   displayName: string | null
 }
 
-export type Room = { participants: Map<string, Participant> }
+/** Reads a drawing's stored scene when its Room first spins up. */
+export type SceneLoader = (roomId: string) => Promise<StoredScene>
+
+export type Room = {
+  participants: Map<string, Participant>
+  /** Resolves when the stored scene has been read (or failed to read). */
+  loaded: Promise<void>
+  /** The authoritative scene, in fractional-index order. */
+  elements: SceneElement[]
+  sceneVersion: number
+  /** Cached at load time for the live badge (spec §1.5). */
+  ownerId: string | null
+}
 
 /**
  * Live rooms, keyed by drawing id — one Room per Drawing. In-memory per
  * process, so the app stays single-replica (spec §2.3).
  */
-export type RoomRegistry = Map<string, Room>
+export type RoomRegistry = {
+  rooms: Map<string, Room>
+  loadScene: SceneLoader
+}
 
-export function createRoomRegistry(): RoomRegistry {
-  return new Map()
+export function createRoomRegistry(loadScene: SceneLoader): RoomRegistry {
+  return { rooms: new Map(), loadScene }
+}
+
+/**
+ * Rooms spin up lazily on first join (spec §2.5). The load promise is stored
+ * on the Room so a burst of simultaneous joins shares one read instead of
+ * racing each other to overwrite the scene.
+ */
+function ensureRoom(registry: RoomRegistry, roomId: string): Room {
+  const existing = registry.rooms.get(roomId)
+  if (existing) return existing
+
+  const room: Room = {
+    participants: new Map(),
+    loaded: Promise.resolve(),
+    elements: [],
+    sceneVersion: 0,
+    ownerId: null,
+  }
+  registry.rooms.set(roomId, room)
+  room.loaded = registry.loadScene(roomId).then(
+    (stored) => {
+      room.elements = stored.elements
+      room.sceneVersion = getSceneVersion(stored.elements)
+      room.ownerId = stored.ownerId
+    },
+    (error) => {
+      // The Room stays open on an empty scene: cursors and presence still
+      // work, and a client's own copy survives reconciliation untouched (an
+      // empty SCENE_INIT adds nothing and deletes nothing).
+      //
+      // Whoever adds the flush of spec §2.3 must give this arm a way to say
+      // so — flushing a Room that never read its drawing would write an
+      // empty scene over a real one.
+      console.error(`[collab] could not load scene for room ${roomId}`, error)
+    },
+  )
+  return room
 }
 
 function rosterOf(room: Room): Participant[] {
@@ -75,22 +132,20 @@ export type RoomJoinResult =
   /** The Room is at its cap; the visitor gets the "drawing full" page. */
   | { status: "full" }
 
-export function joinRoom(
-  rooms: RoomRegistry,
+export async function joinRoom(
+  registry: RoomRegistry,
   roomId: string,
   peer: RoomPeer,
   identity: ParticipantIdentity,
-): RoomJoinResult {
-  let room = rooms.get(roomId)
+): Promise<RoomJoinResult> {
   // Checked before the Room is created, so a refused join never leaves an
-  // empty one behind — and the room being knocked on hears nothing about it.
-  if (room && room.participants.size >= MAX_ROOM_PARTICIPANTS)
+  // empty one behind — and never starts a scene read for a peer that is
+  // about to be turned away.
+  const existing = registry.rooms.get(roomId)
+  if (existing && existing.participants.size >= MAX_ROOM_PARTICIPANTS)
     return { status: "full" }
 
-  if (!room) {
-    room = { participants: new Map() }
-    rooms.set(roomId, room)
-  }
+  const room = ensureRoom(registry, roomId)
 
   const isGuest = identity.userId === null
   const participant: Participant = {
@@ -104,21 +159,71 @@ export function joinRoom(
   room.participants.set(peer.id, participant)
 
   peer.subscribe(ROOM_TOPIC)
+  // Presence goes out before the scene read so avatars never wait on the
+  // database; the canvas fills in a beat later.
   peer.send({
     type: "ROOM_JOINED",
     payload: { connectionId: peer.id, participants: rosterOf(room) },
   })
   peer.publish(ROOM_TOPIC, rosterMessage(room))
+
+  await room.loaded
+  // A late joiner gets the authoritative scene, not whatever its own page
+  // load happened to fetch (spec §5.2).
+  if (room.participants.has(peer.id)) {
+    peer.send({ type: "SCENE_INIT", payload: { elements: room.elements } })
+  }
   return { status: "ok" }
 }
 
-export function receiveFromPeer(
-  rooms: RoomRegistry,
+/**
+ * Merge a peer's delta into the Room and tell the room what won.
+ *
+ * The reply is per-element, not the whole scene: everyone else hears the
+ * winning version of each element the sender touched, and the sender hears
+ * back only the elements where the Room's copy beat its own — the correction
+ * that lets a peer whose delta was discarded converge instead of sitting on a
+ * version nobody else has.
+ */
+function applySceneUpdate(
+  room: Room,
+  peer: RoomPeer,
+  incoming: SceneElement[],
+) {
+  room.elements = reconcileElements(room.elements, incoming, {})
+  room.sceneVersion = getSceneVersion(room.elements)
+
+  // Reconciliation keeps whichever object won by reference, so `winner ===
+  // element` is exactly "the Room accepted what this peer sent" — no need to
+  // re-run the version comparison to find out.
+  const authoritative = new Map(room.elements.map((el) => [el.id, el]))
+  const winners: SceneElement[] = []
+  const corrections: SceneElement[] = []
+  const seen = new Set<string>()
+  for (const element of incoming) {
+    if (seen.has(element.id)) continue
+    seen.add(element.id)
+    const winner = authoritative.get(element.id) ?? element
+    winners.push(winner)
+    if (winner !== element) corrections.push(winner)
+  }
+
+  if (winners.length)
+    peer.publish(ROOM_TOPIC, {
+      type: "SCENE_UPDATE",
+      payload: { elements: winners },
+    })
+  if (corrections.length)
+    peer.send({ type: "SCENE_UPDATE", payload: { elements: corrections } })
+}
+
+export async function receiveFromPeer(
+  registry: RoomRegistry,
   roomId: string,
   peer: RoomPeer,
   raw: string,
 ) {
-  const room = rooms.get(roomId)
+  const room = registry.rooms.get(roomId)
   const participant = room?.participants.get(peer.id)
   if (!room || !participant) return
 
@@ -138,20 +243,35 @@ export function receiveFromPeer(
     return
   }
 
+  if (message.type === "SCENE_UPDATE") {
+    // A client can start drawing before its SCENE_INIT lands. Merging into an
+    // empty scene here would drop everything the drawing already had, so the
+    // delta waits for the load — deltas keep their order because they all
+    // queue behind the same settled promise.
+    await room.loaded
+    if (!room.participants.has(peer.id)) return
+    applySceneUpdate(room, peer, message.payload.elements)
+    return
+  }
+
   peer.publish(ROOM_TOPIC, {
     type: "MOUSE_LOCATION",
     payload: { ...message.payload, connectionId: peer.id },
   })
 }
 
-export function leaveRoom(rooms: RoomRegistry, roomId: string, peer: RoomPeer) {
-  const room = rooms.get(roomId)
+export function leaveRoom(
+  registry: RoomRegistry,
+  roomId: string,
+  peer: RoomPeer,
+) {
+  const room = registry.rooms.get(roomId)
   if (!room?.participants.delete(peer.id)) return
 
   // Nothing is holding the Room open once its last socket goes (spec §2.5);
   // the flush that has to happen first arrives with the persistence slice.
   if (room.participants.size === 0) {
-    rooms.delete(roomId)
+    registry.rooms.delete(roomId)
     return
   }
   peer.publish(ROOM_TOPIC, rosterMessage(room))

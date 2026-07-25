@@ -1,8 +1,8 @@
 /**
  * The room wire protocol (canvas sharing spec §2.2), minus the E2E envelope
  * upstream excalidraw-room wraps everything in — plain JSON over a raw
- * websocket. This slice carries presence and cursors only; scene traffic
- * (SCENE_INIT / SCENE_UPDATE) joins the union in the sync slice.
+ * websocket: presence and cursors, plus the scene traffic (SCENE_INIT on
+ * join, SCENE_UPDATE deltas afterwards).
  *
  * Both ends parse with hand-written guards rather than a schema library:
  * the shapes are tiny and fixed, MOUSE_LOCATION runs at ~30 Hz per peer, and
@@ -42,10 +42,28 @@ export type PointerUpdate = {
   selectedElementIds: Record<string, true>
 }
 
+/**
+ * One Excalidraw element as it crosses the wire. Only the three fields the
+ * merge rule reads are typed; every other property rides along untouched, so
+ * the server never has to know what an element is made of — and a newer
+ * client's properties survive a round trip through an older server.
+ */
+export type SceneElement = {
+  id: string
+  version: number
+  versionNonce: number
+  /** Fractional index — the ordering key. Null on pre-index elements. */
+  index?: string | null
+  isDeleted?: boolean
+  [key: string]: unknown
+}
+
 export type ClientMessage =
   /** Sent once on open; carries the guest's locally-stored display name. */
   | { type: "JOIN"; payload: { name: string } }
   | { type: "MOUSE_LOCATION"; payload: PointerUpdate }
+  /** A delta: only the elements this peer has changed since it last sent. */
+  | { type: "SCENE_UPDATE"; payload: { elements: SceneElement[] } }
 
 export type ServerMessage =
   /** First frame back: who you are in this room, and who else is here. */
@@ -59,6 +77,14 @@ export type ServerMessage =
       type: "MOUSE_LOCATION"
       payload: PointerUpdate & { connectionId: string }
     }
+  /** The Room's whole authoritative scene, sent once per join (spec §5.2). */
+  | { type: "SCENE_INIT"; payload: { elements: SceneElement[] } }
+  /**
+   * The Room's ruling on elements someone just changed — usually the sender's
+   * own version relayed on, but the Room's copy instead wherever the incoming
+   * one lost reconciliation.
+   */
+  | { type: "SCENE_UPDATE"; payload: { elements: SceneElement[] } }
 
 /** Longest display name accepted from a peer, in code points. */
 export const MAX_NAME_LENGTH = 40
@@ -106,6 +132,35 @@ function parsePointerUpdate(payload: unknown): PointerUpdate | null {
 }
 
 /**
+ * Elements are validated only as far as the merge rule needs them — an id and
+ * two numbers. Everything else is left alone rather than whitelisted: the
+ * Room is a relay for element bodies, and a field it stripped would be a
+ * property silently lost from someone's drawing.
+ *
+ * One bad entry rejects the whole payload. A half-applied delta would leave
+ * the Room holding a scene no client ever had.
+ */
+function parseSceneElements(value: unknown): SceneElement[] | null {
+  if (!Array.isArray(value)) return null
+  const elements: SceneElement[] = []
+  for (const entry of value) {
+    if (!isRecord(entry)) return null
+    const { id, version, versionNonce, index } = entry
+    if (typeof id !== "string" || !id) return null
+    if (!isFiniteNumber(version) || !isFiniteNumber(versionNonce)) return null
+    if (index !== undefined && index !== null && typeof index !== "string")
+      return null
+    elements.push(entry as SceneElement)
+  }
+  return elements
+}
+
+function parseSceneMessage(payload: Record<string, unknown>) {
+  const elements = parseSceneElements(payload.elements)
+  return elements === null ? null : { elements }
+}
+
+/**
  * Anything unrecognized returns null and is dropped by the caller: a peer
  * cannot crash the room by sending garbage, and unknown message types are
  * simply ignored (so an older client talking to a newer server degrades
@@ -129,6 +184,12 @@ export function parseClientMessage(raw: string): ClientMessage | null {
   if (decoded.type === "MOUSE_LOCATION") {
     const payload = parsePointerUpdate(decoded.payload)
     return payload === null ? null : { type: "MOUSE_LOCATION", payload }
+  }
+
+  if (decoded.type === "SCENE_UPDATE") {
+    if (!isRecord(decoded.payload)) return null
+    const payload = parseSceneMessage(decoded.payload)
+    return payload === null ? null : { type: "SCENE_UPDATE", payload }
   }
 
   return null
@@ -192,6 +253,14 @@ export function parseServerMessage(raw: string): ServerMessage | null {
       type: "MOUSE_LOCATION",
       payload: { ...pointer, connectionId: payload.connectionId },
     }
+  }
+
+  if (decoded.type === "SCENE_INIT" || decoded.type === "SCENE_UPDATE") {
+    const scene = parseSceneMessage(payload)
+    if (!scene) return null
+    return decoded.type === "SCENE_INIT"
+      ? { type: "SCENE_INIT", payload: scene }
+      : { type: "SCENE_UPDATE", payload: scene }
   }
 
   return null
