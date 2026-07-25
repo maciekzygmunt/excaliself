@@ -126,9 +126,12 @@ function NameField({
         onChange={(e) => {
           writeDraft(e.target.value)
           const sanitized = sanitizeName(e.target.value)
-          // Peers watch the name change as it is typed; an empty field just
-          // waits rather than blanking anyone's avatar.
+          // Peers watch the name change as it is typed. An empty field waits
+          // rather than blanking anyone's avatar — and cancels, so a name
+          // deleted mid-debounce can't land 400ms after it stopped existing
+          // and outlive the edit in storage.
           if (sanitized) commit.run(sanitized)
+          else commit.cancel()
         }}
         onFocus={() => {
           startedFromRef.current = name

@@ -52,6 +52,37 @@ test("typing reaches peers without waiting for a blur", () => {
   }
 })
 
+test("a name deleted mid-debounce never lands", () => {
+  vi.useFakeTimers()
+  try {
+    const onNameChange = vi.fn()
+    render(
+      <GuestNamePill
+        name="Quiet Otter"
+        color={COLOR}
+        onNameChange={onNameChange}
+      />,
+    )
+
+    // Half a name, then second thoughts before the debounce fires. Without
+    // the cancel, "Ada" would reach peers and storage 400ms after it was
+    // deleted — and stay there if the tab closed before any blur.
+    const input = screen.getByLabelText("Your name")
+    typeInto(input, "Ada")
+    act(() => {
+      vi.advanceTimersByTime(100)
+    })
+    typeInto(input, "")
+    act(() => {
+      vi.advanceTimersByTime(1000)
+    })
+
+    expect(onNameChange).not.toHaveBeenCalled()
+  } finally {
+    vi.useRealTimers()
+  }
+})
+
 test("blurring commits the typed name straight away, trimmed", () => {
   const onNameChange = vi.fn()
   render(
