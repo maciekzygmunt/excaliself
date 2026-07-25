@@ -7,9 +7,11 @@
  *
  * - **Uploading.** Anything this tab drew that is still `pending` gets POSTed;
  *   on success the element flips to `saved`, which bumps its version and so
- *   syncs to the room as a normal delta. A refusal — too large, too frequent,
- *   or the network — flips it to `error` instead, which is excalidraw's own
- *   errored-image placeholder and the signal peers use to never ask for it.
+ *   syncs to the room as a normal delta. A refusal — too large, too frequent —
+ *   flips it to `error` instead, which is excalidraw's own errored-image
+ *   placeholder and the signal peers use to never ask for it. A request that
+ *   was never answered is neither: the image stays `pending` and is offered
+ *   again, because a dropped connection is not a verdict on the picture.
  * - **Fetching.** Anything the room shows as `saved` that this tab has no
  *   bytes for is GET-ed and injected with `addFiles()`. That covers both a
  *   peer pasting mid-session and a late joiner whose page loaded first.
@@ -26,7 +28,11 @@ import type {
   ExcalidrawImperativeAPI,
 } from "@excalidraw/excalidraw/types"
 import { useCallback, useEffect, useRef } from "react"
-import { selectMissingFileIds, selectUploads } from "./file-sync"
+import {
+  type ImageStatus,
+  selectMissingFileIds,
+  selectUploads,
+} from "./file-sync"
 import { fetchRoomFile, uploadRoomFile } from "./file-transport"
 import type { SceneElement } from "./protocol"
 
@@ -39,6 +45,14 @@ import type { SceneElement } from "./protocol"
 const MAX_FETCH_ATTEMPTS = 3
 
 /**
+ * How many times a blob is offered before the tab stops carrying it. Only
+ * unanswered attempts count — a refusal is final on the first one — and each
+ * retry waits for the next `onChange`, so this is a bound on a burst rather
+ * than a schedule.
+ */
+const MAX_UPLOAD_ATTEMPTS = 3
+
+/**
  * Flips every element referencing `fileId` to the outcome of its upload.
  * `newElementWith` bumps the version, so the flip travels to peers as an
  * ordinary delta — and `CaptureUpdateAction.NEVER` keeps it out of the local
@@ -47,7 +61,7 @@ const MAX_FETCH_ATTEMPTS = 3
 function markImageStatus(
   api: ExcalidrawImperativeAPI,
   fileId: string,
-  status: "saved" | "error",
+  status: Exclude<ImageStatus, "pending">,
 ) {
   const elements = api.getSceneElementsIncludingDeleted()
   let changed = false
@@ -82,26 +96,29 @@ export function useRoomFiles(options: {
   tokenRef.current = token
 
   /**
-   * Ids this tab will not POST: already in the database, already uploaded, or
-   * already tried. Claimed before the request goes out, so the `onChange`
-   * that fires while it is in flight can't send the same blob twice.
+   * Ids `uploadPending` must not offer again: already in the database, stored
+   * by this tab, in flight, or given up on. An id is claimed before its
+   * request goes out, so the `onChange` that fires while it is in the air
+   * can't send the same blob twice.
    */
-  const handledRef = useRef<Set<string>>(new Set(storedFileIds))
-  const inFlightRef = useRef<Set<string>>(new Set())
+  const skipUploadRef = useRef<Set<string>>(new Set(storedFileIds))
+  const uploadAttemptsRef = useRef<Map<string, number>>(new Map())
+  const inFlightFetchRef = useRef<Set<string>>(new Set())
   const fetchAttemptsRef = useRef<Map<string, number>>(new Map())
-  /** The room the three above were filled in for. */
-  const roomRef = useRef(token)
+  /** The token everything above was seeded for. */
+  const seededForRef = useRef(token)
 
   useEffect(() => {
     // A different token is a different drawing, so every judgement these hold
     // is about a room this tab has left.
-    if (roomRef.current !== token) {
-      roomRef.current = token
-      handledRef.current = new Set()
-      inFlightRef.current = new Set()
+    if (seededForRef.current !== token) {
+      seededForRef.current = token
+      skipUploadRef.current = new Set()
+      uploadAttemptsRef.current = new Map()
+      inFlightFetchRef.current = new Set()
       fetchAttemptsRef.current = new Map()
     }
-    for (const fileId of storedFileIds) handledRef.current.add(fileId)
+    for (const fileId of storedFileIds) skipUploadRef.current.add(fileId)
   }, [token, storedFileIds])
 
   /**
@@ -115,9 +132,24 @@ export function useRoomFiles(options: {
       const token = tokenRef.current
       if (!token) return
 
-      for (const file of selectUploads(elements, files, handledRef.current)) {
-        handledRef.current.add(file.fileId)
+      for (const file of selectUploads(
+        elements,
+        files,
+        skipUploadRef.current,
+      )) {
+        skipUploadRef.current.add(file.fileId)
+        const attempt = (uploadAttemptsRef.current.get(file.fileId) ?? 0) + 1
+        uploadAttemptsRef.current.set(file.fileId, attempt)
+
         void uploadRoomFile(token, file).then((outcome) => {
+          // A blip is not a verdict. The image stays `pending` — which the
+          // uploader still sees, since the bytes are local — and the next
+          // `onChange` offers it again. Only a refusal, or a run of attempts
+          // that got nowhere, earns the errored placeholder.
+          if (outcome === "failed" && attempt < MAX_UPLOAD_ATTEMPTS) {
+            skipUploadRef.current.delete(file.fileId)
+            return
+          }
           const api = apiRef.current
           if (!api) return
           markImageStatus(
@@ -139,14 +171,14 @@ export function useRoomFiles(options: {
 
     const known = new Set(Object.keys(api.getFiles()))
     for (const fileId of selectMissingFileIds(elements, known)) {
-      if (inFlightRef.current.has(fileId)) continue
+      if (inFlightFetchRef.current.has(fileId)) continue
       const attempts = fetchAttemptsRef.current.get(fileId) ?? 0
       if (attempts >= MAX_FETCH_ATTEMPTS) continue
 
       fetchAttemptsRef.current.set(fileId, attempts + 1)
-      inFlightRef.current.add(fileId)
+      inFlightFetchRef.current.add(fileId)
       void fetchRoomFile(token, fileId).then((file) => {
-        inFlightRef.current.delete(fileId)
+        inFlightFetchRef.current.delete(fileId)
         // A tab that uploaded this blob itself already has the bytes, so
         // addFiles is only ever additive here — and re-adding is harmless.
         if (file) apiRef.current?.addFiles([file])

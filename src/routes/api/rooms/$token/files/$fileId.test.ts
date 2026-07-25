@@ -7,7 +7,7 @@
 import { beforeEach, expect, test, vi } from "vitest"
 import { MAX_IMAGE_BYTES } from "@/features/collab/room-files"
 import { IMAGE_UPLOADS_PER_MINUTE } from "@/features/collab/upload-rate-limit"
-import { getRoomFile, putRoomFile } from "./$fileId"
+import { getRoomFile, postRoomFile } from "./$fileId"
 
 vi.mock("@/db", () => ({ db: {} }))
 
@@ -55,7 +55,7 @@ beforeEach(() => {
 test("stores an upload for a token the room admits", async () => {
   admits()
 
-  const response = await putRoomFile({
+  const response = await postRoomFile({
     request: upload({ dataUrl: PNG }),
     params,
   })
@@ -73,7 +73,7 @@ test("an over-cap image is refused with 413 and never stored", async () => {
   const tooBig = `data:image/png;base64,${Buffer.alloc(MAX_IMAGE_BYTES + 1).toString("base64")}`
 
   // Sent without a content-length so the exact check is the one that answers.
-  const response = await putRoomFile({
+  const response = await postRoomFile({
     request: new Request("https://example.test/api/rooms/tok/files/file-1", {
       method: "POST",
       headers: { "x-forwarded-for": `198.51.100.${++nextIp}` },
@@ -89,7 +89,7 @@ test("an over-cap image is refused with 413 and never stored", async () => {
 test("a body too large to hold a legal image is refused before it is read", async () => {
   admits()
 
-  const response = await putRoomFile({
+  const response = await postRoomFile({
     request: upload({ dataUrl: PNG }, { "content-length": String(50_000_000) }),
     params,
   })
@@ -102,7 +102,7 @@ test("a body too large to hold a legal image is refused before it is read", asyn
 test("a malformed body is a 400, not a 413", async () => {
   admits()
 
-  const response = await putRoomFile({
+  const response = await postRoomFile({
     request: upload({ dataUrl: 42 }),
     params,
   })
@@ -116,16 +116,16 @@ test("more than a minute's uploads from one IP in one room get 429", async () =>
   const from = () => upload({ dataUrl: PNG }, { "x-forwarded-for": ip })
 
   for (let i = 0; i < IMAGE_UPLOADS_PER_MINUTE; i++) {
-    expect((await putRoomFile({ request: from(), params })).status).toBe(204)
+    expect((await postRoomFile({ request: from(), params })).status).toBe(204)
   }
 
-  expect((await putRoomFile({ request: from(), params })).status).toBe(429)
+  expect((await postRoomFile({ request: from(), params })).status).toBe(429)
 })
 
 test("an upload on a dead token is refused, and costs no upload budget", async () => {
   refuses()
 
-  const response = await putRoomFile({
+  const response = await postRoomFile({
     request: upload({ dataUrl: PNG }),
     params,
   })

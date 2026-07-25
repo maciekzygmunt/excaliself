@@ -287,7 +287,14 @@ test("nothing is sent while the socket is closed", () => {
 const PNG = "data:image/png;base64,QUJDRA=="
 
 /** Replaces `fetch` with one canned answer and records what was asked for. */
-function stubFetch(response: { ok: boolean; body?: unknown }) {
+function stubFetch(response: {
+  ok: boolean
+  /** Only read when `ok` is false; 4xx is a verdict, 5xx is a bad day. */
+  status?: number
+  body?: unknown
+  /** Rejects instead of answering — the offline case. */
+  offline?: boolean
+}) {
   const calls: { url: string; method: string; body: unknown }[] = []
   vi.stubGlobal(
     "fetch",
@@ -297,8 +304,10 @@ function stubFetch(response: { ok: boolean; body?: unknown }) {
         method: init?.method ?? "GET",
         body: init?.body ? JSON.parse(init.body) : null,
       })
+      if (response.offline) return Promise.reject(new Error("offline"))
       return Promise.resolve({
         ok: response.ok,
+        status: response.status ?? (response.ok ? 200 : 400),
         json: () => Promise.resolve(response.body),
       })
     }),
@@ -337,7 +346,7 @@ test("a refused upload gets the errored-image placeholder", async () => {
   // 413 and 429 are the same answer to the canvas: this image will not reach
   // the room, so it wears excalidraw's own error state — which is also what
   // stops peers ever asking the endpoint for it (spec §5.4).
-  const calls = stubFetch({ ok: false })
+  const calls = stubFetch({ ok: false, status: 413 })
   const api = fakeExcalidraw()
   const { socket, change } = renderRoom(api)
   act(() => socket.receive({ type: "SCENE_INIT", payload: { elements: [] } }))
@@ -471,4 +480,59 @@ test("a missed fetch is retried, but not for the whole session", async () => {
   }
 
   expect(calls).toHaveLength(3)
+})
+
+test("a blip leaves the image pending, and the next change retries it", async () => {
+  // An unanswered request says nothing about the image, so it must not
+  // condemn it — unlike the 413 and 429 the placeholder is meant for.
+  const calls = stubFetch({ ok: true, offline: true })
+  const api = fakeExcalidraw()
+  const { socket, change } = renderRoom(api)
+  act(() => socket.receive({ type: "SCENE_INIT", payload: { elements: [] } }))
+  const files = { "file-1": { id: "file-1", dataURL: PNG } }
+
+  change([image("img", 1, "file-1")], files)
+  await settle()
+  expect(api.scene().map((e) => e.status)).toEqual(["pending"])
+
+  change([image("img", 2, "file-1")], files)
+  await settle()
+
+  expect(calls).toHaveLength(2)
+})
+
+test("an image that never gets an answer eventually gives up", async () => {
+  const calls = stubFetch({ ok: true, offline: true })
+  const api = fakeExcalidraw()
+  const { socket, change } = renderRoom(api)
+  act(() => socket.receive({ type: "SCENE_INIT", payload: { elements: [] } }))
+  const files = { "file-1": { id: "file-1", dataURL: PNG } }
+
+  for (let i = 0; i < 3; i++) {
+    change([image("img", i + 1, "file-1")], files)
+    await settle()
+  }
+  expect(calls).toHaveLength(3)
+  expect(api.scene().map((e) => e.status)).toEqual(["error"])
+
+  // And it stays given up on: further changes carry the errored element, so
+  // nothing offers it again.
+  change(api.scene(), files)
+  await settle()
+  expect(calls).toHaveLength(3)
+})
+
+test("a server error is a blip; a 4xx is a verdict", async () => {
+  const calls = stubFetch({ ok: false, status: 500 })
+  const api = fakeExcalidraw()
+  const { socket, change } = renderRoom(api)
+  act(() => socket.receive({ type: "SCENE_INIT", payload: { elements: [] } }))
+
+  change([image("img", 1, "file-1")], {
+    "file-1": { id: "file-1", dataURL: PNG },
+  })
+  await settle()
+
+  expect(calls).toHaveLength(1)
+  expect(api.scene().map((e) => e.status)).toEqual(["pending"])
 })

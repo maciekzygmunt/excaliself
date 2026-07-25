@@ -14,23 +14,52 @@ import type { SceneElement } from "./protocol"
 import type { RoomFileUpload } from "./room-files"
 
 /**
+ * Where an image's bytes have got to, in upstream's own vocabulary: not
+ * stored yet, stored, or refused by the store (spec §5.4). CONTEXT.md calls
+ * these the three states of a Scene image.
+ */
+export type ImageStatus = "pending" | "saved" | "error"
+
+/**
  * An element's image identity, or null when it isn't a live image. Read
  * defensively: a remote element is untyped JSON, and a local one is only
  * typed until it crosses `SceneElement`.
  */
 function imageOf(
   element: SceneElement,
-): { fileId: string; status: string } | null {
+): { fileId: string; status: ImageStatus } | null {
   if (element.type !== "image" || element.isDeleted) return null
   const { fileId, status } = element as { fileId?: unknown; status?: unknown }
   if (typeof fileId !== "string" || !fileId) return null
-  // Upstream's own default: an image with no status has not been stored yet.
-  return { fileId, status: typeof status === "string" ? status : "pending" }
+  return {
+    fileId,
+    // Upstream's own default: an image with no status is not stored yet.
+    status:
+      status === "saved" || status === "error" ? status : ("pending" as const),
+  }
+}
+
+/** The deduped file ids of the scene's live images at `status`, minus `skip`. */
+function imageFileIds(
+  elements: readonly SceneElement[],
+  status: ImageStatus,
+  skip: ReadonlySet<string>,
+): string[] {
+  const found: string[] = []
+  const seen = new Set<string>()
+  for (const element of elements) {
+    const image = imageOf(element)
+    if (!image || image.status !== status) continue
+    if (skip.has(image.fileId) || seen.has(image.fileId)) continue
+    seen.add(image.fileId)
+    found.push(image.fileId)
+  }
+  return found
 }
 
 /**
  * The blobs this tab owes the room: bytes it holds for an image that is still
- * `pending`, minus every id already known to be stored.
+ * `pending`, minus every id it must not offer.
  *
  * That subtraction is what keeps a room's images from being re-uploaded by
  * everyone who opens the link. Images saved before the session began arrive
@@ -42,22 +71,14 @@ function imageOf(
 export function selectUploads(
   elements: readonly SceneElement[],
   files: BinaryFiles,
-  stored: ReadonlySet<string>,
+  skip: ReadonlySet<string>,
 ): RoomFileUpload[] {
-  const uploads: RoomFileUpload[] = []
-  const seen = new Set<string>()
-  for (const element of elements) {
-    const image = imageOf(element)
-    if (!image || image.status !== "pending") continue
-    if (stored.has(image.fileId) || seen.has(image.fileId)) continue
-    const dataUrl = files[image.fileId]?.dataURL
+  return imageFileIds(elements, "pending", skip).flatMap((fileId) => {
+    const dataUrl: string | undefined = files[fileId]?.dataURL
     // No bytes yet: excalidraw creates the element before the file lands in
     // the scene. The next `onChange` carries both.
-    if (!dataUrl) continue
-    seen.add(image.fileId)
-    uploads.push({ fileId: image.fileId, dataUrl })
-  }
-  return uploads
+    return dataUrl ? [{ fileId, dataUrl }] : []
+  })
 }
 
 /**
@@ -70,14 +91,5 @@ export function selectMissingFileIds(
   elements: readonly SceneElement[],
   known: ReadonlySet<string>,
 ): string[] {
-  const missing: string[] = []
-  const seen = new Set<string>()
-  for (const element of elements) {
-    const image = imageOf(element)
-    if (!image || image.status !== "saved") continue
-    if (known.has(image.fileId) || seen.has(image.fileId)) continue
-    seen.add(image.fileId)
-    missing.push(image.fileId)
-  }
-  return missing
+  return imageFileIds(elements, "saved", known)
 }

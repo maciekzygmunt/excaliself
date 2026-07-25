@@ -20,6 +20,7 @@ import {
 } from "@/features/collab/room-files"
 import { resolveRoomForToken } from "@/features/collab/room-token"
 import { allowImageUpload } from "@/features/collab/upload-rate-limit"
+import { socketIpOf } from "@/lib/client-ip"
 
 /**
  * One generic refusal for every reason, exactly as the upgrade and the
@@ -33,13 +34,16 @@ const unauthorized = () =>
   })
 
 /**
- * srvx exposes the peer address on the request in the built server; the vite
- * dev server does not, and `clientIpKey` falls back to headers there.
+ * The token is the room's dial string here too — same path segment, same row.
+ *
+ * Deliberately *not* spending the token-validation budget the share page and
+ * the websocket upgrade share (spec §4.5, limiter 1). A late joiner
+ * legitimately makes one request per image on the canvas, so any budget small
+ * enough to blunt abuse would break the feature it guards — and spending a
+ * visitor's 60/min on their own images would then refuse their reconnect.
+ * §4.5 names the upload limiter as this surface's only one, and leaves the
+ * read side to the 256-bit token.
  */
-const socketIpOf = (request: Request) =>
-  (request as Request & { ip?: string }).ip ?? null
-
-/** The token is the room's dial string here too — same path segment, same row. */
 async function resolveRoom(request: Request, token: string) {
   const join = await resolveRoomForToken(
     db,
@@ -72,7 +76,7 @@ export async function getRoomFile({
   })
 }
 
-export async function putRoomFile({
+export async function postRoomFile({
   request,
   params,
 }: {
@@ -116,7 +120,7 @@ export const Route = createFileRoute("/api/rooms/$token/files/$fileId")({
   server: {
     handlers: {
       GET: getRoomFile,
-      POST: putRoomFile,
+      POST: postRoomFile,
     },
   },
 })
