@@ -1,0 +1,145 @@
+import { expect, test } from "vitest"
+import {
+  MAX_NAME_LENGTH,
+  parseClientMessage,
+  parseServerMessage,
+  sanitizeName,
+} from "./protocol"
+
+test("a JOIN message carries the sanitized name", () => {
+  expect(
+    parseClientMessage('{"type":"JOIN","payload":{"name":"  Ada  "}}'),
+  ).toEqual({ type: "JOIN", payload: { name: "Ada" } })
+})
+
+test("a JOIN without a usable name is dropped, leaving the server's pseudonym", () => {
+  expect(
+    parseClientMessage('{"type":"JOIN","payload":{"name":"   "}}'),
+  ).toBeNull()
+  expect(parseClientMessage('{"type":"JOIN","payload":{"name":42}}')).toBeNull()
+  expect(parseClientMessage('{"type":"JOIN"}')).toBeNull()
+})
+
+test("names are stripped of control characters and clamped", () => {
+  expect(sanitizeName("Ada\nLovelace")).toBe("Ada Lovelace")
+  expect(sanitizeName("x".repeat(200))).toHaveLength(MAX_NAME_LENGTH)
+  // Clamping counts code points, so an emoji name is never cut mid-surrogate.
+  expect(sanitizeName("🐙".repeat(50))).toBe("🐙".repeat(MAX_NAME_LENGTH))
+})
+
+test("a MOUSE_LOCATION message round-trips the cursor", () => {
+  const raw = JSON.stringify({
+    type: "MOUSE_LOCATION",
+    payload: {
+      pointer: { x: 12.5, y: -3, tool: "pointer" },
+      button: "down",
+      selectedElementIds: { a: true, b: true },
+    },
+  })
+  expect(parseClientMessage(raw)).toEqual({
+    type: "MOUSE_LOCATION",
+    payload: {
+      pointer: { x: 12.5, y: -3, tool: "pointer" },
+      button: "down",
+      selectedElementIds: { a: true, b: true },
+    },
+  })
+})
+
+test("a MOUSE_LOCATION with a missing or non-finite pointer is dropped", () => {
+  const bad = [
+    { pointer: { x: 1, y: 2 }, button: "up", selectedElementIds: {} },
+    { pointer: { x: "1", y: 2, tool: "pointer" }, button: "up" },
+    { pointer: { x: Number.NaN, y: 2, tool: "pointer" }, button: "up" },
+    { pointer: { x: 1, y: 2, tool: "eraser" }, button: "up" },
+    { pointer: { x: 1, y: 2, tool: "pointer" }, button: "sideways" },
+  ]
+  for (const payload of bad) {
+    const raw = JSON.stringify({ type: "MOUSE_LOCATION", payload })
+    expect(parseClientMessage(raw), raw).toBeNull()
+  }
+})
+
+test("selectedElementIds is rebuilt, so a peer can't smuggle arbitrary values through it", () => {
+  const raw = JSON.stringify({
+    type: "MOUSE_LOCATION",
+    payload: {
+      pointer: { x: 0, y: 0, tool: "laser" },
+      button: "up",
+      selectedElementIds: { a: { nested: "junk" } },
+    },
+  })
+  expect(parseClientMessage(raw)?.payload).toMatchObject({
+    selectedElementIds: { a: true },
+  })
+})
+
+test("garbage and unknown types are ignored rather than thrown", () => {
+  expect(parseClientMessage("not json")).toBeNull()
+  expect(parseClientMessage("[]")).toBeNull()
+  expect(parseClientMessage('{"type":"SCENE_UPDATE","payload":{}}')).toBeNull()
+})
+
+// --- the client's side of the wire -------------------------------------
+
+const PARTICIPANT = {
+  connectionId: "peer-a",
+  name: "Wren",
+  color: { background: "#fa5252", stroke: "#c92a2a" },
+  isGuest: true,
+}
+
+test("ROOM_JOINED carries this tab's connection id and the roster", () => {
+  const raw = JSON.stringify({
+    type: "ROOM_JOINED",
+    payload: { connectionId: "peer-self", participants: [PARTICIPANT] },
+  })
+  expect(parseServerMessage(raw)).toEqual({
+    type: "ROOM_JOINED",
+    payload: { connectionId: "peer-self", participants: [PARTICIPANT] },
+  })
+})
+
+test("PARTICIPANTS carries the roster on its own", () => {
+  const raw = JSON.stringify({
+    type: "PARTICIPANTS",
+    payload: { participants: [PARTICIPANT] },
+  })
+  expect(parseServerMessage(raw)).toEqual({
+    type: "PARTICIPANTS",
+    payload: { participants: [PARTICIPANT] },
+  })
+})
+
+test("a relayed cursor keeps the sender it was stamped with", () => {
+  const raw = JSON.stringify({
+    type: "MOUSE_LOCATION",
+    payload: {
+      connectionId: "peer-a",
+      pointer: { x: 1, y: 2, tool: "laser" },
+      button: "up",
+      selectedElementIds: {},
+    },
+  })
+  expect(parseServerMessage(raw)).toMatchObject({
+    payload: { connectionId: "peer-a" },
+  })
+})
+
+test("a malformed frame is ignored rather than thrown out of a socket callback", () => {
+  expect(parseServerMessage("nope")).toBeNull()
+  expect(parseServerMessage('{"type":"PARTICIPANTS","payload":{}}')).toBeNull()
+  expect(
+    parseServerMessage(
+      '{"type":"PARTICIPANTS","payload":{"participants":[{"connectionId":1}]}}',
+    ),
+  ).toBeNull()
+  expect(
+    parseServerMessage('{"type":"ROOM_JOINED","payload":{"participants":[]}}'),
+  ).toBeNull()
+  expect(
+    parseServerMessage(
+      '{"type":"MOUSE_LOCATION","payload":{"pointer":{"x":1,"y":2,"tool":"pointer"},"button":"up"}}',
+    ),
+  ).toBeNull()
+})

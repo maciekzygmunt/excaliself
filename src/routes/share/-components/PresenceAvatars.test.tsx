@@ -1,0 +1,53 @@
+import { cleanup, render, screen } from "@testing-library/react"
+import { afterEach, expect, test } from "vitest"
+import type { Participant } from "@/features/collab/protocol"
+import { initialsOf, PresenceAvatars } from "./PresenceAvatars"
+
+afterEach(cleanup)
+
+const participant = (name: string, i: number): Participant => ({
+  connectionId: `peer-${i}`,
+  name,
+  color: { background: "#fa5252", stroke: "#c92a2a" },
+  isGuest: true,
+})
+
+test("initials come from the first and last word", () => {
+  expect(initialsOf("Ada Lovelace")).toBe("AL")
+  expect(initialsOf("Quiet Otter")).toBe("QO")
+  expect(initialsOf("Wren")).toBe("W")
+  expect(initialsOf("  ada  van  der  berg ")).toBe("AB")
+  expect(initialsOf("   ")).toBe("?")
+})
+
+test("a room with nobody else in it shows no chrome", () => {
+  const { container } = render(<PresenceAvatars participants={[]} />)
+  expect(container.firstChild).toBeNull()
+})
+
+test("each person in the room gets an avatar in their cursor color", () => {
+  render(
+    <PresenceAvatars
+      participants={[participant("Ada Lovelace", 1), participant("Wren", 2)]}
+    />,
+  )
+  const ada = screen.getByTitle("Ada Lovelace")
+  expect(ada.textContent).toBe("AL")
+  expect(ada.style.backgroundColor).toBe("rgb(250, 82, 82)")
+  expect(screen.getByTitle("Wren").textContent).toBe("W")
+})
+
+test("a crowd collapses into a +N tail", () => {
+  render(
+    <PresenceAvatars
+      participants={["A B", "C D", "E F", "G H", "I J", "K L"].map(participant)}
+    />,
+  )
+  expect(screen.getByText("+2")).toBeTruthy()
+  expect(screen.getByLabelText("6 other people here")).toBeTruthy()
+})
+
+test("the label reads naturally for a single other person", () => {
+  render(<PresenceAvatars participants={[participant("Wren", 1)]} />)
+  expect(screen.getByLabelText("1 other person here")).toBeTruthy()
+})

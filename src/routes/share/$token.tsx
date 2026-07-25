@@ -31,6 +31,7 @@ export const Route = createFileRoute("/share/$token")({
 
 function SharePage() {
   const resolution = Route.useLoaderData()
+  const { token } = Route.useParams()
   // Share pages are logged-out surfaces and render light regardless of the
   // device's stored theme (spec §1.3); the bootstrap script already forced
   // it on load, this covers SPA navigation in from a dark app.
@@ -42,7 +43,11 @@ function SharePage() {
   if (resolution.status === "ok") {
     return (
       <Suspense fallback={<LoadingState />}>
-        <SharedCanvas drawing={resolution.drawing} files={resolution.files} />
+        <SharedCanvas
+          drawing={resolution.drawing}
+          files={resolution.files}
+          token={token}
+        />
       </Suspense>
     )
   }

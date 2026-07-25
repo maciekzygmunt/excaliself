@@ -34,3 +34,9 @@ The live collaboration session around one shared Drawing. Exists only while at l
 
 ### Share link
 The one live edit link a Drawing can have (`/share/<token>`), minted and managed by the owner from the Share dialog. "Shared" is derived — a Drawing is shared iff its link exists; stopping sharing deletes it, regenerating replaces the token (old URL dies). Carries an Audience: `members` (any signed-in member of this instance, the default) or `anyone` (no account needed). A link whose token, Audience, or Drawing no longer checks out is dead — every dead link looks identical, revealing nothing about whether the Drawing exists.
+
+### Participant
+One socket connected to a Room, as everyone else in it sees it: a display name, an assigned cursor color, and whether it belongs to a member or a guest. Identified by a Connection id, never by a userId — a member's account never crosses the wire to a guest. A member's name comes from their session and cannot be set from the client; a guest's is a pseudonym it generates and keeps in its own browser.
+
+### Connection id
+The random id a socket is given when it joins a Room, and the only handle other Participants have on it. Ephemeral by design (spec §4.4): reconnecting produces a new one, so it is not an identity that can be tracked or blocked — abuse limits key on IP instead.
