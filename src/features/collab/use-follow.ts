@@ -60,12 +60,13 @@ export function useFollow(options: {
   const relayViewport = useRef(
     createTrailingThrottle<ClientMessage>(CURSOR_INTERVAL_MS, (message) => {
       // Checked here rather than on the way in, so the trailing frame is the
-      // one that gets the chance to go out once the buffer has drained. A
-      // frame dropped under backpressure is not resent: the next scroll
-      // supersedes it, and a follower who stopped receiving mid-pan is
-      // resynced by the publish that a FOLLOWED_BY triggers.
-      if (isBackedUpRef.current()) return
-      sendRef.current(message)
+      // one that gets the chance to go out once the buffer has drained.
+      // Reporting the refusal rather than swallowing it is what keeps that
+      // frame alive: a pan that *ends* while the socket is congested has no
+      // later scroll to supersede it, and followers would sit at stale bounds
+      // until the leader happened to move again.
+      if (isBackedUpRef.current()) return false
+      return sendRef.current(message)
     }),
   )
 

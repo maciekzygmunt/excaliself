@@ -12,24 +12,45 @@ export const CURSOR_INTERVAL_MS = 33
  * trailing flush: the last frame of a pan is the one that decides where a
  * follower's canvas comes to rest, so dropping it would leave them parked
  * slightly off from the person they are following.
+ *
+ * That last frame is also the one with nothing behind it to supersede it, so
+ * a `run` that reports failure (a congested socket, say) doesn't end the
+ * flush — the value stays pending and is retried a window later. Whoever
+ * owns the channel is expected to `cancel()` when it closes for good;
+ * otherwise a permanently failing `run` retries forever.
  */
 export function createTrailingThrottle<T>(
   intervalMs: number,
-  run: (value: T) => void,
+  /** Returns whether the value went out; false holds it for a retry. */
+  run: (value: T) => boolean,
 ) {
   let lastRunAt = Number.NEGATIVE_INFINITY
   let pending: { value: T } | null = null
   let timer: ReturnType<typeof setTimeout> | null = null
 
-  const fire = (value: T) => {
-    lastRunAt = Date.now()
-    run(value)
-  }
-
   const cancel = () => {
     if (timer !== null) clearTimeout(timer)
     timer = null
     pending = null
+  }
+
+  const arm = (delay: number) => {
+    if (timer !== null) return
+    timer = setTimeout(() => {
+      timer = null
+      const next = pending
+      pending = null
+      if (next) attempt(next.value)
+    }, delay)
+  }
+
+  const attempt = (value: T) => {
+    if (!run(value)) {
+      pending = { value }
+      arm(intervalMs)
+      return
+    }
+    lastRunAt = Date.now()
   }
 
   return {
@@ -38,17 +59,11 @@ export function createTrailingThrottle<T>(
       const wait = intervalMs - (Date.now() - lastRunAt)
       if (wait <= 0) {
         cancel()
-        fire(value)
+        attempt(value)
         return
       }
       pending = { value }
-      if (timer !== null) return
-      timer = setTimeout(() => {
-        timer = null
-        const next = pending
-        pending = null
-        if (next) fire(next.value)
-      }, wait)
+      arm(wait)
     },
     cancel,
   }

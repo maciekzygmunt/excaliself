@@ -26,7 +26,10 @@ test("the very first update is never held back", () => {
 test("the viewport throttle sends the first frame at once", () => {
   vi.useFakeTimers()
   const sent: number[] = []
-  const throttle = createTrailingThrottle<number>(33, (v) => sent.push(v))
+  const throttle = createTrailingThrottle<number>(33, (v) => {
+    sent.push(v)
+    return true
+  })
 
   throttle.push(1)
   expect(sent).toEqual([1])
@@ -35,7 +38,10 @@ test("the viewport throttle sends the first frame at once", () => {
 test("the last frame of a burst still lands, once the window is up", () => {
   vi.useFakeTimers()
   const sent: number[] = []
-  const throttle = createTrailingThrottle<number>(33, (v) => sent.push(v))
+  const throttle = createTrailingThrottle<number>(33, (v) => {
+    sent.push(v)
+    return true
+  })
 
   throttle.push(1)
   vi.advanceTimersByTime(5)
@@ -56,7 +62,10 @@ test("the last frame of a burst still lands, once the window is up", () => {
 test("a frame past the window goes straight out", () => {
   vi.useFakeTimers()
   const sent: number[] = []
-  const throttle = createTrailingThrottle<number>(33, (v) => sent.push(v))
+  const throttle = createTrailingThrottle<number>(33, (v) => {
+    sent.push(v)
+    return true
+  })
 
   throttle.push(1)
   vi.advanceTimersByTime(40)
@@ -67,11 +76,53 @@ test("a frame past the window goes straight out", () => {
 test("cancelling drops the frame still waiting to go out", () => {
   vi.useFakeTimers()
   const sent: number[] = []
-  const throttle = createTrailingThrottle<number>(33, (v) => sent.push(v))
+  const throttle = createTrailingThrottle<number>(33, (v) => {
+    sent.push(v)
+    return true
+  })
 
   throttle.push(1)
   throttle.push(2)
   throttle.cancel()
   vi.advanceTimersByTime(100)
   expect(sent).toEqual([1])
+})
+
+test("a frame the run refuses is held and retried, not lost", () => {
+  vi.useFakeTimers()
+  const sent: number[] = []
+  let accepting = false
+  const throttle = createTrailingThrottle<number>(33, (v) => {
+    if (!accepting) return false
+    sent.push(v)
+    return true
+  })
+
+  throttle.push(1)
+  vi.advanceTimersByTime(200)
+  expect(sent).toEqual([])
+
+  // Nothing new arrives — the held frame is all that can put the follower
+  // back where it belongs, so draining has to be enough on its own.
+  accepting = true
+  vi.advanceTimersByTime(33)
+  expect(sent).toEqual([1])
+})
+
+test("a newer frame supersedes the one being retried", () => {
+  vi.useFakeTimers()
+  const sent: number[] = []
+  let accepting = false
+  const throttle = createTrailingThrottle<number>(33, (v) => {
+    if (!accepting) return false
+    sent.push(v)
+    return true
+  })
+
+  throttle.push(1)
+  vi.advanceTimersByTime(50)
+  throttle.push(2)
+  accepting = true
+  vi.advanceTimersByTime(50)
+  expect(sent).toEqual([2])
 })

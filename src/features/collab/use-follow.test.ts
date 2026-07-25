@@ -296,3 +296,31 @@ test("a backed-up socket drops viewport frames instead of queueing them", () => 
   })
   expect(sent).toHaveLength(beforeStall + 1)
 })
+
+test("the frame a congested socket refused still lands once it drains", () => {
+  vi.useFakeTimers()
+  const { hook, sent, socket } = setup()
+
+  act(() =>
+    hook.current.handleServerMessage({
+      type: "FOLLOWED_BY",
+      payload: { connectionIds: ["peer-ada"] },
+    }),
+  )
+  const beforeStall = sent.length
+
+  // A pan that ends while the socket is congested: the last frame is the one
+  // that decides where the follower comes to rest, and no later scroll is
+  // coming to supersede it.
+  socket.backedUp = true
+  act(() => {
+    vi.advanceTimersByTime(40)
+    hook.current.onScrollChange()
+  })
+  expect(sent).toHaveLength(beforeStall)
+
+  socket.backedUp = false
+  act(() => vi.advanceTimersByTime(100))
+  expect(sent).toHaveLength(beforeStall + 1)
+  expect(sent.at(-1)?.type).toBe("USER_VISIBLE_SCENE_BOUNDS")
+})
