@@ -31,17 +31,21 @@ const SharingDot = () => (
 // The Share entry point adapts to the canvas area's width (the @container/
 // canvas wrapper below), not the viewport — the app sidebar can eat 240px,
 // and Excalidraw's own mobile flip keys off its container too. Both
-// surfaces share the 48rem seam, so exactly one of them is ever visible:
-//   ≥64rem  labeled island button
-//   48–64rem  icon-only island button (the centered toolbar needs the room)
-//   <48rem  no island button; Share lives in the burger menu instead
+// surfaces share the 64rem seam, so exactly one of them is ever visible:
+//   ≥72rem  labeled island button
+//   64–72rem  icon-only island button
+//   <64rem  no island button; Share lives in the burger menu instead
+// The seams carry real margin: the top row must hold the burger island,
+// the toggle+title island (title capped at max-w-45), Excalidraw's full
+// ~550px toolbar, our button, and the Library button — worst case ~1000px
+// icon-only and ~1060px labeled before anything may clip.
 const SHARE_BUTTON_CLASS =
-  "gap-1.5 @max-3xl/canvas:hidden @max-5xl/canvas:px-2.5"
-const SHARE_LABEL_CLASS = "@max-5xl/canvas:hidden"
+  "gap-1.5 @max-5xl/canvas:hidden @max-6xl/canvas:px-2.5"
+const SHARE_LABEL_CLASS = "@max-6xl/canvas:hidden"
 // The ! is load-order armor: Excalidraw's lazy-loaded stylesheet declares
 // .dropdown-menu-item { display: flex } after our sheet, which would win
 // the tie against a plain `hidden`.
-const SHARE_MENU_ITEM_CLASS = "@3xl/canvas:hidden!"
+const SHARE_MENU_ITEM_CLASS = "@5xl/canvas:hidden!"
 
 type Props = {
   drawingId: string
