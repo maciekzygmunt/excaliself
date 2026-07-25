@@ -1,5 +1,5 @@
 import { cleanup, render, screen } from "@testing-library/react"
-import { afterEach, expect, test } from "vitest"
+import { afterEach, expect, test, vi } from "vitest"
 import type { Participant } from "@/features/collab/protocol"
 import { initialsOf, PresenceAvatars } from "./PresenceAvatars"
 
@@ -50,4 +50,30 @@ test("a crowd collapses into a +N tail", () => {
 test("the label reads naturally for a single other person", () => {
   render(<PresenceAvatars participants={[participant("Wren", 1)]} />)
   expect(screen.getByLabelText("1 other person here")).toBeTruthy()
+})
+
+test("clicking an avatar asks to follow that person", () => {
+  const onFollow = vi.fn()
+  const wren = participant("Wren", 1)
+  render(<PresenceAvatars participants={[wren]} onFollow={onFollow} />)
+
+  screen.getByRole("button", { name: "Follow Wren" }).click()
+  expect(onFollow).toHaveBeenCalledWith(wren)
+})
+
+test("the followed avatar offers to stop instead", () => {
+  const onFollow = vi.fn()
+  const wren = participant("Wren", 1)
+  render(
+    <PresenceAvatars
+      participants={[wren]}
+      followedConnectionId={wren.connectionId}
+      onFollow={onFollow}
+    />,
+  )
+
+  const avatar = screen.getByRole("button", { name: "Stop following Wren" })
+  expect(avatar.getAttribute("aria-pressed")).toBe("true")
+  avatar.click()
+  expect(onFollow).toHaveBeenCalledWith(wren)
 })

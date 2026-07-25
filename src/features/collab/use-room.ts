@@ -19,6 +19,7 @@ import type { ClientMessage, Participant, PointerUpdate } from "./protocol"
 import { parseServerMessage } from "./protocol"
 import { roomSocketUrl } from "./room-url"
 import { CURSOR_INTERVAL_MS, createDroppableThrottle } from "./throttle"
+import { useFollow } from "./use-follow"
 
 /**
  * Skip a cursor frame when the socket is already backed up rather than
@@ -87,6 +88,12 @@ export function useRoom(options: {
     return true
   }, [])
 
+  const follow = useFollow({ excalidrawAPI, send })
+  // The socket effect must not re-run when follow state changes, so its
+  // handlers are reached through a ref like everything else in there.
+  const followRef = useRef(follow)
+  followRef.current = follow
+
   useEffect(() => {
     if (!token) return
 
@@ -112,6 +119,10 @@ export function useRoom(options: {
         setRoster(message.payload.participants)
         return
       }
+      if (message.type !== "MOUSE_LOCATION") {
+        followRef.current.handleServerMessage(message)
+        return
+      }
 
       const { connectionId, ...pointer } = message.payload
       pointersRef.current.set(connectionId, pointer)
@@ -123,6 +134,7 @@ export function useRoom(options: {
       setSelfConnectionId(null)
       pointersRef.current.clear()
       setRoster([])
+      followRef.current.reset()
     }
     socket.addEventListener("close", handleClosed)
     // An error is always followed by a close event; letting it through
@@ -172,5 +184,23 @@ export function useRoom(options: {
     [participants, selfConnectionId],
   )
 
-  return { participants, others, selfConnectionId, onPointerUpdate }
+  // Null the moment the followed person leaves — the roster is what the ring
+  // and the chip are drawn from, so they can't outlive their subject.
+  const followedParticipant = useMemo(
+    () =>
+      others.find((p) => p.connectionId === follow.followedConnectionId) ??
+      null,
+    [others, follow.followedConnectionId],
+  )
+
+  return {
+    participants,
+    others,
+    selfConnectionId,
+    onPointerUpdate,
+    followedParticipant,
+    onScrollChange: follow.onScrollChange,
+    toggleFollow: follow.toggleFollow,
+    stopFollowing: follow.stopFollowing,
+  }
 }

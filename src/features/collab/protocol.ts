@@ -7,6 +7,11 @@
  * Both ends parse with hand-written guards rather than a schema library:
  * the shapes are tiny and fixed, MOUSE_LOCATION runs at ~30 Hz per peer, and
  * the guest page must not pay for a validator in its bundle.
+ *
+ * Follow mode (spec §1.3) adds two directed channels on top of the room's
+ * broadcast: a follower tells the server who it is trailing (`USER_FOLLOW`),
+ * and the followed peer — told it has an audience by `FOLLOWED_BY` — relays
+ * its viewport (`VIEWPORT_BOUNDS`) to exactly those followers.
  */
 
 /** The single pub/sub topic every peer in a room subscribes to. */
@@ -33,10 +38,21 @@ export type PointerUpdate = {
   selectedElementIds: Record<string, true>
 }
 
+/**
+ * The visible region of a follower's target, in scene coordinates —
+ * structurally Excalidraw's `SceneBounds`, restated here so the server never
+ * has to import the canvas package.
+ */
+export type SceneBounds = readonly [number, number, number, number]
+
 export type ClientMessage =
   /** Sent once on open; carries the guest's locally-stored display name. */
   | { type: "JOIN"; payload: { name: string } }
   | { type: "MOUSE_LOCATION"; payload: PointerUpdate }
+  /** Who this tab is following now; null when it stopped. */
+  | { type: "USER_FOLLOW"; payload: { followedConnectionId: string | null } }
+  /** Sent only while someone is following this tab. */
+  | { type: "VIEWPORT_BOUNDS"; payload: { bounds: SceneBounds } }
 
 export type ServerMessage =
   /** First frame back: who you are in this room, and who else is here. */
@@ -49,6 +65,12 @@ export type ServerMessage =
   | {
       type: "MOUSE_LOCATION"
       payload: PointerUpdate & { connectionId: string }
+    }
+  /** Who is currently trailing this tab; empty means nobody is. */
+  | { type: "FOLLOWED_BY"; payload: { connectionIds: string[] } }
+  | {
+      type: "VIEWPORT_BOUNDS"
+      payload: { connectionId: string; bounds: SceneBounds }
     }
 
 /** Longest display name accepted from a peer, in code points. */
@@ -96,6 +118,13 @@ function parsePointerUpdate(payload: unknown): PointerUpdate | null {
   }
 }
 
+function parseSceneBounds(value: unknown): SceneBounds | null {
+  if (!Array.isArray(value) || value.length !== 4) return null
+  if (!value.every(isFiniteNumber)) return null
+  const [x1, y1, x2, y2] = value as number[]
+  return [x1, y1, x2, y2]
+}
+
 /**
  * Anything unrecognized returns null and is dropped by the caller: a peer
  * cannot crash the room by sending garbage, and unknown message types are
@@ -120,6 +149,25 @@ export function parseClientMessage(raw: string): ClientMessage | null {
   if (decoded.type === "MOUSE_LOCATION") {
     const payload = parsePointerUpdate(decoded.payload)
     return payload === null ? null : { type: "MOUSE_LOCATION", payload }
+  }
+
+  if (decoded.type === "USER_FOLLOW") {
+    if (!isRecord(decoded.payload)) return null
+    const followedConnectionId = decoded.payload.followedConnectionId
+    if (
+      typeof followedConnectionId !== "string" &&
+      followedConnectionId !== null
+    )
+      return null
+    return { type: "USER_FOLLOW", payload: { followedConnectionId } }
+  }
+
+  if (decoded.type === "VIEWPORT_BOUNDS") {
+    if (!isRecord(decoded.payload)) return null
+    const bounds = parseSceneBounds(decoded.payload.bounds)
+    return bounds === null
+      ? null
+      : { type: "VIEWPORT_BOUNDS", payload: { bounds } }
   }
 
   return null
@@ -182,6 +230,22 @@ export function parseServerMessage(raw: string): ServerMessage | null {
     return {
       type: "MOUSE_LOCATION",
       payload: { ...pointer, connectionId: payload.connectionId },
+    }
+  }
+
+  if (decoded.type === "FOLLOWED_BY") {
+    const { connectionIds } = payload
+    if (!Array.isArray(connectionIds)) return null
+    if (!connectionIds.every((id) => typeof id === "string")) return null
+    return { type: "FOLLOWED_BY", payload: { connectionIds } }
+  }
+
+  if (decoded.type === "VIEWPORT_BOUNDS") {
+    const bounds = parseSceneBounds(payload.bounds)
+    if (!bounds || typeof payload.connectionId !== "string") return null
+    return {
+      type: "VIEWPORT_BOUNDS",
+      payload: { connectionId: payload.connectionId, bounds },
     }
   }
 

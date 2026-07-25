@@ -6,6 +6,7 @@
 import { Excalidraw } from "@excalidraw/excalidraw"
 import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types"
 import { useMemo, useState } from "react"
+import { FollowModeOverlay } from "@/components/follow-mode-overlay"
 import { getOrCreateGuestName } from "@/features/collab/guest-identity"
 import { useRoom } from "@/features/collab/use-room"
 import {
@@ -36,16 +37,30 @@ export function SharedCanvas({ drawing, files, token }: Props) {
   // the session's display name instead.
   const [name] = useState(() => getOrCreateGuestName())
 
-  const { others, onPointerUpdate } = useRoom({ token, name, excalidrawAPI })
+  const {
+    others,
+    onPointerUpdate,
+    followedParticipant,
+    onScrollChange,
+    toggleFollow,
+    stopFollowing,
+  } = useRoom({ token, name, excalidrawAPI })
 
   return (
-    <div className="h-dvh w-full">
+    <div className="relative h-dvh w-full">
       <Excalidraw
         initialData={initialData}
         excalidrawAPI={setExcalidrawAPI}
         theme="light"
         onPointerUpdate={onPointerUpdate}
-        renderTopRightUI={() => <PresenceAvatars participants={others} />}
+        onScrollChange={onScrollChange}
+        renderTopRightUI={() => (
+          <PresenceAvatars
+            participants={others}
+            followedConnectionId={followedParticipant?.connectionId ?? null}
+            onFollow={toggleFollow}
+          />
+        )}
         UIOptions={{
           canvasActions: {
             loadScene: false,
@@ -53,6 +68,10 @@ export function SharedCanvas({ drawing, files, token }: Props) {
             toggleTheme: false,
           },
         }}
+      />
+      <FollowModeOverlay
+        participant={followedParticipant}
+        onStop={stopFollowing}
       />
     </div>
   )

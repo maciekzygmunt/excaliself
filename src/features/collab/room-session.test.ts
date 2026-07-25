@@ -232,6 +232,135 @@ test("leaving twice is harmless", () => {
   expect(() => leaveRoom(rooms, ROOM, ada)).not.toThrow()
 })
 
+// --- follow mode (spec §1.3) --------------------------------------------
+
+const follow = (target: string | null) =>
+  JSON.stringify({
+    type: "USER_FOLLOW",
+    payload: { followedConnectionId: target },
+  })
+
+const viewport = (bounds: number[]) =>
+  JSON.stringify({ type: "VIEWPORT_BOUNDS", payload: { bounds } })
+
+const followersIn = (message: ServerMessage | undefined) =>
+  message?.type === "FOLLOWED_BY" ? message.payload.connectionIds : undefined
+
+/** A room of `ada` and `grace`, with their join traffic already forgotten. */
+function twoPeerRoom() {
+  const rooms = createRoomRegistry()
+  const ada = fakePeer("peer-ada")
+  const grace = fakePeer("peer-grace")
+  joinRoom(rooms, ROOM, ada, member("Ada"))
+  joinRoom(rooms, ROOM, grace, member("Grace"))
+  for (const peer of [ada, grace]) {
+    peer.sent.length = 0
+    peer.published.length = 0
+  }
+  return { rooms, ada, grace }
+}
+
+test("the followed peer is told it has an audience", () => {
+  const { rooms, ada, grace } = twoPeerRoom()
+
+  receiveFromPeer(rooms, ROOM, grace, follow("peer-ada"))
+
+  expect(followersIn(ada.sent.at(-1))).toEqual(["peer-grace"])
+  // Following is a private arrangement between two peers — nothing is
+  // fanned out to the room.
+  expect(grace.published).toHaveLength(0)
+  expect(grace.sent).toHaveLength(0)
+})
+
+test("a viewport reaches the followers and nobody else", () => {
+  const { rooms, ada, grace } = twoPeerRoom()
+  const wren = fakePeer("peer-wren")
+  joinRoom(rooms, ROOM, wren, member("Wren"))
+  wren.sent.length = 0
+
+  receiveFromPeer(rooms, ROOM, grace, follow("peer-ada"))
+  ada.sent.length = 0
+  receiveFromPeer(rooms, ROOM, ada, viewport([0, 0, 100, 50]))
+
+  expect(grace.sent.at(-1)).toEqual({
+    type: "VIEWPORT_BOUNDS",
+    payload: { connectionId: "peer-ada", bounds: [0, 0, 100, 50] },
+  })
+  expect(wren.sent).toHaveLength(0)
+  expect(ada.published).toHaveLength(0)
+})
+
+test("a viewport nobody is following is relayed to nobody", () => {
+  const { rooms, ada, grace } = twoPeerRoom()
+
+  receiveFromPeer(rooms, ROOM, ada, viewport([0, 0, 1, 1]))
+
+  expect(grace.sent).toHaveLength(0)
+})
+
+test("stopping tells the peer its audience is gone", () => {
+  const { rooms, ada, grace } = twoPeerRoom()
+
+  receiveFromPeer(rooms, ROOM, grace, follow("peer-ada"))
+  receiveFromPeer(rooms, ROOM, grace, follow(null))
+
+  expect(followersIn(ada.sent.at(-1))).toEqual([])
+
+  ada.sent.length = 0
+  receiveFromPeer(rooms, ROOM, ada, viewport([0, 0, 1, 1]))
+  expect(grace.sent).toHaveLength(0)
+})
+
+test("switching target updates both the old and the new audience", () => {
+  const { rooms, ada, grace } = twoPeerRoom()
+  const wren = fakePeer("peer-wren")
+  joinRoom(rooms, ROOM, wren, member("Wren"))
+  wren.sent.length = 0
+
+  receiveFromPeer(rooms, ROOM, grace, follow("peer-ada"))
+  receiveFromPeer(rooms, ROOM, grace, follow("peer-wren"))
+
+  expect(followersIn(ada.sent.at(-1))).toEqual([])
+  expect(followersIn(wren.sent.at(-1))).toEqual(["peer-grace"])
+})
+
+test("following yourself, a stranger, or the same peer twice is a no-op", () => {
+  const { rooms, ada, grace } = twoPeerRoom()
+
+  receiveFromPeer(rooms, ROOM, grace, follow("peer-grace"))
+  receiveFromPeer(rooms, ROOM, grace, follow("peer-nobody"))
+  expect(grace.sent).toHaveLength(0)
+  expect(ada.sent).toHaveLength(0)
+
+  receiveFromPeer(rooms, ROOM, grace, follow("peer-ada"))
+  ada.sent.length = 0
+  receiveFromPeer(rooms, ROOM, grace, follow("peer-ada"))
+  expect(ada.sent).toHaveLength(0)
+})
+
+test("a follower leaving takes its audience seat with it", () => {
+  const { rooms, ada, grace } = twoPeerRoom()
+
+  receiveFromPeer(rooms, ROOM, grace, follow("peer-ada"))
+  leaveRoom(rooms, ROOM, grace)
+
+  expect(followersIn(ada.sent.at(-1))).toEqual([])
+  // The departed follower must not still be relayed to.
+  expect(() =>
+    receiveFromPeer(rooms, ROOM, ada, viewport([0, 0, 1, 1])),
+  ).not.toThrow()
+  expect(grace.sent.filter((m) => m.type === "VIEWPORT_BOUNDS")).toHaveLength(0)
+})
+
+test("when the followed peer leaves, the follow is forgotten", () => {
+  const { rooms, ada, grace } = twoPeerRoom()
+
+  receiveFromPeer(rooms, ROOM, grace, follow("peer-ada"))
+  leaveRoom(rooms, ROOM, ada)
+
+  expect(rooms.get(ROOM)?.follows.size).toBe(0)
+})
+
 test("rooms are isolated — a peer only ever sees its own drawing's roster", () => {
   const rooms = createRoomRegistry()
   const ada = fakePeer("peer-ada")

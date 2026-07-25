@@ -257,6 +257,17 @@ code {
   .excalidraw:not(.excalidraw-modal-container) {
     background-color: var(--default-bg-color);
   }
+
+  /* Follow mode (spec §1.3) uses Excalidraw's `appState.userToFollow` for the
+     mechanics, but not the chrome it draws for it: a fixed-blue ring and a
+     badge with a close icon. `FollowModeOverlay` stands in its place, in the
+     followed participant's own color and saying what clicking does.
+     The `div` qualifier is load-order armor: Excalidraw's own
+     `.excalidraw .follow-mode { display: flex }` is lazy-loaded and lands
+     after our sheet, so it would win the tie at equal specificity. */
+  .excalidraw div.follow-mode {
+    display: none;
+  }
 }
 
 /* A barely-there scrollbar for scrollable chrome surfaces (palette list):
