@@ -22,11 +22,13 @@ import { CURSOR_INTERVAL_MS, createDroppableThrottle } from "./throttle"
 import { useFollow } from "./use-follow"
 
 /**
- * Skip a cursor frame when the socket is already backed up rather than
- * queueing it — the droppable half of "droppable channel". Roughly a few
- * dozen cursor frames' worth of bytes.
+ * Skip a frame when the socket is already backed up rather than queueing it
+ * — the droppable half of "droppable channel". Roughly a few dozen cursor
+ * frames' worth of bytes. Cursors and follow-mode viewports share the budget
+ * because they share the socket, and both supersede themselves: whatever was
+ * dropped is stale by the time the buffer drains.
  */
-const CURSOR_BACKPRESSURE_BYTES = 8 * 1024
+const BACKPRESSURE_BYTES = 8 * 1024
 
 /** What Excalidraw's `onPointerUpdate` hands us; selection comes from appState. */
 type PointerMove = Omit<PointerUpdate, "selectedElementIds">
@@ -92,7 +94,13 @@ export function useRoom(options: {
     return true
   }, [])
 
-  const follow = useFollow({ excalidrawAPI, send })
+  /** Whether the socket's outbound buffer is too full to take another frame. */
+  const isBackedUp = useCallback(
+    () => (socketRef.current?.bufferedAmount ?? 0) > BACKPRESSURE_BYTES,
+    [],
+  )
+
+  const follow = useFollow({ excalidrawAPI, send, isBackedUp })
   // The socket effect must not re-run when follow state changes, so its
   // handlers are reached through a ref like everything else in there.
   const followRef = useRef(follow)
@@ -158,6 +166,12 @@ export function useRoom(options: {
       pointersRef.current.clear()
       participantsRef.current = []
       selfConnectionIdRef.current = null
+      // The close listener is gone by now, so this is the only place a
+      // *replaced* socket resets follow state — navigating from one share
+      // link to another keeps this component mounted, and a stale follower
+      // set would have every scroll relaying into a room nobody is watching
+      // from.
+      followRef.current.reset()
     }
   }, [token, send, setRoster, pushCollaborators])
 
@@ -172,7 +186,7 @@ export function useRoom(options: {
     (move: PointerMove) => {
       const socket = socketRef.current
       if (socket?.readyState !== WebSocket.OPEN) return
-      if (socket.bufferedAmount > CURSOR_BACKPRESSURE_BYTES) return
+      if (isBackedUp()) return
       if (!allowCursor.current()) return
       send({
         type: "MOUSE_LOCATION",
@@ -184,13 +198,21 @@ export function useRoom(options: {
         },
       })
     },
-    [send],
+    [send, isBackedUp],
   )
 
   // Who else is here — the same exclusion the collaborator map makes, so the
   // avatars and the cursors can never disagree about who is remote.
   const others = useMemo(
     () => participants.filter((p) => p.connectionId !== selfConnectionId),
+    [participants, selfConnectionId],
+  )
+  // And the other half of that split: how the room sees this tab — which
+  // color its cursor wears, whether it joined as a guest. Null until the
+  // join lands. Computed here so no caller has to re-walk the roster and
+  // reach a different answer than `others` did.
+  const self = useMemo(
+    () => participants.find((p) => p.connectionId === selfConnectionId) ?? null,
     [participants, selfConnectionId],
   )
 
@@ -204,9 +226,8 @@ export function useRoom(options: {
   )
 
   return {
-    participants,
+    self,
     others,
-    selfConnectionId,
     onPointerUpdate,
     followedParticipant,
     onScrollChange: follow.onScrollChange,

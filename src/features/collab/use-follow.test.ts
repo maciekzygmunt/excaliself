@@ -87,6 +87,7 @@ function fakeExcalidrawAPI() {
 function setup() {
   const excalidraw = fakeExcalidrawAPI()
   const sent: ClientMessage[] = []
+  const socket = { backedUp: false }
   const rendered = renderHook(() =>
     useFollow({
       excalidrawAPI: excalidraw.api,
@@ -94,11 +95,13 @@ function setup() {
         sent.push(message)
         return true
       },
+      isBackedUp: () => socket.backedUp,
     }),
   )
   return {
     ...excalidraw,
     sent,
+    socket,
     hook: rendered.result,
     unmount: rendered.unmount,
   }
@@ -262,4 +265,34 @@ test("a dropped socket ends both sides of the arrangement", () => {
   expect(state().followedBy.size).toBe(0)
   act(() => hook.current.onScrollChange())
   expect(sent).toHaveLength(0)
+})
+
+test("a backed-up socket drops viewport frames instead of queueing them", () => {
+  vi.useFakeTimers()
+  const { hook, sent, socket } = setup()
+
+  act(() =>
+    hook.current.handleServerMessage({
+      type: "FOLLOWED_BY",
+      payload: { connectionIds: ["peer-ada"] },
+    }),
+  )
+  const beforeStall = sent.length
+
+  socket.backedUp = true
+  for (let i = 0; i < 5; i++) {
+    act(() => {
+      vi.advanceTimersByTime(40)
+      hook.current.onScrollChange()
+    })
+  }
+  expect(sent).toHaveLength(beforeStall)
+
+  // Draining the buffer lets the channel pick straight back up.
+  socket.backedUp = false
+  act(() => {
+    vi.advanceTimersByTime(40)
+    hook.current.onScrollChange()
+  })
+  expect(sent).toHaveLength(beforeStall + 1)
 })

@@ -1,7 +1,6 @@
 /**
  * Who else is in the room, as a stack of initialed avatars in Excalidraw's
- * top-right island (spec §1.3). Deliberately minimal: the guest chrome slice
- * adds the editable name pill beside it and settles the final styling.
+ * top-right island (spec §1.3), to the left of the visitor's own name pill.
  *
  * Only other people are shown — you already know you're here — so a lone
  * visitor gets no chrome at all.

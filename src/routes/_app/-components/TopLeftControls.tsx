@@ -1,25 +1,5 @@
 import { PanelLeftIcon } from "lucide-react"
-import { type ReactNode, useState } from "react"
-import { createPortal } from "react-dom"
-import { useExcalidrawPortalTarget } from "./excalidraw-portal"
-
-const PRIMARY_TARGET_SELECTOR =
-  ".excalidraw .App-menu_top__left > div:first-child"
-const FALLBACK_TRIGGER_SELECTOR = ".excalidraw .main-menu-trigger"
-
-function findPortalTarget(): HTMLElement | null {
-  const primary = document.querySelector(PRIMARY_TARGET_SELECTOR)
-  if (primary instanceof HTMLElement) return primary
-
-  const trigger = document.querySelector(FALLBACK_TRIGGER_SELECTOR)
-  const fallback = trigger?.closest("div")
-  return fallback instanceof HTMLElement ? fallback : null
-}
-
-export function TopLeftPortal({ children }: { children: ReactNode }) {
-  const target = useExcalidrawPortalTarget(findPortalTarget)
-  return target ? createPortal(children, target) : null
-}
+import { useState } from "react"
 
 type Props = {
   initialName: string

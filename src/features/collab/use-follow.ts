@@ -36,8 +36,10 @@ type FollowMessage = Extract<
 export function useFollow(options: {
   excalidrawAPI: ExcalidrawImperativeAPI | null
   send: (message: ClientMessage) => boolean
+  /** True while the socket's outbound buffer is too full for another frame. */
+  isBackedUp: () => boolean
 }) {
-  const { excalidrawAPI, send } = options
+  const { excalidrawAPI, send, isBackedUp } = options
 
   const [followedConnectionId, setFollowedConnectionId] = useState<
     string | null
@@ -49,12 +51,20 @@ export function useFollow(options: {
   /** Who is trailing us, straight off the wire — never rendered here. */
   const followersRef = useRef<ReadonlySet<string>>(new Set())
 
-  // The throttle outlives any one render, so it reaches the socket through a
-  // ref rather than closing over the `send` it happened to be built with.
+  // The throttle outlives any one render, so it reaches the socket through
+  // refs rather than closing over the `send` it happened to be built with.
   const sendRef = useRef(send)
   sendRef.current = send
+  const isBackedUpRef = useRef(isBackedUp)
+  isBackedUpRef.current = isBackedUp
   const relayViewport = useRef(
     createTrailingThrottle<ClientMessage>(CURSOR_INTERVAL_MS, (message) => {
+      // Checked here rather than on the way in, so the trailing frame is the
+      // one that gets the chance to go out once the buffer has drained. A
+      // frame dropped under backpressure is not resent: the next scroll
+      // supersedes it, and a follower who stopped receiving mid-pan is
+      // resynced by the publish that a FOLLOWED_BY triggers.
+      if (isBackedUpRef.current()) return
       sendRef.current(message)
     }),
   )

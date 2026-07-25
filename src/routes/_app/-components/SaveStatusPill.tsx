@@ -1,22 +1,4 @@
 import { Cloud, Loader2 } from "lucide-react"
-import type { ReactNode } from "react"
-import { createPortal } from "react-dom"
-import { useExcalidrawPortalTarget } from "./excalidraw-portal"
-
-const FOOTER_RIGHT_SELECTOR = ".excalidraw .layer-ui__wrapper__footer-right"
-
-function findFooterRight(): HTMLElement | null {
-  const target = document.querySelector(FOOTER_RIGHT_SELECTOR)
-  return target instanceof HTMLElement ? target : null
-}
-
-// Renders into Excalidraw's bottom-right footer flex row (next to the help
-// button), so the pill inherits the row's height and alignment instead of
-// hand-tuned absolute offsets.
-export function FooterRightPortal({ children }: { children: ReactNode }) {
-  const target = useExcalidrawPortalTarget(findFooterRight)
-  return target ? createPortal(children, target) : null
-}
 
 type Props = {
   saving: boolean
