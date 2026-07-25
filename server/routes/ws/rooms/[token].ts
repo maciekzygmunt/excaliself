@@ -10,10 +10,12 @@
 
 import { defineWebSocketHandler } from "nitro"
 import { db } from "@/db"
-import { resolveRoomJoin } from "@/features/collab/join"
 import {
   exceedsFrameCap,
   FRAME_TOO_LARGE_CLOSE_CODE,
+} from "@/features/collab/frame-cap"
+import { resolveRoomJoin } from "@/features/collab/join"
+import {
   LINK_DEAD_CLOSE_CODE,
   ROOM_FULL_CLOSE_CODE,
 } from "@/features/collab/protocol"
@@ -76,20 +78,24 @@ function toRoomPeer(peer: {
 }
 
 /**
- * What the upgrade decided about this socket: which room it belongs in, or
- * that it belongs in none and exists only to be told so.
+ * The room the upgrade seated this socket in, or null for a socket that
+ * belongs in none — refused, or missing the context entirely. Both of those
+ * are answered once, in `open`, by closing; every hook after that has a room
+ * or has nothing to do.
  */
-function contextOf(peer: { context: Record<string, unknown> }) {
+function roomContextOf(peer: { context: Record<string, unknown> }) {
   const context = peer.context as Partial<{
     roomId: string
     identity: ParticipantIdentity
     refused: true
   }>
-  if (context.refused) return { refused: true } as const
   return context.roomId && context.identity
     ? { roomId: context.roomId, identity: context.identity }
     : null
 }
+
+const wasRefused = (peer: { context: Record<string, unknown> }) =>
+  peer.context.refused === true
 
 export default defineWebSocketHandler({
   async upgrade(request) {
@@ -138,12 +144,13 @@ export default defineWebSocketHandler({
   // promise, and continuations on a settled promise run in the order they
   // were registered.
   async open(peer) {
-    const context = contextOf(peer)
-    if (!context) return peer.close(1011, "Room unavailable")
     // The dead-link answer of spec §5.3, and the one close the reconnect loop
     // treats as final: retrying a link that is gone would spin forever.
-    if ("refused" in context)
+    if (wasRefused(peer))
       return peer.close(LINK_DEAD_CLOSE_CODE, "Link no longer active")
+
+    const context = roomContextOf(peer)
+    if (!context) return peer.close(1011, "Room unavailable")
 
     const join = await joinRoom(
       rooms,
@@ -158,13 +165,17 @@ export default defineWebSocketHandler({
   },
 
   async message(peer, message) {
-    const context = contextOf(peer)
-    if (!context || "refused" in context) return
+    const context = roomContextOf(peer)
+    if (!context) return
 
-    // The frame cap of spec §5.4, measured off the raw frame before it is
-    // decoded — a 4 MB payload should not also cost a 4 MB string. The client
-    // needs no error channel for it: the close looks like any other drop, and
-    // the reconnect's SCENE_INIT puts the session back together.
+    // The frame cap of spec §5.4. Measured off the raw frame rather than
+    // `text()`, so an oversized payload is not also decoded into a string of
+    // its own — though it has been buffered by then either way: neither srvx
+    // nor nitro exposes the underlying ws server's `maxPayload`, which is
+    // where a cap could refuse the bytes before they are read.
+    //
+    // The client needs no error channel for it: the close looks like any
+    // other drop, and the reconnect's SCENE_INIT puts the session together.
     if (exceedsFrameCap(message.rawData))
       return peer.close(FRAME_TOO_LARGE_CLOSE_CODE, "Frame too large")
 
@@ -177,8 +188,8 @@ export default defineWebSocketHandler({
   },
 
   close(peer) {
-    const context = contextOf(peer)
-    if (!context || "refused" in context) return
+    const context = roomContextOf(peer)
+    if (!context) return
     leaveRoom(rooms, context.roomId, toRoomPeer(peer))
   },
 })

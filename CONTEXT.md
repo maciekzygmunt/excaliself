@@ -41,5 +41,11 @@ One socket connected to a Room, as everyone else in it sees it: a display name, 
 ### Connection id
 The random id a socket is given when it joins a Room, and the only handle other Participants have on it. Ephemeral by design (spec §4.4): reconnecting produces a new one, so it is not an identity that can be tracked or blocked — abuse limits key on IP instead.
 
+### Heartbeat
+A tiny frame each Participant sends every ~25 s, and the answer the server sends back. It exists to be traffic: a Room where everyone is reading rather than drawing is a live session, and without it a reverse proxy's idle timeout would close the sockets out from under it. The answer is the second half — a Participant whose heartbeat goes unanswered treats its Connection as dead even though the socket still claims to be open, which is the only way a connection that died without saying so is ever noticed.
+
+### Reconnecting
+The state of a Participant whose socket has dropped: the canvas stays live and editable, edits keep landing locally, and the client dials the Room again on a jittered backoff, indefinitely. Announced by one quiet indicator and nothing else — no warning, no retry button, and never any "lost work" language, because there is none: the rejoin merges what was drawn during the outage with whatever the Room has. Two answers end it instead of another dial — the Room is full, or the Share link is dead.
+
 ### Following
 A one-way arrangement between two Participants in a Room: the follower's canvas rides along with the followed Participant's viewport, marked by a ring in that Participant's color and a chip naming them. Started by clicking their avatar, ended by clicking the chip, their avatar, panning or zooming, or by them leaving. Nobody can be made to follow, and being followed changes nothing about what the followed Participant can do — only that their viewport is relayed to whoever is watching.

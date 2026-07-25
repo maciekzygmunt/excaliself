@@ -53,6 +53,12 @@ export type Room = {
   peers: Map<string, RoomPeer>
   /** Follower connection id → the connection id it is trailing (spec §1.3). */
   follows: Map<string, string>
+  /**
+   * When each connection was last heard from. A socket that dies without a
+   * FIN — a lid closing, a phone changing networks — leaves a peer the
+   * server still believes in, and nothing but silence says otherwise.
+   */
+  lastSeenAt: Map<string, number>
   /** Resolves when the stored scene has been read (or failed to read). */
   loaded: Promise<void>
   /** The authoritative scene, in fractional-index order. */
@@ -69,10 +75,14 @@ export type Room = {
 export type RoomRegistry = {
   rooms: Map<string, Room>
   loadScene: SceneLoader
+  now: () => number
 }
 
-export function createRoomRegistry(loadScene: SceneLoader): RoomRegistry {
-  return { rooms: new Map(), loadScene }
+export function createRoomRegistry(
+  loadScene: SceneLoader,
+  now: () => number = () => Date.now(),
+): RoomRegistry {
+  return { rooms: new Map(), loadScene, now }
 }
 
 /**
@@ -88,6 +98,7 @@ function ensureRoom(registry: RoomRegistry, roomId: string): Room {
     participants: new Map(),
     peers: new Map(),
     follows: new Map(),
+    lastSeenAt: new Map(),
     loaded: Promise.resolve(),
     elements: [],
     sceneVersion: 0,
@@ -137,6 +148,37 @@ function broadcastRoster(peer: RoomPeer, room: Room) {
  */
 export const MAX_ROOM_PARTICIPANTS = 25
 
+/**
+ * How long a connection may go silent before the Room stops believing in it.
+ * Clients heartbeat every 25 s (spec §5.3), so this is three-and-a-half
+ * missed beats — a live tab would have to be unreachable for a minute and a
+ * half to be mistaken for a ghost, and a ghost is only ever *forgotten*, so
+ * the cost of being wrong is a roster the next frame puts back.
+ */
+export const PARTICIPANT_IDLE_TIMEOUT_MS = 90_000
+
+/**
+ * Forget connections that have gone silent. A half-open socket holds a seat
+ * against the cap, and there are only 25 — so a room a flaky network has
+ * filled with ghosts would refuse the very reconnect of spec §5.3, and the
+ * returning tab would land on "this drawing is full" holding an unmerged
+ * scene. That is the "no lost work" promise broken by bookkeeping.
+ *
+ * Swept on join rather than on a timer: joining is the only moment a ghost
+ * costs anything, and a timer would be one more thing to own and shut down.
+ */
+function forgetSilentParticipants(room: Room, now: number) {
+  for (const [connectionId, lastSeenAt] of room.lastSeenAt) {
+    if (now - lastSeenAt < PARTICIPANT_IDLE_TIMEOUT_MS) continue
+    room.participants.delete(connectionId)
+    room.peers.delete(connectionId)
+    room.follows.delete(connectionId)
+    room.lastSeenAt.delete(connectionId)
+    for (const [follower, followed] of room.follows)
+      if (followed === connectionId) room.follows.delete(follower)
+  }
+}
+
 export type RoomJoinResult =
   | { status: "ok" }
   /** The Room is at its cap; the visitor gets the "drawing full" page. */
@@ -150,10 +192,14 @@ export async function joinRoom(
 ): Promise<RoomJoinResult> {
   // Checked before the Room is created, so a refused join never leaves an
   // empty one behind — and never starts a scene read for a peer that is
-  // about to be turned away.
+  // about to be turned away. Ghosts are swept first: a seat nobody is
+  // sitting in must not be what turns a reconnect away.
   const existing = registry.rooms.get(roomId)
-  if (existing && existing.participants.size >= MAX_ROOM_PARTICIPANTS)
-    return { status: "full" }
+  if (existing) {
+    forgetSilentParticipants(existing, registry.now())
+    if (existing.participants.size >= MAX_ROOM_PARTICIPANTS)
+      return { status: "full" }
+  }
 
   const room = ensureRoom(registry, roomId)
 
@@ -168,6 +214,7 @@ export async function joinRoom(
   }
   room.participants.set(peer.id, participant)
   room.peers.set(peer.id, peer)
+  room.lastSeenAt.set(peer.id, registry.now())
 
   peer.subscribe(ROOM_TOPIC)
   // Presence goes out before the scene read so avatars never wait on the
@@ -296,13 +343,18 @@ export async function receiveFromPeer(
   const message = parseClientMessage(raw)
   if (!message) return
 
-  // Answered ahead of the room lookup, so the heartbeat works in the window
-  // between the socket opening and the join landing (spec §5.3). A beat that
-  // went unanswered there would be read as a dead socket, and the client
-  // would drop a connection that was only still reading its scene.
+  const room = registry.rooms.get(roomId)
+  // Any frame at all is proof of life, and `PING` most of all: it is the only
+  // one a room where nobody is drawing will ever produce.
+  if (room?.participants.has(peer.id))
+    room.lastSeenAt.set(peer.id, registry.now())
+
+  // Answered ahead of the participant check, so the heartbeat works in the
+  // window between the socket opening and the join landing (spec §5.3). A
+  // beat that went unanswered there would be read as a dead socket, and the
+  // client would drop a connection that was only still reading its scene.
   if (message.type === "PING") return peer.send({ type: "PONG", payload: {} })
 
-  const room = registry.rooms.get(roomId)
   const participant = room?.participants.get(peer.id)
   if (!room || !participant) return
 
@@ -364,6 +416,7 @@ export function leaveRoom(
   const room = registry.rooms.get(roomId)
   if (!room?.participants.delete(peer.id)) return
   room.peers.delete(peer.id)
+  room.lastSeenAt.delete(peer.id)
 
   // A departing peer both stops following and stops being followed. Its own
   // followers need no message — Excalidraw drops `userToFollow` by itself

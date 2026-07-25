@@ -18,8 +18,10 @@ import { config as loadEnv } from "dotenv"
 import { Client } from "pg"
 import {
   FRAME_TOO_LARGE_CLOSE_CODE,
-  LINK_DEAD_CLOSE_CODE,
   MAX_FRAME_BYTES,
+} from "../src/features/collab/frame-cap"
+import {
+  LINK_DEAD_CLOSE_CODE,
   ROOM_FULL_CLOSE_CODE,
 } from "../src/features/collab/protocol"
 import { MAX_ROOM_PARTICIPANTS } from "../src/features/collab/room-session"

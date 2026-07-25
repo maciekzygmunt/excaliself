@@ -281,23 +281,26 @@ export function useRoom(options: {
     // across a whole outage rather than restarting with each attempt.
     const backoff = createReconnectBackoff()
     let retryTimer: ReturnType<typeof setTimeout> | null = null
-    let heartbeat: Heartbeat | null = null
     let disposed = false
+    /** The current socket's heartbeat, so unmounting can stop it too. */
+    let beat: Heartbeat | null = null
 
     const connect = () => {
       const socket = new WebSocket(roomSocketUrl(token, window.location))
       socketRef.current = socket
-      const beat = createHeartbeat({
+      beat = createHeartbeat({
         ping: () => send({ type: "PING", payload: {} }),
         // A socket that still says OPEN and answers nothing is a connection
         // that died without a FIN. Closing it is what hands it to the retry
         // below; nothing else would ever notice.
         onSilent: () => socket.close(),
       })
-      heartbeat = beat
+      // Captured, so each socket's handlers stop and answer their own beat
+      // rather than whichever one a later dial has installed.
+      const ownBeat = beat
 
       socket.addEventListener("open", () => {
-        beat.start()
+        ownBeat.start()
         send({ type: "JOIN", payload: { name: nameRef.current } })
       })
 
@@ -307,7 +310,7 @@ export function useRoom(options: {
         if (!message) return
 
         if (message.type === "PONG") {
-          beat.acknowledge()
+          ownBeat.acknowledge()
           return
         }
         if (message.type === "ROOM_JOINED") {
@@ -355,7 +358,7 @@ export function useRoom(options: {
       })
 
       socket.addEventListener("close", (event: CloseEvent) => {
-        beat.stop()
+        ownBeat.stop()
         if (socketRef.current === socket) socketRef.current = null
         forgetConnection()
         if (disposed) return
@@ -389,7 +392,7 @@ export function useRoom(options: {
     return () => {
       disposed = true
       if (retryTimer !== null) clearTimeout(retryTimer)
-      heartbeat?.stop()
+      beat?.stop()
       socketRef.current?.close()
       socketRef.current = null
       participantsRef.current = []

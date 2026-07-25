@@ -42,17 +42,6 @@ export const ROOM_FULL_CLOSE_CODE = 4029
  */
 export const LINK_DEAD_CLOSE_CODE = 4010
 
-/**
- * Every frame this protocol will accept, in bytes (spec §5.4). Anything
- * larger closes the socket with the standard 1009 (message too big); the
- * client self-heals through the same reconnect + `SCENE_INIT` resync as any
- * other drop, so there is no error channel for it.
- */
-export const MAX_FRAME_BYTES = 4 * 1024 * 1024
-
-/** WebSocket's own "message too big" code — what an oversized frame closes with. */
-export const FRAME_TOO_LARGE_CLOSE_CODE = 1009
-
 /** Cursor and avatar color, in Excalidraw's `Collaborator["color"]` shape. */
 export type ParticipantColor = { background: string; stroke: string }
 
@@ -153,44 +142,6 @@ export const MAX_NAME_LENGTH = 40
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value)
-}
-
-const encoder = new TextEncoder()
-
-/**
- * Exact UTF-8 size of a string. Allocates a copy, so callers keep it off the
- * hot path — {@link exceedsFrameCap} only reaches for it in the narrow band
- * where the cheap bounds cannot decide.
- */
-export function utf8ByteLength(text: string): number {
-  return encoder.encode(text).length
-}
-
-/**
- * Whether a frame is over the cap of spec §5.4, given whatever the transport
- * handed over — a string, a Buffer, an ArrayBuffer.
- *
- * The string path is written around the two bounds that need no work:
- * UTF-8 never spends fewer bytes than there are UTF-16 code units, and never
- * more than three per unit. Every real frame — a cursor at 30 Hz, a
- * one-element delta — is decided by a comparison against `.length`, and only
- * a payload in the megabyte band is actually measured.
- */
-export function exceedsFrameCap(
-  raw: unknown,
-  maxBytes: number = MAX_FRAME_BYTES,
-): boolean {
-  if (typeof raw === "string") {
-    if (raw.length * 3 <= maxBytes) return false
-    if (raw.length > maxBytes) return true
-    return utf8ByteLength(raw) > maxBytes
-  }
-  // Buffer is a Uint8Array, so the view check covers the node adapter too.
-  if (ArrayBuffer.isView(raw)) return raw.byteLength > maxBytes
-  if (raw instanceof ArrayBuffer) return raw.byteLength > maxBytes
-  // Anything else is a shape this protocol does not speak; the parser will
-  // drop it, and refusing to guess its size is not the cap's job.
-  return false
 }
 
 function isFiniteNumber(value: unknown): value is number {

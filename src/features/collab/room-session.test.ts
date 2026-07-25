@@ -7,6 +7,7 @@ import {
   joinRoom,
   leaveRoom,
   MAX_ROOM_PARTICIPANTS,
+  PARTICIPANT_IDLE_TIMEOUT_MS,
   type RoomPeer,
   type RoomRegistry,
   receiveFromPeer,
@@ -645,12 +646,13 @@ test("a peer that left mid-load is not sent a scene", async () => {
 })
 
 /** Seats the cap's worth of sockets, so the next join is the one refused. */
-const fillRoom = (registry: RoomRegistry) =>
-  Promise.all(
-    Array.from({ length: MAX_ROOM_PARTICIPANTS }, (_, i) =>
-      joinRoom(registry, ROOM, fakePeer(`peer-${i}`), guest),
-    ),
+async function fillRoom(registry: RoomRegistry) {
+  const peers = Array.from({ length: MAX_ROOM_PARTICIPANTS }, (_, i) =>
+    fakePeer(`peer-${i}`),
   )
+  await Promise.all(peers.map((peer) => joinRoom(registry, ROOM, peer, guest)))
+  return peers
+}
 
 test("a room fills up to the cap", async () => {
   const registry = emptyRegistry()
@@ -744,4 +746,61 @@ test("a PING is answered while the room is still reading its scene", async () =>
   await receiveFromPeer(registry, ROOM, peer, '{"type":"PING","payload":{}}')
 
   expect(peer.sent.at(-1)).toEqual({ type: "PONG", payload: {} })
+})
+
+/** A registry over an empty drawing whose clock the test drives by hand. */
+function clockedRegistry() {
+  let clock = 1_000_000
+  const registry = createRoomRegistry(
+    async () => ({ elements: [], ownerId: null }),
+    () => clock,
+  )
+  return {
+    registry,
+    advance: (ms: number) => {
+      clock += ms
+    },
+  }
+}
+
+test("a seat nobody is sitting in does not turn a reconnect away", async () => {
+  // The socket that died without a FIN: the server still holds its seat, and
+  // there are only 25. Without the sweep the returning tab is told the
+  // drawing is full and its unmerged scene is thrown away.
+  const { registry, advance } = clockedRegistry()
+  await fillRoom(registry)
+
+  advance(PARTICIPANT_IDLE_TIMEOUT_MS + 1)
+
+  expect(await joinRoom(registry, ROOM, fakePeer("peer-back"), guest)).toEqual({
+    status: "ok",
+  })
+})
+
+test("a peer that keeps talking keeps its seat", async () => {
+  const { registry, advance } = clockedRegistry()
+  const seated = await fillRoom(registry)
+
+  // Every one of them heartbeats on the way to the timeout.
+  advance(PARTICIPANT_IDLE_TIMEOUT_MS - 1)
+  for (const peer of seated)
+    await receiveFromPeer(registry, ROOM, peer, '{"type":"PING","payload":{}}')
+  advance(PARTICIPANT_IDLE_TIMEOUT_MS - 1)
+
+  expect(await joinRoom(registry, ROOM, fakePeer("peer-late"), guest)).toEqual({
+    status: "full",
+  })
+})
+
+test("a forgotten peer is gone from the roster the next joiner is handed", async () => {
+  const { registry, advance } = clockedRegistry()
+  await joinRoom(registry, ROOM, fakePeer("peer-ghost"), member("Wren"))
+
+  advance(PARTICIPANT_IDLE_TIMEOUT_MS + 1)
+  const arriving = fakePeer("peer-new")
+  await joinRoom(registry, ROOM, arriving, member("Ada"))
+
+  expect(rosterOf(arriving.sent.find((m) => m.type === "ROOM_JOINED"))).toEqual(
+    ["Ada"],
+  )
 })

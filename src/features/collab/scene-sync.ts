@@ -12,8 +12,8 @@
  * decisions live and none of them need React to be exercised.
  */
 
+import { exceedsFrameCap, MAX_FRAME_BYTES, utf8ByteLength } from "./frame-cap"
 import type { SceneElement } from "./protocol"
-import { MAX_FRAME_BYTES, utf8ByteLength } from "./protocol"
 import { getSceneVersion } from "./reconcile"
 
 /** Upstream's `SYNC_FULL_SCENE_INTERVAL_MS` — the safety-net cadence. */
@@ -55,10 +55,11 @@ export function splitSceneFrames(
   if (elements.length === 0) return []
   const budget = maxBytes - FRAME_ENVELOPE_BYTES
 
-  // Three bytes per UTF-16 code unit is the worst UTF-8 can do, so a payload
-  // that clears the budget at that rate needs no per-element accounting.
+  // The whole selection in one frame, which is every ordinary delta — and
+  // decided by the same cheap bounds the server's cap uses, so neither end
+  // can drift into a different idea of how big "too big" is.
   const serialized = JSON.stringify(elements)
-  if (serialized.length * 3 <= budget) return [[...elements]]
+  if (!exceedsFrameCap(serialized, budget)) return [[...elements]]
 
   const frames: SceneElement[][] = []
   let frame: SceneElement[] = []
@@ -66,9 +67,16 @@ export function splitSceneFrames(
   for (const element of elements) {
     const bytes = utf8ByteLength(JSON.stringify(element)) + 1 // the comma
     // A single element over the cap cannot be split, and sending it would
-    // close the socket on arrival. Dropping it loses that one element's sync
-    // until it is edited again; keeping it would lose the session.
-    if (bytes > budget) continue
+    // close the socket on arrival — which the reconnect would then repeat
+    // forever. Dropping it costs that element's sync; keeping it would cost
+    // the session. Loud, because nothing downstream will ever notice: peers
+    // simply never see the shape, and its owner sees no error.
+    if (bytes > budget) {
+      console.warn(
+        `[collab] element ${element.id} is ${bytes} bytes — too large for one frame, not synced`,
+      )
+      continue
+    }
     if (frame.length > 0 && frameBytes + bytes > budget) {
       frames.push(frame)
       frame = []
