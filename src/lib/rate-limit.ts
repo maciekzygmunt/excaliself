@@ -22,26 +22,38 @@ export function createRateLimiter(options: {
   limit: number
   windowMs: number
   /**
-   * Sweep threshold, not a hard cap: keys arrive from strangers, so the map
-   * sheds expired windows once it grows past this rather than accumulating
-   * one entry per address that ever knocked.
+   * Hard ceiling on tracked keys. Keys arrive from strangers, so the map
+   * sheds expired windows once it grows past this — and if a flood of
+   * distinct keys leaves nothing expired to shed, it evicts the
+   * longest-standing ones anyway. Bounded memory beats perfect accounting:
+   * an evicted key gets a fresh budget, which is the price of not letting
+   * the limiter itself become the way to exhaust the process.
    */
   maxTrackedKeys?: number
 }): RateLimiter {
   const { limit, windowMs, maxTrackedKeys = 10_000 } = options
+  /** Insertion-ordered, so the front of the map is the oldest window. */
   const windows = new Map<string, Window>()
+  // Eviction goes past the ceiling rather than to it, so the scan is paid
+  // once per batch of new keys instead of once per request.
+  const evictTo = Math.max(1, Math.floor(maxTrackedKeys * 0.9))
 
   const expired = (window: Window, now: number) =>
     now - window.startedAt >= windowMs
 
+  function shed(now: number, keep: string) {
+    for (const [tracked, window] of windows) {
+      if (expired(window, now)) windows.delete(tracked)
+    }
+    if (windows.size <= maxTrackedKeys) return
+    for (const tracked of windows.keys()) {
+      if (windows.size <= evictTo) break
+      if (tracked !== keep) windows.delete(tracked)
+    }
+  }
+
   return {
     allow(key, now) {
-      if (windows.size > maxTrackedKeys) {
-        for (const [tracked, window] of windows) {
-          if (expired(window, now)) windows.delete(tracked)
-        }
-      }
-
       const current = windows.get(key)
       const window =
         current && !expired(current, now)
@@ -49,6 +61,8 @@ export function createRateLimiter(options: {
           : { startedAt: now, count: 0 }
       window.count += 1
       windows.set(key, window)
+
+      if (windows.size > maxTrackedKeys) shed(now, key)
 
       return window.count <= limit
     },
