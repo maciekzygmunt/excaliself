@@ -107,14 +107,19 @@ class Peer {
     ])
   }
 
+  /** Where the frame log stands now, to pass as `since` on a later expect. */
+  mark() {
+    return this.frames.length
+  }
+
   /** Waits for the next frame of `type` that satisfies `matches`. */
   async expect(
     type: string,
     matches: (frame: Frame) => boolean = () => true,
-    timeoutMs = 5000,
+    { timeoutMs = 5000, since = 0 } = {},
   ): Promise<Frame> {
     const deadline = Date.now() + timeoutMs
-    let seen = 0
+    let seen = since
     while (Date.now() < deadline) {
       for (; seen < this.frames.length; seen++) {
         const frame = this.frames[seen]
@@ -148,6 +153,32 @@ async function roomSettlesAt(peer: Peer, size: number, timeoutMs = 5000) {
   }
   throw new Error(`the room never settled at ${size} participants`)
 }
+
+type WireElement = {
+  id: string
+  version: number
+  versionNonce: number
+  [key: string]: unknown
+}
+
+const elementsOf = (frame: Frame) =>
+  (frame.payload.elements ?? []) as WireElement[]
+
+/** A shape no other run could have drawn, so checks can't read each other's. */
+const scribble = (version: number, versionNonce = 1): WireElement => ({
+  id: `smoke-${randomBytes(6).toString("hex")}`,
+  version,
+  versionNonce,
+  index: "a1",
+  type: "rectangle",
+  x: 0,
+  y: 0,
+  width: 10,
+  height: 10,
+})
+
+const findElement = (frame: Frame, id: string) =>
+  elementsOf(frame).find((element) => element.id === id)
 
 // --- the checks --------------------------------------------------------
 
@@ -323,6 +354,68 @@ const checks: {
       } finally {
         for (const peer of seated) peer.close()
       }
+    },
+  },
+  {
+    name: "a joiner is handed the room's scene",
+    run: async (token, url) => {
+      const peer = await Peer.connect(socketUrl(url, token))
+      await peer.expect("SCENE_INIT")
+      peer.close()
+    },
+  },
+  {
+    name: "an edit by one peer lands in the other's scene, and in a late joiner's",
+    run: async (token, url) => {
+      const a = await Peer.connect(socketUrl(url, token))
+      await a.expect("SCENE_INIT")
+      const b = await Peer.connect(socketUrl(url, token))
+      await b.expect("SCENE_INIT")
+
+      const drawn = scribble(1)
+      a.send({ type: "SCENE_UPDATE", payload: { elements: [drawn] } })
+      await b.expect("SCENE_UPDATE", (f) => Boolean(findElement(f, drawn.id)))
+      if (a.frames.some((f) => f.type === "SCENE_UPDATE"))
+        throw new Error("a peer received the echo of its own edit")
+
+      // The room, not the database, is what a late joiner is initialized from.
+      const c = await Peer.connect(socketUrl(url, token))
+      await c.expect("SCENE_INIT", (f) => Boolean(findElement(f, drawn.id)))
+
+      a.close()
+      b.close()
+      c.close()
+    },
+  },
+  {
+    name: "a stale edit is refused, and its sender is handed the winner",
+    run: async (token, url) => {
+      const a = await Peer.connect(socketUrl(url, token))
+      await a.expect("SCENE_INIT")
+      const b = await Peer.connect(socketUrl(url, token))
+      await b.expect("SCENE_INIT")
+
+      const winner = scribble(9)
+      a.send({ type: "SCENE_UPDATE", payload: { elements: [winner] } })
+      await b.expect("SCENE_UPDATE", (f) => Boolean(findElement(f, winner.id)))
+
+      const before = b.mark()
+      b.send({
+        type: "SCENE_UPDATE",
+        payload: { elements: [{ ...winner, version: 2 }] },
+      })
+      // The room answers its own sender — the correction that lets a peer
+      // whose edit lost converge instead of sitting on a version nobody has.
+      const correction = await b.expect(
+        "SCENE_UPDATE",
+        (f) => findElement(f, winner.id) !== undefined,
+        { since: before },
+      )
+      if (findElement(correction, winner.id)?.version !== 9)
+        throw new Error("the room let a stale version through")
+
+      a.close()
+      b.close()
     },
   },
 ]
