@@ -6,6 +6,7 @@ import {
   createRoomRegistry,
   joinRoom,
   leaveRoom,
+  MAX_ROOM_PARTICIPANTS,
   type RoomPeer,
   receiveFromPeer,
 } from "./room-session"
@@ -436,4 +437,59 @@ test("rooms are isolated — a peer only ever sees its own drawing's roster", ()
   expect(rosterOf(grace.sent[0])).toEqual(["Grace"])
   expect(rooms.get("drawing-1")?.participants.size).toBe(1)
   expect(rooms.get("drawing-2")?.participants.size).toBe(1)
+})
+
+/** Seats the cap's worth of sockets, so the next join is the one refused. */
+const fillRoom = (rooms: ReturnType<typeof createRoomRegistry>) => {
+  for (let i = 0; i < MAX_ROOM_PARTICIPANTS; i++) {
+    joinRoom(rooms, ROOM, fakePeer(`peer-${i}`), guest)
+  }
+}
+
+test("a room fills up to the cap", () => {
+  const rooms = createRoomRegistry()
+  fillRoom(rooms)
+
+  expect(rooms.get(ROOM)?.participants.size).toBe(MAX_ROOM_PARTICIPANTS)
+})
+
+test("the socket past the cap is refused and joins nothing", () => {
+  const rooms = createRoomRegistry()
+  fillRoom(rooms)
+  const late = fakePeer("peer-late")
+
+  expect(joinRoom(rooms, ROOM, late, guest)).toEqual({ status: "full" })
+  expect(late.sent).toEqual([])
+  expect(late.topics).toEqual([])
+  expect(rooms.get(ROOM)?.participants.size).toBe(MAX_ROOM_PARTICIPANTS)
+})
+
+test("the room the refused socket knocked on is not told about it", () => {
+  const rooms = createRoomRegistry()
+  fillRoom(rooms)
+  const late = fakePeer("peer-late")
+
+  joinRoom(rooms, ROOM, late, guest)
+
+  expect(late.published).toEqual([])
+})
+
+test("a departure frees the slot", () => {
+  const rooms = createRoomRegistry()
+  fillRoom(rooms)
+  const leaving = fakePeer("peer-0")
+  leaveRoom(rooms, ROOM, leaving)
+
+  expect(joinRoom(rooms, ROOM, fakePeer("peer-late"), guest)).toEqual({
+    status: "ok",
+  })
+})
+
+test("a full room does not keep anyone out of a different drawing", () => {
+  const rooms = createRoomRegistry()
+  fillRoom(rooms)
+
+  expect(joinRoom(rooms, "drawing-2", fakePeer("peer-late"), guest)).toEqual({
+    status: "ok",
+  })
 })

@@ -22,9 +22,11 @@ type Props = {
   files: PersistedFile[]
   /** The share token this visitor arrived on; also the room's dial string. */
   token: string
+  /** The room refused this visitor at its participant cap (spec §4.5). */
+  onRoomFull: () => void
 }
 
-export function SharedCanvas({ drawing, files, token }: Props) {
+export function SharedCanvas({ drawing, files, token, onRoomFull }: Props) {
   const initialData = useMemo(
     () => buildInitialSceneData({ data: drawing.data, files }).initialData,
     [drawing.data, files],
@@ -44,7 +46,7 @@ export function SharedCanvas({ drawing, files, token }: Props) {
     onScrollChange,
     toggleFollow,
     stopFollowing,
-  } = useRoom({ token, name, excalidrawAPI })
+  } = useRoom({ token, name, excalidrawAPI, onRoomFull })
 
   return (
     <div className="relative h-dvh w-full">

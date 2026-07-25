@@ -19,6 +19,8 @@ instance:
 3. Two peers see each other join, a name sent on `JOIN` reaches the other peer,
    a cursor is relayed to the other peer (and never echoed back to its sender),
    and closing one socket updates the other's roster.
+4. The socket past the room's participant cap is closed with the room-full
+   code (spec §4.5), and a departure reopens the slot.
 
 ## Running it
 
@@ -68,3 +70,7 @@ port, so it exercises the same path a browser takes.
 - **Presence works but cursors don't arrive** — the peers are in different
   crossws namespaces. The upgrade hook pins the namespace to the drawing id;
   see `namespaceFor` in the route.
+- **Checks that passed a moment ago now fail with "connection refused"** — a
+  run spends about thirty token validations, so two back-to-back runs from one
+  host trip the 60/min per-IP limit of spec §4.5. Wait out the minute; the
+  limiter is working.

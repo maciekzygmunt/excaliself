@@ -17,6 +17,15 @@
 /** The single pub/sub topic every peer in a room subscribes to. */
 export const ROOM_TOPIC = "room"
 
+/**
+ * Close code for a join the participant cap refused (spec §4.5). It lives in
+ * the application-private 4000–4999 range because that is the only range a
+ * server may send and the browser hands to the client intact — a refused
+ * upgrade, by contrast, reaches the page as an indistinguishable 1006. The
+ * number echoes HTTP 429: too many, come back later.
+ */
+export const ROOM_FULL_CLOSE_CODE = 4029
+
 /** Cursor and avatar color, in Excalidraw's `Collaborator["color"]` shape. */
 export type ParticipantColor = { background: string; stroke: string }
 

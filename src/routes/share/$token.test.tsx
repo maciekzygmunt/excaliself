@@ -7,12 +7,13 @@ import {
 } from "@testing-library/react"
 import type { ReactNode } from "react"
 import { afterEach, beforeEach, expect, test, vi } from "vitest"
+import type { ShareVisit } from "@/features/shares/server"
 import type { ShareResolution } from "@/features/shares/store"
 
 const TOKEN = "a-share-token"
 const invalidate = vi.fn()
 const navigate = vi.fn()
-let loaderData: ShareResolution
+let loaderData: ShareVisit
 let search: { full?: boolean } = {}
 
 vi.mock("@tanstack/react-router", () => ({
@@ -35,10 +36,21 @@ vi.mock("@tanstack/react-router", () => ({
 vi.mock("@/features/shares/server", () => ({ resolveShareToken: vi.fn() }))
 
 // The real one drags Excalidraw into jsdom; this slice is about the states
-// around the canvas, not the canvas.
+// around the canvas, not the canvas. The button stands in for the room
+// closing the socket at its participant cap.
 vi.mock("./-components/SharedCanvas", () => ({
-  default: ({ token }: { token: string }) => (
-    <div data-testid="shared-canvas" data-token={token} />
+  default: ({
+    token,
+    onRoomFull,
+  }: {
+    token: string
+    onRoomFull: () => void
+  }) => (
+    <div data-testid="shared-canvas" data-token={token}>
+      <button type="button" onClick={onRoomFull}>
+        Refuse the join
+      </button>
+    </div>
   ),
 }))
 
@@ -61,8 +73,9 @@ const OK: ShareResolution = {
 }
 const SIGNIN: ShareResolution = { status: "signin", drawingName: "Roadmap Q3" }
 const DEAD: ShareResolution = { status: "dead" }
+const THROTTLED: ShareVisit = { status: "throttled" }
 
-async function renderShare(resolution: ShareResolution) {
+async function renderShare(resolution: ShareVisit) {
   loaderData = resolution
   const { Route } = await import("./$token")
   const SharePage = (
@@ -222,4 +235,42 @@ test("every spelling of the flag the URL can carry turns the state on", async ()
   expect(validateSearch({ full: "true" })).toEqual({ full: true })
   expect(validateSearch({ full: "" })).toEqual({ full: true })
   expect(validateSearch({})).toEqual({})
+})
+
+test("a refused join sends the visitor to the room-full state", async () => {
+  await renderShare(OK)
+  fireEvent.click(
+    await screen.findByRole("button", { name: "Refuse the join" }),
+  )
+  // Recorded in the URL rather than component state, so the retry is a plain
+  // navigation back to the same page.
+  expect(navigate).toHaveBeenCalledWith({
+    search: { full: true },
+    replace: true,
+  })
+})
+
+test("a throttled visit gets its own retryable state, not the dead link", async () => {
+  await renderShare(THROTTLED)
+  expect(
+    screen.getByRole("heading", { name: "Too many attempts" }),
+  ).toBeDefined()
+  expect(screen.queryByTestId("shared-canvas")).toBeNull()
+  // The token was never looked up, so the page can't say anything about it.
+  expect(screen.queryByText(/Roadmap Q3/)).toBeNull()
+  expect(screen.queryByLabelText(/email/i)).toBeNull()
+})
+
+test("retrying a throttled visit re-runs the loader in place", async () => {
+  await renderShare(THROTTLED)
+  fireEvent.click(screen.getByRole("button", { name: "Try again" }))
+  expect(invalidate).toHaveBeenCalled()
+})
+
+test("the ?full flag can't turn a throttled visit into the room-full state", async () => {
+  search = { full: true }
+  await renderShare(THROTTLED)
+  expect(
+    screen.getByRole("heading", { name: "Too many attempts" }),
+  ).toBeDefined()
 })
