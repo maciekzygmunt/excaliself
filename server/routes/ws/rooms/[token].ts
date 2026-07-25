@@ -10,7 +10,6 @@
 
 import { defineWebSocketHandler } from "nitro"
 import { db } from "@/db"
-import { resolveRoomJoin } from "@/features/collab/join"
 import { ROOM_FULL_CLOSE_CODE } from "@/features/collab/protocol"
 import type {
   ParticipantIdentity,
@@ -22,10 +21,9 @@ import {
   leaveRoom,
   receiveFromPeer,
 } from "@/features/collab/room-session"
+import { resolveRoomForToken } from "@/features/collab/room-token"
 import { loadRoomScene } from "@/features/collab/scene-store"
-import { resolveShareForRoom } from "@/features/shares/store"
 import { allowTokenValidation } from "@/features/shares/token-rate-limit"
-import { auth } from "@/lib/auth"
 
 /**
  * Live rooms for this process. In-memory by design (spec §2.3) — the app
@@ -91,14 +89,11 @@ export default defineWebSocketHandler({
       new URL(request.url).pathname.split("/").pop() || "",
     )
 
-    // Both checks run on every (re)connect, so stop, regenerate, an audience
-    // tighten, and trash all take effect on the next join (spec §4.1).
-    const [share, session] = await Promise.all([
-      token ? resolveShareForRoom(db, token) : null,
-      auth.api.getSession({ headers: request.headers }),
-    ])
-
-    const join = resolveRoomJoin({ share, user: session?.user ?? null })
+    // Every check runs on every (re)connect, so stop, regenerate, an audience
+    // tighten, and trash all take effect on the next join (spec §4.1). The
+    // room-scoped image endpoints call the same function, which is the only
+    // way "validated the same way the upgrade does" stays true.
+    const join = await resolveRoomForToken(db, token, request.headers)
     // One generic refusal for every reason, like the dead-link page: a
     // rejected upgrade never reveals whether the drawing exists.
     if (join.status !== "ok")

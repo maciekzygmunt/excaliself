@@ -1,0 +1,158 @@
+/**
+ * The blob half of the room (canvas sharing spec §2.4): keep the drawing's
+ * images and the drawing's elements in step, without ever putting bytes on
+ * the socket.
+ *
+ * Two duties, both driven by the scene rather than by events:
+ *
+ * - **Uploading.** Anything this tab drew that is still `pending` gets POSTed;
+ *   on success the element flips to `saved`, which bumps its version and so
+ *   syncs to the room as a normal delta. A refusal — too large, too frequent,
+ *   or the network — flips it to `error` instead, which is excalidraw's own
+ *   errored-image placeholder and the signal peers use to never ask for it.
+ * - **Fetching.** Anything the room shows as `saved` that this tab has no
+ *   bytes for is GET-ed and injected with `addFiles()`. That covers both a
+ *   peer pasting mid-session and a late joiner whose page loaded first.
+ *
+ * Like the rest of the room plumbing, nothing here touches React state: both
+ * entry points are called from `onChange` and from the socket's message
+ * handler, either of which can fire many times a second.
+ */
+
+import { CaptureUpdateAction, newElementWith } from "@excalidraw/excalidraw"
+import type { OrderedExcalidrawElement } from "@excalidraw/excalidraw/element/types"
+import type {
+  BinaryFiles,
+  ExcalidrawImperativeAPI,
+} from "@excalidraw/excalidraw/types"
+import { useCallback, useEffect, useRef } from "react"
+import { selectMissingFileIds, selectUploads } from "./file-sync"
+import { fetchRoomFile, uploadRoomFile } from "./file-transport"
+import type { SceneElement } from "./protocol"
+
+/**
+ * A `saved` image whose bytes won't come is a placeholder that never resolves,
+ * so a miss is worth retrying — but the row is written before the flip that
+ * advertised it, which means a miss is already a surprise. Three attempts
+ * covers a blip; more would be a tab hammering a 404 for the whole session.
+ */
+const MAX_FETCH_ATTEMPTS = 3
+
+/**
+ * Flips every element referencing `fileId` to the outcome of its upload.
+ * `newElementWith` bumps the version, so the flip travels to peers as an
+ * ordinary delta — and `CaptureUpdateAction.NEVER` keeps it out of the local
+ * undo stack, because a storage outcome is not something the user did.
+ */
+function markImageStatus(
+  api: ExcalidrawImperativeAPI,
+  fileId: string,
+  status: "saved" | "error",
+) {
+  const elements = api.getSceneElementsIncludingDeleted()
+  let changed = false
+  const next: OrderedExcalidrawElement[] = elements.map((element) => {
+    if (element.type !== "image" || element.fileId !== fileId) return element
+    if (element.status === status) return element
+    changed = true
+    return newElementWith(element, { status })
+  })
+  if (!changed) return
+  api.updateScene({ elements: next, captureUpdate: CaptureUpdateAction.NEVER })
+}
+
+export function useRoomFiles(options: {
+  /** The share token; null keeps both directions closed. */
+  token: string | null
+  excalidrawAPI: ExcalidrawImperativeAPI | null
+  /**
+   * The ids the page already loaded out of the database. They are the scene's
+   * pre-existing images, and `restore()` hands them back as `pending` — so
+   * without this list every visitor would re-upload the whole drawing.
+   */
+  storedFileIds: readonly string[]
+}) {
+  const { token, excalidrawAPI, storedFileIds } = options
+
+  // Read through refs for the same reason the socket does: these callbacks
+  // run inside onChange, and re-creating them would re-run its effects.
+  const apiRef = useRef(excalidrawAPI)
+  apiRef.current = excalidrawAPI
+  const tokenRef = useRef(token)
+  tokenRef.current = token
+
+  /**
+   * Ids this tab will not POST: already in the database, already uploaded, or
+   * already tried. Claimed before the request goes out, so the `onChange`
+   * that fires while it is in flight can't send the same blob twice.
+   */
+  const handledRef = useRef<Set<string>>(new Set(storedFileIds))
+  const inFlightRef = useRef<Set<string>>(new Set())
+  const fetchAttemptsRef = useRef<Map<string, number>>(new Map())
+  /** The room the three above were filled in for. */
+  const roomRef = useRef(token)
+
+  useEffect(() => {
+    // A different token is a different drawing, so every judgement these hold
+    // is about a room this tab has left.
+    if (roomRef.current !== token) {
+      roomRef.current = token
+      handledRef.current = new Set()
+      inFlightRef.current = new Set()
+      fetchAttemptsRef.current = new Map()
+    }
+    for (const fileId of storedFileIds) handledRef.current.add(fileId)
+  }, [token, storedFileIds])
+
+  /**
+   * Called from `onChange`, and deliberately not gated on SCENE_INIT the way
+   * element broadcasts are: the row has to exist before the element that
+   * references it may claim to be `saved`, and an image pasted while the
+   * socket is still opening must not be left pending forever.
+   */
+  const uploadPending = useCallback(
+    (elements: readonly SceneElement[], files: BinaryFiles) => {
+      const token = tokenRef.current
+      if (!token) return
+
+      for (const file of selectUploads(elements, files, handledRef.current)) {
+        handledRef.current.add(file.fileId)
+        void uploadRoomFile(token, file).then((outcome) => {
+          const api = apiRef.current
+          if (!api) return
+          markImageStatus(
+            api,
+            file.fileId,
+            outcome === "stored" ? "saved" : "error",
+          )
+        })
+      }
+    },
+    [],
+  )
+
+  /** Called with every scene the room hands this tab — SCENE_INIT included. */
+  const fetchMissing = useCallback((elements: readonly SceneElement[]) => {
+    const token = tokenRef.current
+    const api = apiRef.current
+    if (!token || !api) return
+
+    const known = new Set(Object.keys(api.getFiles()))
+    for (const fileId of selectMissingFileIds(elements, known)) {
+      if (inFlightRef.current.has(fileId)) continue
+      const attempts = fetchAttemptsRef.current.get(fileId) ?? 0
+      if (attempts >= MAX_FETCH_ATTEMPTS) continue
+
+      fetchAttemptsRef.current.set(fileId, attempts + 1)
+      inFlightRef.current.add(fileId)
+      void fetchRoomFile(token, fileId).then((file) => {
+        inFlightRef.current.delete(fileId)
+        // A tab that uploaded this blob itself already has the bytes, so
+        // addFiles is only ever additive here — and re-adding is harmless.
+        if (file) apiRef.current?.addFiles([file])
+      })
+    }
+  }, [])
+
+  return { uploadPending, fetchMissing }
+}

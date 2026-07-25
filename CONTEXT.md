@@ -43,3 +43,6 @@ The random id a socket is given when it joins a Room, and the only handle other 
 
 ### Following
 A one-way arrangement between two Participants in a Room: the follower's canvas rides along with the followed Participant's viewport, marked by a ring in that Participant's color and a chip naming them. Started by clicking their avatar, ended by clicking the chip, their avatar, panning or zooming, or by them leaving. Nobody can be made to follow, and being followed changes nothing about what the followed Participant can do — only that their viewport is relayed to whoever is watching.
+
+### Scene image
+An image on a Drawing's canvas, stored as bytes under a content-addressed file id that the image element on the scene points at. Bytes and elements travel separately in a Room: the element syncs like any other element, while the bytes go over a room-scoped HTTP endpoint the same Share link opens. An image is *saved* once its bytes are stored — which is the signal other Participants use to fetch them — *pending* until then, and *errored* when the store refused it (too large, or too many uploads), in which case nobody fetches it and everyone sees a placeholder.
