@@ -10,16 +10,38 @@ import { sanitizeName } from "./protocol"
 
 export const GUEST_NAME_STORAGE_KEY = "excaliself:guest-name"
 
+/** Whatever holds a `localStorage` — the window, in a browser. */
+type StorageHost = { localStorage?: Storage }
+
 function randomSeed(): number {
   return Math.floor(Math.random() * 0xff_ff_ff_ff)
 }
 
 /**
- * Storage is optional and every access is guarded: private-mode Safari
- * throws on `localStorage`, and a guest without persistence should still get
- * a working name for the session rather than an error.
+ * Reading `window.localStorage` is itself throwable: Chrome raises a
+ * SecurityError on the *property* when site data is blocked. So the lookup
+ * happens here, inside the guard, rather than at the call site — where the
+ * throw would escape into a render.
  */
-export function getOrCreateGuestName(storage?: Storage | null): string {
+function resolveStorage(host: StorageHost | null | undefined): Storage | null {
+  try {
+    return host?.localStorage ?? null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * The name this browser goes by, minting and storing one on first visit.
+ * Every access to storage is guarded — the property lookup, the read, and the
+ * write — so a guest whose storage is unavailable still gets a working name;
+ * it just lives for this page load.
+ */
+export function getOrCreateGuestName(
+  host: StorageHost | null | undefined = globalThis,
+): string {
+  const storage = resolveStorage(host)
+
   const stored = readGuestName(storage)
   if (stored) return stored
 
@@ -32,7 +54,7 @@ export function getOrCreateGuestName(storage?: Storage | null): string {
   return name
 }
 
-function readGuestName(storage?: Storage | null): string | null {
+function readGuestName(storage: Storage | null): string | null {
   try {
     return sanitizeName(storage?.getItem(GUEST_NAME_STORAGE_KEY))
   } catch {

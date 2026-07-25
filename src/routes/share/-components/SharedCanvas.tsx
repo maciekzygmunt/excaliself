@@ -34,11 +34,7 @@ export function SharedCanvas({ drawing, files, token }: Props) {
   // The name a guest kept from a previous visit, generated on first arrival.
   // Signed-in members send it too; the server ignores it for them and uses
   // the session's display name instead.
-  const [name] = useState(() =>
-    getOrCreateGuestName(
-      typeof window === "undefined" ? null : window.localStorage,
-    ),
-  )
+  const [name] = useState(() => getOrCreateGuestName())
 
   const { others, onPointerUpdate } = useRoom({ token, name, excalidrawAPI })
 
