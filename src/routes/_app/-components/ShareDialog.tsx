@@ -159,7 +159,10 @@ export function ShareDialog({ drawingId, open, onOpenChange }: Props) {
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="gap-0 p-0 sm:max-w-md">
-        <div className="px-5 pt-5 pb-1">
+        {/* min-w-0 on every section: DialogContent is a grid, and grid
+            items' default min-width:auto would let the long token URL push
+            the layout wider than the panel instead of truncating. */}
+        <div className="min-w-0 px-5 pt-5 pb-1">
           <DialogTitle>Share drawing</DialogTitle>
           <DialogDescription className="mt-1">
             {shared
@@ -167,7 +170,7 @@ export function ShareDialog({ drawingId, open, onOpenChange }: Props) {
               : "Create a link that lets others edit this drawing with you, live."}
           </DialogDescription>
         </div>
-        <div className="space-y-4 px-5 py-4">
+        <div className="min-w-0 space-y-4 px-5 py-4">
           {shared && url && <LinkRow key={share.token} url={url} />}
           <AudienceCards
             value={shared ? share.audience : draftAudience}
@@ -189,7 +192,7 @@ export function ShareDialog({ drawingId, open, onOpenChange }: Props) {
           )}
         </div>
         {shared && (
-          <div className="flex items-center justify-between border-t border-border/60 bg-muted/40 px-5 py-3">
+          <div className="flex min-w-0 items-center justify-between border-t border-border/60 bg-muted/40 px-5 py-3">
             <Button
               variant="ghost"
               size="sm"
