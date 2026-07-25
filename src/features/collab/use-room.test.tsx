@@ -127,6 +127,8 @@ function renderRoom(api: ReturnType<typeof fakeExcalidraw>) {
       name: "Ada",
       // The hook only ever reaches for the handful of methods above.
       excalidrawAPI: api as never,
+      // The participant cap is #125's; nothing here trips it.
+      onRoomFull: () => {},
     })
     onChange = room.onChange as never
     return null

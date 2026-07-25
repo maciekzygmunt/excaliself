@@ -145,6 +145,13 @@ export function useRoom(options: {
    * it before then would mark those elements as "the room has seen these"
    * while the socket was still opening, and the catch-up below — the one
    * thing that would have carried them — would then skip every one of them.
+   *
+   * Excalidraw also hands `onChange` the scene's `files`, and they are
+   * deliberately dropped: image bytes never travel on the socket (spec §2.4).
+   * An image element syncs like any other element, but its blob rides a
+   * room-scoped HTTP endpoint that peers GET and inject with `addFiles()` —
+   * until that lands (#124), an image added mid-session reaches peers as an
+   * element they have no bytes for.
    */
   const onChange = useCallback(
     (elements: readonly OrderedExcalidrawElement[]) => {
