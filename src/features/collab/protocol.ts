@@ -11,7 +11,7 @@
  * Follow mode (spec §1.3) adds two directed channels on top of the room's
  * broadcast: a follower tells the server who it is trailing (`USER_FOLLOW`),
  * and the followed peer — told it has an audience by `FOLLOWED_BY` — relays
- * its viewport (`VIEWPORT_BOUNDS`) to exactly those followers.
+ * its viewport (`USER_VISIBLE_SCENE_BOUNDS`) to exactly those followers.
  */
 
 /** The single pub/sub topic every peer in a room subscribes to. */
@@ -52,7 +52,7 @@ export type ClientMessage =
   /** Who this tab is following now; null when it stopped. */
   | { type: "USER_FOLLOW"; payload: { followedConnectionId: string | null } }
   /** Sent only while someone is following this tab. */
-  | { type: "VIEWPORT_BOUNDS"; payload: { bounds: SceneBounds } }
+  | { type: "USER_VISIBLE_SCENE_BOUNDS"; payload: { bounds: SceneBounds } }
 
 export type ServerMessage =
   /** First frame back: who you are in this room, and who else is here. */
@@ -69,7 +69,7 @@ export type ServerMessage =
   /** Who is currently trailing this tab; empty means nobody is. */
   | { type: "FOLLOWED_BY"; payload: { connectionIds: string[] } }
   | {
-      type: "VIEWPORT_BOUNDS"
+      type: "USER_VISIBLE_SCENE_BOUNDS"
       payload: { connectionId: string; bounds: SceneBounds }
     }
 
@@ -162,12 +162,12 @@ export function parseClientMessage(raw: string): ClientMessage | null {
     return { type: "USER_FOLLOW", payload: { followedConnectionId } }
   }
 
-  if (decoded.type === "VIEWPORT_BOUNDS") {
+  if (decoded.type === "USER_VISIBLE_SCENE_BOUNDS") {
     if (!isRecord(decoded.payload)) return null
     const bounds = parseSceneBounds(decoded.payload.bounds)
     return bounds === null
       ? null
-      : { type: "VIEWPORT_BOUNDS", payload: { bounds } }
+      : { type: "USER_VISIBLE_SCENE_BOUNDS", payload: { bounds } }
   }
 
   return null
@@ -240,11 +240,11 @@ export function parseServerMessage(raw: string): ServerMessage | null {
     return { type: "FOLLOWED_BY", payload: { connectionIds } }
   }
 
-  if (decoded.type === "VIEWPORT_BOUNDS") {
+  if (decoded.type === "USER_VISIBLE_SCENE_BOUNDS") {
     const bounds = parseSceneBounds(payload.bounds)
     if (!bounds || typeof payload.connectionId !== "string") return null
     return {
-      type: "VIEWPORT_BOUNDS",
+      type: "USER_VISIBLE_SCENE_BOUNDS",
       payload: { connectionId: payload.connectionId, bounds },
     }
   }

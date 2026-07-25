@@ -28,6 +28,11 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import type { ClientMessage, Participant, ServerMessage } from "./protocol"
 import { CURSOR_INTERVAL_MS, createTrailingThrottle } from "./throttle"
 
+type FollowMessage = Extract<
+  ServerMessage,
+  { type: "FOLLOWED_BY" | "USER_VISIBLE_SCENE_BOUNDS" }
+>
+
 export function useFollow(options: {
   excalidrawAPI: ExcalidrawImperativeAPI | null
   send: (message: ClientMessage) => boolean
@@ -54,15 +59,16 @@ export function useFollow(options: {
     }),
   )
 
+  /**
+   * Hand our viewport to whoever is trailing us. Mutual follows are pruned
+   * server-side, per recipient — suppressing the whole relay here would
+   * strand any third peer following us as well.
+   */
   const publishViewport = useCallback(() => {
     const api = apiRef.current
     if (!api || followersRef.current.size === 0) return
-    // Cross-follow: if we are following someone who is also following us,
-    // relaying our viewport would bounce the pair back and forth forever.
-    if (followedRef.current && followersRef.current.has(followedRef.current))
-      return
     relayViewport.current.push({
-      type: "VIEWPORT_BOUNDS",
+      type: "USER_VISIBLE_SCENE_BOUNDS",
       payload: { bounds: getVisibleSceneBounds(api.getAppState()) },
     })
   }, [])
@@ -74,9 +80,14 @@ export function useFollow(options: {
     }
   }, [])
 
-  /** Excalidraw's canvas moved — tell whoever is watching. */
-  const onScrollChange = useCallback(() => {
-    publishViewport()
+  // Bounds move with the window as well as with the canvas, and Excalidraw's
+  // `onScrollChange` only fires for the latter — without this a leader who
+  // resizes leaves their followers parked on stale bounds until the next pan.
+  useEffect(() => {
+    window.addEventListener("resize", publishViewport)
+    return () => {
+      window.removeEventListener("resize", publishViewport)
+    }
   }, [publishViewport])
 
   /**
@@ -128,9 +139,9 @@ export function useFollow(options: {
     apiRef.current?.updateScene({ appState: { userToFollow: null } })
   }, [])
 
-  /** Everything off the wire that isn't roster or cursor traffic. */
+  /** The two follow-mode frames; `use-room` routes the rest. */
   const handleServerMessage = useCallback(
-    (message: ServerMessage) => {
+    (message: FollowMessage) => {
       const api = apiRef.current
 
       if (message.type === "FOLLOWED_BY") {
@@ -146,7 +157,7 @@ export function useFollow(options: {
         return
       }
 
-      if (message.type === "VIEWPORT_BOUNDS") {
+      if (message.type === "USER_VISIBLE_SCENE_BOUNDS") {
         if (!api || message.payload.connectionId !== followedRef.current) return
         api.updateScene({
           appState: zoomToFitBounds({
@@ -174,7 +185,8 @@ export function useFollow(options: {
 
   return {
     followedConnectionId,
-    onScrollChange,
+    /** Wire straight to Excalidraw's `onScrollChange` prop. */
+    onScrollChange: publishViewport,
     toggleFollow,
     stopFollowing,
     handleServerMessage,

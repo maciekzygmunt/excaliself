@@ -105,25 +105,25 @@ test("a USER_FOLLOW without a string-or-null target is dropped", () => {
   ).toBeNull()
 })
 
-test("VIEWPORT_BOUNDS round-trips the four scene coordinates", () => {
+test("USER_VISIBLE_SCENE_BOUNDS round-trips the four scene coordinates", () => {
   expect(
     parseClientMessage(
-      '{"type":"VIEWPORT_BOUNDS","payload":{"bounds":[-10,0,20.5,30]}}',
+      '{"type":"USER_VISIBLE_SCENE_BOUNDS","payload":{"bounds":[-10,0,20.5,30]}}',
     ),
   ).toEqual({
-    type: "VIEWPORT_BOUNDS",
+    type: "USER_VISIBLE_SCENE_BOUNDS",
     payload: { bounds: [-10, 0, 20.5, 30] },
   })
 })
 
 test("bounds that aren't four finite numbers are dropped", () => {
   const bad = [
-    '{"type":"VIEWPORT_BOUNDS","payload":{"bounds":[1,2,3]}}',
-    '{"type":"VIEWPORT_BOUNDS","payload":{"bounds":[1,2,3,4,5]}}',
-    '{"type":"VIEWPORT_BOUNDS","payload":{"bounds":[1,2,3,"4"]}}',
-    '{"type":"VIEWPORT_BOUNDS","payload":{"bounds":[1,2,3,null]}}',
-    '{"type":"VIEWPORT_BOUNDS","payload":{"bounds":{}}}',
-    '{"type":"VIEWPORT_BOUNDS","payload":{}}',
+    '{"type":"USER_VISIBLE_SCENE_BOUNDS","payload":{"bounds":[1,2,3]}}',
+    '{"type":"USER_VISIBLE_SCENE_BOUNDS","payload":{"bounds":[1,2,3,4,5]}}',
+    '{"type":"USER_VISIBLE_SCENE_BOUNDS","payload":{"bounds":[1,2,3,"4"]}}',
+    '{"type":"USER_VISIBLE_SCENE_BOUNDS","payload":{"bounds":[1,2,3,null]}}',
+    '{"type":"USER_VISIBLE_SCENE_BOUNDS","payload":{"bounds":{}}}',
+    '{"type":"USER_VISIBLE_SCENE_BOUNDS","payload":{}}',
   ]
   for (const raw of bad) expect(parseClientMessage(raw), raw).toBeNull()
 })
@@ -187,11 +187,11 @@ test("FOLLOWED_BY carries the connection ids trailing this tab", () => {
 
 test("a relayed viewport keeps the sender it was stamped with", () => {
   const raw = JSON.stringify({
-    type: "VIEWPORT_BOUNDS",
+    type: "USER_VISIBLE_SCENE_BOUNDS",
     payload: { connectionId: "peer-a", bounds: [0, 0, 100, 50] },
   })
   expect(parseServerMessage(raw)).toEqual({
-    type: "VIEWPORT_BOUNDS",
+    type: "USER_VISIBLE_SCENE_BOUNDS",
     payload: { connectionId: "peer-a", bounds: [0, 0, 100, 50] },
   })
 })
@@ -205,12 +205,12 @@ test("a malformed follow frame is ignored rather than thrown", () => {
   ).toBeNull()
   expect(
     parseServerMessage(
-      '{"type":"VIEWPORT_BOUNDS","payload":{"bounds":[0,0,1,1]}}',
+      '{"type":"USER_VISIBLE_SCENE_BOUNDS","payload":{"bounds":[0,0,1,1]}}',
     ),
   ).toBeNull()
   expect(
     parseServerMessage(
-      '{"type":"VIEWPORT_BOUNDS","payload":{"connectionId":"peer-a","bounds":[0,0,1]}}',
+      '{"type":"USER_VISIBLE_SCENE_BOUNDS","payload":{"connectionId":"peer-a","bounds":[0,0,1]}}',
     ),
   ).toBeNull()
 })

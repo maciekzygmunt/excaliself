@@ -28,13 +28,13 @@ export function initialsOf(name: string): string {
 
 export function PresenceAvatars({
   participants,
-  followedConnectionId = null,
+  followedConnectionId,
   onFollow,
 }: {
   participants: readonly Participant[]
   /** Whose avatar should read as "you are following this one". */
-  followedConnectionId?: string | null
-  onFollow?: (participant: Participant) => void
+  followedConnectionId: string | null
+  onFollow: (participant: Participant) => void
 }) {
   if (participants.length === 0) return null
 
@@ -59,7 +59,7 @@ export function PresenceAvatars({
                 ? `Stop following ${participant.name}`
                 : `Follow ${participant.name}`
             }
-            onClick={() => onFollow?.(participant)}
+            onClick={() => onFollow(participant)}
             className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-full text-[0.625rem] font-semibold text-white ring-2 ring-(--island-bg-color) transition-transform hover:scale-110"
             style={{
               backgroundColor: participant.color.background,

@@ -119,7 +119,10 @@ export function useRoom(options: {
         setRoster(message.payload.participants)
         return
       }
-      if (message.type !== "MOUSE_LOCATION") {
+      if (
+        message.type === "FOLLOWED_BY" ||
+        message.type === "USER_VISIBLE_SCENE_BOUNDS"
+      ) {
         followRef.current.handleServerMessage(message)
         return
       }

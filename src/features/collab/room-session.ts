@@ -174,10 +174,14 @@ export function receiveFromPeer(
     return
   }
 
-  if (message.type === "VIEWPORT_BOUNDS") {
+  if (message.type === "USER_VISIBLE_SCENE_BOUNDS") {
     for (const followerId of followersOf(room, peer.id)) {
+      // Two peers following each other would drag one another's canvas back
+      // and forth forever. Dropping just that one edge breaks the loop while
+      // everyone else trailing this peer still gets the viewport.
+      if (room.follows.get(peer.id) === followerId) continue
       room.peers.get(followerId)?.send({
-        type: "VIEWPORT_BOUNDS",
+        type: "USER_VISIBLE_SCENE_BOUNDS",
         payload: { connectionId: peer.id, bounds: message.payload.bounds },
       })
     }

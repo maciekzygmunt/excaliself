@@ -241,7 +241,7 @@ const follow = (target: string | null) =>
   })
 
 const viewport = (bounds: number[]) =>
-  JSON.stringify({ type: "VIEWPORT_BOUNDS", payload: { bounds } })
+  JSON.stringify({ type: "USER_VISIBLE_SCENE_BOUNDS", payload: { bounds } })
 
 const followersIn = (message: ServerMessage | undefined) =>
   message?.type === "FOLLOWED_BY" ? message.payload.connectionIds : undefined
@@ -283,11 +283,32 @@ test("a viewport reaches the followers and nobody else", () => {
   receiveFromPeer(rooms, ROOM, ada, viewport([0, 0, 100, 50]))
 
   expect(grace.sent.at(-1)).toEqual({
-    type: "VIEWPORT_BOUNDS",
+    type: "USER_VISIBLE_SCENE_BOUNDS",
     payload: { connectionId: "peer-ada", bounds: [0, 0, 100, 50] },
   })
   expect(wren.sent).toHaveLength(0)
   expect(ada.published).toHaveLength(0)
+})
+
+test("two peers following each other don't drag each other around", () => {
+  const { rooms, ada, grace } = twoPeerRoom()
+  const wren = fakePeer("peer-wren")
+  joinRoom(rooms, ROOM, wren, member("Wren"))
+
+  receiveFromPeer(rooms, ROOM, grace, follow("peer-ada"))
+  receiveFromPeer(rooms, ROOM, ada, follow("peer-grace"))
+  receiveFromPeer(rooms, ROOM, wren, follow("peer-ada"))
+  for (const peer of [ada, grace, wren]) peer.sent.length = 0
+
+  receiveFromPeer(rooms, ROOM, ada, viewport([0, 0, 100, 50]))
+
+  // Only the mutual edge is dropped — Wren, who follows Ada one way, still
+  // gets the viewport.
+  expect(grace.sent).toHaveLength(0)
+  expect(wren.sent.at(-1)).toMatchObject({
+    type: "USER_VISIBLE_SCENE_BOUNDS",
+    payload: { connectionId: "peer-ada" },
+  })
 })
 
 test("a viewport nobody is following is relayed to nobody", () => {
@@ -349,7 +370,9 @@ test("a follower leaving takes its audience seat with it", () => {
   expect(() =>
     receiveFromPeer(rooms, ROOM, ada, viewport([0, 0, 1, 1])),
   ).not.toThrow()
-  expect(grace.sent.filter((m) => m.type === "VIEWPORT_BOUNDS")).toHaveLength(0)
+  expect(
+    grace.sent.filter((m) => m.type === "USER_VISIBLE_SCENE_BOUNDS"),
+  ).toHaveLength(0)
 })
 
 test("when the followed peer leaves, the follow is forgotten", () => {

@@ -190,7 +190,7 @@ const checks: {
 
       // Nobody is following yet, so a viewport must reach nobody.
       watched.send({
-        type: "VIEWPORT_BOUNDS",
+        type: "USER_VISIBLE_SCENE_BOUNDS",
         payload: { bounds: [0, 0, 1, 1] },
       })
 
@@ -204,20 +204,21 @@ const checks: {
       )
 
       watched.send({
-        type: "VIEWPORT_BOUNDS",
+        type: "USER_VISIBLE_SCENE_BOUNDS",
         payload: { bounds: [10, 20, 110, 70] },
       })
       const relayed = await follower.expect(
-        "VIEWPORT_BOUNDS",
+        "USER_VISIBLE_SCENE_BOUNDS",
         (f) => f.payload.connectionId === watchedId,
       )
       if ((relayed.payload.bounds as number[])[0] !== 10)
         throw new Error("the viewport arrived with the wrong bounds")
       if (
-        follower.frames.filter((f) => f.type === "VIEWPORT_BOUNDS").length > 1
+        follower.frames.filter((f) => f.type === "USER_VISIBLE_SCENE_BOUNDS")
+          .length > 1
       )
         throw new Error("a viewport was relayed before anyone was following")
-      if (bystander.frames.some((f) => f.type === "VIEWPORT_BOUNDS"))
+      if (bystander.frames.some((f) => f.type === "USER_VISIBLE_SCENE_BOUNDS"))
         throw new Error("a viewport reached someone who was not following")
 
       follower.send({
@@ -230,12 +231,13 @@ const checks: {
       )
 
       watched.send({
-        type: "VIEWPORT_BOUNDS",
+        type: "USER_VISIBLE_SCENE_BOUNDS",
         payload: { bounds: [1, 1, 2, 2] },
       })
       await new Promise((r) => setTimeout(r, 250))
       if (
-        follower.frames.filter((f) => f.type === "VIEWPORT_BOUNDS").length > 1
+        follower.frames.filter((f) => f.type === "USER_VISIBLE_SCENE_BOUNDS")
+          .length > 1
       )
         throw new Error("viewports kept arriving after the follow was stopped")
 
