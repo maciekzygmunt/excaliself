@@ -80,6 +80,54 @@ test("garbage and unknown types are ignored rather than thrown", () => {
   expect(parseClientMessage('{"type":"SCENE_UPDATE","payload":{}}')).toBeNull()
 })
 
+test("USER_FOLLOW names a target, and null says 'nobody'", () => {
+  expect(
+    parseClientMessage(
+      '{"type":"USER_FOLLOW","payload":{"followedConnectionId":"peer-a"}}',
+    ),
+  ).toEqual({
+    type: "USER_FOLLOW",
+    payload: { followedConnectionId: "peer-a" },
+  })
+  expect(
+    parseClientMessage(
+      '{"type":"USER_FOLLOW","payload":{"followedConnectionId":null}}',
+    ),
+  ).toEqual({ type: "USER_FOLLOW", payload: { followedConnectionId: null } })
+})
+
+test("a USER_FOLLOW without a string-or-null target is dropped", () => {
+  expect(parseClientMessage('{"type":"USER_FOLLOW","payload":{}}')).toBeNull()
+  expect(
+    parseClientMessage(
+      '{"type":"USER_FOLLOW","payload":{"followedConnectionId":7}}',
+    ),
+  ).toBeNull()
+})
+
+test("USER_VISIBLE_SCENE_BOUNDS round-trips the four scene coordinates", () => {
+  expect(
+    parseClientMessage(
+      '{"type":"USER_VISIBLE_SCENE_BOUNDS","payload":{"bounds":[-10,0,20.5,30]}}',
+    ),
+  ).toEqual({
+    type: "USER_VISIBLE_SCENE_BOUNDS",
+    payload: { bounds: [-10, 0, 20.5, 30] },
+  })
+})
+
+test("bounds that aren't four finite numbers are dropped", () => {
+  const bad = [
+    '{"type":"USER_VISIBLE_SCENE_BOUNDS","payload":{"bounds":[1,2,3]}}',
+    '{"type":"USER_VISIBLE_SCENE_BOUNDS","payload":{"bounds":[1,2,3,4,5]}}',
+    '{"type":"USER_VISIBLE_SCENE_BOUNDS","payload":{"bounds":[1,2,3,"4"]}}',
+    '{"type":"USER_VISIBLE_SCENE_BOUNDS","payload":{"bounds":[1,2,3,null]}}',
+    '{"type":"USER_VISIBLE_SCENE_BOUNDS","payload":{"bounds":{}}}',
+    '{"type":"USER_VISIBLE_SCENE_BOUNDS","payload":{}}',
+  ]
+  for (const raw of bad) expect(parseClientMessage(raw), raw).toBeNull()
+})
+
 // --- the client's side of the wire -------------------------------------
 
 const PARTICIPANT = {
@@ -124,6 +172,47 @@ test("a relayed cursor keeps the sender it was stamped with", () => {
   expect(parseServerMessage(raw)).toMatchObject({
     payload: { connectionId: "peer-a" },
   })
+})
+
+test("FOLLOWED_BY carries the connection ids trailing this tab", () => {
+  const raw = JSON.stringify({
+    type: "FOLLOWED_BY",
+    payload: { connectionIds: ["peer-a", "peer-b"] },
+  })
+  expect(parseServerMessage(raw)).toEqual({
+    type: "FOLLOWED_BY",
+    payload: { connectionIds: ["peer-a", "peer-b"] },
+  })
+})
+
+test("a relayed viewport keeps the sender it was stamped with", () => {
+  const raw = JSON.stringify({
+    type: "USER_VISIBLE_SCENE_BOUNDS",
+    payload: { connectionId: "peer-a", bounds: [0, 0, 100, 50] },
+  })
+  expect(parseServerMessage(raw)).toEqual({
+    type: "USER_VISIBLE_SCENE_BOUNDS",
+    payload: { connectionId: "peer-a", bounds: [0, 0, 100, 50] },
+  })
+})
+
+test("a malformed follow frame is ignored rather than thrown", () => {
+  expect(parseServerMessage('{"type":"FOLLOWED_BY","payload":{}}')).toBeNull()
+  expect(
+    parseServerMessage(
+      '{"type":"FOLLOWED_BY","payload":{"connectionIds":[1]}}',
+    ),
+  ).toBeNull()
+  expect(
+    parseServerMessage(
+      '{"type":"USER_VISIBLE_SCENE_BOUNDS","payload":{"bounds":[0,0,1,1]}}',
+    ),
+  ).toBeNull()
+  expect(
+    parseServerMessage(
+      '{"type":"USER_VISIBLE_SCENE_BOUNDS","payload":{"connectionId":"peer-a","bounds":[0,0,1]}}',
+    ),
+  ).toBeNull()
 })
 
 test("a malformed frame is ignored rather than thrown out of a socket callback", () => {

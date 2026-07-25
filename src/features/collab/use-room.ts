@@ -38,13 +38,16 @@ import {
   SYNC_FULL_SCENE_INTERVAL_MS,
 } from "./scene-sync"
 import { CURSOR_INTERVAL_MS, createDroppableThrottle } from "./throttle"
+import { useFollow } from "./use-follow"
 
 /**
- * Skip a cursor frame when the socket is already backed up rather than
- * queueing it — the droppable half of "droppable channel". Roughly a few
- * dozen cursor frames' worth of bytes.
+ * Skip a frame when the socket is already backed up rather than queueing it
+ * — the droppable half of "droppable channel". Roughly a few dozen cursor
+ * frames' worth of bytes. Cursors and follow-mode viewports share the budget
+ * because they share the socket, and both supersede themselves: whatever was
+ * dropped is stale by the time the buffer drains.
  */
-const CURSOR_BACKPRESSURE_BYTES = 8 * 1024
+const BACKPRESSURE_BYTES = 8 * 1024
 
 /** What Excalidraw's `onPointerUpdate` hands us; selection comes from appState. */
 type PointerMove = Omit<PointerUpdate, "selectedElementIds">
@@ -113,6 +116,18 @@ export function useRoom(options: {
     socket.send(JSON.stringify(message))
     return true
   }, [])
+
+  /** Whether the socket's outbound buffer is too full to take another frame. */
+  const isBackedUp = useCallback(
+    () => (socketRef.current?.bufferedAmount ?? 0) > BACKPRESSURE_BYTES,
+    [],
+  )
+
+  const follow = useFollow({ excalidrawAPI, send, isBackedUp })
+  // The socket effect must not re-run when follow state changes, so its
+  // handlers are reached through a ref like everything else in there.
+  const followRef = useRef(follow)
+  followRef.current = follow
 
   /** An empty selection is nothing for the room to rule on — don't send it. */
   const sendScene = useCallback(
@@ -222,6 +237,13 @@ export function useRoom(options: {
         setRoster(message.payload.participants)
         return
       }
+      if (
+        message.type === "FOLLOWED_BY" ||
+        message.type === "USER_VISIBLE_SCENE_BOUNDS"
+      ) {
+        followRef.current.handleServerMessage(message)
+        return
+      }
       if (message.type === "SCENE_INIT") {
         const merged = applyRemoteScene(message.payload.elements)
         if (!merged) return
@@ -249,6 +271,7 @@ export function useRoom(options: {
       setSelfConnectionId(null)
       pointersRef.current.clear()
       setRoster([])
+      followRef.current.reset()
       // The one close the page reacts to: the room was full, so the visitor
       // never got in and belongs on the "drawing full" state instead.
       if (event.code === ROOM_FULL_CLOSE_CODE) onRoomFullRef.current()
@@ -272,6 +295,12 @@ export function useRoom(options: {
       // What the old socket had told the room means nothing to the next one.
       broadcasterRef.current = createSceneBroadcaster()
       sceneInitializedRef.current = false
+      // The close listener is gone by now, so this is the only place a
+      // *replaced* socket resets follow state — navigating from one share
+      // link to another keeps this component mounted, and a stale follower
+      // set would have every scroll relaying into a room nobody is watching
+      // from.
+      followRef.current.reset()
     }
   }, [
     token,
@@ -295,7 +324,7 @@ export function useRoom(options: {
     (move: PointerMove) => {
       const socket = socketRef.current
       if (socket?.readyState !== WebSocket.OPEN) return
-      if (socket.bufferedAmount > CURSOR_BACKPRESSURE_BYTES) return
+      if (isBackedUp()) return
       if (!allowCursor.current()) return
       send({
         type: "MOUSE_LOCATION",
@@ -307,7 +336,7 @@ export function useRoom(options: {
         },
       })
     },
-    [send],
+    [send, isBackedUp],
   )
 
   // Who else is here — the same exclusion the collaborator map makes, so the
@@ -325,5 +354,23 @@ export function useRoom(options: {
     [participants, selfConnectionId],
   )
 
-  return { self, others, onChange, onPointerUpdate }
+  // Null the moment the followed person leaves — the roster is what the ring
+  // and the chip are drawn from, so they can't outlive their subject.
+  const followedParticipant = useMemo(
+    () =>
+      others.find((p) => p.connectionId === follow.followedConnectionId) ??
+      null,
+    [others, follow.followedConnectionId],
+  )
+
+  return {
+    self,
+    others,
+    onChange,
+    onPointerUpdate,
+    followedParticipant,
+    onScrollChange: follow.onScrollChange,
+    toggleFollow: follow.toggleFollow,
+    stopFollowing: follow.stopFollowing,
+  }
 }

@@ -253,6 +253,73 @@ const checks: {
     },
   },
   {
+    name: "a follower gets the viewport, and only while it is following",
+    run: async (token, url) => {
+      const watched = await Peer.connect(socketUrl(url, token))
+      const watchedId = (await watched.expect("ROOM_JOINED")).payload
+        .connectionId as string
+      const follower = await Peer.connect(socketUrl(url, token))
+      await follower.expect("ROOM_JOINED")
+      const bystander = await Peer.connect(socketUrl(url, token))
+      await bystander.expect("ROOM_JOINED")
+
+      // Nobody is following yet, so a viewport must reach nobody.
+      watched.send({
+        type: "USER_VISIBLE_SCENE_BOUNDS",
+        payload: { bounds: [0, 0, 1, 1] },
+      })
+
+      follower.send({
+        type: "USER_FOLLOW",
+        payload: { followedConnectionId: watchedId },
+      })
+      await watched.expect(
+        "FOLLOWED_BY",
+        (f) => (f.payload.connectionIds as string[]).length === 1,
+      )
+
+      watched.send({
+        type: "USER_VISIBLE_SCENE_BOUNDS",
+        payload: { bounds: [10, 20, 110, 70] },
+      })
+      const relayed = await follower.expect(
+        "USER_VISIBLE_SCENE_BOUNDS",
+        (f) => f.payload.connectionId === watchedId,
+      )
+      if ((relayed.payload.bounds as number[])[0] !== 10)
+        throw new Error("the viewport arrived with the wrong bounds")
+      if (
+        follower.frames.filter((f) => f.type === "USER_VISIBLE_SCENE_BOUNDS")
+          .length > 1
+      )
+        throw new Error("a viewport was relayed before anyone was following")
+      if (bystander.frames.some((f) => f.type === "USER_VISIBLE_SCENE_BOUNDS"))
+        throw new Error("a viewport reached someone who was not following")
+
+      follower.send({
+        type: "USER_FOLLOW",
+        payload: { followedConnectionId: null },
+      })
+      await watched.expect(
+        "FOLLOWED_BY",
+        (f) => (f.payload.connectionIds as string[]).length === 0,
+      )
+
+      watched.send({
+        type: "USER_VISIBLE_SCENE_BOUNDS",
+        payload: { bounds: [1, 1, 2, 2] },
+      })
+      await new Promise((r) => setTimeout(r, 250))
+      if (
+        follower.frames.filter((f) => f.type === "USER_VISIBLE_SCENE_BOUNDS")
+          .length > 1
+      )
+        throw new Error("viewports kept arriving after the follow was stopped")
+
+      for (const peer of [watched, follower, bystander]) peer.close()
+    },
+  },
+  {
     // Spec §4.5. The upgrade still succeeds — the cap is enforced on the
     // open, because only a close code reaches the page as something it can
     // turn into the "this drawing is full" state.

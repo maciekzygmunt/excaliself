@@ -115,6 +115,9 @@ function fakeExcalidraw(initial: SceneElement[] = []) {
         api.onChange(scene)
       },
     ),
+    // Follow mode subscribes on mount (spec §1.3). Nothing here drives it,
+    // but the real API always has it, so the stand-in must too.
+    onUserFollow: () => () => {},
   }
   return api
 }

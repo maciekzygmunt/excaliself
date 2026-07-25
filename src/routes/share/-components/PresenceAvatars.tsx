@@ -1,10 +1,12 @@
 /**
  * Who else is in the room, as a stack of initialed avatars in Excalidraw's
- * top-right island (spec §1.3). Deliberately minimal: the guest chrome slice
- * adds the editable name pill beside it and settles the final styling.
+ * top-right island (spec §1.3), to the left of the visitor's own name pill.
  *
  * Only other people are shown — you already know you're here — so a lone
  * visitor gets no chrome at all.
+ *
+ * Each avatar is also follow mode's entry point (spec §1.3): clicking one
+ * rides along with that person's viewport, and clicking it again stops.
  */
 
 import type { Participant } from "@/features/collab/protocol"
@@ -25,8 +27,13 @@ export function initialsOf(name: string): string {
 
 export function PresenceAvatars({
   participants,
+  followedConnectionId,
+  onFollow,
 }: {
   participants: readonly Participant[]
+  /** Whose avatar should read as "you are following this one". */
+  followedConnectionId: string | null
+  onFollow: (participant: Participant) => void
 }) {
   if (participants.length === 0) return null
 
@@ -38,16 +45,34 @@ export function PresenceAvatars({
       className="flex items-center -space-x-1.5"
       aria-label={`${participants.length} other ${participants.length === 1 ? "person" : "people"} here`}
     >
-      {shown.map((participant) => (
-        <span
-          key={participant.connectionId}
-          title={participant.name}
-          className="flex h-7 w-7 items-center justify-center rounded-full text-[0.625rem] font-semibold text-white ring-2 ring-(--island-bg-color)"
-          style={{ backgroundColor: participant.color.background }}
-        >
-          {initialsOf(participant.name)}
-        </span>
-      ))}
+      {shown.map((participant) => {
+        const followed = participant.connectionId === followedConnectionId
+        return (
+          <button
+            key={participant.connectionId}
+            type="button"
+            title={participant.name}
+            aria-pressed={followed}
+            aria-label={
+              followed
+                ? `Stop following ${participant.name}`
+                : `Follow ${participant.name}`
+            }
+            onClick={() => onFollow(participant)}
+            className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-full text-[0.625rem] font-semibold text-white ring-2 ring-(--island-bg-color) transition-transform hover:scale-110"
+            style={{
+              backgroundColor: participant.color.background,
+              // The followed avatar grows a second ring in its own color, so
+              // it matches the ring drawn around the canvas.
+              boxShadow: followed
+                ? `0 0 0 4px ${participant.color.background}`
+                : undefined,
+            }}
+          >
+            {initialsOf(participant.name)}
+          </button>
+        )
+      })}
       {overflow > 0 && (
         <span className="flex h-7 items-center justify-center rounded-full bg-(--color-surface-low) px-1.5 text-[0.625rem] font-semibold text-(--color-on-surface) ring-2 ring-(--island-bg-color)">
           +{overflow}

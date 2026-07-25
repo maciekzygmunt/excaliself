@@ -9,13 +9,14 @@
 // top-left island, presence and the visitor's name pill ride the top-right
 // row, and the attribution sits in the bottom-right footer.
 
-import { Excalidraw } from "@excalidraw/excalidraw"
+import { Excalidraw, MainMenu } from "@excalidraw/excalidraw"
 import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types"
 import { useCallback, useMemo, useState } from "react"
 import {
   FooterRightPortal,
   TopLeftPortal,
 } from "@/components/excalidraw-portal"
+import { FollowModeOverlay } from "@/components/follow-mode-overlay"
 import {
   getOrCreateGuestName,
   rememberGuestName,
@@ -28,9 +29,32 @@ import {
 import { GuestAttribution } from "./GuestAttribution"
 import { GuestNamePill } from "./GuestNamePill"
 import { GuestTitle } from "./GuestTitle"
+import { MenuParticipants } from "./MenuParticipants"
 import { PresenceAvatars } from "./PresenceAvatars"
 
 import "@excalidraw/excalidraw/index.css"
+
+// The top-right row holds the presence avatars and the visitor's name pill,
+// and it has to share the strip with Excalidraw's own toolbar. The pill is
+// the wider and the less urgent of the two — it is set once and forgotten,
+// while the avatars are both who-is-here and follow mode's entry point — so
+// below the seam the pill leaves the row for the burger menu, the same trade
+// the member canvas makes with its Share button.
+//
+// The seam is the canvas area, not the viewport — this surface has no
+// sidebar, but Excalidraw's toolbar is a fixed-width island the row is laid
+// out after, so what matters is how much is left beside it.
+//
+// 50rem rather than a round breakpoint because the pill is not a fixed width:
+// its field grows with the name to `max-w-40` (10rem), so the seam has to
+// clear the longest name the field will accept, not the pseudonym a visitor
+// happens to arrive with. Measured with a short name it would look like 43rem
+// is enough, and then a visitor types their full name and it clips.
+const NAME_PILL_CLASS = "@max-[50rem]/canvas:hidden"
+// The ! is load-order armor, as on the member canvas: Excalidraw's
+// lazy-loaded sheet declares .dropdown-menu-item { display: flex } after ours
+// and would win the tie against a plain `hidden`.
+const NAME_MENU_ROW_CLASS = "@min-[50rem]/canvas:hidden!"
 
 type Props = {
   drawing: { id: string; name: string; data: string }
@@ -55,12 +79,16 @@ export function SharedCanvas({ drawing, files, token, onRoomFull }: Props) {
   const [name, setName] = useState(getOrCreateGuestName)
 
   // `self` is how the room sees this tab — null until the join lands.
-  const { self, others, onChange, onPointerUpdate } = useRoom({
-    token,
-    name,
-    excalidrawAPI,
-    onRoomFull,
-  })
+  const {
+    self,
+    others,
+    onChange,
+    onPointerUpdate,
+    followedParticipant,
+    onScrollChange,
+    toggleFollow,
+    stopFollowing,
+  } = useRoom({ token, name, excalidrawAPI, onRoomFull })
 
   // Renaming re-announces the name to the room (useRoom rejoins on the
   // change) and keeps it for the next visit, where a fresh connection id
@@ -85,24 +113,35 @@ export function SharedCanvas({ drawing, files, token, onRoomFull }: Props) {
   const shownName = isGuest ? name : (self?.name ?? name)
 
   return (
-    <div className="h-dvh w-full">
+    <div className="@container/canvas relative h-dvh w-full">
       <Excalidraw
         initialData={initialData}
         excalidrawAPI={setExcalidrawAPI}
         theme="light"
         onChange={onChange}
         onPointerUpdate={onPointerUpdate}
-        renderTopRightUI={() => (
-          <>
-            <PresenceAvatars participants={others} />
-            <GuestNamePill
-              name={shownName}
-              color={self?.color ?? null}
-              editable={isGuest}
-              onNameChange={handleNameChange}
-            />
-          </>
-        )}
+        onScrollChange={onScrollChange}
+        // Excalidraw lays this row out after its toolbar without wrapping, so
+        // in mobile layout it starts past the right edge whatever is in it.
+        // Everything moves to the burger menu there rather than clipping.
+        renderTopRightUI={(isMobile) =>
+          isMobile ? null : (
+            <>
+              <PresenceAvatars
+                participants={others}
+                followedConnectionId={followedParticipant?.connectionId ?? null}
+                onFollow={toggleFollow}
+              />
+              <GuestNamePill
+                name={shownName}
+                color={self?.color ?? null}
+                editable={isGuest}
+                onNameChange={handleNameChange}
+                className={NAME_PILL_CLASS}
+              />
+            </>
+          )
+        }
         UIOptions={{
           canvasActions: {
             loadScene: false,
@@ -111,6 +150,37 @@ export function SharedCanvas({ drawing, files, token, onRoomFull }: Props) {
           },
         }}
       >
+        {/* Declaring a menu replaces Excalidraw's default one, so the items
+            below are that default, restated — minus the entries `UIOptions`
+            already turns off for this surface. */}
+        <MainMenu>
+          <MenuParticipants
+            participants={others}
+            followedConnectionId={followedParticipant?.connectionId ?? null}
+            onFollow={toggleFollow}
+          />
+          <div className={NAME_MENU_ROW_CLASS}>
+            <GuestNamePill
+              name={shownName}
+              color={self?.color ?? null}
+              editable={isGuest}
+              onNameChange={handleNameChange}
+              // In the menu it is a row, not an island: no card of its own,
+              // and free to use the width the dropdown gives it.
+              className="h-9 w-full max-w-none bg-transparent px-2 shadow-none"
+            />
+            <MainMenu.Separator />
+          </div>
+          <MainMenu.DefaultItems.Export />
+          <MainMenu.DefaultItems.SaveAsImage />
+          <MainMenu.DefaultItems.SearchMenu />
+          <MainMenu.DefaultItems.Help />
+          <MainMenu.DefaultItems.ClearCanvas />
+          <MainMenu.Separator />
+          <MainMenu.Group title="Excalidraw links">
+            <MainMenu.DefaultItems.Socials />
+          </MainMenu.Group>
+        </MainMenu>
         <TopLeftPortal>
           <GuestTitle name={drawing.name} />
         </TopLeftPortal>
@@ -118,6 +188,12 @@ export function SharedCanvas({ drawing, files, token, onRoomFull }: Props) {
           <GuestAttribution token={token} showSignIn={isGuest} />
         </FooterRightPortal>
       </Excalidraw>
+      {/* Outside the canvas, so the ring frames the whole surface — chrome
+          portaled inside would sit under it. */}
+      <FollowModeOverlay
+        participant={followedParticipant}
+        onStop={stopFollowing}
+      />
     </div>
   )
 }
