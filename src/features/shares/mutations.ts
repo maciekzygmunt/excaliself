@@ -41,6 +41,14 @@ export function useCreateShare(
   })
 }
 
+/**
+ * Deleting the row is only half of stop-sharing (spec §5.5). It hands the
+ * owner's own tabs back to classic autosave — the share query empties, their
+ * sockets close, and the paused hook picks up on the merged scene — but the
+ * guests' sockets stay open until the server evicts them, and until then the
+ * Room and the owner are both writing the drawing. That eviction is #121; the
+ * two never ship apart, since the whole feature lands on main in one merge.
+ */
 export function useStopSharing(drawingId: string) {
   const queryClient = useQueryClient()
   return useMutation({

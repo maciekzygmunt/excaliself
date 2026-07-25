@@ -55,7 +55,9 @@ const registryFrom = (load: SceneLoader, save: SceneSaver = async () => {}) =>
 
 /** A registry over an empty stored drawing — the presence tests' default. */
 const emptyRegistry = (load?: SceneLoader) =>
-  registryFrom(load ?? (async () => ({ elements: [], ownerId: null })))
+  registryFrom(
+    load ?? (async () => ({ elements: [], ownerId: null, readable: true })),
+  )
 
 const member = (displayName: string) => ({
   userId: `u:${displayName}`,
@@ -483,6 +485,7 @@ test("a joiner is handed the stored scene", async () => {
   const registry = registryFrom(async () => ({
     elements: stored,
     ownerId: "owner-1",
+    readable: true,
   }))
   const ada = fakePeer("peer-ada")
   await joinRoom(registry, ROOM, ada, member("Ada"))
@@ -497,7 +500,7 @@ test("the drawing is read once however many peers pile in at the same moment", a
   let reads = 0
   const registry = registryFrom(async () => {
     reads += 1
-    return { elements: [element("rect", 1)], ownerId: null }
+    return { elements: [element("rect", 1)], ownerId: null, readable: true }
   })
   const peers = ["a", "b", "c"].map((id) => fakePeer(id))
 
@@ -513,6 +516,7 @@ test("a late joiner gets the scene as edited, not as stored", async () => {
   const registry = registryFrom(async () => ({
     elements: [element("rect", 1)],
     ownerId: null,
+    readable: true,
   }))
   const ada = fakePeer("peer-ada")
   await joinRoom(registry, ROOM, ada, member("Ada"))
@@ -597,7 +601,11 @@ test("an edit that arrives before the scene has loaded still merges into it", as
   })
   const registry = registryFrom(async () => {
     await opened
-    return { elements: [element("stored", 1, { index: "a0" })], ownerId: null }
+    return {
+      elements: [element("stored", 1, { index: "a0" })],
+      ownerId: null,
+      readable: true,
+    }
   })
   const ada = fakePeer("peer-ada")
 
@@ -638,7 +646,7 @@ test("a peer that left mid-load is not sent a scene", async () => {
   })
   const registry = registryFrom(async () => {
     await opened
-    return { elements: [], ownerId: null }
+    return { elements: [], ownerId: null, readable: true }
   })
   const ada = fakePeer("peer-ada")
   const grace = fakePeer("peer-grace")
@@ -701,7 +709,7 @@ test("a refused join does not start a scene read", async () => {
   let reads = 0
   const registry = registryFrom(async () => {
     reads += 1
-    return { elements: [], ownerId: null }
+    return { elements: [], ownerId: null, readable: true }
   })
   await fillRoom(registry)
 
@@ -736,10 +744,15 @@ test("a full room does not keep anyone out of a different drawing", async () => 
 function recordingRegistry(
   stored: SceneElement[] = [],
   save?: SceneSaver,
+  options: { readable?: boolean } = {},
 ): RoomRegistry & { writes: SceneElement[][] } {
   const writes: SceneElement[][] = []
   const registry = registryFrom(
-    async () => ({ elements: stored, ownerId: "owner-1" }),
+    async () => ({
+      elements: stored,
+      ownerId: "owner-1",
+      readable: options.readable ?? true,
+    }),
     async (roomId, elements) => {
       writes.push(elements)
       await save?.(roomId, elements)
@@ -938,4 +951,68 @@ test("a rejoin during the final write keeps the room alive", async () => {
   expect(elementsOf(framesOf(grace, "SCENE_INIT")[0])).toEqual([
     element("a", 1),
   ])
+})
+
+// Regression: a Room that may not write was still marked dirty on every edit,
+// and `reapIfIdle` refused to drop a dirty Room — so one transient read
+// failure left a Room in the registry for the life of the process, never
+// re-reading the drawing and never persisting anything again.
+test("a room that could not read its drawing is torn down like any other", async () => {
+  const errors = vi.spyOn(console, "error").mockImplementation(() => {})
+  try {
+    const registry = registryFrom(async () => {
+      throw new Error("database is down")
+    })
+    const ada = fakePeer("peer-ada")
+    await joinRoom(registry, ROOM, ada, member("Ada"))
+    await receiveFromPeer(registry, ROOM, ada, sceneUpdate([element("a", 1)]))
+
+    await leaveRoom(registry, ROOM, ada)
+
+    // Gone, so the next join re-reads the drawing and can persist again.
+    expect(registry.rooms.has(ROOM)).toBe(false)
+  } finally {
+    errors.mockRestore()
+  }
+})
+
+test("a drawing whose stored scene is unreadable is never written over", async () => {
+  vi.useFakeTimers()
+  try {
+    const registry = recordingRegistry([], undefined, { readable: false })
+    const ada = fakePeer("peer-ada")
+    await joinRoom(registry, ROOM, ada, member("Ada"))
+
+    await receiveFromPeer(registry, ROOM, ada, sceneUpdate([element("a", 1)]))
+    await vi.advanceTimersByTimeAsync(ROOM_FLUSH_INTERVAL_MS * 2)
+    await leaveRoom(registry, ROOM, ada)
+
+    expect(registry.writes).toEqual([])
+  } finally {
+    vi.useRealTimers()
+  }
+})
+
+// Regression: dirtiness was decided by `getSceneVersion`, a sum of versions.
+// An element that wins on the versionNonce tie-break has the same version, so
+// the sum and the element count both stay put — the room relayed the new
+// content to every peer and the database kept the old.
+test("an edit that wins on the nonce tie-break is still persisted", async () => {
+  vi.useFakeTimers()
+  try {
+    const stored = element("rect", 4, { versionNonce: 9 })
+    const registry = recordingRegistry([stored])
+    const ada = fakePeer("peer-ada")
+    await joinRoom(registry, ROOM, ada, member("Ada"))
+
+    // Same version, lower nonce — reconciliation's deterministic winner.
+    const winner = element("rect", 4, { versionNonce: 2, extra: "new" })
+    await receiveFromPeer(registry, ROOM, ada, sceneUpdate([winner]))
+    await vi.advanceTimersByTimeAsync(ROOM_FLUSH_INTERVAL_MS)
+
+    expect(registry.writes).toHaveLength(1)
+    expect(registry.writes[0][0].versionNonce).toBe(2)
+  } finally {
+    vi.useRealTimers()
+  }
 })

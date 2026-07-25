@@ -102,13 +102,11 @@ export function DrawingCanvas({ drawingId, readOnly = false }: Props) {
    * the socket like any visitor, which is what makes "the room is the only
    * writer" true: with a solo writer still running, two tabs of the owner's
    * would fight the room over the same drawing.
-   *
-   * No name is sent — the server takes a member's name from their session and
-   * ignores whatever the wire claims, so there is nothing for this tab to say.
    */
   const room = useRoom({
     token: readOnly ? null : (share?.token ?? null),
-    name: "",
+    // A member's name is the session's; this tab has none to offer.
+    name: null,
     excalidrawAPI,
     onRoomFull: handleRoomFull,
   })

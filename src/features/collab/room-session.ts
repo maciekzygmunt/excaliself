@@ -60,6 +60,8 @@ export type SceneSaver = (
 export const ROOM_FLUSH_INTERVAL_MS = 15_000
 
 export type Room = {
+  /** The drawing this Room belongs to — its key in the registry. */
+  id: string
   participants: Map<string, Participant>
   /**
    * The live socket behind each participant. Follow mode is the first thing
@@ -121,6 +123,7 @@ function ensureRoom(registry: RoomRegistry, roomId: string): Room {
   if (existing) return existing
 
   const room: Room = {
+    id: roomId,
     participants: new Map(),
     peers: new Map(),
     follows: new Map(),
@@ -139,7 +142,12 @@ function ensureRoom(registry: RoomRegistry, roomId: string): Room {
       room.elements = stored.elements
       room.sceneVersion = getSceneVersion(stored.elements)
       room.ownerId = stored.ownerId
-      room.persistable = true
+      // Unreadable stored JSON leaves the Room open but mute, exactly like a
+      // read that threw: the drawing rendered as an empty canvas here, and
+      // writing that emptiness back is how a recoverable file becomes an
+      // empty one. It is the same call the solo canvas makes when it pauses
+      // autosave over a corrupt scene.
+      room.persistable = stored.readable
     },
     (error) => {
       // The Room stays open on an empty scene: cursors and presence still
@@ -160,31 +168,40 @@ function disarmFlush(room: Room) {
 }
 
 /**
+ * Work this Room still owes the database. A Room that may not write has none
+ * by definition, however much it has accumulated — without that clause a
+ * drawing whose read failed would be marked dirty forever, and `reapIfIdle`
+ * below would keep its Room in the registry for the life of the process,
+ * never re-reading the drawing and never persisting another thing.
+ */
+const hasUnwrittenWork = (room: Room) => room.dirty && room.persistable
+
+/**
  * A Room with nothing left to hold it open — no sockets, nothing unwritten —
  * is torn down, so the next join reads the drawing fresh (spec §2.5). Called
  * after every write rather than only from `leaveRoom` because the last
  * participant can leave while a write is still in flight, and a Room whose
  * flush had to be retried must not be dropped while it still owes one.
  */
-function reapIfIdle(registry: RoomRegistry, roomId: string, room: Room) {
-  if (room.participants.size > 0 || room.dirty) return
-  if (registry.rooms.get(roomId) !== room) return
+function reapIfIdle(registry: RoomRegistry, room: Room) {
+  if (room.participants.size > 0 || hasUnwrittenWork(room)) return
+  if (registry.rooms.get(room.id) !== room) return
   disarmFlush(room)
-  registry.rooms.delete(roomId)
+  registry.rooms.delete(room.id)
 }
 
-function armFlush(registry: RoomRegistry, roomId: string, room: Room) {
+function armFlush(registry: RoomRegistry, room: Room) {
   if (room.flushTimer !== null || !room.persistable) return
   room.flushTimer = setTimeout(() => {
     room.flushTimer = null
-    void flushRoom(registry, roomId)
+    void flushRoom(registry, room)
   }, ROOM_FLUSH_INTERVAL_MS)
 }
 
 /** The scene changed: schedule the trailing write of spec §2.3. */
-function markDirty(registry: RoomRegistry, roomId: string, room: Room) {
+function markDirty(registry: RoomRegistry, room: Room) {
   room.dirty = true
-  armFlush(registry, roomId, room)
+  armFlush(registry, room)
 }
 
 /**
@@ -197,33 +214,28 @@ function markDirty(registry: RoomRegistry, roomId: string, room: Room) {
  * read-modify-writes on the same row in flight at once, and the older one
  * could land last.
  */
-export function flushRoom(
-  registry: RoomRegistry,
-  roomId: string,
-): Promise<void> {
-  const room = registry.rooms.get(roomId)
-  if (!room) return Promise.resolve()
+function flushRoom(registry: RoomRegistry, room: Room): Promise<void> {
   disarmFlush(room)
-  if (!room.dirty || !room.persistable) return room.flushing
+  if (!hasUnwrittenWork(room)) return room.flushing
 
   room.dirty = false
   room.flushing = room.flushing.then(() =>
     // Read the scene inside the chain, not at call time: anything merged
     // while an earlier write was in flight rides along on this one.
     registry
-      .saveScene(roomId, room.elements)
+      .saveScene(room.id, room.elements)
       .then(
         () => {
-          reapIfIdle(registry, roomId, room)
+          reapIfIdle(registry, room)
         },
         (error) => {
           // A failed write is not lost work — the scene is still in memory. Mark
           // it unwritten again and let the throttle retry; a Room whose last
           // participant has already left keeps retrying (and stays in the
           // registry) until the write lands rather than dropping the edits.
-          console.error(`[collab] could not flush room ${roomId}`, error)
+          console.error(`[collab] could not flush room ${room.id}`, error)
           room.dirty = true
-          armFlush(registry, roomId, room)
+          armFlush(registry, room)
         },
       ),
   )
@@ -237,7 +249,7 @@ export function flushRoom(
  */
 export async function flushAllRooms(registry: RoomRegistry): Promise<void> {
   await Promise.all(
-    [...registry.rooms.keys()].map((roomId) => flushRoom(registry, roomId)),
+    [...registry.rooms.values()].map((room) => flushRoom(registry, room)),
   )
 }
 
@@ -386,19 +398,27 @@ function setFollowTarget(
  * is anything new to persist. A delta that lost every comparison leaves the
  * scene exactly as it was, and re-writing it would be a database round trip
  * for nothing.
+ *
+ * That question is answered by identity, not by `sceneVersion`: reconciliation
+ * keeps the winning object by reference, so an element the Room replaced is a
+ * different object than the one it held. A version sum cannot see the
+ * versionNonce tie-break — a remote element with the same `version` and a
+ * lower nonce wins, is relayed to every peer, and leaves the sum and the count
+ * exactly where they were. Persisting off the sum would let that content
+ * converge everywhere except the database.
  */
 function applySceneUpdate(
   room: Room,
   peer: RoomPeer,
   incoming: SceneElement[],
 ): boolean {
-  const previousCount = room.elements.length
-  const previousVersion = room.sceneVersion
-  room.elements = reconcileElements(room.elements, incoming, {})
+  const previous = room.elements
+  const previousById = new Map(previous.map((el) => [el.id, el]))
+  room.elements = reconcileElements(previous, incoming, {})
   room.sceneVersion = getSceneVersion(room.elements)
   const changed =
-    room.sceneVersion !== previousVersion ||
-    room.elements.length !== previousCount
+    room.elements.length !== previous.length ||
+    room.elements.some((el) => previousById.get(el.id) !== el)
 
   // Reconciliation keeps whichever object won by reference, so `winner ===
   // element` is exactly "the Room accepted what this peer sent" — no need to
@@ -480,7 +500,7 @@ export async function receiveFromPeer(
     await room.loaded
     if (!room.participants.has(peer.id)) return
     if (applySceneUpdate(room, peer, message.payload.elements))
-      markDirty(registry, roomId, room)
+      markDirty(registry, room)
     return
   }
 
@@ -515,8 +535,8 @@ export async function leaveRoom(
   // rejoin during the write keeps the Room, and a write that has to be
   // retried keeps it too.
   if (room.participants.size === 0) {
-    await flushRoom(registry, roomId)
-    reapIfIdle(registry, roomId, room)
+    await flushRoom(registry, room)
+    reapIfIdle(registry, room)
     return
   }
   peer.publish(ROOM_TOPIC, rosterMessage(room))

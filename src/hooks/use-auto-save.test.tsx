@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { act, render } from "@testing-library/react"
 import type { ReactNode } from "react"
 import { expect, test, vi } from "vitest"
-import { useAutoSave } from "./use-auto-save"
+import { type SaveOutcome, useAutoSave } from "./use-auto-save"
 
 function wrapper({ children }: { children: ReactNode }) {
   const client = new QueryClient()
@@ -13,16 +13,18 @@ function Harness({
   onSave,
   onChangeRef,
   flushRef,
+  savedRef,
   paused = false,
   skipInitialChange = false,
 }: {
-  onSave: (payload: string) => Promise<unknown>
+  onSave: (payload: string) => Promise<SaveOutcome>
   onChangeRef: { current: ((data: string) => void) | null }
   flushRef?: { current: (() => Promise<void>) | null }
+  savedRef?: { current: boolean }
   paused?: boolean
   skipInitialChange?: boolean
 }) {
-  const { handleChange, flush } = useAutoSave<string, string>({
+  const { handleChange, flush, saved } = useAutoSave<string, string>({
     toPayload: (d) => d,
     getSignature: (p) => p,
     onSave,
@@ -31,6 +33,7 @@ function Harness({
   })
   onChangeRef.current = handleChange
   if (flushRef) flushRef.current = flush
+  if (savedRef) savedRef.current = saved
   return null
 }
 
@@ -309,4 +312,42 @@ test("flush with nothing outstanding resolves immediately", async () => {
   })
 
   expect(onSave).not.toHaveBeenCalled()
+})
+
+// A write the server accepted but did not store (a drawing that moved to the
+// collab socket, canvas sharing spec §5.5) must not read as a save — and must
+// not become the signature the dedup compares against, or the state would be
+// skipped once writing is possible again.
+test("a write that stored nothing neither claims Saved nor counts as committed", async () => {
+  const onSave = vi.fn(async () => ({ committed: false }))
+  const onChangeRef = { current: null as ((data: string) => void) | null }
+  const savedRef = { current: false }
+  const flushRef = { current: null as (() => Promise<void>) | null }
+
+  render(
+    <Harness
+      onSave={onSave}
+      onChangeRef={onChangeRef}
+      flushRef={flushRef}
+      savedRef={savedRef}
+    />,
+    { wrapper },
+  )
+
+  act(() => onChangeRef.current?.("refused"))
+  await act(async () => {
+    await flushRef.current?.()
+  })
+  expect(onSave).toHaveBeenCalledTimes(1)
+  expect(savedRef.current).toBe(false)
+
+  // Writing works again; the same state must go out rather than be deduped.
+  onSave.mockImplementation(async () => ({ committed: true }))
+  act(() => onChangeRef.current?.("refused"))
+  await act(async () => {
+    await flushRef.current?.()
+  })
+  expect(onSave).toHaveBeenCalledTimes(2)
+  expect(onSave).toHaveBeenLastCalledWith("refused")
+  expect(savedRef.current).toBe(true)
 })

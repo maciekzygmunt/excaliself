@@ -55,8 +55,12 @@ type PointerMove = Omit<PointerUpdate, "selectedElementIds">
 export function useRoom(options: {
   /** The share token from the URL; null keeps the socket closed. */
   token: string | null
-  /** This tab's display name. Only honored by the server for guests. */
-  name: string
+  /**
+   * This tab's display name, or null when it has none to offer — a member's
+   * name comes from their session and the server ignores whatever the wire
+   * claims, so the owner's own tab has nothing to say here.
+   */
+  name: string | null
   excalidrawAPI: ExcalidrawImperativeAPI | null
   /** The room turned this tab away at its participant cap (spec §4.5). */
   onRoomFull: () => void
@@ -219,7 +223,8 @@ export function useRoom(options: {
     socketRef.current = socket
 
     socket.addEventListener("open", () => {
-      send({ type: "JOIN", payload: { name: nameRef.current } })
+      const name = nameRef.current
+      if (name !== null) send({ type: "JOIN", payload: { name } })
     })
 
     socket.addEventListener("message", (event) => {
@@ -314,9 +319,9 @@ export function useRoom(options: {
   ])
 
   // Rejoining is what re-announces a name, so this only matters while the
-  // socket is already open (the guest name pill lands in a later slice).
+  // socket is already open — the guest name pill renaming mid-session.
   useEffect(() => {
-    send({ type: "JOIN", payload: { name } })
+    if (name !== null) send({ type: "JOIN", payload: { name } })
   }, [name, send])
 
   const allowCursor = useRef(createDroppableThrottle(CURSOR_INTERVAL_MS))

@@ -9,6 +9,9 @@ import {
 
 const stored = (scene: unknown) => JSON.stringify(scene)
 
+const elementsFrom = (data: string | null | undefined) =>
+  parseStoredScene(data).elements
+
 test("the elements are lifted out of a serialized scene", () => {
   const data = stored({
     type: "excalidraw",
@@ -17,7 +20,7 @@ test("the elements are lifted out of a serialized scene", () => {
     elements: [{ id: "rect", version: 4, versionNonce: 7, index: "a0" }],
   })
 
-  expect(parseStoredScene(data)).toEqual([
+  expect(elementsFrom(data)).toEqual([
     { id: "rect", version: 4, versionNonce: 7, index: "a0" },
   ])
 })
@@ -25,7 +28,7 @@ test("the elements are lifted out of a serialized scene", () => {
 test("an element without version fields is defaulted, the way restore() does it", () => {
   const data = stored({ elements: [{ id: "rect", type: "rectangle", x: 3 }] })
 
-  expect(parseStoredScene(data)).toEqual([
+  expect(elementsFrom(data)).toEqual([
     { id: "rect", type: "rectangle", x: 3, version: 1, versionNonce: 0 },
   ])
 })
@@ -40,18 +43,24 @@ test("only entries with no usable id are skipped — the rest of the drawing sur
     ],
   })
 
-  expect(parseStoredScene(data)).toEqual([
+  expect(elementsFrom(data)).toEqual([
     { id: "rect", version: 1, versionNonce: 1 },
   ])
 })
 
-test("a blank, corrupt, or elementless drawing opens as an empty scene", () => {
-  expect(parseStoredScene(undefined)).toEqual([])
-  expect(parseStoredScene("")).toEqual([])
-  expect(parseStoredScene("{}")).toEqual([])
-  expect(parseStoredScene("not json at all")).toEqual([])
-  expect(parseStoredScene(stored({ elements: "nope" }))).toEqual([])
-  expect(parseStoredScene(stored(null))).toEqual([])
+test("a blank or elementless drawing opens as an empty scene, and stays writable", () => {
+  for (const data of [undefined, "", "{}", stored({ elements: "nope" })]) {
+    expect(parseStoredScene(data)).toEqual({ elements: [], readable: true })
+  }
+})
+
+// The Room checks `readable` before it flushes: a drawing whose JSON cannot be
+// read opens as an empty canvas, and writing that emptiness back is how an
+// unreadable file becomes an empty one (spec §2.3).
+test("a drawing whose JSON cannot be read opens empty and is marked unreadable", () => {
+  for (const data of ["not json at all", stored(null), stored([1, 2])]) {
+    expect(parseStoredScene(data)).toEqual({ elements: [], readable: false })
+  }
 })
 
 // --- flushing back (spec §2.3) ------------------------------------------

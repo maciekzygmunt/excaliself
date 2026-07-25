@@ -40,7 +40,7 @@ function renderSaver() {
   // Only the fields this path reads; the row has a dozen more.
   queryClient.setQueryData(drawingQueryOptions("d1").queryKey, DRAWING as never)
   const saveRef = {
-    current: null as ((payload: typeof PAYLOAD) => Promise<void>) | null,
+    current: null as ((payload: typeof PAYLOAD) => Promise<unknown>) | null,
   }
   function Harness() {
     saveRef.current = useSaveScenePayload("d1")

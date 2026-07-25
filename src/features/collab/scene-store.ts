@@ -12,7 +12,12 @@ import type { SceneElement } from "./protocol"
 type Db = NodePgDatabase<typeof schema>
 
 /** The stored scene plus the owner the live badge will need (spec §1.5). */
-export type StoredScene = { elements: SceneElement[]; ownerId: string | null }
+export type StoredScene = {
+  elements: SceneElement[]
+  ownerId: string | null
+  /** False when the stored JSON could not be read; see {@link parseStoredScene}. */
+  readable: boolean
+}
 
 /**
  * Stored elements are read with the same tolerance `restore()` gives them
@@ -40,20 +45,42 @@ export function toRoomElements(value: unknown): SceneElement[] {
 }
 
 /**
+ * The stored JSON as an object, or null when it cannot be read at all. A blank
+ * drawing reads as `{}` rather than null: there is nothing wrong with it, it
+ * simply has nothing in it yet.
+ */
+function parseStoredObject(
+  data: string | null | undefined,
+): Record<string, unknown> | null {
+  if (!data) return {}
+  try {
+    const parsed: unknown = JSON.parse(data)
+    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed))
+      return null
+    return parsed as Record<string, unknown>
+  } catch {
+    return null
+  }
+}
+
+/**
  * `drawings.data` is whatever `serializeAsJSON` wrote — the Room only ever
  * wants its `elements`. Unreadable JSON yields an empty scene rather than
  * throwing: a corrupt drawing already renders as blank for its owner, and a
  * Room that refuses to open would take the share link down with it.
+ *
+ * It also yields `readable: false`, which is what stops the Room from writing
+ * that emptiness back over the file (spec §2.3). The solo canvas makes the
+ * same call — it pauses autosave over a corrupt scene rather than overwriting
+ * it — and a Room has no "Edit anyway" button to offer instead.
  */
-export function parseStoredScene(data: string | null | undefined) {
-  if (!data) return []
-  try {
-    const parsed: unknown = JSON.parse(data)
-    if (typeof parsed !== "object" || parsed === null) return []
-    return toRoomElements((parsed as { elements?: unknown }).elements)
-  } catch {
-    return []
-  }
+export function parseStoredScene(data: string | null | undefined): {
+  elements: SceneElement[]
+  readable: boolean
+} {
+  const stored = parseStoredObject(data)
+  if (!stored) return { elements: [], readable: false }
+  return { elements: toRoomElements(stored.elements), readable: true }
 }
 
 export async function loadRoomScene(
@@ -65,7 +92,7 @@ export async function loadRoomScene(
     .from(drawings)
     .where(eq(drawings.id, drawingId))
   return {
-    elements: parseStoredScene(drawing?.data),
+    ...parseStoredScene(drawing?.data),
     ownerId: drawing?.ownerId ?? null,
   }
 }
@@ -77,30 +104,16 @@ export async function loadRoomScene(
  * left it. Scene-level tweaks made mid-session neither sync nor persist,
  * which is what excalidraw.com does too.
  *
- * Unreadable JSON is replaced rather than preserved: the Room opened that
- * drawing as an empty canvas (`parseStoredScene`), so its elements are the
- * only real content left, and keeping the broken envelope would only keep the
- * drawing broken.
+ * Unreadable JSON falls back to a bare envelope, but a Room should never get
+ * here with one: `parseStoredScene` reports such a drawing as unreadable and
+ * the Room refuses to write at all. This arm exists for the case where the row
+ * turned corrupt between the read and the write.
  */
 export function mergeSceneElements(
   data: string | null | undefined,
   elements: SceneElement[],
 ): string {
-  let stored: Record<string, unknown> = {}
-  if (data) {
-    try {
-      const parsed: unknown = JSON.parse(data)
-      if (
-        typeof parsed === "object" &&
-        parsed !== null &&
-        !Array.isArray(parsed)
-      )
-        stored = parsed as Record<string, unknown>
-    } catch {
-      // Falls through to the bare envelope below.
-    }
-  }
-  return JSON.stringify({ ...stored, elements })
+  return JSON.stringify({ ...(parseStoredObject(data) ?? {}), elements })
 }
 
 /**
