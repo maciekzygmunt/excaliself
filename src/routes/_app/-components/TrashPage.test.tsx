@@ -120,7 +120,6 @@ function makeTrashedDrawing(
     thumbnail: null,
     folderId: null,
     ownerId: "user-1",
-    isPublic: false,
     starred: false,
     deletedAt: daysAgo(5),
     trashRootId: overrides.id,
