@@ -62,7 +62,6 @@ function makeDrawing(overrides: Partial<Drawing> = {}): Drawing {
     thumbnail: null,
     folderId: null,
     ownerId: "user-1",
-    isPublic: false,
     starred: false,
     deletedAt: null,
     trashRootId: null,

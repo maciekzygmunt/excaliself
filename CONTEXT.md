@@ -31,3 +31,6 @@ A non-interactive visual rendering of a Drawing's scene, shown on Gallery cards 
 
 ### Room
 The live collaboration session around one shared Drawing. Exists only while at least one participant (owner or guest) is connected; holds the authoritative scene while live. There is at most one Room per Drawing.
+
+### Share link
+The one live edit link a Drawing can have (`/share/<token>`), minted and managed by the owner from the Share dialog. "Shared" is derived — a Drawing is shared iff its link exists; stopping sharing deletes it, regenerating replaces the token (old URL dies). Carries an Audience: `members` (any signed-in member of this instance, the default) or `anyone` (no account needed). A link whose token, Audience, or Drawing no longer checks out is dead — every dead link looks identical, revealing nothing about whether the Drawing exists.

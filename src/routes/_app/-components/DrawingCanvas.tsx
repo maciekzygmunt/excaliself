@@ -1,9 +1,11 @@
 import { Excalidraw, MainMenu } from "@excalidraw/excalidraw"
 import type { ExcalidrawElement } from "@excalidraw/excalidraw/element/types"
 import type { AppState, BinaryFiles } from "@excalidraw/excalidraw/types"
-import { PanelLeftIcon } from "lucide-react"
+import { useQuery } from "@tanstack/react-query"
+import { PanelLeftIcon, Share2Icon } from "lucide-react"
 import { useCallback, useEffect, useState } from "react"
 import { toast } from "sonner"
+import { Button } from "@/components/ui/button"
 import { useSidebar } from "@/components/ui/sidebar"
 import { useRenameDrawing } from "@/features/drawings/mutations"
 import {
@@ -12,9 +14,11 @@ import {
   useDrawingScene,
   useSaveScenePayload,
 } from "@/features/drawings/scene"
+import { drawingShareQueryOptions } from "@/features/shares/queries"
 import { useAutoSave } from "@/hooks/use-auto-save"
 import { useCanvasTheme } from "@/hooks/use-theme"
 import { FooterRightPortal, SaveStatusPill } from "./SaveStatusPill"
+import { ShareDialog } from "./ShareDialog"
 import { TopLeftControls, TopLeftPortal } from "./TopLeftControls"
 
 import "@excalidraw/excalidraw/index.css"
@@ -37,6 +41,15 @@ export function DrawingCanvas({ drawingId, readOnly = false }: Props) {
   const { drawing, initialData, isDataCorrupt } = useDrawingScene(drawingId)
   const saveScenePayload = useSaveScenePayload(drawingId)
   const renameMutation = useRenameDrawing()
+
+  // Share state drives the button's green "sharing is on" dot. Trashed
+  // drawings hide the share surface entirely — their link is dead while in
+  // the trash and comes back on restore (spec §4.3).
+  const [shareOpen, setShareOpen] = useState(false)
+  const { data: share } = useQuery({
+    ...drawingShareQueryOptions(drawingId),
+    enabled: !readOnly,
+  })
 
   // A corrupt stored scene opens as an empty canvas; pause autosave until the
   // user acknowledges, so the next save doesn't silently overwrite the data.
@@ -111,6 +124,19 @@ export function DrawingCanvas({ drawingId, readOnly = false }: Props) {
         theme={canvasTheme}
         viewModeEnabled={readOnly || undefined}
         onChange={readOnly ? undefined : handleSceneChange}
+        renderTopRightUI={
+          readOnly
+            ? undefined
+            : () => (
+                <Button onClick={() => setShareOpen(true)} className="gap-1.5">
+                  <Share2Icon className="h-3.5 w-3.5" />
+                  Share
+                  {share && (
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                  )}
+                </Button>
+              )
+        }
         UIOptions={{
           canvasActions: {
             loadScene: false,
@@ -159,6 +185,13 @@ export function DrawingCanvas({ drawingId, readOnly = false }: Props) {
           />
         </TopLeftPortal>
       </Excalidraw>
+      {!readOnly && (
+        <ShareDialog
+          drawingId={drawingId}
+          open={shareOpen}
+          onOpenChange={setShareOpen}
+        />
+      )}
     </div>
   )
 }

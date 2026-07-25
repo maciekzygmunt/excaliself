@@ -123,8 +123,10 @@ export function setCanvasThemePreference(preference: CanvasThemePreference) {
 }
 
 // Logged-out pages are always light regardless of the stored choice; these
-// are the only routes that render logged-out.
+// exact paths plus every /share/<token> page are the only routes that can
+// render logged-out.
 const LOGGED_OUT_PATHS = ["/login", "/setup", "/invite", "/reset-password"]
+const LOGGED_OUT_PREFIX = "/share/"
 
 /**
  * Inlined into the document head (after the theme-color meta) so the right
@@ -136,7 +138,8 @@ const LOGGED_OUT_PATHS = ["/login", "/setup", "/invite", "/reset-password"]
 export const themeBootstrapScript = [
   "try{",
   `var d=localStorage.getItem(${JSON.stringify(THEME_STORAGE_KEY)})==="dark"`,
-  `&&${JSON.stringify(LOGGED_OUT_PATHS)}.indexOf(location.pathname)<0;`,
+  `&&${JSON.stringify(LOGGED_OUT_PATHS)}.indexOf(location.pathname)<0`,
+  `&&location.pathname.indexOf(${JSON.stringify(LOGGED_OUT_PREFIX)})!==0;`,
   'document.documentElement.classList.toggle("dark",d);',
   "var m=document.querySelector('meta[name=\"theme-color\"]');",
   `if(m)m.setAttribute("content",d?${JSON.stringify(THEME_COLORS.dark)}:${JSON.stringify(THEME_COLORS.light)});`,

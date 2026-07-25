@@ -162,7 +162,6 @@ export const drawings = pgTable("drawings", {
   ownerId: text("ownerId")
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
-  isPublic: boolean("isPublic").notNull().default(false),
   starred: boolean("starred").notNull().default(false),
   // Soft delete — see folders.deletedAt/trashRootId for the model.
   deletedAt: timestamp("deletedAt"),
@@ -174,6 +173,36 @@ export const drawings = pgTable("drawings", {
     .notNull()
     .$defaultFn(() => new Date()),
 })
+
+// Share links (canvas sharing spec §3). "Shared" is derived — a drawing is
+// shared iff a row exists here; there is no flag on drawings. The unique
+// index on drawingId is what enforces "one live link per drawing".
+//
+// The migration adding this table also dropped the never-used
+// drawings.isPublic. Migrations run on boot with no down-migrations, so
+// rolling back to a pre-sharing image needs this one-line restore first:
+//   ALTER TABLE drawings ADD COLUMN "isPublic" boolean NOT NULL DEFAULT false;
+export const shares = pgTable(
+  "shares",
+  {
+    id: text("id").primaryKey(),
+    token: text("token").notNull().unique(),
+    drawingId: text("drawingId")
+      .notNull()
+      .references(() => drawings.id, { onDelete: "cascade" }),
+    audience: text("audience", { enum: ["members", "anyone"] })
+      .notNull()
+      .default("members"),
+    createdAt: timestamp("createdAt")
+      .notNull()
+      .$defaultFn(() => new Date()),
+  },
+  (table) => ({
+    oneLinkPerDrawing: uniqueIndex("shares_one_link_per_drawing").on(
+      table.drawingId,
+    ),
+  }),
+)
 
 export const drawingFiles = pgTable("drawing_files", {
   id: text("id").primaryKey(),
