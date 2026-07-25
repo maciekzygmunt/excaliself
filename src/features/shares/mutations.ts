@@ -13,11 +13,24 @@ import {
 // the share query cache — no invalidation round-trip, so the dialog flips
 // state the moment the server answers.
 
-export function useCreateShare(drawingId: string) {
+/**
+ * `beforeCreate` is the handoff of spec §5.5: the owner's last solo save has
+ * to be in the database *before* the `shares` row exists, because from that
+ * moment the server refuses classic writes and the Room loads the drawing as
+ * stored. Awaiting it inside the mutationFn means `isPending` — and so every
+ * disabled control in the dialog — covers the flush too.
+ */
+export function useCreateShare(
+  drawingId: string,
+  options: { beforeCreate?: () => Promise<void> } = {},
+) {
   const queryClient = useQueryClient()
+  const { beforeCreate } = options
   return useMutation({
-    mutationFn: (audience: ShareAudience) =>
-      createShare({ data: { drawingId, audience } }),
+    mutationFn: async (audience: ShareAudience) => {
+      await beforeCreate?.()
+      return createShare({ data: { drawingId, audience } })
+    },
     onSuccess: (share) => {
       queryClient.setQueryData(
         drawingShareQueryOptions(drawingId).queryKey,

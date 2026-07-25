@@ -51,11 +51,13 @@ export function useAutoSave<TData, TPayload>({
   const pendingSigRef = useRef<string | null>(null)
   const latestDataRef = useRef<TData | null>(null)
   const performSaveRef = useRef<(data: TData) => void>(() => {})
+  /** The save in flight, so `flush` has something to wait on. */
+  const inFlightRef = useRef<Promise<unknown> | null>(null)
 
   // All bookkeeping lives in mutation-level callbacks: unlike per-mutate
   // callbacks, they run even after unmount, so the post-settle re-check and
   // error reporting survive the unmount flush.
-  const { mutate, isPending } = useMutation({
+  const { mutateAsync, isPending } = useMutation({
     mutationFn: (vars: SaveVars<TPayload>) =>
       handlersRef.current.onSave(vars.payload),
     scope: scopeId ? { id: scopeId } : undefined,
@@ -82,14 +84,35 @@ export function useAutoSave<TData, TPayload>({
         return
       }
       pendingSigRef.current = sig
-      mutate({ payload, sig })
+      // mutateAsync rather than mutate purely so `flush` has a handle on the
+      // write; failures are still reported by the mutation's own onError, and
+      // the catch here only keeps them from surfacing as unhandled rejections.
+      inFlightRef.current = mutateAsync({ payload, sig }).catch(() => {})
     },
-    [mutate],
+    [mutateAsync],
   )
   performSaveRef.current = performSave
 
   const { run: runDebouncedSave, flush: flushDebouncedSave } =
     useDebounceCallback(performSave, DEBOUNCE_MS)
+
+  /**
+   * Commit everything outstanding and resolve once it has landed. The one
+   * caller that needs this is a handoff — sharing a drawing moves ownership
+   * of its data to the collab room, and the last solo save has to be in the
+   * database before that happens (canvas sharing spec §5.5).
+   *
+   * A save can chain another from its own onSuccess (the user kept editing
+   * while it was in flight), so this waits until nothing new appears.
+   */
+  const flush = useCallback(async () => {
+    flushDebouncedSave()
+    let awaited: Promise<unknown> | null = null
+    while (inFlightRef.current && inFlightRef.current !== awaited) {
+      awaited = inFlightRef.current
+      await awaited
+    }
+  }, [flushDebouncedSave])
 
   const handleChange = useCallback(
     (data: TData) => {
@@ -133,5 +156,6 @@ export function useAutoSave<TData, TPayload>({
     saving: isPending,
     saved,
     handleChange,
+    flush,
   }
 }

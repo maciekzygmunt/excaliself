@@ -1,6 +1,10 @@
 import { Excalidraw, MainMenu } from "@excalidraw/excalidraw"
-import type { ExcalidrawElement } from "@excalidraw/excalidraw/element/types"
-import type { AppState, BinaryFiles } from "@excalidraw/excalidraw/types"
+import type { OrderedExcalidrawElement } from "@excalidraw/excalidraw/element/types"
+import type {
+  AppState,
+  BinaryFiles,
+  ExcalidrawImperativeAPI,
+} from "@excalidraw/excalidraw/types"
 import { useQuery } from "@tanstack/react-query"
 import { PanelLeftIcon, Share2Icon } from "lucide-react"
 import { useCallback, useEffect, useState } from "react"
@@ -11,6 +15,7 @@ import {
 } from "@/components/excalidraw-portal"
 import { Button } from "@/components/ui/button"
 import { useSidebar } from "@/components/ui/sidebar"
+import { useRoom } from "@/features/collab/use-room"
 import { useRenameDrawing } from "@/features/drawings/mutations"
 import {
   buildScenePayload,
@@ -69,6 +74,8 @@ export function DrawingCanvas({ drawingId, readOnly = false }: Props) {
   const { drawing, initialData, isDataCorrupt } = useDrawingScene(drawingId)
   const saveScenePayload = useSaveScenePayload(drawingId)
   const renameMutation = useRenameDrawing()
+  const [excalidrawAPI, setExcalidrawAPI] =
+    useState<ExcalidrawImperativeAPI | null>(null)
 
   // Share state drives the button's green "sharing is on" dot. Trashed
   // drawings hide the share surface entirely — their link is dead while in
@@ -78,6 +85,38 @@ export function DrawingCanvas({ drawingId, readOnly = false }: Props) {
     ...drawingShareQueryOptions(drawingId),
     enabled: !readOnly,
   })
+
+  // The cap is 25, so this is a corner the owner should almost never see —
+  // but while it lasts they are genuinely offline: the room refused them and
+  // the server refuses classic writes for a shared drawing, so saying so is
+  // the only honest thing to do.
+  const handleRoomFull = useCallback(() => {
+    toast.error("This drawing has too many people in it right now", {
+      id: `room-full:${drawingId}`,
+      description: "Your changes won't be saved until someone leaves.",
+    })
+  }, [drawingId])
+
+  /**
+   * Shared ⇒ always collab mode (spec §1.1, §5.5). The owner's own tabs join
+   * the socket like any visitor, which is what makes "the room is the only
+   * writer" true: with a solo writer still running, two tabs of the owner's
+   * would fight the room over the same drawing.
+   *
+   * No name is sent — the server takes a member's name from their session and
+   * ignores whatever the wire claims, so there is nothing for this tab to say.
+   */
+  const room = useRoom({
+    token: readOnly ? null : (share?.token ?? null),
+    name: "",
+    excalidrawAPI,
+    onRoomFull: handleRoomFull,
+  })
+  // `undefined` is "the share query hasn't answered yet", and autosave stays
+  // live through that window: the server refuses the write if the drawing
+  // turns out to be shared, and that refusal is what flips this tab into
+  // collab mode (see `useSaveScenePayload`).
+  const isShared = share != null && !readOnly
 
   // A corrupt stored scene opens as an empty canvas; pause autosave until the
   // user acknowledges, so the next save doesn't silently overwrite the data.
@@ -106,7 +145,12 @@ export function DrawingCanvas({ drawingId, readOnly = false }: Props) {
     }
   }, [isDataCorrupt, corruptAcknowledged, drawingId, readOnly])
 
-  const { saving, saved, handleChange } = useAutoSave({
+  const {
+    saving,
+    saved,
+    handleChange,
+    flush: flushAutoSave,
+  } = useAutoSave({
     toPayload: buildScenePayload,
     getSignature: getScenePayloadSignature,
     onSave: saveScenePayload,
@@ -114,21 +158,30 @@ export function DrawingCanvas({ drawingId, readOnly = false }: Props) {
     skipInitialChange: true,
     // `readOnly` also unwires onChange below; pausing here is belt and
     // braces so no code path can flush a save for a trashed drawing.
-    paused: autoSavePaused || readOnly,
+    //
+    // While the drawing is shared, classic autosave is suspended and the room
+    // persists instead (spec §5.5). Changes keep being *recorded* though —
+    // `handleChange` still runs — so when sharing stops the hook picks up
+    // exactly where the session left off and saves the collaborative result.
+    paused: autoSavePaused || readOnly || isShared,
     onError: () => {
       toast.error("Failed to save drawing", { id: "drawing-save-error" })
     },
   })
 
+  const roomChange = room.onChange
   const handleSceneChange = useCallback(
     (
-      elements: readonly ExcalidrawElement[],
+      elements: readonly OrderedExcalidrawElement[],
       appState: AppState,
       files: BinaryFiles,
     ) => {
       handleChange({ elements, appState, files })
+      // A no-op until the socket is up and SCENE_INIT has landed, so it costs
+      // an unshared drawing one call per change and nothing else.
+      roomChange(elements)
     },
-    [handleChange],
+    [handleChange, roomChange],
   )
 
   const handleNameSubmit = (newName: string) => {
@@ -145,6 +198,7 @@ export function DrawingCanvas({ drawingId, readOnly = false }: Props) {
     <div className="@container/canvas size-full">
       <Excalidraw
         initialData={initialData}
+        excalidrawAPI={setExcalidrawAPI}
         // Controlled: the canvas renders in the app theme, and a theme baked
         // into the saved scene state is ignored on load. With the prop set,
         // Excalidraw disables its toggleTheme action, which also retires the
@@ -152,6 +206,11 @@ export function DrawingCanvas({ drawingId, readOnly = false }: Props) {
         theme={canvasTheme}
         viewModeEnabled={readOnly || undefined}
         onChange={readOnly ? undefined : handleSceneChange}
+        // The owner is a participant like anyone else: their cursor goes out
+        // and their viewport is relayed to whoever is following them. Both are
+        // inert while the socket is closed.
+        onPointerUpdate={readOnly ? undefined : room.onPointerUpdate}
+        onScrollChange={readOnly ? undefined : room.onScrollChange}
         renderTopRightUI={
           readOnly
             ? undefined
@@ -233,6 +292,7 @@ export function DrawingCanvas({ drawingId, readOnly = false }: Props) {
           drawingId={drawingId}
           open={shareOpen}
           onOpenChange={setShareOpen}
+          onBeforeCreate={flushAutoSave}
         />
       )}
     </div>

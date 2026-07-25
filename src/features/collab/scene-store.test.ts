@@ -1,5 +1,11 @@
+import type { SQL } from "drizzle-orm"
+import { PgDialect } from "drizzle-orm/pg-core"
 import { expect, test } from "vitest"
-import { parseStoredScene } from "./scene-store"
+import {
+  mergeSceneElements,
+  parseStoredScene,
+  saveRoomScene,
+} from "./scene-store"
 
 const stored = (scene: unknown) => JSON.stringify(scene)
 
@@ -46,4 +52,107 @@ test("a blank, corrupt, or elementless drawing opens as an empty scene", () => {
   expect(parseStoredScene("not json at all")).toEqual([])
   expect(parseStoredScene(stored({ elements: "nope" }))).toEqual([])
   expect(parseStoredScene(stored(null))).toEqual([])
+})
+
+// --- flushing back (spec §2.3) ------------------------------------------
+
+const element = (id: string, version: number) => ({
+  id,
+  version,
+  versionNonce: 1,
+})
+
+test("a flush replaces the elements and leaves the rest of the stored scene alone", () => {
+  const data = stored({
+    type: "excalidraw",
+    version: 2,
+    source: "https://excalidraw.com",
+    appState: { viewBackgroundColor: "#fff", gridSize: 20 },
+    elements: [element("old", 1)],
+  })
+
+  const merged = JSON.parse(mergeSceneElements(data, [element("new", 9)]))
+
+  // appState is whatever the last solo save wrote — mid-session scene tweaks
+  // neither sync nor persist (spec §2.3).
+  expect(merged.appState).toEqual({ viewBackgroundColor: "#fff", gridSize: 20 })
+  expect(merged.type).toBe("excalidraw")
+  expect(merged.source).toBe("https://excalidraw.com")
+  expect(merged.elements).toEqual([element("new", 9)])
+})
+
+test("a blank or corrupt stored scene is replaced rather than preserved", () => {
+  const elements = [element("rect", 2)]
+  for (const data of [null, "", "not json at all", stored([1, 2, 3])]) {
+    expect(JSON.parse(mergeSceneElements(data, elements))).toEqual({ elements })
+  }
+})
+
+type SaveCall =
+  | { kind: "select"; where: SQL }
+  | { kind: "update"; set: Record<string, unknown>; where: SQL }
+
+function fakeDb(row: { data: string | null } | undefined) {
+  const calls: SaveCall[] = []
+  const db = {
+    select: () => ({
+      from: () => ({
+        where: (where: SQL) => {
+          calls.push({ kind: "select", where })
+          return Promise.resolve(row ? [row] : [])
+        },
+      }),
+    }),
+    update: () => ({
+      set: (set: Record<string, unknown>) => ({
+        where: (where: SQL) => {
+          calls.push({ kind: "update", set, where })
+          return Promise.resolve()
+        },
+      }),
+    }),
+  } as unknown as Parameters<typeof saveRoomScene>[0]
+  return { db, calls }
+}
+
+test("saveRoomScene writes the merged scene and bumps updatedAt", async () => {
+  const { db, calls } = fakeDb({
+    data: stored({ appState: { gridSize: 20 }, elements: [element("old", 1)] }),
+  })
+
+  await saveRoomScene(db, "drawing-1", [element("new", 5)])
+
+  expect(calls.map((call) => call.kind)).toEqual(["select", "update"])
+  const update = calls[1] as Extract<SaveCall, { kind: "update" }>
+  expect(JSON.parse(update.set.data as string)).toEqual({
+    appState: { gridSize: 20 },
+    elements: [element("new", 5)],
+  })
+  // A collaborative edit is an edit: the drawing has to surface as Recent.
+  expect(update.set.updatedAt).toBeInstanceOf(Date)
+  expect(new PgDialect().sqlToQuery(update.where).sql).toContain(
+    `"drawings"."id" =`,
+  )
+})
+
+test("saveRoomScene writes nothing when the drawing is gone", async () => {
+  const { db, calls } = fakeDb(undefined)
+
+  await saveRoomScene(db, "drawing-1", [element("rect", 1)])
+
+  expect(calls.map((call) => call.kind)).toEqual(["select"])
+})
+
+test("saveRoomScene is not blocked by the trash — a trashed drawing keeps the work", async () => {
+  const { db, calls } = fakeDb({ data: stored({ elements: [] }) })
+
+  await saveRoomScene(db, "drawing-1", [element("rect", 1)])
+
+  // §5.1: trashing mid-session ends with a final flush so guest work up to
+  // that moment comes back with the drawing on restore.
+  const select = calls[0] as Extract<SaveCall, { kind: "select" }>
+  expect(new PgDialect().sqlToQuery(select.where).sql).not.toContain(
+    "deletedAt",
+  )
+  expect(calls.map((call) => call.kind)).toEqual(["select", "update"])
 })

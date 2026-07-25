@@ -7,6 +7,7 @@ import type {
 } from "@excalidraw/excalidraw/types"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { useCallback, useMemo } from "react"
+import { drawingShareQueryOptions } from "@/features/shares/queries"
 import { drawingQueryOptions, drawingsQueryOptions } from "./queries"
 import { saveDrawingScene } from "./server"
 
@@ -142,9 +143,20 @@ export function useSaveScenePayload(id: string) {
   const queryClient = useQueryClient()
   return useCallback(
     async (payload: ScenePayload) => {
-      await saveDrawingScene({
+      const result = await saveDrawingScene({
         data: { id, data: payload.data, files: payload.files },
       })
+      // The drawing was shared — from another tab, or from this one before
+      // its share query caught up — so the room owns its data now and the
+      // server refused this write (spec §5.5). Not an error: refetch the
+      // share, which is what flips this canvas into collab mode. Nothing is
+      // lost, because joining the room reconciles the local scene into it.
+      if (result?.status === "shared") {
+        await queryClient.invalidateQueries({
+          queryKey: drawingShareQueryOptions(id).queryKey,
+        })
+        return
+      }
       // Mirror the committed payload into the caches instead of invalidating:
       // refetching the detail query would re-download every base64 blob the
       // client just uploaded.

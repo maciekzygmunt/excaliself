@@ -12,15 +12,17 @@ function wrapper({ children }: { children: ReactNode }) {
 function Harness({
   onSave,
   onChangeRef,
+  flushRef,
   paused = false,
   skipInitialChange = false,
 }: {
   onSave: (payload: string) => Promise<unknown>
   onChangeRef: { current: ((data: string) => void) | null }
+  flushRef?: { current: (() => Promise<void>) | null }
   paused?: boolean
   skipInitialChange?: boolean
 }) {
-  const { handleChange } = useAutoSave<string, string>({
+  const { handleChange, flush } = useAutoSave<string, string>({
     toPayload: (d) => d,
     getSignature: (p) => p,
     onSave,
@@ -28,6 +30,7 @@ function Harness({
     skipInitialChange,
   })
   onChangeRef.current = handleChange
+  if (flushRef) flushRef.current = flush
   return null
 }
 
@@ -238,4 +241,72 @@ test("unpausing without edits does not save the as-loaded state", async () => {
   })
   expect(onSave).not.toHaveBeenCalled()
   vi.useRealTimers()
+})
+
+// --- the share-time handoff (canvas sharing spec §5.5) -------------------
+
+test("flush commits a debounced edit without waiting out the delay", async () => {
+  const onSave = vi.fn(() => Promise.resolve())
+  const onChangeRef = { current: null as ((data: string) => void) | null }
+  const flushRef = { current: null as (() => Promise<void>) | null }
+
+  render(
+    <Harness onSave={onSave} onChangeRef={onChangeRef} flushRef={flushRef} />,
+    { wrapper },
+  )
+
+  act(() => onChangeRef.current?.("drawn-just-before-sharing"))
+  await act(async () => {
+    await flushRef.current?.()
+  })
+
+  expect(onSave).toHaveBeenCalledTimes(1)
+  expect(onSave).toHaveBeenCalledWith("drawn-just-before-sharing")
+})
+
+test("flush resolves only once the write has landed", async () => {
+  const resolvers: Array<() => void> = []
+  const onSave = vi.fn(
+    () => new Promise<void>((resolve) => resolvers.push(resolve)),
+  )
+  const onChangeRef = { current: null as ((data: string) => void) | null }
+  const flushRef = { current: null as (() => Promise<void>) | null }
+
+  render(
+    <Harness onSave={onSave} onChangeRef={onChangeRef} flushRef={flushRef} />,
+    { wrapper },
+  )
+
+  act(() => onChangeRef.current?.("edit"))
+  let settled = false
+  await act(async () => {
+    void flushRef.current?.().then(() => {
+      settled = true
+    })
+  })
+  // The share row must not be created while this is still in the air.
+  expect(onSave).toHaveBeenCalledTimes(1)
+  expect(settled).toBe(false)
+
+  await act(async () => {
+    resolvers[0]?.()
+  })
+  expect(settled).toBe(true)
+})
+
+test("flush with nothing outstanding resolves immediately", async () => {
+  const onSave = vi.fn(() => Promise.resolve())
+  const onChangeRef = { current: null as ((data: string) => void) | null }
+  const flushRef = { current: null as (() => Promise<void>) | null }
+
+  render(
+    <Harness onSave={onSave} onChangeRef={onChangeRef} flushRef={flushRef} />,
+    { wrapper },
+  )
+
+  await act(async () => {
+    await flushRef.current?.()
+  })
+
+  expect(onSave).not.toHaveBeenCalled()
 })

@@ -1,6 +1,7 @@
-// What a Room loads when it spins up (canvas sharing spec §2.5). Kept out of
-// the websocket route — which imports the live db — so the parsing half is
-// drivable by tests with a fake db, mirroring shares/store.ts.
+// What a Room loads when it spins up, and what it writes back (canvas sharing
+// spec §2.3, §2.5). Kept out of the websocket route — which imports the live
+// db — so the parsing half is drivable by tests with a fake db, mirroring
+// shares/store.ts.
 
 import { eq } from "drizzle-orm"
 import type { NodePgDatabase } from "drizzle-orm/node-postgres"
@@ -67,4 +68,66 @@ export async function loadRoomScene(
     elements: parseStoredScene(drawing?.data),
     ownerId: drawing?.ownerId ?? null,
   }
+}
+
+/**
+ * A flush is elements-only (spec §2.3): everything else the stored JSON
+ * carries — `appState` above all, but also the `type`/`version`/`source`
+ * envelope `serializeAsJSON` writes — is kept exactly as the last solo save
+ * left it. Scene-level tweaks made mid-session neither sync nor persist,
+ * which is what excalidraw.com does too.
+ *
+ * Unreadable JSON is replaced rather than preserved: the Room opened that
+ * drawing as an empty canvas (`parseStoredScene`), so its elements are the
+ * only real content left, and keeping the broken envelope would only keep the
+ * drawing broken.
+ */
+export function mergeSceneElements(
+  data: string | null | undefined,
+  elements: SceneElement[],
+): string {
+  let stored: Record<string, unknown> = {}
+  if (data) {
+    try {
+      const parsed: unknown = JSON.parse(data)
+      if (
+        typeof parsed === "object" &&
+        parsed !== null &&
+        !Array.isArray(parsed)
+      )
+        stored = parsed as Record<string, unknown>
+    } catch {
+      // Falls through to the bare envelope below.
+    }
+  }
+  return JSON.stringify({ ...stored, elements })
+}
+
+/**
+ * Write a Room's authoritative scene back to its drawing (spec §2.3). Bumps
+ * `updatedAt` because a collaborative edit is an edit — the drawing has to
+ * surface as Recent for its owner like any other.
+ *
+ * Deliberately not guarded on `deletedAt`: trashing mid-session ends with a
+ * final flush precisely so guest work up to that moment survives and comes
+ * back with the drawing on restore (spec §5.1). A hard delete leaves no row,
+ * and the update simply matches nothing.
+ */
+export async function saveRoomScene(
+  db: Db,
+  drawingId: string,
+  elements: SceneElement[],
+): Promise<void> {
+  const [drawing] = await db
+    .select({ data: drawings.data })
+    .from(drawings)
+    .where(eq(drawings.id, drawingId))
+  if (!drawing) return
+  await db
+    .update(drawings)
+    .set({
+      data: mergeSceneElements(drawing.data, elements),
+      updatedAt: new Date(),
+    })
+    .where(eq(drawings.id, drawingId))
 }

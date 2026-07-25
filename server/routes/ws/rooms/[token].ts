@@ -18,11 +18,13 @@ import type {
 } from "@/features/collab/room-session"
 import {
   createRoomRegistry,
+  flushAllRooms,
   joinRoom,
   leaveRoom,
   receiveFromPeer,
 } from "@/features/collab/room-session"
-import { loadRoomScene } from "@/features/collab/scene-store"
+import { loadRoomScene, saveRoomScene } from "@/features/collab/scene-store"
+import { registerShutdownFlush } from "@/features/collab/shutdown"
 import { resolveShareForRoom } from "@/features/shares/store"
 import { allowTokenValidation } from "@/features/shares/token-rate-limit"
 import { auth } from "@/lib/auth"
@@ -30,9 +32,22 @@ import { auth } from "@/lib/auth"
 /**
  * Live rooms for this process. In-memory by design (spec §2.3) — the app
  * stays single-replica until a pub/sub backplane is added. Each Room reads
- * the drawing's stored scene once, on the first join.
+ * the drawing's stored scene once, on the first join, and writes it back on
+ * the ~15 s dirty throttle, on last-leave, and on SIGTERM.
+ *
+ * A plain module-level const, unlike the token limiter next door: only this
+ * bundle ever touches the registry, so the built server's split between the
+ * websocket route and the server-function chunk cannot duplicate it.
  */
-const rooms = createRoomRegistry((roomId) => loadRoomScene(db, roomId))
+const rooms = createRoomRegistry(
+  (roomId) => loadRoomScene(db, roomId),
+  (roomId, elements) => saveRoomScene(db, roomId, elements),
+)
+
+// Registered here rather than in a nitro plugin because rooms only exist once
+// this module has loaded — if it never loaded, there is nothing to flush. The
+// process's own exit stays srvx's business (see shutdown.ts).
+registerShutdownFlush(() => flushAllRooms(rooms))
 
 type PeerContext = { roomId: string; identity: ParticipantIdentity }
 
@@ -140,9 +155,11 @@ export default defineWebSocketHandler({
     )
   },
 
-  close(peer) {
+  // Async because the last participant out waits for the Room's final write
+  // before the Room is torn down (spec §2.3).
+  async close(peer) {
     const context = contextOf(peer)
     if (!context) return
-    leaveRoom(rooms, context.roomId, toRoomPeer(peer))
+    await leaveRoom(rooms, context.roomId, toRoomPeer(peer))
   },
 })
