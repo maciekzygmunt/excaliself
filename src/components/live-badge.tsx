@@ -22,9 +22,11 @@ import { cn } from "@/lib/utils"
  * are dropped — four of them read aloud is noise, and the count is the fact.
  */
 function liveLabel(live: LiveDrawing): string {
-  if (live.count === 1 && live.participants[0])
-    return `${live.participants[0].name} is in this drawing`
-  return `${live.count} people are in this drawing`
+  const [first] = live.participants
+  if (live.count > 1) return `${live.count} people are in this drawing`
+  return first
+    ? `${first.name} is in this drawing`
+    : "1 person is in this drawing"
 }
 
 /** The gallery card's corner stack: overlapping faces, then a "+N" tail. */
@@ -51,11 +53,12 @@ export function LiveAvatarStack({
       )}
     >
       {live.participants.map((participant, i) => (
+        // No `title`: the stack takes no pointer events, so a native tooltip
+        // could never open. The names live in the label above instead.
         <span
           // Two guests can land on the same pseudonym and the payload carries
           // no connection ids, so position is the only stable key here.
           key={i}
-          title={participant.name}
           className="flex h-5 w-5 items-center justify-center rounded-full text-[9px] font-semibold text-white ring-2 ring-card"
           style={{ backgroundColor: participant.color.background }}
         >

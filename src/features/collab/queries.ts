@@ -20,8 +20,12 @@ export const liveDrawingsQueryOptions = () =>
     queryKey: ["drawings", "live"] as const,
     queryFn: () => getLiveDrawings(),
     refetchInterval: LIVE_POLL_INTERVAL_MS,
-    // Nothing else invalidates live-ness, and a stale-on-mount refetch on
-    // every navigation would poll far harder than the interval asks for.
+    // Without this, every navigation would refetch on mount and poll far
+    // harder than the interval asks for. It does not stop the `["drawings"]`
+    // invalidations behind rename/star/move/trash from prefix-matching this
+    // key — that's an extra Map scan on an action the user just took, which
+    // is cheap enough to leave alone rather than break the shared key the
+    // spec asks for.
     staleTime: LIVE_POLL_INTERVAL_MS,
   })
 

@@ -173,7 +173,12 @@ function DrawingCard({
         aria-label={drawing.name}
         className="absolute inset-0 rounded-card"
       />
-      <div className="relative aspect-[4/3] overflow-hidden border-b border-hairline">
+      {/* `relative` anchors the avatar stack to the preview's corner — and
+          makes this div positioned, so it now paints above the stretched
+          link that is its DOM-earlier sibling. `pointer-events-none` is what
+          keeps clicks on the preview (the card's largest target) reaching
+          that link instead of dying here; nothing inside is interactive. */}
+      <div className="pointer-events-none relative aspect-[4/3] overflow-hidden border-b border-hairline">
         <Preview name={drawing.name} data={drawing.data} />
         <LiveAvatarStack
           live={live}
