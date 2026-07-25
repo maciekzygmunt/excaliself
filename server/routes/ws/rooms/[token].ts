@@ -22,15 +22,17 @@ import {
   leaveRoom,
   receiveFromPeer,
 } from "@/features/collab/room-session"
+import { loadRoomScene } from "@/features/collab/scene-store"
 import { resolveShareForRoom } from "@/features/shares/store"
 import { allowTokenValidation } from "@/features/shares/token-rate-limit"
 import { auth } from "@/lib/auth"
 
 /**
  * Live rooms for this process. In-memory by design (spec §2.3) — the app
- * stays single-replica until a pub/sub backplane is added.
+ * stays single-replica until a pub/sub backplane is added. Each Room reads
+ * the drawing's stored scene once, on the first join.
  */
-const rooms = createRoomRegistry()
+const rooms = createRoomRegistry((roomId) => loadRoomScene(db, roomId))
 
 type PeerContext = { roomId: string; identity: ParticipantIdentity }
 
@@ -108,10 +110,14 @@ export default defineWebSocketHandler({
     }
   },
 
-  open(peer) {
+  // Both hooks are async because a Room may still be reading its scene. Frame
+  // order survives that either way: everything queues behind the same load
+  // promise, and continuations on a settled promise run in the order they
+  // were registered.
+  async open(peer) {
     const context = contextOf(peer)
     if (!context) return peer.close(1011, "Room unavailable")
-    const join = joinRoom(
+    const join = await joinRoom(
       rooms,
       context.roomId,
       toRoomPeer(peer),
@@ -123,10 +129,15 @@ export default defineWebSocketHandler({
     if (join.status === "full") peer.close(ROOM_FULL_CLOSE_CODE, "Room full")
   },
 
-  message(peer, message) {
+  async message(peer, message) {
     const context = contextOf(peer)
     if (!context) return
-    receiveFromPeer(rooms, context.roomId, toRoomPeer(peer), message.text())
+    await receiveFromPeer(
+      rooms,
+      context.roomId,
+      toRoomPeer(peer),
+      message.text(),
+    )
   },
 
   close(peer) {
