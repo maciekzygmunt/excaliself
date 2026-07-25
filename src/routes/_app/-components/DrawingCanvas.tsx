@@ -23,6 +23,26 @@ import { TopLeftControls, TopLeftPortal } from "./TopLeftControls"
 
 import "@excalidraw/excalidraw/index.css"
 
+/** The green "sharing is on" dot shown beside the Share label. */
+const SharingDot = () => (
+  <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />
+)
+
+// The Share entry point adapts to the canvas area's width (the @container/
+// canvas wrapper below), not the viewport — the app sidebar can eat 240px,
+// and Excalidraw's own mobile flip keys off its container too. Both
+// surfaces share the 48rem seam, so exactly one of them is ever visible:
+//   ≥64rem  labeled island button
+//   48–64rem  icon-only island button (the centered toolbar needs the room)
+//   <48rem  no island button; Share lives in the burger menu instead
+const SHARE_BUTTON_CLASS =
+  "gap-1.5 @max-3xl/canvas:hidden @max-5xl/canvas:px-2.5"
+const SHARE_LABEL_CLASS = "@max-5xl/canvas:hidden"
+// The ! is load-order armor: Excalidraw's lazy-loaded stylesheet declares
+// .dropdown-menu-item { display: flex } after our sheet, which would win
+// the tie against a plain `hidden`.
+const SHARE_MENU_ITEM_CLASS = "@3xl/canvas:hidden!"
+
 type Props = {
   drawingId: string
   /**
@@ -114,7 +134,7 @@ export function DrawingCanvas({ drawingId, readOnly = false }: Props) {
   if (!drawing || !initialData) return null
 
   return (
-    <div className="size-full">
+    <div className="@container/canvas size-full">
       <Excalidraw
         initialData={initialData}
         // Controlled: the canvas renders in the app theme, and a theme baked
@@ -128,12 +148,15 @@ export function DrawingCanvas({ drawingId, readOnly = false }: Props) {
           readOnly
             ? undefined
             : () => (
-                <Button onClick={() => setShareOpen(true)} className="gap-1.5">
+                <Button
+                  onClick={() => setShareOpen(true)}
+                  aria-label="Share"
+                  title="Share"
+                  className={SHARE_BUTTON_CLASS}
+                >
                   <Share2Icon className="h-3.5 w-3.5" />
-                  Share
-                  {share && (
-                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                  )}
+                  <span className={SHARE_LABEL_CLASS}>Share</span>
+                  {share && <SharingDot />}
                 </Button>
               )
         }
@@ -152,6 +175,18 @@ export function DrawingCanvas({ drawingId, readOnly = false }: Props) {
           >
             Drawings
           </MainMenu.Item>
+          {!readOnly && (
+            <MainMenu.Item
+              className={SHARE_MENU_ITEM_CLASS}
+              icon={<Share2Icon className="h-4 w-4" />}
+              onSelect={() => setShareOpen(true)}
+            >
+              <span className="inline-flex items-center gap-1.5">
+                Share
+                {share != null && <SharingDot />}
+              </span>
+            </MainMenu.Item>
+          )}
           <MainMenu.Separator />
           <MainMenu.DefaultItems.LoadScene />
           <MainMenu.DefaultItems.SaveToActiveFile />
