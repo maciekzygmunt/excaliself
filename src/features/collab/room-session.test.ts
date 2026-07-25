@@ -245,9 +245,7 @@ test("rooms are isolated — a peer only ever sees its own drawing's roster", ()
   expect(rooms.get("drawing-2")?.participants.size).toBe(1)
 })
 
-// The participant cap of spec §4.5. 25 is far above any real trusted-circle
-// session; what it stops is a script opening sockets until the process is
-// out of memory.
+/** Seats the cap's worth of sockets, so the next join is the one refused. */
 const fillRoom = (rooms: ReturnType<typeof createRoomRegistry>) => {
   for (let i = 0; i < MAX_ROOM_PARTICIPANTS; i++) {
     joinRoom(rooms, ROOM, fakePeer(`peer-${i}`), guest)

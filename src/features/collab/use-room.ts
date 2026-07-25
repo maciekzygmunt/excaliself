@@ -37,7 +37,7 @@ export function useRoom(options: {
   name: string
   excalidrawAPI: ExcalidrawImperativeAPI | null
   /** The room turned this tab away at its participant cap (spec §4.5). */
-  onRoomFull?: () => void
+  onRoomFull: () => void
 }) {
   const { token, name, excalidrawAPI, onRoomFull } = options
 
@@ -129,7 +129,7 @@ export function useRoom(options: {
       setRoster([])
       // The one close the page reacts to: the room was full, so the visitor
       // never got in and belongs on the "drawing full" state instead.
-      if (event.code === ROOM_FULL_CLOSE_CODE) onRoomFullRef.current?.()
+      if (event.code === ROOM_FULL_CLOSE_CODE) onRoomFullRef.current()
     }
     socket.addEventListener("close", handleClosed)
     // An error is always followed by a close event; letting it through

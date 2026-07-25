@@ -7,7 +7,7 @@ import { useDocumentTitle } from "@/lib/document-title"
 import { DeadLink } from "./-components/DeadLink"
 import { DrawingFull } from "./-components/DrawingFull"
 import { SignInGate } from "./-components/SignInGate"
-import { TooManyRequests } from "./-components/TooManyRequests"
+import { TooManyAttempts } from "./-components/TooManyAttempts"
 
 const SharedCanvas = lazy(() => import("./-components/SharedCanvas"))
 
@@ -58,7 +58,7 @@ function SharePage() {
   // Answered before anything about the token, because the limiter refuses
   // ahead of the lookup — this visit knows nothing about the drawing.
   if (resolution.status === "throttled")
-    return <TooManyRequests onRetry={() => router.invalidate()} />
+    return <TooManyAttempts onRetry={() => router.invalidate()} />
 
   // Dead is checked first among the resolutions and answers unconditionally:
   // no flag and no session can turn a dead token into any other page.

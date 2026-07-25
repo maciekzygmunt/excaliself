@@ -1,4 +1,5 @@
-import { expect, test } from "vitest"
+import { expect, test, vi } from "vitest"
+import type { RateLimiter } from "@/lib/rate-limit"
 import {
   allowTokenValidation,
   TOKEN_VALIDATIONS_PER_MINUTE,
@@ -47,4 +48,25 @@ test("the budget refills the next minute", () => {
   }
 
   expect(allowTokenValidation(visitor, 60_000)).toBe(true)
+})
+
+// The websocket route and the server functions are separate bundles in the
+// built server, so a second evaluation of this module must adopt the limiter
+// the first one pinned — otherwise each surface quietly gets its own 60/min.
+test("a second evaluation of the module adopts the limiter already in the process", async () => {
+  const key = Symbol.for("excaliself.share-token-rate-limit")
+  const host = globalThis as typeof globalThis & { [key]?: RateLimiter }
+  const pinned = host[key]
+  const stub: RateLimiter = { allow: vi.fn(() => true), trackedKeys: () => 0 }
+  host[key] = stub
+
+  try {
+    vi.resetModules()
+    const reloaded = await import("./token-rate-limit")
+    reloaded.allowTokenValidation(from("203.0.113.20"), 0)
+    expect(stub.allow).toHaveBeenCalledWith("203.0.113.20", 0)
+  } finally {
+    host[key] = pinned
+    vi.resetModules()
+  }
 })

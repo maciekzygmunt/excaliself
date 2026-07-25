@@ -15,12 +15,11 @@
 /** Every request whose address can't be read shares this one bucket. */
 const UNKNOWN_KEY = "unknown"
 
+/** Blank is as good as absent — a header a proxy set to "" names nobody. */
+const address = (value: string | null | undefined) => value?.trim() || null
+
 function lastForwardedHop(value: string | null): string | null {
-  if (!value) return null
-  const hops = value
-    .split(",")
-    .map((hop) => hop.trim())
-    .filter(Boolean)
+  const hops = (value ?? "").split(",").map(address).filter(Boolean)
   return hops.at(-1) ?? null
 }
 
@@ -32,8 +31,8 @@ export function clientIpKey(input: {
   const { headers, socketIp } = input
   return (
     lastForwardedHop(headers.get("x-forwarded-for")) ??
-    headers.get("x-real-ip")?.trim() ??
-    socketIp?.trim() ??
+    address(headers.get("x-real-ip")) ??
+    address(socketIp) ??
     UNKNOWN_KEY
   )
 }

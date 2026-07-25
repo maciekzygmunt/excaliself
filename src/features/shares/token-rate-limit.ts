@@ -10,14 +10,26 @@
  */
 
 import { clientIpKey } from "@/lib/client-ip"
-import { createRateLimiter } from "@/lib/rate-limit"
+import { createRateLimiter, type RateLimiter } from "@/lib/rate-limit"
 
 export const TOKEN_VALIDATIONS_PER_MINUTE = 60
 
-const limiter = createRateLimiter({
+/**
+ * The build splits the app across bundles — the nitro websocket route and the
+ * server functions are separate rollup outputs — so a plain module-level
+ * `const` is instantiated once per bundle and the two surfaces would each get
+ * a budget of their own (verified in `.output/server`, not a theory). They do
+ * share a process, so the registered symbol is what makes the budget one.
+ */
+const LIMITER = Symbol.for("excaliself.share-token-rate-limit")
+type Host = typeof globalThis & { [LIMITER]?: RateLimiter }
+
+const host = globalThis as Host
+host[LIMITER] ??= createRateLimiter({
   limit: TOKEN_VALIDATIONS_PER_MINUTE,
   windowMs: 60_000,
 })
+const limiter: RateLimiter = host[LIMITER]
 
 /**
  * Counts one validation for the caller's IP and says whether to serve it.

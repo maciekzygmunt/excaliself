@@ -50,3 +50,18 @@ test("ignores an empty or whitespace-only forwarded header", () => {
 test("falls back to one shared bucket when no address can be read", () => {
   expect(clientIpKey({ headers: headers({}), socketIp: null })).toBe("unknown")
 })
+
+// A proxy that sets the header but leaves it empty would otherwise put every
+// visitor in one bucket named "" — the shape of a self-inflicted lockout.
+test("a blank x-real-ip is treated as absent, not as everyone's address", () => {
+  expect(
+    clientIpKey({
+      headers: headers({ "x-real-ip": "  " }),
+      socketIp: "203.0.113.7",
+    }),
+  ).toBe("203.0.113.7")
+})
+
+test("a blank socket address falls through to the shared bucket", () => {
+  expect(clientIpKey({ headers: headers({}), socketIp: "" })).toBe("unknown")
+})
