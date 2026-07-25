@@ -16,7 +16,7 @@ import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { toCollaborators } from "./collaborators"
 import type { ClientMessage, Participant, PointerUpdate } from "./protocol"
-import { parseServerMessage } from "./protocol"
+import { parseServerMessage, ROOM_FULL_CLOSE_CODE } from "./protocol"
 import { roomSocketUrl } from "./room-url"
 import { CURSOR_INTERVAL_MS, createDroppableThrottle } from "./throttle"
 
@@ -36,8 +36,10 @@ export function useRoom(options: {
   /** This tab's display name. Only honored by the server for guests. */
   name: string
   excalidrawAPI: ExcalidrawImperativeAPI | null
+  /** The room turned this tab away at its participant cap (spec §4.5). */
+  onRoomFull?: () => void
 }) {
-  const { token, name, excalidrawAPI } = options
+  const { token, name, excalidrawAPI, onRoomFull } = options
 
   const [participants, setParticipants] = useState<Participant[]>([])
   const [selfConnectionId, setSelfConnectionId] = useState<string | null>(null)
@@ -53,6 +55,8 @@ export function useRoom(options: {
   apiRef.current = excalidrawAPI
   const nameRef = useRef(name)
   nameRef.current = name
+  const onRoomFullRef = useRef(onRoomFull)
+  onRoomFullRef.current = onRoomFull
 
   const pushCollaborators = useCallback(() => {
     apiRef.current?.updateScene({
@@ -118,11 +122,14 @@ export function useRoom(options: {
       pushCollaborators()
     })
 
-    const handleClosed = () => {
+    const handleClosed = (event: CloseEvent) => {
       selfConnectionIdRef.current = null
       setSelfConnectionId(null)
       pointersRef.current.clear()
       setRoster([])
+      // The one close the page reacts to: the room was full, so the visitor
+      // never got in and belongs on the "drawing full" state instead.
+      if (event.code === ROOM_FULL_CLOSE_CODE) onRoomFullRef.current?.()
     }
     socket.addEventListener("close", handleClosed)
     // An error is always followed by a close event; letting it through

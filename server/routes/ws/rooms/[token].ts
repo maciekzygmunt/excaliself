@@ -11,6 +11,7 @@
 import { defineWebSocketHandler } from "nitro"
 import { db } from "@/db"
 import { resolveRoomJoin } from "@/features/collab/join"
+import { ROOM_FULL_CLOSE_CODE } from "@/features/collab/protocol"
 import type {
   ParticipantIdentity,
   RoomPeer,
@@ -22,6 +23,7 @@ import {
   receiveFromPeer,
 } from "@/features/collab/room-session"
 import { resolveShareForRoom } from "@/features/shares/store"
+import { allowTokenValidation } from "@/features/shares/token-rate-limit"
 import { auth } from "@/lib/auth"
 
 /**
@@ -70,6 +72,17 @@ function contextOf(peer: { context: Record<string, unknown> }) {
 
 export default defineWebSocketHandler({
   async upgrade(request) {
+    // Same per-IP budget as the share page's loader, spent before the token
+    // is looked up so a reconnect storm costs the database nothing (§4.5).
+    // The socket address is srvx's, when the runtime exposes one.
+    if (
+      !allowTokenValidation({
+        headers: request.headers,
+        socketIp: (request as { ip?: string }).ip ?? null,
+      })
+    )
+      throw new Response("Too Many Requests", { status: 429 })
+
     // The path is `/ws/rooms/<token>`; nitro's route params aren't exposed to
     // the upgrade hook, so read the token off the URL directly.
     const token = decodeURIComponent(
@@ -98,7 +111,16 @@ export default defineWebSocketHandler({
   open(peer) {
     const context = contextOf(peer)
     if (!context) return peer.close(1011, "Room unavailable")
-    joinRoom(rooms, context.roomId, toRoomPeer(peer), context.identity)
+    const join = joinRoom(
+      rooms,
+      context.roomId,
+      toRoomPeer(peer),
+      context.identity,
+    )
+    // The cap is enforced here rather than at the upgrade because a refused
+    // handshake reaches the browser as an opaque 1006; a close code the page
+    // can read is what turns this into the "drawing full" state.
+    if (join.status === "full") peer.close(ROOM_FULL_CLOSE_CODE, "Room full")
   },
 
   message(peer, message) {

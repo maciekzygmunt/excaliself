@@ -16,6 +16,8 @@
 import { randomBytes, randomUUID } from "node:crypto"
 import { config as loadEnv } from "dotenv"
 import { Client } from "pg"
+import { ROOM_FULL_CLOSE_CODE } from "../src/features/collab/protocol"
+import { MAX_ROOM_PARTICIPANTS } from "../src/features/collab/room-session"
 
 loadEnv()
 
@@ -79,6 +81,20 @@ class Peer {
 
   close() {
     this.socket.close()
+  }
+
+  /** The code the server closed with, for the closes that mean something. */
+  closedWith(timeoutMs = 5000): Promise<number> {
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(
+        () => reject(new Error("timed out waiting for close")),
+        timeoutMs,
+      )
+      this.socket.addEventListener("close", (event) => {
+        clearTimeout(timer)
+        resolve(event.code)
+      })
+    })
   }
 
   /** Waits for the next frame of `type` that satisfies `matches`. */
@@ -175,6 +191,38 @@ const checks: {
       if (aJoined.payload.connectionId === bId)
         throw new Error("two sockets shared one connection id")
       a.close()
+    },
+  },
+  {
+    // Spec §4.5. The upgrade still succeeds — the cap is enforced on the
+    // open, because only a close code reaches the page as something it can
+    // turn into the "this drawing is full" state.
+    name: "the socket past the participant cap is closed, and its slot reopens",
+    run: async (token, url) => {
+      const seated = await Promise.all(
+        Array.from({ length: MAX_ROOM_PARTICIPANTS }, () =>
+          Peer.connect(socketUrl(url, token)),
+        ),
+      )
+      try {
+        await Promise.all(seated.map((peer) => peer.expect("ROOM_JOINED")))
+
+        const refused = await Peer.connect(socketUrl(url, token))
+        const code = await refused.closedWith()
+        if (code !== ROOM_FULL_CLOSE_CODE)
+          throw new Error(
+            `expected close code ${ROOM_FULL_CLOSE_CODE}, got ${code}`,
+          )
+        if (refused.frames.length > 0)
+          throw new Error("a refused socket was told about the room")
+
+        seated.pop()?.close()
+        const admitted = await Peer.connect(socketUrl(url, token))
+        await admitted.expect("ROOM_JOINED")
+        admitted.close()
+      } finally {
+        for (const peer of seated) peer.close()
+      }
     },
   },
 ]

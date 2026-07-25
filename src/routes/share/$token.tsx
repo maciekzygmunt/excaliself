@@ -7,6 +7,7 @@ import { useDocumentTitle } from "@/lib/document-title"
 import { DeadLink } from "./-components/DeadLink"
 import { DrawingFull } from "./-components/DrawingFull"
 import { SignInGate } from "./-components/SignInGate"
+import { TooManyRequests } from "./-components/TooManyRequests"
 
 const SharedCanvas = lazy(() => import("./-components/SharedCanvas"))
 
@@ -23,11 +24,11 @@ const LoadingState = () => (
 
 export const Route = createFileRoute("/share/$token")({
   ssr: false,
-  // ?full renders the room-full state on an otherwise live link. The real
-  // trigger is the participant cap refusing the socket join, which the
-  // rate-limits slice wires up; this flag keeps the page reachable (and
-  // reviewable) until then. Presence is the whole flag, so a hand-typed
-  // ?full=1 and the ?full=true the router itself writes both count.
+  // ?full renders the room-full state on an otherwise live link. The page
+  // writes it itself when the participant cap refuses the socket join
+  // (spec §4.5) — a search param rather than component state so a refused
+  // visitor can retry by simply dropping it. Presence is the whole flag, so
+  // a hand-typed ?full=1 and the ?full=true the router writes both count.
   validateSearch: (search: Record<string, unknown>): { full?: boolean } =>
     "full" in search ? { full: true } : {},
   // Validation happens at request time, on every visit: the router's default
@@ -54,8 +55,13 @@ function SharePage() {
     resolution.status === "ok" ? resolution.drawing.name : undefined,
   )
 
-  // Dead is checked first and answers unconditionally: no flag and no
-  // session can turn a dead token into any other page.
+  // Answered before anything about the token, because the limiter refuses
+  // ahead of the lookup — this visit knows nothing about the drawing.
+  if (resolution.status === "throttled")
+    return <TooManyRequests onRetry={() => router.invalidate()} />
+
+  // Dead is checked first among the resolutions and answers unconditionally:
+  // no flag and no session can turn a dead token into any other page.
   if (resolution.status === "dead") return <DeadLink />
 
   if (resolution.status === "signin") {
@@ -69,9 +75,8 @@ function SharePage() {
     )
   }
 
-  // Retrying drops the flag as well as revalidating — otherwise the flag
-  // that put the visitor here would put them straight back. Once the cap is
-  // real, the same button re-attempts the join.
+  // Retrying just drops the flag: that remounts the canvas, which re-dials
+  // the room — and keeping the flag would put the visitor straight back here.
   if (full)
     return (
       <DrawingFull onRetry={() => navigate({ search: {}, replace: true })} />
@@ -83,6 +88,7 @@ function SharePage() {
         drawing={resolution.drawing}
         files={resolution.files}
         token={token}
+        onRoomFull={() => navigate({ search: { full: true }, replace: true })}
       />
     </Suspense>
   )
