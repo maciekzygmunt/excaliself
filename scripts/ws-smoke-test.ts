@@ -48,11 +48,22 @@ type Frame = { type: string; payload: Record<string, unknown> }
 class Peer {
   readonly frames: Frame[] = []
   private socket: WebSocket
+  /**
+   * Subscribed at construction, not when someone asks: the server can close a
+   * socket the instant it opens (the participant cap does exactly that), and a
+   * listener added after `connect()` resolves would miss it.
+   */
+  private readonly closeCode: Promise<number>
 
   private constructor(socket: WebSocket) {
     this.socket = socket
     socket.addEventListener("message", (event) => {
       this.frames.push(JSON.parse(String(event.data)))
+    })
+    this.closeCode = new Promise((resolve) => {
+      socket.addEventListener("close", (event) => {
+        resolve(event.code)
+      })
     })
   }
 
@@ -85,16 +96,15 @@ class Peer {
 
   /** The code the server closed with, for the closes that mean something. */
   closedWith(timeoutMs = 5000): Promise<number> {
-    return new Promise((resolve, reject) => {
-      const timer = setTimeout(
-        () => reject(new Error("timed out waiting for close")),
-        timeoutMs,
-      )
-      this.socket.addEventListener("close", (event) => {
-        clearTimeout(timer)
-        resolve(event.code)
-      })
-    })
+    return Promise.race([
+      this.closeCode,
+      new Promise<number>((_, reject) =>
+        setTimeout(
+          () => reject(new Error("timed out waiting for close")),
+          timeoutMs,
+        ),
+      ),
+    ])
   }
 
   /** Waits for the next frame of `type` that satisfies `matches`. */
@@ -120,6 +130,24 @@ class Peer {
 
 const participantsOf = (frame: Frame) =>
   (frame.payload.participants ?? []) as { connectionId: string; name: string }[]
+
+/**
+ * Waits for a peer's *latest* roster to settle at `size`. `expect` scans from
+ * the first frame, which can't tell "the room grew to 24 on the way up" from
+ * "the room came back down to 24" — and the difference is what says the
+ * server has finished processing a departure.
+ */
+async function roomSettlesAt(peer: Peer, size: number, timeoutMs = 5000) {
+  const deadline = Date.now() + timeoutMs
+  while (Date.now() < deadline) {
+    const latest = [...peer.frames]
+      .reverse()
+      .find((f) => f.type === "PARTICIPANTS" || f.type === "ROOM_JOINED")
+    if (latest && participantsOf(latest).length === size) return
+    await new Promise((r) => setTimeout(r, 25))
+  }
+  throw new Error(`the room never settled at ${size} participants`)
+}
 
 // --- the checks --------------------------------------------------------
 
@@ -216,7 +244,12 @@ const checks: {
         if (refused.frames.length > 0)
           throw new Error("a refused socket was told about the room")
 
+        // The departure and the replacement's handshake travel on different
+        // connections, so wait until a peer that stayed can see the slot is
+        // free — otherwise the replacement can race the leave and be refused.
         seated.pop()?.close()
+        await roomSettlesAt(seated[0], MAX_ROOM_PARTICIPANTS - 1)
+
         const admitted = await Peer.connect(socketUrl(url, token))
         await admitted.expect("ROOM_JOINED")
         admitted.close()
