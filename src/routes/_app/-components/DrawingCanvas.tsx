@@ -5,6 +5,10 @@ import { useQuery } from "@tanstack/react-query"
 import { PanelLeftIcon, Share2Icon } from "lucide-react"
 import { useCallback, useEffect, useState } from "react"
 import { toast } from "sonner"
+import {
+  FooterRightPortal,
+  TopLeftPortal,
+} from "@/components/excalidraw-portal"
 import { Button } from "@/components/ui/button"
 import { useSidebar } from "@/components/ui/sidebar"
 import { useRenameDrawing } from "@/features/drawings/mutations"
@@ -17,9 +21,9 @@ import {
 import { drawingShareQueryOptions } from "@/features/shares/queries"
 import { useAutoSave } from "@/hooks/use-auto-save"
 import { useCanvasTheme } from "@/hooks/use-theme"
-import { FooterRightPortal, SaveStatusPill } from "./SaveStatusPill"
+import { SaveStatusPill } from "./SaveStatusPill"
 import { ShareDialog } from "./ShareDialog"
-import { TopLeftControls, TopLeftPortal } from "./TopLeftControls"
+import { TopLeftControls } from "./TopLeftControls"
 
 import "@excalidraw/excalidraw/index.css"
 

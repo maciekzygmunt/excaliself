@@ -46,12 +46,33 @@ export function getOrCreateGuestName(
   if (stored) return stored
 
   const name = guestNameFromSeed(randomSeed())
+  writeGuestName(storage, name)
+  return name
+}
+
+/**
+ * Keep a name the guest typed into the pill, so the next visit — or the next
+ * reconnect, which mints a fresh connection id — comes back as the same
+ * person. Returns the sanitized name that was stored, or null when nothing
+ * usable is left of it (in which case the previous name stands).
+ */
+export function rememberGuestName(
+  name: string,
+  host: StorageHost | null | undefined = globalThis,
+): string | null {
+  const sanitized = sanitizeName(name)
+  if (!sanitized) return null
+
+  writeGuestName(resolveStorage(host), sanitized)
+  return sanitized
+}
+
+function writeGuestName(storage: Storage | null, name: string) {
   try {
     storage?.setItem(GUEST_NAME_STORAGE_KEY, name)
   } catch {
     // Unwritable storage: the name lives for this page load only.
   }
-  return name
 }
 
 function readGuestName(storage: Storage | null): string | null {
