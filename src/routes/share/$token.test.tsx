@@ -10,6 +10,7 @@ import { afterEach, beforeEach, expect, test, vi } from "vitest"
 import type { ShareResolution } from "@/features/shares/store"
 
 const invalidate = vi.fn()
+const navigate = vi.fn()
 let loaderData: ShareResolution
 let search: { full?: boolean } = {}
 
@@ -20,6 +21,7 @@ vi.mock("@tanstack/react-router", () => ({
     useSearch: () => search,
   }),
   useRouter: () => ({ invalidate }),
+  useNavigate: () => navigate,
   Link: ({ to, children, ...rest }: { to: string; children?: ReactNode }) => (
     <a href={to} {...rest}>
       {children}
@@ -130,6 +132,23 @@ test("signing in on the gate revalidates in place instead of navigating away", a
   await waitFor(() => expect(invalidate).toHaveBeenCalled())
 })
 
+test("the gate stays pending until the revalidation it kicked off finishes", async () => {
+  signInEmail.mockResolvedValueOnce({ error: null })
+  invalidate.mockReturnValueOnce(new Promise(() => {}))
+  await renderShare(SIGNIN)
+  fireEvent.change(screen.getByLabelText(/email/i), {
+    target: { value: "member@example.com" },
+  })
+  fireEvent.change(screen.getByLabelText(/password/i), {
+    target: { value: "hunter22" },
+  })
+  fireEvent.click(screen.getByRole("button", { name: "Sign in" }))
+  // Going idle here would offer a resubmit over a page about to be replaced.
+  expect(
+    await screen.findByRole("button", { name: "Signing in..." }),
+  ).toBeDefined()
+})
+
 test("bad credentials on the gate leave the visitor on the gate", async () => {
   signInEmail.mockResolvedValueOnce({ error: { message: "Invalid password" } })
   await renderShare(SIGNIN)
@@ -167,4 +186,29 @@ test("the ?full flag can't turn a dead token into any other page", async () => {
   expect(
     screen.getByRole("heading", { name: "This link is no longer active" }),
   ).toBeDefined()
+})
+
+test("retrying drops the flag that put the visitor on the full page", async () => {
+  search = { full: true }
+  await renderShare(OK)
+  fireEvent.click(screen.getByRole("button", { name: "Try again" }))
+  // Revalidating alone would land right back here — the flag has to go.
+  expect(navigate).toHaveBeenCalledWith({ search: {}, replace: true })
+})
+
+test("every spelling of the flag the URL can carry turns the state on", async () => {
+  const { Route } = await import("./$token")
+  const validateSearch = (
+    Route as unknown as {
+      options: {
+        validateSearch: (s: Record<string, unknown>) => { full?: boolean }
+      }
+    }
+  ).options.validateSearch
+  // ?full=1 is what a reviewer types; ?full=true is what the router writes
+  // back out for { full: true }; ?full is the bare flag.
+  expect(validateSearch({ full: "1" })).toEqual({ full: true })
+  expect(validateSearch({ full: "true" })).toEqual({ full: true })
+  expect(validateSearch({ full: "" })).toEqual({ full: true })
+  expect(validateSearch({})).toEqual({})
 })

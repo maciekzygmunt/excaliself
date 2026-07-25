@@ -1,24 +1,21 @@
 import { useForm } from "@tanstack/react-form"
 import type { ReactNode } from "react"
 import { toast } from "sonner"
-import { z } from "zod"
 import { FormTextField } from "@/components/form-text-field"
 import { Button } from "@/components/ui/button"
 import { FieldGroup } from "@/components/ui/field"
+import { signInFormSchema } from "@/features/auth/schema"
 import { authClient } from "@/lib/auth-client"
-
-const formSchema = z.object({
-  email: z.email(),
-  password: z.string(),
-})
 
 type Props = {
   /**
    * Runs once the credentials are accepted and the session cookie is set.
    * Where that lands the member is the page's call: /login navigates, the
-   * share sign-in gate revalidates in place.
+   * share sign-in gate revalidates in place. Awaited, so a handler that
+   * takes a moment (revalidation) keeps the button in its pending state
+   * instead of going idle over a page that is about to be replaced.
    */
-  onSignedIn: () => void
+  onSignedIn: () => void | Promise<void>
   /** Microcopy under the submit button — each page explains its own context. */
   children?: ReactNode
 }
@@ -31,14 +28,14 @@ type Props = {
 export function SignInForm({ onSignedIn, children }: Props) {
   const form = useForm({
     defaultValues: { email: "", password: "" },
-    validators: { onSubmit: formSchema },
+    validators: { onSubmit: signInFormSchema },
     onSubmit: async ({ value }) => {
       const result = await authClient.signIn.email(value)
       if (result.error) {
         toast.error(result.error.message)
         return
       }
-      onSignedIn()
+      await onSignedIn()
     },
   })
 
