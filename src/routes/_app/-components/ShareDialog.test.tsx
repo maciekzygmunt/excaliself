@@ -7,6 +7,7 @@ import {
   waitFor,
 } from "@testing-library/react"
 import type { ReactNode } from "react"
+import { toast } from "sonner"
 import { afterEach, beforeEach, expect, test, vi } from "vitest"
 import {
   createShare,
@@ -35,7 +36,12 @@ const SHARE = {
 }
 
 function renderDialog(share: typeof SHARE | null) {
-  const queryClient = new QueryClient()
+  // staleTime pins the seeded cache: with the default 0 the mounted query
+  // refetches in the background against the unconfigured getDrawingShare
+  // mock and flips the dialog to the unshared state mid-test.
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { staleTime: Number.POSITIVE_INFINITY } },
+  })
   queryClient.setQueryData(["shares", "d1"], share)
   const wrapper = ({ children }: { children: ReactNode }) => (
     <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
@@ -99,6 +105,43 @@ test("copy button gives feedback after copying the link", async () => {
     `${window.location.origin}/share/${TOKEN}`,
   )
   await waitFor(() => expect(screen.getByText("Copied")).toBeDefined())
+})
+
+test('a failed copy never claims success — error toast instead of "Copied"', async () => {
+  // Insecure origins (self-hosted over plain HTTP) reject or lack the
+  // clipboard API; jsdom also has no execCommand, so both paths fail here.
+  const writeText = vi.fn().mockRejectedValue(new Error("denied"))
+  Object.defineProperty(navigator, "clipboard", {
+    value: { writeText },
+    configurable: true,
+  })
+  renderDialog(SHARE)
+
+  fireEvent.click(screen.getByRole("button", { name: /copy/i }))
+
+  await waitFor(() => expect(toast.error).toHaveBeenCalled())
+  expect(screen.queryByText("Copied")).toBeNull()
+})
+
+test("every share control is disabled while any share mutation is in flight", async () => {
+  // A stop that never resolves keeps the dialog busy.
+  vi.mocked(stopSharing).mockReturnValue(new Promise(() => {}))
+  renderDialog(SHARE)
+
+  fireEvent.click(screen.getByRole("button", { name: /stop sharing/i }))
+
+  await waitFor(() =>
+    expect(screen.getByRole("button", { name: /stopping/i })).toHaveProperty(
+      "disabled",
+      true,
+    ),
+  )
+  expect(
+    screen.getByRole("button", { name: /regenerate link/i }),
+  ).toHaveProperty("disabled", true)
+  expect(
+    screen.getByRole("radio", { name: /anyone with the link/i }),
+  ).toHaveProperty("disabled", true)
 })
 
 test("stop sharing empties the cached share so the dialog flips to the unshared state", async () => {

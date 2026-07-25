@@ -7,6 +7,7 @@
 import { useQuery } from "@tanstack/react-query"
 import { Check, Copy, Link2, RefreshCw } from "lucide-react"
 import { useEffect, useState } from "react"
+import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -35,6 +36,27 @@ const AUDIENCE_COPY: Record<ShareAudience, { label: string; hint: string }> = {
   },
 }
 
+/**
+ * execCommand fallback for the async clipboard API, which is unavailable on
+ * insecure origins — a real deployment mode for a self-hosted app served
+ * over plain HTTP on a LAN.
+ */
+function legacyCopy(text: string): boolean {
+  const textarea = document.createElement("textarea")
+  textarea.value = text
+  textarea.style.position = "fixed"
+  textarea.style.opacity = "0"
+  document.body.appendChild(textarea)
+  textarea.select()
+  try {
+    return document.execCommand("copy")
+  } catch {
+    return false
+  } finally {
+    textarea.remove()
+  }
+}
+
 function useCopy(url: string) {
   const [copied, setCopied] = useState(false)
   useEffect(() => {
@@ -44,9 +66,19 @@ function useCopy(url: string) {
   }, [copied])
   return {
     copied,
-    copy: () => {
-      navigator.clipboard?.writeText(url)
-      setCopied(true)
+    // "Copied" only after a copy actually landed — a false confirmation
+    // here means the owner walks away having shared nothing.
+    copy: async () => {
+      let ok = false
+      if (navigator.clipboard) {
+        ok = await navigator.clipboard.writeText(url).then(
+          () => true,
+          () => false,
+        )
+      }
+      if (!ok) ok = legacyCopy(url)
+      if (ok) setCopied(true)
+      else toast.error("Couldn't copy the link — select and copy it manually")
     },
   }
 }
@@ -79,9 +111,11 @@ function LinkRow({ url }: { url: string }) {
 function AudienceCards({
   value,
   onChange,
+  disabled = false,
 }: {
   value: ShareAudience
   onChange: (audience: ShareAudience) => void
+  disabled?: boolean
 }) {
   return (
     <div className="space-y-2">
@@ -93,12 +127,14 @@ function AudienceCards({
             value === audience
               ? "border-iris bg-iris-muted/50"
               : "border-border/60 hover:border-border",
+            disabled && "cursor-default opacity-70",
           )}
         >
           <input
             type="radio"
             name="share-audience"
             checked={value === audience}
+            disabled={disabled}
             onChange={() => onChange(audience)}
             className="sr-only"
           />
@@ -140,6 +176,15 @@ export function ShareDialog({ drawingId, open, onOpenChange }: Props) {
   const regenerateMutation = useRegenerateShare(drawingId)
   const audienceMutation = useSetShareAudience(drawingId)
 
+  // One flag gates every control: the mutations write the same cache entry,
+  // and letting them race (Stop while Regenerate is in flight) can leave the
+  // dialog showing a link or audience the database no longer has.
+  const busy =
+    createMutation.isPending ||
+    stopMutation.isPending ||
+    regenerateMutation.isPending ||
+    audienceMutation.isPending
+
   // The audience is pickable before the link exists; this local choice seeds
   // the create call. Reset each time the dialog opens so a stale pick from a
   // previous visit doesn't leak into a fresh one.
@@ -174,6 +219,7 @@ export function ShareDialog({ drawingId, open, onOpenChange }: Props) {
           {shared && url && <LinkRow key={share.token} url={url} />}
           <AudienceCards
             value={shared ? share.audience : draftAudience}
+            disabled={shared && busy}
             onChange={(audience) =>
               shared
                 ? audienceMutation.mutate(audience)
@@ -183,7 +229,7 @@ export function ShareDialog({ drawingId, open, onOpenChange }: Props) {
           {!shared && (
             <Button
               onClick={() => createMutation.mutate(draftAudience)}
-              disabled={createMutation.isPending}
+              disabled={busy}
               className="w-full gap-1.5"
             >
               <Link2 className="h-4 w-4" />
@@ -197,7 +243,7 @@ export function ShareDialog({ drawingId, open, onOpenChange }: Props) {
               variant="ghost"
               size="sm"
               onClick={() => stopMutation.mutate()}
-              disabled={stopMutation.isPending}
+              disabled={busy}
               className="text-destructive hover:text-destructive"
             >
               {stopMutation.isPending ? "Stopping…" : "Stop sharing"}
@@ -206,7 +252,7 @@ export function ShareDialog({ drawingId, open, onOpenChange }: Props) {
               variant="outline"
               size="sm"
               onClick={() => regenerateMutation.mutate()}
-              disabled={regenerateMutation.isPending}
+              disabled={busy}
               className="gap-1.5"
             >
               <RefreshCw className="h-3.5 w-3.5" />
