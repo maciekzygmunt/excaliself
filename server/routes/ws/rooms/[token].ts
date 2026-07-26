@@ -129,9 +129,11 @@ export default defineWebSocketHandler({
     )
   },
 
-  close(peer) {
+  // Async because the last participant out waits for the Room's final write
+  // before the Room is torn down (spec §2.3).
+  async close(peer) {
     const context = contextOf(peer)
     if (!context) return
-    leaveRoom(rooms, context.roomId, toRoomPeer(peer))
+    await leaveRoom(rooms, context.roomId, toRoomPeer(peer))
   },
 })

@@ -182,6 +182,42 @@ const findElement = (frame: Frame, id: string) =>
 
 // --- the checks --------------------------------------------------------
 
+/**
+ * Thrown by a check that cannot run in this environment (no DATABASE_URL for
+ * the persistence check, say). Reported, but not counted as a failure.
+ */
+class Skipped extends Error {}
+
+/**
+ * Reads a shared drawing straight out of Postgres — the only way to see what
+ * a Room actually flushed, since nothing on the wire reports it.
+ */
+async function storedScene(
+  token: string,
+): Promise<{ elements: WireElement[]; appState: unknown }> {
+  const connectionString = process.env.DATABASE_URL
+  if (!connectionString)
+    throw new Skipped("needs DATABASE_URL to read the stored drawing")
+  const client = new Client({ connectionString })
+  await client.connect()
+  try {
+    const { rows } = await client.query<{ data: string | null }>(
+      `select d.data from drawings d
+         join shares s on s."drawingId" = d.id
+        where s.token = $1`,
+      [token],
+    )
+    if (rows.length === 0) throw new Error("the token resolved to no drawing")
+    const parsed = JSON.parse(rows[0].data || "{}") as {
+      elements?: WireElement[]
+      appState?: unknown
+    }
+    return { elements: parsed.elements ?? [], appState: parsed.appState }
+  } finally {
+    await client.end()
+  }
+}
+
 const checks: {
   name: string
   run: (token: string, url: string) => Promise<void>
@@ -418,6 +454,45 @@ const checks: {
       b.close()
     },
   },
+  {
+    // Spec §2.3: the last socket out writes the scene before the Room is torn
+    // down — the "guest edits survive the owner closing their tab" case, and
+    // the one thing no in-process test can prove.
+    name: "the last peer out flushes the scene to the database, elements only",
+    run: async (token, url) => {
+      const before = await storedScene(token)
+
+      const a = await Peer.connect(socketUrl(url, token))
+      await a.expect("SCENE_INIT")
+      const b = await Peer.connect(socketUrl(url, token))
+      await b.expect("SCENE_INIT")
+
+      const drawn = scribble(1)
+      a.send({ type: "SCENE_UPDATE", payload: { elements: [drawn] } })
+      // The room has ruled on it once the other peer hears about it.
+      await b.expect("SCENE_UPDATE", (f) => Boolean(findElement(f, drawn.id)))
+
+      a.close()
+      b.close()
+
+      // The write starts when the room empties, so poll rather than guess.
+      const deadline = Date.now() + 5000
+      let after = await storedScene(token)
+      while (
+        Date.now() < deadline &&
+        !after.elements.some((el) => el.id === drawn.id)
+      ) {
+        await new Promise((r) => setTimeout(r, 100))
+        after = await storedScene(token)
+      }
+      if (!after.elements.some((el) => el.id === drawn.id))
+        throw new Error("the edit never reached the database")
+
+      // Elements-only: appState is whatever the last solo save wrote.
+      if (JSON.stringify(after.appState) !== JSON.stringify(before.appState))
+        throw new Error("the flush overwrote appState")
+    },
+  },
 ]
 
 // --- token provisioning ------------------------------------------------
@@ -475,6 +550,10 @@ async function main() {
         await check.run(token, args.url)
         console.log(`  ✓ ${check.name}`)
       } catch (error) {
+        if (error instanceof Skipped) {
+          console.log(`  – ${check.name} (${error.message})`)
+          continue
+        }
         failed++
         console.error(`  ✗ ${check.name}\n      ${(error as Error).message}`)
       }

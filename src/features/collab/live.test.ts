@@ -22,10 +22,12 @@ const fakePeer = (id: string): RoomPeer => ({
 const ownedByOwner: SceneLoader = async () => ({
   elements: [],
   ownerId: OWNER,
+  readable: true,
 })
 
+/** Presence, not persistence — these rooms never write. */
 const registryOf = (load: SceneLoader = ownedByOwner) =>
-  createRoomRegistry(load)
+  createRoomRegistry(load, async () => {})
 
 const member = (userId: string, displayName: string) => ({
   userId,
@@ -67,6 +69,7 @@ test("drawings someone else owns are not the caller's business", async () => {
   const registry = registryOf(async () => ({
     elements: [],
     ownerId: "someone-else",
+    readable: true,
   }))
   await joinRoom(registry, "d1", fakePeer("p1"), guest("Quiet Otter"))
 

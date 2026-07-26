@@ -167,11 +167,24 @@ type Props = {
   drawingId: string
   open: boolean
   onOpenChange: (open: boolean) => void
+  /**
+   * Commit the canvas's pending autosave and resolve once it has landed.
+   * Awaited before the link is minted (spec §5.5) — after that the server
+   * refuses classic writes, so anything still debounced would be lost.
+   */
+  onBeforeCreate?: () => Promise<void>
 }
 
-export function ShareDialog({ drawingId, open, onOpenChange }: Props) {
+export function ShareDialog({
+  drawingId,
+  open,
+  onOpenChange,
+  onBeforeCreate,
+}: Props) {
   const { data: share } = useQuery(drawingShareQueryOptions(drawingId))
-  const createMutation = useCreateShare(drawingId)
+  const createMutation = useCreateShare(drawingId, {
+    beforeCreate: onBeforeCreate,
+  })
   const stopMutation = useStopSharing(drawingId)
   const regenerateMutation = useRegenerateShare(drawingId)
   const audienceMutation = useSetShareAudience(drawingId)

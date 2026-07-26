@@ -26,6 +26,9 @@ instance:
    and is what a third peer joining afterwards is initialized from.
 7. An edit that loses reconciliation is refused, and the room hands its sender
    the version that won.
+8. The last socket out flushes the room's scene to `drawings.data` (spec §2.3),
+   and the flush is elements-only — `appState` comes through untouched. This
+   one reads Postgres directly, so it is skipped when `DATABASE_URL` is unset.
 
 ## Running it
 

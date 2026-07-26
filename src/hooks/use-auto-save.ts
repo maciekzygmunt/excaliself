@@ -5,12 +5,22 @@ import { useDebounceCallback } from "./use-debounce-callback"
 const DEBOUNCE_MS = 300
 const SAVED_INDICATOR_MS = 2000
 
+/**
+ * What `onSave` may report back. `{ committed: false }` means the server
+ * accepted the call but stored nothing (a drawing that has moved to the collab
+ * socket, canvas sharing spec §5.5) — the hook then neither claims "Saved" nor
+ * treats that payload as the state on disk, so whatever makes writes possible
+ * again saves it for real. Anything else, `undefined` included, is a save.
+ */
+// biome-ignore lint/suspicious/noConfusingVoidType: most savers return nothing, and `void` is the only type an async function with no return statement satisfies
+export type SaveOutcome = { committed?: boolean } | void
+
 type Options<TData, TPayload> = {
   /** Build the exact payload that gets persisted. Runs once per save attempt. */
   toPayload: (data: TData) => TPayload
   /** Fingerprint of a payload, used to skip redundant saves. */
   getSignature: (payload: TPayload) => string
-  onSave: (payload: TPayload) => Promise<unknown>
+  onSave: (payload: TPayload) => Promise<SaveOutcome>
   /**
    * Saves sharing this scope id run one at a time (react-query mutation
    * scope), so a slow older save can never land after a newer one.
@@ -51,17 +61,24 @@ export function useAutoSave<TData, TPayload>({
   const pendingSigRef = useRef<string | null>(null)
   const latestDataRef = useRef<TData | null>(null)
   const performSaveRef = useRef<(data: TData) => void>(() => {})
+  /** The save in flight, so `flush` has something to wait on. */
+  const inFlightRef = useRef<Promise<unknown> | null>(null)
 
   // All bookkeeping lives in mutation-level callbacks: unlike per-mutate
   // callbacks, they run even after unmount, so the post-settle re-check and
   // error reporting survive the unmount flush.
-  const { mutate, isPending } = useMutation({
+  const { mutateAsync, isPending } = useMutation({
     mutationFn: (vars: SaveVars<TPayload>) =>
       handlersRef.current.onSave(vars.payload),
     scope: scopeId ? { id: scopeId } : undefined,
-    onSuccess: (_data, { sig }) => {
-      lastSavedSigRef.current = sig
-      setSaved(true)
+    onSuccess: (result, { sig }) => {
+      // A call that stored nothing is not a save: claiming "Saved" would be a
+      // lie, and recording its signature would let the dedup skip the state
+      // later, once writing is possible again.
+      if (result?.committed !== false) {
+        lastSavedSigRef.current = sig
+        setSaved(true)
+      }
       // The user may have kept editing — or undone back to the previously
       // saved state — while this save was in flight. If the latest state no
       // longer matches what was committed, save it now.
@@ -82,14 +99,43 @@ export function useAutoSave<TData, TPayload>({
         return
       }
       pendingSigRef.current = sig
-      mutate({ payload, sig })
+      // mutateAsync rather than mutate so `flush` has a handle on the write —
+      // and, crucially, on its failure. The rejection is kept intact for
+      // `flush`; the separate catch below is only for the background saves
+      // nobody awaits, which report through the mutation's own onError and
+      // would otherwise surface as unhandled rejections.
+      const settled = mutateAsync({ payload, sig })
+      settled.catch(() => {})
+      inFlightRef.current = settled
     },
-    [mutate],
+    [mutateAsync],
   )
   performSaveRef.current = performSave
 
   const { run: runDebouncedSave, flush: flushDebouncedSave } =
     useDebounceCallback(performSave, DEBOUNCE_MS)
+
+  /**
+   * Commit everything outstanding and resolve once it has landed. The one
+   * caller that needs this is a handoff — sharing a drawing moves ownership
+   * of its data to the collab room, and the last solo save has to be in the
+   * database before that happens (canvas sharing spec §5.5).
+   *
+   * **Rejects if the write failed.** That is the whole point: a handoff that
+   * proceeds on a failed flush hands the Room a drawing it will load from
+   * stale data, and the caller has to be able to stop.
+   *
+   * A save can chain another from its own onSuccess (the user kept editing
+   * while it was in flight), so this waits until nothing new appears.
+   */
+  const flush = useCallback(async () => {
+    flushDebouncedSave()
+    let awaited: Promise<unknown> | null = null
+    while (inFlightRef.current && inFlightRef.current !== awaited) {
+      awaited = inFlightRef.current
+      await awaited
+    }
+  }, [flushDebouncedSave])
 
   const handleChange = useCallback(
     (data: TData) => {
@@ -133,5 +179,6 @@ export function useAutoSave<TData, TPayload>({
     saving: isPending,
     saved,
     handleChange,
+    flush,
   }
 }
