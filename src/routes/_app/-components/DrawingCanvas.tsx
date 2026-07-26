@@ -5,7 +5,7 @@ import type {
   BinaryFiles,
   ExcalidrawImperativeAPI,
 } from "@excalidraw/excalidraw/types"
-import { useQuery } from "@tanstack/react-query"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { PanelLeftIcon, Share2Icon } from "lucide-react"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
@@ -96,10 +96,10 @@ export function DrawingCanvas({ drawingId, readOnly = false }: Props) {
   // but while it lasts they are genuinely offline: the room refused them, and
   // the server refuses classic writes for a shared drawing.
   //
-  // The message says *reload* rather than "wait for a slot" because nothing
-  // here retries the socket — a refused join stays refused until the page is
-  // loaded again (auto-reconnect is #126). Telling someone their work will
-  // come back on its own, when it won't, is how the work gets lost.
+  // Only ever a *first* join refused by the cap; a rejoin the cap turns away
+  // is retried instead, because that tab is holding a scene (spec §5.3). So
+  // the message still says reload: nothing is coming back on its own here,
+  // and saying otherwise is how the work gets lost.
   const handleRoomFull = useCallback(() => {
     toast.error("This drawing has too many people in it right now", {
       id: `room-full:${drawingId}`,
@@ -108,6 +108,21 @@ export function DrawingCanvas({ drawingId, readOnly = false }: Props) {
         "Your changes aren't being saved. Reload the page to try joining again.",
     })
   }, [drawingId])
+
+  /**
+   * The link died under this tab — the owner stopped or regenerated it in
+   * another tab, or the drawing was trashed. Re-reading the share row is the
+   * whole answer: with no row, `token` goes null, the socket effect tears
+   * down, and classic autosave picks up from this tab's in-memory scene,
+   * which is the stop-sharing reverse of spec §5.5. A regenerated link comes
+   * back with a new token and the socket redials on it.
+   */
+  const queryClient = useQueryClient()
+  const handleLinkDead = useCallback(() => {
+    void queryClient.invalidateQueries({
+      queryKey: drawingShareQueryOptions(drawingId).queryKey,
+    })
+  }, [queryClient, drawingId])
 
   /**
    * Shared ⇒ always collab mode (spec §1.1, §5.5). The owner's own tabs join
@@ -121,6 +136,7 @@ export function DrawingCanvas({ drawingId, readOnly = false }: Props) {
     name: null,
     excalidrawAPI,
     onRoomFull: handleRoomFull,
+    onLinkDead: handleLinkDead,
     // The drawing's images as this tab loaded them: already in the database,
     // so the room is owed nothing for them (spec §2.4).
     storedFileIds,

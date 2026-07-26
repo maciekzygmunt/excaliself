@@ -12,6 +12,7 @@
  * decisions live and none of them need React to be exercised.
  */
 
+import { exceedsFrameCap, MAX_FRAME_BYTES, utf8ByteLength } from "./frame-cap"
 import type { SceneElement } from "./protocol"
 import { getSceneVersion } from "./reconcile"
 
@@ -32,6 +33,60 @@ function isSyncableElement(element: SceneElement, now: number): boolean {
   return typeof element.updated === "number"
     ? element.updated > now - DELETED_ELEMENT_TIMEOUT_MS
     : true
+}
+
+/** Room enough for `{"type":"SCENE_UPDATE","payload":{"elements":[]}}`, and then some. */
+const FRAME_ENVELOPE_BYTES = 128
+
+/**
+ * Cut a selection into frames the server will accept (spec §5.4). The cap is
+ * enforced there by closing the socket with 1009, and a client that healed by
+ * reconnecting and re-sending the same oversized frame would close it again —
+ * a loop the drawing never escapes. So the one side that can avoid tripping
+ * it does: a big enough scene goes out as several frames instead of one.
+ *
+ * Whole-scene syncs are what get near the cap at all; ordinary deltas are a
+ * handful of elements and take the fast path without measuring anything.
+ */
+export function splitSceneFrames(
+  elements: readonly SceneElement[],
+  maxBytes: number = MAX_FRAME_BYTES,
+): SceneElement[][] {
+  if (elements.length === 0) return []
+  const budget = maxBytes - FRAME_ENVELOPE_BYTES
+
+  // The whole selection in one frame, which is every ordinary delta — and
+  // decided by the same cheap bounds the server's cap uses, so neither end
+  // can drift into a different idea of how big "too big" is.
+  const serialized = JSON.stringify(elements)
+  if (!exceedsFrameCap(serialized, budget)) return [[...elements]]
+
+  const frames: SceneElement[][] = []
+  let frame: SceneElement[] = []
+  let frameBytes = 0
+  for (const element of elements) {
+    const bytes = utf8ByteLength(JSON.stringify(element)) + 1 // the comma
+    // A single element over the cap cannot be split, and sending it would
+    // close the socket on arrival — which the reconnect would then repeat
+    // forever. Dropping it costs that element's sync; keeping it would cost
+    // the session. Loud, because nothing downstream will ever notice: peers
+    // simply never see the shape, and its owner sees no error.
+    if (bytes > budget) {
+      console.warn(
+        `[collab] element ${element.id} is ${bytes} bytes — too large for one frame, not synced`,
+      )
+      continue
+    }
+    if (frame.length > 0 && frameBytes + bytes > budget) {
+      frames.push(frame)
+      frame = []
+      frameBytes = 0
+    }
+    frame.push(element)
+    frameBytes += bytes
+  }
+  if (frame.length > 0) frames.push(frame)
+  return frames
 }
 
 export function createSceneBroadcaster(now: () => number = () => Date.now()) {

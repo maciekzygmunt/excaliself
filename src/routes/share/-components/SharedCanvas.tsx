@@ -17,6 +17,7 @@ import {
   TopLeftPortal,
 } from "@/components/excalidraw-portal"
 import { FollowModeOverlay } from "@/components/follow-mode-overlay"
+import { ReconnectingIndicator } from "@/components/reconnecting-indicator"
 import {
   getOrCreateGuestName,
   rememberGuestName,
@@ -30,6 +31,7 @@ import { GuestAttribution } from "./GuestAttribution"
 import { GuestNamePill } from "./GuestNamePill"
 import { GuestTitle } from "./GuestTitle"
 import { MenuParticipants } from "./MenuParticipants"
+import { MenuReconnecting } from "./MenuReconnecting"
 import { PresenceAvatars } from "./PresenceAvatars"
 
 import "@excalidraw/excalidraw/index.css"
@@ -63,9 +65,17 @@ type Props = {
   token: string
   /** The room refused this visitor at its participant cap (spec §4.5). */
   onRoomFull: () => void
+  /** The link stopped checking out while this tab held it (spec §5.3). */
+  onLinkDead: () => void
 }
 
-export function SharedCanvas({ drawing, files, token, onRoomFull }: Props) {
+export function SharedCanvas({
+  drawing,
+  files,
+  token,
+  onRoomFull,
+  onLinkDead,
+}: Props) {
   const initialData = useMemo(
     () => buildInitialSceneData({ data: drawing.data, files }).initialData,
     [drawing.data, files],
@@ -85,13 +95,21 @@ export function SharedCanvas({ drawing, files, token, onRoomFull }: Props) {
   const {
     self,
     others,
+    connectionStatus,
     onChange,
     onPointerUpdate,
     followedParticipant,
     onScrollChange,
     toggleFollow,
     stopFollowing,
-  } = useRoom({ token, name, excalidrawAPI, onRoomFull, storedFileIds })
+  } = useRoom({
+    token,
+    name,
+    excalidrawAPI,
+    onRoomFull,
+    onLinkDead,
+    storedFileIds,
+  })
 
   // Renaming re-announces the name to the room (useRoom rejoins on the
   // change) and keeps it for the next visit, where a fresh connection id
@@ -130,6 +148,9 @@ export function SharedCanvas({ drawing, files, token, onRoomFull }: Props) {
         renderTopRightUI={(isMobile) =>
           isMobile ? null : (
             <>
+              {/* Where the avatars were: a disconnected tab has no roster to
+                  show, so the two never compete for the row. */}
+              <ReconnectingIndicator status={connectionStatus} />
               <PresenceAvatars
                 participants={others}
                 followedConnectionId={followedParticipant?.connectionId ?? null}
@@ -157,6 +178,7 @@ export function SharedCanvas({ drawing, files, token, onRoomFull }: Props) {
             below are that default, restated — minus the entries `UIOptions`
             already turns off for this surface. */}
         <MainMenu>
+          <MenuReconnecting status={connectionStatus} />
           <MenuParticipants
             participants={others}
             followedConnectionId={followedParticipant?.connectionId ?? null}

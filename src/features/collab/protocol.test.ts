@@ -296,3 +296,14 @@ test("an element missing what the merge rule reads rejects the whole delta", () 
     ),
   ).toBeNull()
 })
+
+test("the heartbeat round-trips as the smallest frame the protocol has", () => {
+  expect(parseClientMessage('{"type":"PING","payload":{}}')).toEqual({
+    type: "PING",
+    payload: {},
+  })
+  expect(parseServerMessage('{"type":"PONG","payload":{}}')).toEqual({
+    type: "PONG",
+    payload: {},
+  })
+})

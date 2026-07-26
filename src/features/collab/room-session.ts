@@ -78,6 +78,12 @@ export type Room = {
   userIds: Map<string, string | null>
   /** Follower connection id → the connection id it is trailing (spec §1.3). */
   follows: Map<string, string>
+  /**
+   * When each connection was last heard from. A socket that dies without a
+   * FIN — a lid closing, a phone changing networks — leaves a peer the
+   * server still believes in, and nothing but silence says otherwise.
+   */
+  lastSeenAt: Map<string, number>
   /** Resolves when the stored scene has been read (or failed to read). */
   loaded: Promise<void>
   /**
@@ -111,13 +117,16 @@ export type RoomRegistry = {
   rooms: Map<string, Room>
   loadScene: SceneLoader
   saveScene: SceneSaver
+  /** Injected so the ghost sweep of spec §5.3 is drivable from a test. */
+  now: () => number
 }
 
 export function createRoomRegistry(
   loadScene: SceneLoader,
   saveScene: SceneSaver,
+  now: () => number = () => Date.now(),
 ): RoomRegistry {
-  return { rooms: new Map(), loadScene, saveScene }
+  return { rooms: new Map(), loadScene, saveScene, now }
 }
 
 /**
@@ -135,6 +144,7 @@ function ensureRoom(registry: RoomRegistry, roomId: string): Room {
     peers: new Map(),
     userIds: new Map(),
     follows: new Map(),
+    lastSeenAt: new Map(),
     loaded: Promise.resolve(),
     persistable: false,
     elements: [],
@@ -284,6 +294,45 @@ function broadcastRoster(peer: RoomPeer, room: Room) {
  */
 export const MAX_ROOM_PARTICIPANTS = 25
 
+/**
+ * How long a connection may go silent before the Room stops believing in it.
+ * Clients heartbeat every 25 s (spec §5.3), so this is three-and-a-half
+ * missed beats — a live tab would have to be unreachable for a minute and a
+ * half to be mistaken for a ghost, and a ghost is only ever *forgotten*, so
+ * the cost of being wrong is a roster the next frame puts back.
+ */
+export const PARTICIPANT_IDLE_TIMEOUT_MS = 90_000
+
+/**
+ * Forget connections that have gone silent. A half-open socket holds a seat
+ * against the cap, and there are only 25 — so a room a flaky network has
+ * filled with ghosts would refuse the very reconnect of spec §5.3, and the
+ * returning tab would land on "this drawing is full" holding an unmerged
+ * scene. That is the "no lost work" promise broken by bookkeeping.
+ *
+ * Swept on join rather than on a timer: joining is the only moment a ghost
+ * costs anything, and a timer would be one more thing to own and shut down.
+ *
+ * The Room itself is never torn down here even if this empties it — the join
+ * that triggered the sweep is about to take a seat in it, and dropping it
+ * would throw away an authoritative scene that may still owe the database a
+ * write.
+ */
+function forgetSilentParticipants(room: Room, now: number) {
+  for (const [connectionId, lastSeenAt] of room.lastSeenAt) {
+    if (now - lastSeenAt < PARTICIPANT_IDLE_TIMEOUT_MS) continue
+    room.participants.delete(connectionId)
+    room.peers.delete(connectionId)
+    // Every map keyed by connection id, or the live badge would keep counting
+    // a ghost against its owner (spec §1.5).
+    room.userIds.delete(connectionId)
+    room.follows.delete(connectionId)
+    room.lastSeenAt.delete(connectionId)
+    for (const [follower, followed] of room.follows)
+      if (followed === connectionId) room.follows.delete(follower)
+  }
+}
+
 export type RoomJoinResult =
   | { status: "ok" }
   /** The Room is at its cap; the visitor gets the "drawing full" page. */
@@ -297,10 +346,14 @@ export async function joinRoom(
 ): Promise<RoomJoinResult> {
   // Checked before the Room is created, so a refused join never leaves an
   // empty one behind — and never starts a scene read for a peer that is
-  // about to be turned away.
+  // about to be turned away. Ghosts are swept first: a seat nobody is
+  // sitting in must not be what turns a reconnect away.
   const existing = registry.rooms.get(roomId)
-  if (existing && existing.participants.size >= MAX_ROOM_PARTICIPANTS)
-    return { status: "full" }
+  if (existing) {
+    forgetSilentParticipants(existing, registry.now())
+    if (existing.participants.size >= MAX_ROOM_PARTICIPANTS)
+      return { status: "full" }
+  }
 
   const room = ensureRoom(registry, roomId)
 
@@ -316,6 +369,7 @@ export async function joinRoom(
   room.participants.set(peer.id, participant)
   room.peers.set(peer.id, peer)
   room.userIds.set(peer.id, identity.userId)
+  room.lastSeenAt.set(peer.id, registry.now())
 
   peer.subscribe(ROOM_TOPIC)
   // Presence goes out before the scene read so avatars never wait on the
@@ -455,35 +509,64 @@ function applySceneUpdate(
   return changed
 }
 
+/**
+ * What the transport should do with a socket after handing over a frame.
+ *
+ * `evicted` is the one answer it must act on: the Room has forgotten this
+ * connection — its seat swept as a ghost while the socket was suspended —
+ * so everything the socket sends from here would be dropped on the floor,
+ * silently, forever. Closing it is what turns a client that believes it is
+ * connected into one that rejoins.
+ */
+export type FrameOutcome = "ok" | "evicted"
+
 export async function receiveFromPeer(
   registry: RoomRegistry,
   roomId: string,
   peer: RoomPeer,
   raw: string,
-) {
-  const room = registry.rooms.get(roomId)
-  const participant = room?.participants.get(peer.id)
-  if (!room || !participant) return
-
+): Promise<FrameOutcome> {
   const message = parseClientMessage(raw)
-  if (!message) return
+  if (!message) return "ok"
+
+  const room = registry.rooms.get(roomId)
+  // No Room at all is not an eviction — the socket belongs to a drawing
+  // nobody is in, and the close hook will tidy it up on its own.
+  if (!room) return "ok"
+
+  const participant = room.participants.get(peer.id)
+  if (!participant) return "evicted"
+
+  // Any frame at all is proof of life, and `PING` most of all: it is the only
+  // one a room where nobody is drawing will ever produce. Stamped before the
+  // answer goes out, so the seat this heartbeat is defending is held for the
+  // full window rather than the window minus a round trip.
+  room.lastSeenAt.set(peer.id, registry.now())
+
+  // Only ever answered for a peer that still has a seat. A `PONG` to an
+  // evicted socket would tell its client the connection is healthy while the
+  // Room ignores every scene and cursor frame it sends.
+  if (message.type === "PING") {
+    peer.send({ type: "PONG", payload: {} })
+    return "ok"
+  }
 
   if (message.type === "JOIN") {
     // Only guests name themselves. A member's name is whatever the session
     // says, so a compromised client can't pose as someone else in the room.
     if (!participant.isGuest || participant.name === message.payload.name)
-      return
+      return "ok"
     room.participants.set(peer.id, {
       ...participant,
       name: message.payload.name,
     })
     broadcastRoster(peer, room)
-    return
+    return "ok"
   }
 
   if (message.type === "USER_FOLLOW") {
     setFollowTarget(room, peer.id, message.payload.followedConnectionId)
-    return
+    return "ok"
   }
 
   if (message.type === "USER_VISIBLE_SCENE_BOUNDS") {
@@ -498,7 +581,7 @@ export async function receiveFromPeer(
         payload: { connectionId: peer.id, bounds: message.payload.bounds },
       })
     }
-    return
+    return "ok"
   }
 
   if (message.type === "SCENE_UPDATE") {
@@ -507,16 +590,18 @@ export async function receiveFromPeer(
     // delta waits for the load — deltas keep their order because they all
     // queue behind the same settled promise.
     await room.loaded
-    if (!room.participants.has(peer.id)) return
+    // Swept as a ghost while the load was in flight, or simply gone.
+    if (!room.participants.has(peer.id)) return "evicted"
     if (applySceneUpdate(room, peer, message.payload.elements))
       markDirty(registry, room)
-    return
+    return "ok"
   }
 
   peer.publish(ROOM_TOPIC, {
     type: "MOUSE_LOCATION",
     payload: { ...message.payload, connectionId: peer.id },
   })
+  return "ok"
 }
 
 export async function leaveRoom(
@@ -528,6 +613,7 @@ export async function leaveRoom(
   if (!room?.participants.delete(peer.id)) return
   room.peers.delete(peer.id)
   room.userIds.delete(peer.id)
+  room.lastSeenAt.delete(peer.id)
 
   // A departing peer both stops following and stops being followed. Its own
   // followers need no message — Excalidraw drops `userToFollow` by itself

@@ -12,8 +12,11 @@
  * over the canvas, so nothing about it may cause a render either. What to
  * send is decided in `scene-sync.ts`; this file is the plumbing around it.
  *
- * Reconnection, heartbeats, and the frame cap are a later slice; a dropped
- * socket here stays dropped until the page is reloaded.
+ * A dropped socket is dialed again forever (spec §5.3). Editing carries on
+ * against the local canvas the whole time — the sends simply no-op — and the
+ * `SCENE_INIT` of the next join merges the two sides. The only closes that
+ * end the loop are the two the server says something with: the participant
+ * cap and a link that has died.
  */
 
 import {
@@ -27,18 +30,25 @@ import type {
   ExcalidrawImperativeAPI,
 } from "@excalidraw/excalidraw/types"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { createReconnectBackoff } from "./backoff"
 import { toCollaborators } from "./collaborators"
+import { createHeartbeat, type Heartbeat } from "./heartbeat"
 import type {
   ClientMessage,
   Participant,
   PointerUpdate,
   SceneElement,
 } from "./protocol"
-import { parseServerMessage, ROOM_FULL_CLOSE_CODE } from "./protocol"
+import {
+  LINK_DEAD_CLOSE_CODE,
+  parseServerMessage,
+  ROOM_FULL_CLOSE_CODE,
+} from "./protocol"
 import { roomSocketUrl } from "./room-url"
 import {
   createSceneBroadcaster,
   SYNC_FULL_SCENE_INTERVAL_MS,
+  splitSceneFrames,
 } from "./scene-sync"
 import { CURSOR_INTERVAL_MS, createDroppableThrottle } from "./throttle"
 import { useFollow } from "./use-follow"
@@ -56,6 +66,15 @@ const BACKPRESSURE_BYTES = 8 * 1024
 /** What Excalidraw's `onPointerUpdate` hands us; selection comes from appState. */
 type PointerMove = Omit<PointerUpdate, "selectedElementIds">
 
+/**
+ * Where the socket stands, for the one piece of chrome that says so.
+ * `connecting` is the first dial, before anything has gone wrong — the page
+ * is already showing a loader, so it needs no second one. `reconnecting`
+ * means a dial has failed or a live socket has dropped, and is the only
+ * state the "Reconnecting…" indicator answers to (spec §5.3).
+ */
+export type ConnectionStatus = "connecting" | "connected" | "reconnecting"
+
 export function useRoom(options: {
   /** The share token from the URL; null keeps the socket closed. */
   token: string | null
@@ -69,16 +88,25 @@ export function useRoom(options: {
   /** The room turned this tab away at its participant cap (spec §4.5). */
   onRoomFull: () => void
   /**
+   * The token stopped checking out — stopped, regenerated, audience
+   * tightened, drawing trashed. The socket will not be dialed again, and the
+   * page is expected to re-resolve the token (spec §5.3).
+   */
+  onLinkDead: () => void
+  /**
    * The image ids the page loaded out of the database — the drawing's images
    * from before this visit. They are already stored, so this tab owes the
    * room nothing for them (spec §2.4). Must be referentially stable.
    */
   storedFileIds: readonly string[]
 }) {
-  const { token, name, excalidrawAPI, onRoomFull, storedFileIds } = options
+  const { token, name, excalidrawAPI, onRoomFull, onLinkDead, storedFileIds } =
+    options
 
   const [participants, setParticipants] = useState<Participant[]>([])
   const [selfConnectionId, setSelfConnectionId] = useState<string | null>(null)
+  const [connectionStatus, setConnectionStatus] =
+    useState<ConnectionStatus>("connecting")
 
   const socketRef = useRef<WebSocket | null>(null)
   const broadcasterRef = useRef(createSceneBroadcaster())
@@ -97,6 +125,8 @@ export function useRoom(options: {
   nameRef.current = name
   const onRoomFullRef = useRef(onRoomFull)
   onRoomFullRef.current = onRoomFull
+  const onLinkDeadRef = useRef(onLinkDead)
+  onLinkDeadRef.current = onLinkDead
 
   const pushCollaborators = useCallback(() => {
     apiRef.current?.updateScene({
@@ -152,11 +182,19 @@ export function useRoom(options: {
   const followRef = useRef(follow)
   followRef.current = follow
 
-  /** An empty selection is nothing for the room to rule on — don't send it. */
+  /**
+   * An empty selection is nothing for the room to rule on — don't send it.
+   * Anything large enough to trip the server's frame cap goes out in pieces
+   * instead of being refused (spec §5.4).
+   */
   const sendScene = useCallback(
-    (elements: SceneElement[]) =>
-      elements.length > 0 &&
-      send({ type: "SCENE_UPDATE", payload: { elements } }),
+    (elements: SceneElement[]) => {
+      let sent = false
+      for (const frame of splitSceneFrames(elements))
+        sent =
+          send({ type: "SCENE_UPDATE", payload: { elements: frame } }) || sent
+      return sent
+    },
     [send],
   )
 
@@ -242,101 +280,178 @@ export function useRoom(options: {
     [fetchMissing],
   )
 
+  /**
+   * Everything the socket that just went away had established. Called on
+   * every close, not only on unmount, because a reconnect is a *new*
+   * connection to a room that may have restarted: the broadcaster's record
+   * of "the room has seen this" is about the old server, and keeping it
+   * would have the catch-up skip exactly the elements a restart lost.
+   */
+  const forgetConnection = useCallback(() => {
+    selfConnectionIdRef.current = null
+    setSelfConnectionId(null)
+    pointersRef.current.clear()
+    setRoster([])
+    // A stale follower set would have every scroll relaying into a room
+    // nobody is watching from.
+    followRef.current.reset()
+    if (fullSyncTimerRef.current !== null) {
+      clearTimeout(fullSyncTimerRef.current)
+      fullSyncTimerRef.current = null
+    }
+    broadcasterRef.current = createSceneBroadcaster()
+    // Local edits keep landing on the canvas while this is false; they simply
+    // aren't offered to the broadcaster until the next SCENE_INIT says what
+    // the room already has.
+    sceneInitializedRef.current = false
+  }, [setRoster])
+
   // The socket waits for the canvas: a SCENE_INIT with nowhere to put it
-  // would leave this tab holding a scene the room has moved past. The API
-  // arrives once and never changes, so this is one connect, not a reconnect.
+  // would leave this tab holding a scene the room has moved past.
   const canvasReady = excalidrawAPI !== null
 
   useEffect(() => {
     if (!token || !canvasReady) return
 
-    const socket = new WebSocket(roomSocketUrl(token, window.location))
-    socketRef.current = socket
+    // Shared by every dial in this effect's lifetime, so the wait grows
+    // across a whole outage rather than restarting with each attempt.
+    const backoff = createReconnectBackoff()
+    let retryTimer: ReturnType<typeof setTimeout> | null = null
+    let disposed = false
+    /** The current socket's heartbeat, so unmounting can stop it too. */
+    let beat: Heartbeat | null = null
+    /**
+     * Whether this tab has ever been seated in the room. It is what separates
+     * a visitor the cap turned away — who belongs on the "drawing full" page
+     * — from a participant whose seat was taken while it was reconnecting,
+     * who is holding a scene and must not be sent anywhere (see the close
+     * handler).
+     */
+    let everJoined = false
 
-    socket.addEventListener("open", () => {
-      const name = nameRef.current
-      if (name !== null) send({ type: "JOIN", payload: { name } })
-    })
+    const connect = () => {
+      const socket = new WebSocket(roomSocketUrl(token, window.location))
+      socketRef.current = socket
+      beat = createHeartbeat({
+        ping: () => send({ type: "PING", payload: {} }),
+        // A socket that still says OPEN and answers nothing is a connection
+        // that died without a FIN. Closing it is what hands it to the retry
+        // below; nothing else would ever notice.
+        onSilent: () => socket.close(),
+      })
+      // Captured, so each socket's handlers stop and answer their own beat
+      // rather than whichever one a later dial has installed.
+      const ownBeat = beat
 
-    socket.addEventListener("message", (event) => {
-      if (typeof event.data !== "string") return
-      const message = parseServerMessage(event.data)
-      if (!message) return
+      socket.addEventListener("open", () => {
+        ownBeat.start()
+        const name = nameRef.current
+        if (name !== null) send({ type: "JOIN", payload: { name } })
+      })
 
-      if (message.type === "ROOM_JOINED") {
-        selfConnectionIdRef.current = message.payload.connectionId
-        setSelfConnectionId(message.payload.connectionId)
-        setRoster(message.payload.participants)
-        return
-      }
-      if (message.type === "PARTICIPANTS") {
-        setRoster(message.payload.participants)
-        return
-      }
-      if (
-        message.type === "FOLLOWED_BY" ||
-        message.type === "USER_VISIBLE_SCENE_BOUNDS"
-      ) {
-        followRef.current.handleServerMessage(message)
-        return
-      }
-      if (message.type === "SCENE_INIT") {
-        const merged = applyRemoteScene(message.payload.elements)
-        if (!merged) return
-        sceneInitializedRef.current = true
-        // Anything this tab was holding that the room's scene didn't have —
-        // an edit the owner saved between this page's fetch and the room's
-        // load, or a stroke drawn while the socket was still opening — goes
-        // up now, so the room converges on the union of the two rather than
-        // quietly dropping one side.
-        if (sendScene(broadcasterRef.current.catchUp(merged))) queueFullSync()
-        return
-      }
-      if (message.type === "SCENE_UPDATE") {
-        applyRemoteScene(message.payload.elements)
-        return
-      }
+      socket.addEventListener("message", (event) => {
+        if (typeof event.data !== "string") return
+        const message = parseServerMessage(event.data)
+        if (!message) return
 
-      const { connectionId, ...pointer } = message.payload
-      pointersRef.current.set(connectionId, pointer)
-      pushCollaborators()
-    })
+        if (message.type === "PONG") {
+          ownBeat.acknowledge()
+          return
+        }
+        if (message.type === "ROOM_JOINED") {
+          // Not on `open`: a handshake the server accepts and then abandons
+          // would otherwise read as a healthy connection and reset the wait
+          // that keeps a crash-looping server from being hammered.
+          backoff.reset()
+          everJoined = true
+          setConnectionStatus("connected")
+          selfConnectionIdRef.current = message.payload.connectionId
+          setSelfConnectionId(message.payload.connectionId)
+          setRoster(message.payload.participants)
+          return
+        }
+        if (message.type === "PARTICIPANTS") {
+          setRoster(message.payload.participants)
+          return
+        }
+        if (
+          message.type === "FOLLOWED_BY" ||
+          message.type === "USER_VISIBLE_SCENE_BOUNDS"
+        ) {
+          followRef.current.handleServerMessage(message)
+          return
+        }
+        if (message.type === "SCENE_INIT") {
+          const merged = applyRemoteScene(message.payload.elements)
+          if (!merged) return
+          sceneInitializedRef.current = true
+          // Anything this tab was holding that the room's scene didn't have —
+          // an edit the owner saved between this page's fetch and the room's
+          // load, a stroke drawn while the socket was still opening, or
+          // everything drawn during an outage — goes up now, so the room
+          // converges on the union of the two rather than dropping one side.
+          if (sendScene(broadcasterRef.current.catchUp(merged))) queueFullSync()
+          return
+        }
+        if (message.type === "SCENE_UPDATE") {
+          applyRemoteScene(message.payload.elements)
+          return
+        }
 
-    const handleClosed = (event: CloseEvent) => {
-      selfConnectionIdRef.current = null
-      setSelfConnectionId(null)
-      pointersRef.current.clear()
-      setRoster([])
-      followRef.current.reset()
-      // The one close the page reacts to: the room was full, so the visitor
-      // never got in and belongs on the "drawing full" state instead.
-      if (event.code === ROOM_FULL_CLOSE_CODE) onRoomFullRef.current()
+        const { connectionId, ...pointer } = message.payload
+        pointersRef.current.set(connectionId, pointer)
+        pushCollaborators()
+      })
+
+      socket.addEventListener("close", (event: CloseEvent) => {
+        ownBeat.stop()
+        // A close from a socket this effect has finished with says nothing
+        // about the connection that is live now. Closes are asynchronous, so
+        // navigating from one share link to another can land the old one's
+        // close *after* the new socket has joined — and resetting there would
+        // wipe the new connection's roster and broadcaster, quietly stopping
+        // every local edit from going out until the next reconnect.
+        if (disposed || socketRef.current !== socket) return
+        socketRef.current = null
+        forgetConnection()
+
+        // The cap turned this tab away. Terminal only for a visitor who never
+        // got in — for one that had a seat, this is a reconnect arriving
+        // before the server let go of its old one, and the "drawing full"
+        // page would unmount the canvas and take the scene it drew during the
+        // outage with it. So it waits for a seat instead (spec §5.3).
+        if (event.code === ROOM_FULL_CLOSE_CODE && !everJoined) {
+          onRoomFullRef.current()
+          return
+        }
+        // The link stopped checking out — the one close that must not be
+        // retried, or a stopped link would loop until the tab is shut
+        // (spec §5.3). Every reconnect goes through the upgrade's
+        // re-validation, so this is also how a link killed during an outage
+        // is discovered.
+        if (event.code === LINK_DEAD_CLOSE_CODE) {
+          onLinkDeadRef.current()
+          return
+        }
+
+        setConnectionStatus("reconnecting")
+        retryTimer = setTimeout(connect, backoff.next())
+      })
+      // An error is always followed by a close event; letting it through
+      // unhandled would surface as an unhandled rejection in the console.
+      socket.addEventListener("error", () => {})
     }
-    socket.addEventListener("close", handleClosed)
-    // An error is always followed by a close event; letting it through
-    // unhandled would surface as an unhandled rejection in the console.
-    socket.addEventListener("error", () => {})
+
+    connect()
 
     return () => {
-      socket.removeEventListener("close", handleClosed)
-      socket.close()
+      disposed = true
+      if (retryTimer !== null) clearTimeout(retryTimer)
+      beat?.stop()
+      socketRef.current?.close()
       socketRef.current = null
-      pointersRef.current.clear()
       participantsRef.current = []
-      selfConnectionIdRef.current = null
-      if (fullSyncTimerRef.current !== null) {
-        clearTimeout(fullSyncTimerRef.current)
-        fullSyncTimerRef.current = null
-      }
-      // What the old socket had told the room means nothing to the next one.
-      broadcasterRef.current = createSceneBroadcaster()
-      sceneInitializedRef.current = false
-      // The close listener is gone by now, so this is the only place a
-      // *replaced* socket resets follow state — navigating from one share
-      // link to another keeps this component mounted, and a stale follower
-      // set would have every scroll relaying into a room nobody is watching
-      // from.
-      followRef.current.reset()
+      forgetConnection()
     }
   }, [
     token,
@@ -347,6 +462,7 @@ export function useRoom(options: {
     setRoster,
     pushCollaborators,
     applyRemoteScene,
+    forgetConnection,
   ])
 
   // Rejoining is what re-announces a name, so this only matters while the
@@ -402,6 +518,7 @@ export function useRoom(options: {
   return {
     self,
     others,
+    connectionStatus,
     onChange,
     onPointerUpdate,
     followedParticipant,

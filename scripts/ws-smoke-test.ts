@@ -16,7 +16,14 @@
 import { randomBytes, randomUUID } from "node:crypto"
 import { config as loadEnv } from "dotenv"
 import { Client } from "pg"
-import { ROOM_FULL_CLOSE_CODE } from "../src/features/collab/protocol"
+import {
+  FRAME_TOO_LARGE_CLOSE_CODE,
+  MAX_FRAME_BYTES,
+} from "../src/features/collab/frame-cap"
+import {
+  LINK_DEAD_CLOSE_CODE,
+  ROOM_FULL_CLOSE_CODE,
+} from "../src/features/collab/protocol"
 import { MAX_ROOM_PARTICIPANTS } from "../src/features/collab/room-session"
 
 loadEnv()
@@ -223,16 +230,51 @@ const checks: {
   run: (token: string, url: string) => Promise<void>
 }[] = [
   {
-    name: "a bogus token is refused at upgrade",
+    // Spec §5.3. The upgrade completes and the close code carries the answer:
+    // a refused handshake would reach the browser as an opaque 1006, which a
+    // client reconnecting through an outage cannot tell from a server that is
+    // merely down — and would retry against forever.
+    name: "a bogus token is closed with the dead-link code, not left to retry",
     run: async (_token, url) => {
       const dead = randomBytes(32).toString("hex")
-      await Peer.connect(socketUrl(url, dead))
-        .then(() => {
-          throw new Error("upgrade accepted a token that does not exist")
-        })
-        .catch((error: Error) => {
-          if (error.message !== "connection refused") throw error
-        })
+      const refused = await Peer.connect(socketUrl(url, dead))
+      const code = await refused.closedWith()
+      if (code !== LINK_DEAD_CLOSE_CODE)
+        throw new Error(
+          `expected close code ${LINK_DEAD_CLOSE_CODE}, got ${code}`,
+        )
+      if (refused.frames.length > 0)
+        throw new Error("a refused socket was told something about a room")
+    },
+  },
+  {
+    // Spec §5.3, rollout note 2 — the thing that keeps a quiet session alive
+    // past a proxy's 60 s idle timeout.
+    name: "a heartbeat is answered",
+    run: async (token, url) => {
+      const peer = await Peer.connect(socketUrl(url, token))
+      await peer.expect("ROOM_JOINED")
+      peer.send({ type: "PING", payload: {} })
+      await peer.expect("PONG")
+      peer.close()
+    },
+  },
+  {
+    // Spec §5.4. No error channel: the close is all the client gets, and the
+    // reconnect's SCENE_INIT is what puts the session back together.
+    name: "a frame past the cap closes the socket with 1009",
+    run: async (token, url) => {
+      const peer = await Peer.connect(socketUrl(url, token))
+      await peer.expect("ROOM_JOINED")
+      // Comfortably over 4 MB, and shaped like something the parser would
+      // otherwise accept — so what refuses it is the cap and nothing else.
+      const oversized = { ...scribble(1), text: "x".repeat(MAX_FRAME_BYTES) }
+      peer.send({ type: "SCENE_UPDATE", payload: { elements: [oversized] } })
+      const code = await peer.closedWith()
+      if (code !== FRAME_TOO_LARGE_CLOSE_CODE)
+        throw new Error(
+          `expected close code ${FRAME_TOO_LARGE_CLOSE_CODE}, got ${code}`,
+        )
     },
   },
   {

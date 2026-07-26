@@ -3,6 +3,7 @@ import type { SceneElement } from "./protocol"
 import {
   createSceneBroadcaster,
   DELETED_ELEMENT_TIMEOUT_MS,
+  splitSceneFrames,
 } from "./scene-sync"
 
 const NOW = 1_700_000_000_000
@@ -110,4 +111,36 @@ test("a deletion with no timestamp keeps syncing rather than being lost", () => 
   expect(
     idsOf(broadcaster.full([element("a", 2, { isDeleted: true })])),
   ).toEqual(["a"])
+})
+
+test("an ordinary delta goes out as one frame, unmeasured", () => {
+  const elements = [element("a", 1), element("b", 1)]
+  expect(splitSceneFrames(elements)).toEqual([elements])
+  expect(splitSceneFrames([])).toEqual([])
+})
+
+test("a scene too big for one frame is cut into several", () => {
+  // Each element carries a kilobyte of payload; the cap here fits a handful.
+  const fat = (id: string) =>
+    element(id, 1, { text: "x".repeat(1_000) }) as SceneElement
+  const elements = ["a", "b", "c", "d", "e"].map(fat)
+
+  const frames = splitSceneFrames(elements, 2_500)
+
+  expect(frames.length).toBeGreaterThan(1)
+  // Nothing is lost and nothing is duplicated in the cutting.
+  expect(frames.flat().map((el) => el.id)).toEqual(["a", "b", "c", "d", "e"])
+  for (const frame of frames)
+    expect(JSON.stringify(frame).length).toBeLessThan(2_500)
+})
+
+test("an element too big to ever fit is dropped rather than looping the socket", () => {
+  // Sending it would close the socket with 1009, and the reconnect would send
+  // it again — the one failure mode the split exists to prevent.
+  const elements = [
+    element("ok", 1) as SceneElement,
+    element("huge", 1, { text: "x".repeat(5_000) }) as SceneElement,
+  ]
+
+  expect(splitSceneFrames(elements, 2_000)).toEqual([[elements[0]]])
 })

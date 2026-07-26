@@ -89,6 +89,11 @@ function SharePage() {
         files={resolution.files}
         token={token}
         onRoomFull={() => navigate({ search: { full: true }, replace: true })}
+        // Replaying the loader is the whole answer: the same resolution that
+        // refused the socket decides the page, so a stopped or regenerated
+        // link lands on the dead-link state and an audience tightened under
+        // a guest lands on the sign-in gate (spec §5.3).
+        onLinkDead={() => router.invalidate()}
       />
     </Suspense>
   )
