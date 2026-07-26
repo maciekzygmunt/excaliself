@@ -14,32 +14,23 @@ import {
   exceedsFrameCap,
   FRAME_TOO_LARGE_CLOSE_CODE,
 } from "@/features/collab/frame-cap"
-import { resolveRoomJoin } from "@/features/collab/join"
 import {
   LINK_DEAD_CLOSE_CODE,
   ROOM_FULL_CLOSE_CODE,
 } from "@/features/collab/protocol"
+import { rooms } from "@/features/collab/room-registry"
 import type {
   ParticipantIdentity,
   RoomPeer,
 } from "@/features/collab/room-session"
 import {
-  createRoomRegistry,
   joinRoom,
   leaveRoom,
   receiveFromPeer,
 } from "@/features/collab/room-session"
-import { loadRoomScene } from "@/features/collab/scene-store"
-import { resolveShareForRoom } from "@/features/shares/store"
+import { resolveRoomForToken } from "@/features/collab/room-token"
 import { allowTokenValidation } from "@/features/shares/token-rate-limit"
-import { auth } from "@/lib/auth"
-
-/**
- * Live rooms for this process. In-memory by design (spec §2.3) — the app
- * stays single-replica until a pub/sub backplane is added. Each Room reads
- * the drawing's stored scene once, on the first join.
- */
-const rooms = createRoomRegistry((roomId) => loadRoomScene(db, roomId))
+import { socketIpOf } from "@/lib/client-ip"
 
 /**
  * crossws derives the namespace from the pathname by default, which would
@@ -105,7 +96,7 @@ export default defineWebSocketHandler({
     if (
       !allowTokenValidation({
         headers: request.headers,
-        socketIp: (request as { ip?: string }).ip ?? null,
+        socketIp: socketIpOf(request),
       })
     )
       throw new Response("Too Many Requests", { status: 429 })
@@ -116,14 +107,12 @@ export default defineWebSocketHandler({
       new URL(request.url).pathname.split("/").pop() || "",
     )
 
-    // Both checks run on every (re)connect, so stop, regenerate, an audience
-    // tighten, and trash all take effect on the next join (spec §4.1).
-    const [share, session] = await Promise.all([
-      token ? resolveShareForRoom(db, token) : null,
-      auth.api.getSession({ headers: request.headers }),
-    ])
-
-    const join = resolveRoomJoin({ share, user: session?.user ?? null })
+    // Runs on every (re)connect, so stop, regenerate, an audience tighten,
+    // and trash all take effect on the next join (spec §4.1). The room-scoped
+    // image endpoints call the same function, so the token, audience and
+    // deletedAt decision is literally shared — the per-IP budget above is not,
+    // and `$fileId.ts` says why.
+    const join = await resolveRoomForToken(db, token, request.headers)
     // One generic refusal for every reason, like the dead-link page: nothing
     // here reveals whether the drawing exists. The socket is accepted anyway
     // and closed in `open` with a code the client can read — a rejected
@@ -192,9 +181,11 @@ export default defineWebSocketHandler({
     if (outcome === "evicted") peer.close(1000, "Rejoin")
   },
 
-  close(peer) {
+  // Async because the last participant out waits for the Room's final write
+  // before the Room is torn down (spec §2.3).
+  async close(peer) {
     const context = roomContextOf(peer)
     if (!context) return
-    leaveRoom(rooms, context.roomId, toRoomPeer(peer))
+    await leaveRoom(rooms, context.roomId, toRoomPeer(peer))
   },
 })

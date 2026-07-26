@@ -80,6 +80,9 @@ export function SharedCanvas({
     () => buildInitialSceneData({ data: drawing.data, files }).initialData,
     [drawing.data, files],
   )
+  // The drawing's images from before this visit: already in the database, so
+  // this tab must not POST them back to the room-scoped endpoint (spec §2.4).
+  const storedFileIds = useMemo(() => files.map((file) => file.fileId), [files])
   const [excalidrawAPI, setExcalidrawAPI] =
     useState<ExcalidrawImperativeAPI | null>(null)
 
@@ -99,7 +102,14 @@ export function SharedCanvas({
     onScrollChange,
     toggleFollow,
     stopFollowing,
-  } = useRoom({ token, name, excalidrawAPI, onRoomFull, onLinkDead })
+  } = useRoom({
+    token,
+    name,
+    excalidrawAPI,
+    onRoomFull,
+    onLinkDead,
+    storedFileIds,
+  })
 
   // Renaming re-announces the name to the room (useRoom rejoins on the
   // change) and keeps it for the next visit, where a fresh connection id

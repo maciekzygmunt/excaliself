@@ -35,7 +35,10 @@ const SHARE = {
   createdAt: new Date("2026-07-20"),
 }
 
-function renderDialog(share: typeof SHARE | null) {
+function renderDialog(
+  share: typeof SHARE | null,
+  onBeforeCreate?: () => Promise<void>,
+) {
   // staleTime pins the seeded cache: with the default 0 the mounted query
   // refetches in the background against the unconfigured getDrawingShare
   // mock and flips the dialog to the unshared state mid-test.
@@ -46,9 +49,15 @@ function renderDialog(share: typeof SHARE | null) {
   const wrapper = ({ children }: { children: ReactNode }) => (
     <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
   )
-  render(<ShareDialog drawingId="d1" open onOpenChange={vi.fn()} />, {
-    wrapper,
-  })
+  render(
+    <ShareDialog
+      drawingId="d1"
+      open
+      onOpenChange={vi.fn()}
+      onBeforeCreate={onBeforeCreate}
+    />,
+    { wrapper },
+  )
   return queryClient
 }
 
@@ -166,4 +175,43 @@ test("regenerate swaps the cached token", async () => {
   await waitFor(() =>
     expect(queryClient.getQueryData(["shares", "d1"])).toEqual(regenerated),
   )
+})
+
+// Spec §5.5: the last solo save has to land before the shares row exists —
+// after that the server refuses classic writes and the Room loads the drawing
+// as stored, so a still-debounced stroke would simply vanish.
+test("the pending autosave is flushed before the link is minted", async () => {
+  const order: string[] = []
+  vi.mocked(createShare).mockImplementation(async () => {
+    order.push("create")
+    return SHARE
+  })
+  renderDialog(null, async () => {
+    order.push("flush")
+  })
+
+  fireEvent.click(screen.getByRole("button", { name: /Create share link/ }))
+
+  await waitFor(() => expect(order).toEqual(["flush", "create"]))
+})
+
+test("the dialog stays busy while the autosave flush is still in the air", async () => {
+  let release: () => void = () => {}
+  const flushed = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  vi.mocked(createShare).mockResolvedValue(SHARE)
+  renderDialog(null, () => flushed)
+
+  fireEvent.click(screen.getByRole("button", { name: /Create share link/ }))
+
+  await waitFor(() =>
+    expect(
+      screen.getByRole("button", { name: /Creating/ }).hasAttribute("disabled"),
+    ).toBe(true),
+  )
+  expect(createShare).not.toHaveBeenCalled()
+
+  release()
+  await waitFor(() => expect(createShare).toHaveBeenCalledTimes(1))
 })

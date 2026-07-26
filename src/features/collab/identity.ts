@@ -94,6 +94,22 @@ export function memberDisplayName(user: {
 }
 
 /**
+ * The one or two letters an avatar wears, wherever a participant is drawn as
+ * a circle — the room's presence stack and the owner's live badge both.
+ * Middle names are dropped rather than crowding the circle.
+ */
+export function initialsOf(name: string): string {
+  const words = name.trim().split(/\s+/).filter(Boolean)
+  if (words.length === 0) return "?"
+  const first = words[0]
+  const last = words.length > 1 ? words[words.length - 1] : ""
+  return [first, last]
+    .map((word) => [...word][0]?.toUpperCase() ?? "")
+    .join("")
+    .slice(0, 2)
+}
+
+/**
  * Excalidraw's own collaborator palette (Open Color 6/9 pairs): `background`
  * fills the cursor and the avatar, `stroke` outlines both. Kept server-side
  * because the live badge reads the same colors out of room presence.

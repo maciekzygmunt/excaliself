@@ -10,8 +10,10 @@
  *
  * The server is the authority, not a relay: every incoming delta is merged
  * into the Room's own copy first, and what goes back out is the Room's ruling
- * rather than the sender's claim. Flushing that scene to the database is the
- * next slice; a Room here lives and dies in memory.
+ * rather than the sender's claim. That scene is also the only thing being
+ * written to the drawing while a share is live (spec §2.3): flushes go out on
+ * a trailing throttle while dirty, when the last participant leaves, and on
+ * SIGTERM.
  */
 
 import { guestNameForConnection, pickParticipantColor } from "./identity"
@@ -43,7 +45,23 @@ export type ParticipantIdentity = {
 /** Reads a drawing's stored scene when its Room first spins up. */
 export type SceneLoader = (roomId: string) => Promise<StoredScene>
 
+/** Writes a Room's authoritative scene back to its drawing (spec §2.3). */
+export type SceneSaver = (
+  roomId: string,
+  elements: SceneElement[],
+) => Promise<void>
+
+/**
+ * How long a Room sits on unsaved edits before writing them (spec §2.3).
+ * Trailing, so a burst of strokes costs one write rather than one per stroke,
+ * and a hard crash loses at most this much from the database — reconnecting
+ * clients reconcile and re-broadcast the rest.
+ */
+export const ROOM_FLUSH_INTERVAL_MS = 15_000
+
 export type Room = {
+  /** The drawing this Room belongs to — its key in the registry. */
+  id: string
   participants: Map<string, Participant>
   /**
    * The live socket behind each participant. Follow mode is the first thing
@@ -51,6 +69,13 @@ export type Room = {
    * the pub/sub topic can only do the latter.
    */
   peers: Map<string, RoomPeer>
+  /**
+   * Connection id → the authenticated userId behind it, null for a guest.
+   * Kept beside the roster rather than on the {@link Participant} because the
+   * roster goes on the wire and userIds must not (spec §1.5) — the live badge
+   * is the only thing that reads this, to drop the caller's own connections.
+   */
+  userIds: Map<string, string | null>
   /** Follower connection id → the connection id it is trailing (spec §1.3). */
   follows: Map<string, string>
   /**
@@ -61,11 +86,27 @@ export type Room = {
   lastSeenAt: Map<string, number>
   /** Resolves when the stored scene has been read (or failed to read). */
   loaded: Promise<void>
+  /**
+   * False when the stored scene could not be read. Such a Room still relays
+   * cursors and edits, but it must never write: its `elements` describe a
+   * drawing it never saw, and flushing them would erase the real one.
+   */
+  persistable: boolean
   /** The authoritative scene, in fractional-index order. */
   elements: SceneElement[]
   sceneVersion: number
   /** Cached at load time for the live badge (spec §1.5). */
   ownerId: string | null
+  /** Set when a merge changed the scene, cleared once it has been written. */
+  dirty: boolean
+  /** The armed trailing flush, if any. */
+  flushTimer: ReturnType<typeof setTimeout> | null
+  /**
+   * The write in flight, so overlapping triggers (the throttle firing as the
+   * last participant leaves, say) queue instead of racing each other into the
+   * same row.
+   */
+  flushing: Promise<void>
 }
 
 /**
@@ -75,14 +116,17 @@ export type Room = {
 export type RoomRegistry = {
   rooms: Map<string, Room>
   loadScene: SceneLoader
+  saveScene: SceneSaver
+  /** Injected so the ghost sweep of spec §5.3 is drivable from a test. */
   now: () => number
 }
 
 export function createRoomRegistry(
   loadScene: SceneLoader,
+  saveScene: SceneSaver,
   now: () => number = () => Date.now(),
 ): RoomRegistry {
-  return { rooms: new Map(), loadScene, now }
+  return { rooms: new Map(), loadScene, saveScene, now }
 }
 
 /**
@@ -95,14 +139,20 @@ function ensureRoom(registry: RoomRegistry, roomId: string): Room {
   if (existing) return existing
 
   const room: Room = {
+    id: roomId,
     participants: new Map(),
     peers: new Map(),
+    userIds: new Map(),
     follows: new Map(),
     lastSeenAt: new Map(),
     loaded: Promise.resolve(),
+    persistable: false,
     elements: [],
     sceneVersion: 0,
     ownerId: null,
+    dirty: false,
+    flushTimer: null,
+    flushing: Promise.resolve(),
   }
   registry.rooms.set(roomId, room)
   room.loaded = registry.loadScene(roomId).then(
@@ -110,19 +160,115 @@ function ensureRoom(registry: RoomRegistry, roomId: string): Room {
       room.elements = stored.elements
       room.sceneVersion = getSceneVersion(stored.elements)
       room.ownerId = stored.ownerId
+      // Unreadable stored JSON leaves the Room open but mute, exactly like a
+      // read that threw: the drawing rendered as an empty canvas here, and
+      // writing that emptiness back is how a recoverable file becomes an
+      // empty one. It is the same call the solo canvas makes when it pauses
+      // autosave over a corrupt scene.
+      room.persistable = stored.readable
     },
     (error) => {
       // The Room stays open on an empty scene: cursors and presence still
       // work, and a client's own copy survives reconciliation untouched (an
-      // empty SCENE_INIT adds nothing and deletes nothing).
-      //
-      // Whoever adds the flush of spec §2.3 must give this arm a way to say
-      // so — flushing a Room that never read its drawing would write an
-      // empty scene over a real one.
+      // empty SCENE_INIT adds nothing and deletes nothing). `persistable`
+      // stays false, so nothing this Room accumulates is ever written — a
+      // flush here would put an empty scene over a real drawing.
       console.error(`[collab] could not load scene for room ${roomId}`, error)
     },
   )
   return room
+}
+
+function disarmFlush(room: Room) {
+  if (room.flushTimer === null) return
+  clearTimeout(room.flushTimer)
+  room.flushTimer = null
+}
+
+/**
+ * Work this Room still owes the database. A Room that may not write has none
+ * by definition, however much it has accumulated — without that clause a
+ * drawing whose read failed would be marked dirty forever, and `reapIfIdle`
+ * below would keep its Room in the registry for the life of the process,
+ * never re-reading the drawing and never persisting another thing.
+ */
+const hasUnwrittenWork = (room: Room) => room.dirty && room.persistable
+
+/**
+ * A Room with nothing left to hold it open — no sockets, nothing unwritten —
+ * is torn down, so the next join reads the drawing fresh (spec §2.5). Called
+ * after every write rather than only from `leaveRoom` because the last
+ * participant can leave while a write is still in flight, and a Room whose
+ * flush had to be retried must not be dropped while it still owes one.
+ */
+function reapIfIdle(registry: RoomRegistry, room: Room) {
+  if (room.participants.size > 0 || hasUnwrittenWork(room)) return
+  if (registry.rooms.get(room.id) !== room) return
+  disarmFlush(room)
+  registry.rooms.delete(room.id)
+}
+
+function armFlush(registry: RoomRegistry, room: Room) {
+  if (room.flushTimer !== null || !room.persistable) return
+  room.flushTimer = setTimeout(() => {
+    room.flushTimer = null
+    void flushRoom(registry, room)
+  }, ROOM_FLUSH_INTERVAL_MS)
+}
+
+/** The scene changed: schedule the trailing write of spec §2.3. */
+function markDirty(registry: RoomRegistry, room: Room) {
+  room.dirty = true
+  armFlush(registry, room)
+}
+
+/**
+ * Write the Room's scene now, if it has anything unwritten. Resolves when the
+ * write has landed, which is what makes the last-leave and SIGTERM flushes
+ * meaningful — both have to know the drawing is safe before they let go.
+ *
+ * Writes are chained onto `flushing` rather than fired in parallel: the
+ * throttle firing just as the last participant leaves would otherwise put two
+ * read-modify-writes on the same row in flight at once, and the older one
+ * could land last.
+ */
+function flushRoom(registry: RoomRegistry, room: Room): Promise<void> {
+  disarmFlush(room)
+  if (!hasUnwrittenWork(room)) return room.flushing
+
+  room.dirty = false
+  room.flushing = room.flushing.then(() =>
+    // Read the scene inside the chain, not at call time: anything merged
+    // while an earlier write was in flight rides along on this one.
+    registry
+      .saveScene(room.id, room.elements)
+      .then(
+        () => {
+          reapIfIdle(registry, room)
+        },
+        (error) => {
+          // A failed write is not lost work — the scene is still in memory. Mark
+          // it unwritten again and let the throttle retry; a Room whose last
+          // participant has already left keeps retrying (and stays in the
+          // registry) until the write lands rather than dropping the edits.
+          console.error(`[collab] could not flush room ${room.id}`, error)
+          room.dirty = true
+          armFlush(registry, room)
+        },
+      ),
+  )
+  return room.flushing
+}
+
+/**
+ * Every Room's final write, for graceful shutdown (spec §2.3, rollout note 3).
+ * Rooms stay in the registry: the process is going away, and tearing them
+ * down would only race the sockets that are about to close with it.
+ */
+export async function flushAllRooms(registry: RoomRegistry): Promise<void> {
+  await Promise.all(
+    [...registry.rooms.values()].map((room) => flushRoom(registry, room)),
+  )
 }
 
 function rosterOf(room: Room): Participant[] {
@@ -166,12 +312,20 @@ export const PARTICIPANT_IDLE_TIMEOUT_MS = 90_000
  *
  * Swept on join rather than on a timer: joining is the only moment a ghost
  * costs anything, and a timer would be one more thing to own and shut down.
+ *
+ * The Room itself is never torn down here even if this empties it — the join
+ * that triggered the sweep is about to take a seat in it, and dropping it
+ * would throw away an authoritative scene that may still owe the database a
+ * write.
  */
 function forgetSilentParticipants(room: Room, now: number) {
   for (const [connectionId, lastSeenAt] of room.lastSeenAt) {
     if (now - lastSeenAt < PARTICIPANT_IDLE_TIMEOUT_MS) continue
     room.participants.delete(connectionId)
     room.peers.delete(connectionId)
+    // Every map keyed by connection id, or the live badge would keep counting
+    // a ghost against its owner (spec §1.5).
+    room.userIds.delete(connectionId)
     room.follows.delete(connectionId)
     room.lastSeenAt.delete(connectionId)
     for (const [follower, followed] of room.follows)
@@ -214,6 +368,7 @@ export async function joinRoom(
   }
   room.participants.set(peer.id, participant)
   room.peers.set(peer.id, peer)
+  room.userIds.set(peer.id, identity.userId)
   room.lastSeenAt.set(peer.id, registry.now())
 
   peer.subscribe(ROOM_TOPIC)
@@ -301,14 +456,32 @@ function setFollowTarget(
  * back only the elements where the Room's copy beat its own — the correction
  * that lets a peer whose delta was discarded converge instead of sitting on a
  * version nobody else has.
+ *
+ * Returns whether the Room's own copy actually moved — what decides if there
+ * is anything new to persist. A delta that lost every comparison leaves the
+ * scene exactly as it was, and re-writing it would be a database round trip
+ * for nothing.
+ *
+ * That question is answered by identity, not by `sceneVersion`: reconciliation
+ * keeps the winning object by reference, so an element the Room replaced is a
+ * different object than the one it held. A version sum cannot see the
+ * versionNonce tie-break — a remote element with the same `version` and a
+ * lower nonce wins, is relayed to every peer, and leaves the sum and the count
+ * exactly where they were. Persisting off the sum would let that content
+ * converge everywhere except the database.
  */
 function applySceneUpdate(
   room: Room,
   peer: RoomPeer,
   incoming: SceneElement[],
-) {
-  room.elements = reconcileElements(room.elements, incoming, {})
+): boolean {
+  const previous = room.elements
+  const previousById = new Map(previous.map((el) => [el.id, el]))
+  room.elements = reconcileElements(previous, incoming, {})
   room.sceneVersion = getSceneVersion(room.elements)
+  const changed =
+    room.elements.length !== previous.length ||
+    room.elements.some((el) => previousById.get(el.id) !== el)
 
   // Reconciliation keeps whichever object won by reference, so `winner ===
   // element` is exactly "the Room accepted what this peer sent" — no need to
@@ -332,6 +505,8 @@ function applySceneUpdate(
     })
   if (corrections.length)
     peer.send({ type: "SCENE_UPDATE", payload: { elements: corrections } })
+
+  return changed
 }
 
 /**
@@ -415,8 +590,10 @@ export async function receiveFromPeer(
     // delta waits for the load — deltas keep their order because they all
     // queue behind the same settled promise.
     await room.loaded
+    // Swept as a ghost while the load was in flight, or simply gone.
     if (!room.participants.has(peer.id)) return "evicted"
-    applySceneUpdate(room, peer, message.payload.elements)
+    if (applySceneUpdate(room, peer, message.payload.elements))
+      markDirty(registry, room)
     return "ok"
   }
 
@@ -427,7 +604,7 @@ export async function receiveFromPeer(
   return "ok"
 }
 
-export function leaveRoom(
+export async function leaveRoom(
   registry: RoomRegistry,
   roomId: string,
   peer: RoomPeer,
@@ -435,6 +612,7 @@ export function leaveRoom(
   const room = registry.rooms.get(roomId)
   if (!room?.participants.delete(peer.id)) return
   room.peers.delete(peer.id)
+  room.userIds.delete(peer.id)
   room.lastSeenAt.delete(peer.id)
 
   // A departing peer both stops following and stops being followed. Its own
@@ -446,10 +624,15 @@ export function leaveRoom(
     room.follows.delete(followerId)
   if (wasFollowing) sendFollowedBy(room, wasFollowing)
 
-  // Nothing is holding the Room open once its last socket goes (spec §2.5);
-  // the flush that has to happen first arrives with the persistence slice.
+  // The last socket out writes the scene before the Room is torn down
+  // (spec §2.3) — otherwise everything since the last throttle tick would
+  // die with it, which is exactly the "guest edits survive the owner closing
+  // their tab" case. `reapIfIdle` rather than an unconditional delete: a
+  // rejoin during the write keeps the Room, and a write that has to be
+  // retried keeps it too.
   if (room.participants.size === 0) {
-    registry.rooms.delete(roomId)
+    await flushRoom(registry, room)
+    reapIfIdle(registry, room)
     return
   }
   peer.publish(ROOM_TOPIC, rosterMessage(room))

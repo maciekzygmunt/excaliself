@@ -9,21 +9,11 @@
  * rides along with that person's viewport, and clicking it again stops.
  */
 
+import { initialsOf } from "@/features/collab/identity"
 import type { Participant } from "@/features/collab/protocol"
 
 /** Beyond this the stack turns into a "+N" tail rather than growing. */
 const MAX_AVATARS = 4
-
-export function initialsOf(name: string): string {
-  const words = name.trim().split(/\s+/).filter(Boolean)
-  if (words.length === 0) return "?"
-  const first = words[0]
-  const last = words.length > 1 ? words[words.length - 1] : ""
-  return [first, last]
-    .map((word) => [...word][0]?.toUpperCase() ?? "")
-    .join("")
-    .slice(0, 2)
-}
 
 export function PresenceAvatars({
   participants,

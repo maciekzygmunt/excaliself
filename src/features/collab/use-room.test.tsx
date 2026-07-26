@@ -28,6 +28,14 @@ vi.mock("@excalidraw/excalidraw", () => ({
     remote: SceneElement[],
     appState: Record<string, never>,
   ) => reconcileElements(local, remote, appState),
+  // Upstream's version bump, restated: it is what turns an image's storage
+  // outcome into an ordinary delta the room picks up.
+  newElementWith: (element: SceneElement, updates: Partial<SceneElement>) => ({
+    ...element,
+    ...updates,
+    version: element.version + 1,
+    versionNonce: element.versionNonce + 1,
+  }),
 }))
 
 const TOKEN = "share-token"
@@ -123,21 +131,39 @@ function element(
   }
 }
 
+/** One image element, in the shape the file half reads it. */
+function image(
+  id: string,
+  version: number,
+  fileId: string,
+  status: "pending" | "saved" | "error" = "pending",
+): SceneElement {
+  return element(id, version, { type: "image", fileId, status })
+}
+
+type FakeFiles = Record<string, { id: string; dataURL: string }>
+
 /**
- * A stand-in for Excalidraw: it holds a scene, hands it back, and — like the
- * real `updateScene` — calls `onChange` synchronously when the scene lands.
+ * A stand-in for Excalidraw: it holds a scene and its files, hands both back,
+ * and — like the real `updateScene` — calls `onChange` synchronously when a
+ * scene lands.
  */
-function fakeExcalidraw(initial: SceneElement[] = []) {
+function fakeExcalidraw(initial: SceneElement[] = [], files: FakeFiles = {}) {
   let scene = initial
   const api = {
     scene: () => scene,
-    /** What a local edit does before Excalidraw announces it. */
-    setScene: (next: SceneElement[]) => {
-      scene = next
+    /** Excalidraw commits a local edit before it calls `onChange`. */
+    setScene: (elements: SceneElement[]) => {
+      scene = elements
     },
+    files,
     onChange: (_elements: readonly SceneElement[]) => {},
     getSceneElementsIncludingDeleted: () => scene,
     getAppState: () => ({ collaborators: new Map() }),
+    getFiles: () => api.files,
+    addFiles: vi.fn((added: { id: string; dataURL: string }[]) => {
+      for (const file of added) api.files[file.id] = file
+    }),
     updateScene: vi.fn(
       (data: { elements?: SceneElement[]; captureUpdate?: string }) => {
         if (!data.elements) return
@@ -152,8 +178,17 @@ function fakeExcalidraw(initial: SceneElement[] = []) {
   return api
 }
 
-function renderRoom(api: ReturnType<typeof fakeExcalidraw>) {
-  let onChange: ((elements: readonly SceneElement[]) => void) | null = null
+function renderRoom(
+  api: ReturnType<typeof fakeExcalidraw>,
+  storedFileIds: readonly string[] = [],
+) {
+  let onChange:
+    | ((
+        elements: readonly SceneElement[],
+        appState: unknown,
+        files: FakeFiles,
+      ) => void)
+    | null = null
   let status: ConnectionStatus = "connecting"
   const onRoomFull = vi.fn()
   const onLinkDead = vi.fn()
@@ -165,6 +200,7 @@ function renderRoom(api: ReturnType<typeof fakeExcalidraw>) {
       excalidrawAPI: api as never,
       onRoomFull,
       onLinkDead,
+      storedFileIds,
     })
     onChange = room.onChange as never
     status = room.connectionStatus
@@ -172,7 +208,7 @@ function renderRoom(api: ReturnType<typeof fakeExcalidraw>) {
   }
   const { rerender } = render(<Harness token={TOKEN} />)
   // Wire the fake's updateScene back into the hook, the way Excalidraw does.
-  api.onChange = (elements) => onChange?.(elements)
+  api.onChange = (elements) => onChange?.(elements, null, api.files)
   const socket = sockets[0]
   act(() => socket.open())
   return {
@@ -184,13 +220,12 @@ function renderRoom(api: ReturnType<typeof fakeExcalidraw>) {
     status: () => status,
     /** The socket the hook is on now — a reconnect makes a new one. */
     latest: () => sockets[sockets.length - 1],
-    change: (elements: SceneElement[]) =>
-      act(() => {
-        // The canvas holds the edit before it announces it — which is what
-        // makes an edit survive a disconnect the hook heard nothing about.
-        api.setScene(elements)
-        onChange?.(elements)
-      }),
+    // The canvas commits the edit before it announces it — which is what
+    // makes an edit survive a disconnect the hook heard nothing about.
+    change: (elements: SceneElement[], files: FakeFiles = api.files) => {
+      api.setScene(elements)
+      act(() => onChange?.(elements, null, files))
+    },
   }
 }
 
@@ -493,4 +528,297 @@ test("a late close from a socket the hook has moved on from leaves the live one 
   expect(next.scenesSent.map((els) => els.map((e) => e.id))).toEqual([
     ["drawn-after"],
   ])
+})
+
+// --- Images (spec §2.4) -----------------------------------------------------
+//
+// Bytes never cross the socket. What these check is the seam either side of
+// that rule: a local blob reaching the HTTP endpoint before its element
+// claims to be saved, and a peer's saved element pulling the bytes back.
+
+const PNG = "data:image/png;base64,QUJDRA=="
+
+/** Replaces `fetch` with one canned answer and records what was asked for. */
+function stubFetch(response: {
+  ok: boolean
+  /** Only read when `ok` is false; 4xx is a verdict, 5xx is a bad day. */
+  status?: number
+  body?: unknown
+  /** Rejects instead of answering — the offline case. */
+  offline?: boolean
+}) {
+  const calls: { url: string; method: string; body: unknown }[] = []
+  vi.stubGlobal(
+    "fetch",
+    vi.fn((url: string, init?: { method?: string; body?: string }) => {
+      calls.push({
+        url,
+        method: init?.method ?? "GET",
+        body: init?.body ? JSON.parse(init.body) : null,
+      })
+      if (response.offline) return Promise.reject(new Error("offline"))
+      return Promise.resolve({
+        ok: response.ok,
+        status: response.status ?? (response.ok ? 200 : 400),
+        json: () => Promise.resolve(response.body),
+      })
+    }),
+  )
+  return calls
+}
+
+/** Lets the upload/fetch promises and the updateScene they cause settle. */
+const settle = () => act(async () => {})
+
+test("an image pasted here is stored over HTTP, then syncs as a saved delta", async () => {
+  const calls = stubFetch({ ok: true })
+  const api = fakeExcalidraw()
+  const { socket, change } = renderRoom(api)
+  act(() => socket.receive({ type: "SCENE_INIT", payload: { elements: [] } }))
+
+  change([image("img", 1, "file-1")], {
+    "file-1": { id: "file-1", dataURL: PNG },
+  })
+  await settle()
+
+  expect(calls).toEqual([
+    {
+      url: "/api/rooms/share-token/files/file-1",
+      method: "POST",
+      body: { dataUrl: PNG },
+    },
+  ])
+  // The blob went over HTTP; what reaches the room is the element, now saved.
+  const broadcast = socket.scenesSent.at(-1) ?? []
+  expect(broadcast.map((e) => [e.id, e.status])).toEqual([["img", "saved"]])
+  expect(socket.sent.join("")).not.toContain(PNG)
+})
+
+test("a refused upload gets the errored-image placeholder", async () => {
+  // 413 and 429 are the same answer to the canvas: this image will not reach
+  // the room, so it wears excalidraw's own error state — which is also what
+  // stops peers ever asking the endpoint for it (spec §5.4).
+  const calls = stubFetch({ ok: false, status: 413 })
+  const api = fakeExcalidraw()
+  const { socket, change } = renderRoom(api)
+  act(() => socket.receive({ type: "SCENE_INIT", payload: { elements: [] } }))
+
+  change([image("img", 1, "file-1")], {
+    "file-1": { id: "file-1", dataURL: PNG },
+  })
+  await settle()
+
+  expect(calls).toHaveLength(1)
+  expect(api.scene().map((e) => e.status)).toEqual(["error"])
+})
+
+test("the same blob is offered once, however often onChange fires", async () => {
+  const calls = stubFetch({ ok: true })
+  const api = fakeExcalidraw()
+  const { socket, change } = renderRoom(api)
+  act(() => socket.receive({ type: "SCENE_INIT", payload: { elements: [] } }))
+  const files = { "file-1": { id: "file-1", dataURL: PNG } }
+
+  change([image("img", 1, "file-1")], files)
+  change([image("img", 1, "file-1")], files)
+  await settle()
+
+  expect(calls).toHaveLength(1)
+})
+
+test("images the page already loaded are never uploaded back", async () => {
+  // `restore()` hands stored images back as `pending` forever, so without the
+  // loader's id list every visitor would POST the whole drawing on arrival.
+  const calls = stubFetch({ ok: true })
+  const api = fakeExcalidraw()
+  const { socket, change } = renderRoom(api, ["file-1"])
+  act(() => socket.receive({ type: "SCENE_INIT", payload: { elements: [] } }))
+
+  change([image("img", 1, "file-1")], {
+    "file-1": { id: "file-1", dataURL: PNG },
+  })
+  await settle()
+
+  expect(calls).toEqual([])
+})
+
+test("a peer's saved image is fetched and injected into the canvas", async () => {
+  const calls = stubFetch({
+    ok: true,
+    body: {
+      fileId: "file-1",
+      mimeType: "image/png",
+      dataUrl: PNG,
+      created: 7,
+    },
+  })
+  const api = fakeExcalidraw()
+  const { socket } = renderRoom(api)
+
+  act(() =>
+    socket.receive({
+      type: "SCENE_INIT",
+      payload: { elements: [image("img", 1, "file-1", "saved")] },
+    }),
+  )
+  await settle()
+
+  expect(calls).toEqual([
+    { url: "/api/rooms/share-token/files/file-1", method: "GET", body: null },
+  ])
+  expect(api.addFiles).toHaveBeenCalledWith([
+    { id: "file-1", mimeType: "image/png", dataURL: PNG, created: 7 },
+  ])
+})
+
+test("a late joiner asks only for the bytes it is missing", async () => {
+  const calls = stubFetch({ ok: true, body: null })
+  const api = fakeExcalidraw([], { "file-1": { id: "file-1", dataURL: PNG } })
+  const { socket } = renderRoom(api, ["file-1"])
+
+  act(() =>
+    socket.receive({
+      type: "SCENE_INIT",
+      payload: {
+        elements: [
+          image("has", 1, "file-1", "saved"),
+          image("needs", 1, "file-2", "saved"),
+        ],
+      },
+    }),
+  )
+  await settle()
+
+  expect(calls.map((call) => call.url)).toEqual([
+    "/api/rooms/share-token/files/file-2",
+  ])
+})
+
+test("a peer's pending or errored image is never fetched", async () => {
+  // Pending means the row isn't written yet; errored means it never will be.
+  const calls = stubFetch({ ok: true, body: null })
+  const api = fakeExcalidraw()
+  const { socket } = renderRoom(api)
+
+  act(() =>
+    socket.receive({
+      type: "SCENE_INIT",
+      payload: {
+        elements: [
+          image("a", 1, "file-1", "pending"),
+          image("b", 1, "file-2", "error"),
+        ],
+      },
+    }),
+  )
+  await settle()
+
+  expect(calls).toEqual([])
+})
+
+test("a missed fetch retries itself, in a room that has gone quiet", async () => {
+  // Nothing else would ask again: fetchMissing only runs when a frame
+  // arrives, and a room where everyone stopped drawing sends none.
+  vi.useFakeTimers()
+  const calls = stubFetch({ ok: false })
+  const api = fakeExcalidraw()
+  const { socket } = renderRoom(api)
+
+  act(() =>
+    socket.receive({
+      type: "SCENE_INIT",
+      payload: { elements: [image("img", 1, "file-1", "saved")] },
+    }),
+  )
+  await act(async () => {})
+  expect(calls).toHaveLength(1)
+
+  // No further frames — only the clock moves.
+  await act(() => vi.advanceTimersByTimeAsync(2_000))
+  expect(calls).toHaveLength(2)
+  await act(() => vi.advanceTimersByTimeAsync(2_000))
+  expect(calls).toHaveLength(3)
+
+  // And then it gives up rather than hammering a 404 all session.
+  await act(() => vi.advanceTimersByTimeAsync(30_000))
+  expect(calls).toHaveLength(3)
+})
+
+test("a blip leaves the image pending, and the next change retries it", async () => {
+  // An unanswered request says nothing about the image, so it must not
+  // condemn it — unlike the 413 and 429 the placeholder is meant for.
+  const calls = stubFetch({ ok: true, offline: true })
+  const api = fakeExcalidraw()
+  const { socket, change } = renderRoom(api)
+  act(() => socket.receive({ type: "SCENE_INIT", payload: { elements: [] } }))
+  const files = { "file-1": { id: "file-1", dataURL: PNG } }
+
+  change([image("img", 1, "file-1")], files)
+  await settle()
+  expect(api.scene().map((e) => e.status)).toEqual(["pending"])
+
+  change([image("img", 2, "file-1")], files)
+  await settle()
+
+  expect(calls).toHaveLength(2)
+})
+
+test("an image that never gets an answer eventually gives up", async () => {
+  const calls = stubFetch({ ok: true, offline: true })
+  const api = fakeExcalidraw()
+  const { socket, change } = renderRoom(api)
+  act(() => socket.receive({ type: "SCENE_INIT", payload: { elements: [] } }))
+  const files = { "file-1": { id: "file-1", dataURL: PNG } }
+
+  for (let i = 0; i < 3; i++) {
+    change([image("img", i + 1, "file-1")], files)
+    await settle()
+  }
+  expect(calls).toHaveLength(3)
+  expect(api.scene().map((e) => e.status)).toEqual(["error"])
+
+  // And it stays given up on: further changes carry the errored element, so
+  // nothing offers it again.
+  change(api.scene(), files)
+  await settle()
+  expect(calls).toHaveLength(3)
+})
+
+test.each([
+  ["a server error", 500],
+  // The link was stopped or regenerated mid-session. That says nothing about
+  // the picture, and the socket may well still be live (#121 does the
+  // eviction) — so the room must not be told the image is broken.
+  ["an authorization refusal", 401],
+])("%s is a blip, not a verdict on the image", async (_label, status) => {
+  const calls = stubFetch({ ok: false, status })
+  const api = fakeExcalidraw()
+  const { socket, change } = renderRoom(api)
+  act(() => socket.receive({ type: "SCENE_INIT", payload: { elements: [] } }))
+
+  change([image("img", 1, "file-1")], {
+    "file-1": { id: "file-1", dataURL: PNG },
+  })
+  await settle()
+
+  expect(calls).toHaveLength(1)
+  expect(api.scene().map((e) => e.status)).toEqual(["pending"])
+})
+
+test.each([
+  ["too large", 413],
+  ["too frequent", 429],
+])("%s is a verdict, and errors the image at once", async (_label, status) => {
+  const calls = stubFetch({ ok: false, status })
+  const api = fakeExcalidraw()
+  const { socket, change } = renderRoom(api)
+  act(() => socket.receive({ type: "SCENE_INIT", payload: { elements: [] } }))
+
+  change([image("img", 1, "file-1")], {
+    "file-1": { id: "file-1", dataURL: PNG },
+  })
+  await settle()
+
+  expect(calls).toHaveLength(1)
+  expect(api.scene().map((e) => e.status)).toEqual(["error"])
 })

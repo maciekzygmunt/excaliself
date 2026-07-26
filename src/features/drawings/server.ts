@@ -2,12 +2,13 @@
 
 import { randomUUID } from "node:crypto"
 import { createServerFn } from "@tanstack/react-start"
-import { and, desc, eq, inArray, isNotNull, isNull } from "drizzle-orm"
+import { and, desc, eq, isNotNull, isNull } from "drizzle-orm"
 import { z } from "zod"
 import { db } from "@/db"
 import { drawingFiles, drawings, folders } from "@/db/schema"
 import { findNearestLiveAncestorId } from "@/features/folders/subtree"
 import { authMiddleware } from "@/middleware/auth"
+import { writeDrawingScene } from "./scene-write"
 
 const persistedFileSchema = z.object({
   fileId: z.string(),
@@ -139,67 +140,13 @@ export const saveDrawingScene = createServerFn({ method: "POST" })
       files: z.array(persistedFileSchema),
     }),
   )
-  .handler(async ({ data: { id, data: sceneData, files }, context }) => {
-    const userId = context.session.user.id
-
-    await db.transaction(async (tx) => {
-      const now = new Date()
-
-      // Refuses writes to trashed drawings so a stale open tab can't keep
-      // autosaving into the trash. This guard is permanent: even once trashed
-      // drawings become viewable read-only (#53), writes stay blocked here.
-      const updated = await tx
-        .update(drawings)
-        .set({ data: sceneData, updatedAt: now })
-        .where(
-          and(
-            eq(drawings.id, id),
-            eq(drawings.ownerId, userId),
-            isNull(drawings.deletedAt),
-          ),
-        )
-        .returning({ id: drawings.id })
-      if (updated.length === 0) throw new Error("Drawing not found")
-
-      const existing = await tx
-        .select({ fileId: drawingFiles.fileId })
-        .from(drawingFiles)
-        .where(eq(drawingFiles.drawingId, id))
-      const existingFileIds = new Set(existing.map((row) => row.fileId))
-      const incomingFileIds = new Set(files.map((file) => file.fileId))
-
-      const fileIdsToRemove = [...existingFileIds].filter(
-        (fileId) => !incomingFileIds.has(fileId),
-      )
-      const filesToInsert = files.filter(
-        (file) => !existingFileIds.has(file.fileId),
-      )
-
-      if (fileIdsToRemove.length > 0) {
-        await tx
-          .delete(drawingFiles)
-          .where(
-            and(
-              eq(drawingFiles.drawingId, id),
-              inArray(drawingFiles.fileId, fileIdsToRemove),
-            ),
-          )
-      }
-
-      if (filesToInsert.length > 0) {
-        await tx.insert(drawingFiles).values(
-          filesToInsert.map((file) => ({
-            id: randomUUID(),
-            drawingId: id,
-            fileId: file.fileId,
-            mimeType: file.mimeType,
-            dataUrl: file.dataUrl,
-            createdAt: now,
-          })),
-        )
-      }
-    })
-  })
+  .handler(async ({ data: { id, data: sceneData, files }, context }) =>
+    writeDrawingScene(db, context.session.user.id, {
+      id,
+      data: sceneData,
+      files,
+    }),
+  )
 
 export const trashDrawing = createServerFn({ method: "POST" })
   .middleware([authMiddleware])

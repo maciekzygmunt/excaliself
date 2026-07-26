@@ -1,6 +1,7 @@
 import { expect, test } from "vitest"
 import {
   guestNameForConnection,
+  initialsOf,
   memberDisplayName,
   PARTICIPANT_COLORS,
   pickParticipantColor,
@@ -50,4 +51,12 @@ test("a freed color is reused before the palette wraps", () => {
 test("past the palette's length colors wrap instead of running out", () => {
   const taken = [...PARTICIPANT_COLORS]
   expect(PARTICIPANT_COLORS).toContainEqual(pickParticipantColor(taken))
+})
+
+test("initials come from the first and last word", () => {
+  expect(initialsOf("Ada Lovelace")).toBe("AL")
+  expect(initialsOf("Quiet Otter")).toBe("QO")
+  expect(initialsOf("Wren")).toBe("W")
+  expect(initialsOf("  ada  van  der  berg ")).toBe("AB")
+  expect(initialsOf("   ")).toBe("?")
 })

@@ -13,11 +13,24 @@ import {
 // the share query cache — no invalidation round-trip, so the dialog flips
 // state the moment the server answers.
 
-export function useCreateShare(drawingId: string) {
+/**
+ * `beforeCreate` is the handoff of spec §5.5: the owner's last solo save has
+ * to be in the database *before* the `shares` row exists, because from that
+ * moment the server refuses classic writes and the Room loads the drawing as
+ * stored. Awaiting it inside the mutationFn means `isPending` — and so every
+ * disabled control in the dialog — covers the flush too.
+ */
+export function useCreateShare(
+  drawingId: string,
+  options: { beforeCreate?: () => Promise<void> } = {},
+) {
   const queryClient = useQueryClient()
+  const { beforeCreate } = options
   return useMutation({
-    mutationFn: (audience: ShareAudience) =>
-      createShare({ data: { drawingId, audience } }),
+    mutationFn: async (audience: ShareAudience) => {
+      await beforeCreate?.()
+      return createShare({ data: { drawingId, audience } })
+    },
     onSuccess: (share) => {
       queryClient.setQueryData(
         drawingShareQueryOptions(drawingId).queryKey,
@@ -28,6 +41,14 @@ export function useCreateShare(drawingId: string) {
   })
 }
 
+/**
+ * Deleting the row is only half of stop-sharing (spec §5.5). It hands the
+ * owner's own tabs back to classic autosave — the share query empties, their
+ * sockets close, and the paused hook picks up on the merged scene — but the
+ * guests' sockets stay open until the server evicts them, and until then the
+ * Room and the owner are both writing the drawing. That eviction is #121; the
+ * two never ship apart, since the whole feature lands on main in one merge.
+ */
 export function useStopSharing(drawingId: string) {
   const queryClient = useQueryClient()
   return useMutation({

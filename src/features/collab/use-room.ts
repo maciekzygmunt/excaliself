@@ -25,7 +25,10 @@ import {
   restoreElements,
 } from "@excalidraw/excalidraw"
 import type { OrderedExcalidrawElement } from "@excalidraw/excalidraw/element/types"
-import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types"
+import type {
+  BinaryFiles,
+  ExcalidrawImperativeAPI,
+} from "@excalidraw/excalidraw/types"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { createReconnectBackoff } from "./backoff"
 import { toCollaborators } from "./collaborators"
@@ -49,6 +52,7 @@ import {
 } from "./scene-sync"
 import { CURSOR_INTERVAL_MS, createDroppableThrottle } from "./throttle"
 import { useFollow } from "./use-follow"
+import { useRoomFiles } from "./use-room-files"
 
 /**
  * Skip a frame when the socket is already backed up rather than queueing it
@@ -74,8 +78,12 @@ export type ConnectionStatus = "connecting" | "connected" | "reconnecting"
 export function useRoom(options: {
   /** The share token from the URL; null keeps the socket closed. */
   token: string | null
-  /** This tab's display name. Only honored by the server for guests. */
-  name: string
+  /**
+   * This tab's display name, or null when it has none to offer — a member's
+   * name comes from their session and the server ignores whatever the wire
+   * claims, so the owner's own tab has nothing to say here.
+   */
+  name: string | null
   excalidrawAPI: ExcalidrawImperativeAPI | null
   /** The room turned this tab away at its participant cap (spec §4.5). */
   onRoomFull: () => void
@@ -85,8 +93,15 @@ export function useRoom(options: {
    * page is expected to re-resolve the token (spec §5.3).
    */
   onLinkDead: () => void
+  /**
+   * The image ids the page loaded out of the database — the drawing's images
+   * from before this visit. They are already stored, so this tab owes the
+   * room nothing for them (spec §2.4). Must be referentially stable.
+   */
+  storedFileIds: readonly string[]
 }) {
-  const { token, name, excalidrawAPI, onRoomFull, onLinkDead } = options
+  const { token, name, excalidrawAPI, onRoomFull, onLinkDead, storedFileIds } =
+    options
 
   const [participants, setParticipants] = useState<Participant[]>([])
   const [selfConnectionId, setSelfConnectionId] = useState<string | null>(null)
@@ -152,6 +167,15 @@ export function useRoom(options: {
     [],
   )
 
+  // Image bytes ride HTTP, not the socket (spec §2.4). Both halves are driven
+  // from the two places below — local changes and remote frames — and, like
+  // everything else in here, never cause a render.
+  const { uploadPending, fetchMissing } = useRoomFiles({
+    token,
+    excalidrawAPI,
+    storedFileIds,
+  })
+
   const follow = useFollow({ excalidrawAPI, send, isBackedUp })
   // The socket effect must not re-run when follow state changes, so its
   // handlers are reached through a ref like everything else in there.
@@ -198,20 +222,24 @@ export function useRoom(options: {
    * while the socket was still opening, and the catch-up below — the one
    * thing that would have carried them — would then skip every one of them.
    *
-   * Excalidraw also hands `onChange` the scene's `files`, and they are
-   * deliberately dropped: image bytes never travel on the socket (spec §2.4).
-   * An image element syncs like any other element, but its blob rides a
-   * room-scoped HTTP endpoint that peers GET and inject with `addFiles()` —
-   * until that lands (#124), an image added mid-session reaches peers as an
-   * element they have no bytes for.
+   * The scene's `files` never reach the socket — image bytes travel over the
+   * room-scoped HTTP endpoint instead (spec §2.4). The upload is offered
+   * ahead of the SCENE_INIT gate on purpose: storing a blob needs the token,
+   * not the room, and an image pasted while the socket is still opening would
+   * otherwise sit `pending` until something else moved the scene.
    */
   const onChange = useCallback(
-    (elements: readonly OrderedExcalidrawElement[]) => {
+    (
+      elements: readonly OrderedExcalidrawElement[],
+      _appState: unknown,
+      files: BinaryFiles,
+    ) => {
+      uploadPending(elements, files)
       if (!sceneInitializedRef.current) return
       const delta = broadcasterRef.current.delta(elements)
       if (delta && sendScene(delta)) queueFullSync()
     },
-    [sendScene, queueFullSync],
+    [sendScene, queueFullSync, uploadPending],
   )
 
   /**
@@ -220,29 +248,37 @@ export function useRoom(options: {
    * holds, then apply it with `CaptureUpdateAction.NEVER` so a peer's work
    * never lands in this tab's undo stack (spec §2.2). Returns the scene as
    * merged, for the callers that need to answer it.
+   *
+   * The merged scene is also what the blob half reads: a peer's image arrives
+   * here as an element with no bytes, and its `saved` status is the signal
+   * that the room-scoped endpoint has them.
    */
-  const applyRemoteScene = useCallback((remote: SceneElement[]) => {
-    const api = apiRef.current
-    if (!api) return null
-    // Both casts cross the same gap: a `SceneElement` is an element the type
-    // system has no proof about, and `restoreElements` is precisely the call
-    // that establishes it — after which the branded remote/reconciled types
-    // are bookkeeping upstream does for its own callers.
-    const restored = restoreElements(remote as never, null)
-    const reconciled = reconcileElements(
-      api.getSceneElementsIncludingDeleted(),
-      restored as never,
-      api.getAppState(),
-    )
-    // Ahead of updateScene, which re-triggers onChange synchronously — after
-    // it, this merge would go straight back out as if it were a local edit.
-    broadcasterRef.current.received(remote, reconciled)
-    api.updateScene({
-      elements: reconciled,
-      captureUpdate: CaptureUpdateAction.NEVER,
-    })
-    return reconciled
-  }, [])
+  const applyRemoteScene = useCallback(
+    (remote: SceneElement[]) => {
+      const api = apiRef.current
+      if (!api) return null
+      // Both casts cross the same gap: a `SceneElement` is an element the type
+      // system has no proof about, and `restoreElements` is precisely the call
+      // that establishes it — after which the branded remote/reconciled types
+      // are bookkeeping upstream does for its own callers.
+      const restored = restoreElements(remote as never, null)
+      const reconciled = reconcileElements(
+        api.getSceneElementsIncludingDeleted(),
+        restored as never,
+        api.getAppState(),
+      )
+      // Ahead of updateScene, which re-triggers onChange synchronously — after
+      // it, this merge would go straight back out as if it were a local edit.
+      broadcasterRef.current.received(remote, reconciled)
+      api.updateScene({
+        elements: reconciled,
+        captureUpdate: CaptureUpdateAction.NEVER,
+      })
+      fetchMissing(reconciled)
+      return reconciled
+    },
+    [fetchMissing],
+  )
 
   /**
    * Everything the socket that just went away had established. Called on
@@ -309,7 +345,8 @@ export function useRoom(options: {
 
       socket.addEventListener("open", () => {
         ownBeat.start()
-        send({ type: "JOIN", payload: { name: nameRef.current } })
+        const name = nameRef.current
+        if (name !== null) send({ type: "JOIN", payload: { name } })
       })
 
       socket.addEventListener("message", (event) => {
@@ -429,9 +466,9 @@ export function useRoom(options: {
   ])
 
   // Rejoining is what re-announces a name, so this only matters while the
-  // socket is already open (the guest name pill lands in a later slice).
+  // socket is already open — the guest name pill renaming mid-session.
   useEffect(() => {
-    send({ type: "JOIN", payload: { name } })
+    if (name !== null) send({ type: "JOIN", payload: { name } })
   }, [name, send])
 
   const allowCursor = useRef(createDroppableThrottle(CURSOR_INTERVAL_MS))

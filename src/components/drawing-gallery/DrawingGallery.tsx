@@ -6,6 +6,7 @@ import {
   Trash2,
 } from "lucide-react"
 import { useEffect, useMemo, useRef, useState } from "react"
+import { LiveAvatarStack } from "@/components/live-badge"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,6 +14,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Skeleton } from "@/components/ui/skeleton"
+import { useLiveDrawing } from "@/features/collab/queries"
 import type { Drawing } from "@/features/drawings/queries"
 import type { Folder } from "@/features/folders/queries"
 import { useDelayedVisible } from "@/hooks/use-delayed-visible"
@@ -153,6 +155,10 @@ function DrawingCard({
   folder?: Folder
   onTrash: () => void
 }) {
+  // Read per card rather than per grid: one shared poll loop either way
+  // (spec §1.5), and a poll that found one new visitor re-renders one card.
+  const live = useLiveDrawing(drawing.id)
+
   return (
     <div
       className={cn(
@@ -167,8 +173,17 @@ function DrawingCard({
         aria-label={drawing.name}
         className="absolute inset-0 rounded-card"
       />
-      <div className="aspect-[4/3] overflow-hidden border-b border-hairline">
+      {/* `relative` anchors the avatar stack to the preview's corner — and
+          makes this div positioned, so it now paints above the stretched
+          link that is its DOM-earlier sibling. `pointer-events-none` is what
+          keeps clicks on the preview (the card's largest target) reaching
+          that link instead of dying here; nothing inside is interactive. */}
+      <div className="pointer-events-none relative aspect-[4/3] overflow-hidden border-b border-hairline">
         <Preview name={drawing.name} data={drawing.data} />
+        <LiveAvatarStack
+          live={live}
+          className="absolute bottom-2 left-2 animate-in fade-in-0 zoom-in-95 duration-200"
+        />
       </div>
       <div className="flex items-center gap-2 px-3 py-2.5">
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
