@@ -12,27 +12,19 @@ import { defineWebSocketHandler } from "nitro"
 import { db } from "@/db"
 import { resolveRoomJoin } from "@/features/collab/join"
 import { ROOM_FULL_CLOSE_CODE } from "@/features/collab/protocol"
+import { rooms } from "@/features/collab/room-registry"
 import type {
   ParticipantIdentity,
   RoomPeer,
 } from "@/features/collab/room-session"
 import {
-  createRoomRegistry,
   joinRoom,
   leaveRoom,
   receiveFromPeer,
 } from "@/features/collab/room-session"
-import { loadRoomScene } from "@/features/collab/scene-store"
 import { resolveShareForRoom } from "@/features/shares/store"
 import { allowTokenValidation } from "@/features/shares/token-rate-limit"
 import { auth } from "@/lib/auth"
-
-/**
- * Live rooms for this process. In-memory by design (spec §2.3) — the app
- * stays single-replica until a pub/sub backplane is added. Each Room reads
- * the drawing's stored scene once, on the first join.
- */
-const rooms = createRoomRegistry((roomId) => loadRoomScene(db, roomId))
 
 type PeerContext = { roomId: string; identity: ParticipantIdentity }
 

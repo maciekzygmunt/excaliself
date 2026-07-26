@@ -1,9 +1,38 @@
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render as renderBare,
+  screen,
+} from "@testing-library/react"
 import { afterEach, beforeAll, beforeEach, expect, test, vi } from "vitest"
 import type { Drawing } from "@/features/drawings/queries"
 import type { Folder } from "@/features/folders/queries"
 import { DrawingGallery } from "./DrawingGallery"
 import { renderPreviewSvg } from "./preview"
+
+// Cards poll for live sessions (spec §1.5); these tests are not about the
+// badge, so the poll answers "nobody".
+vi.mock("@/features/collab/server", () => ({
+  getLiveDrawings: vi.fn(async () => []),
+}))
+
+/**
+ * Every card runs the live poll's `useQuery`, so it needs a client — and
+ * `rerender` has to keep the same one, or the second render loses it.
+ */
+const render = (ui: React.ReactElement) => {
+  const client = new QueryClient()
+  const wrap = (node: React.ReactElement) => (
+    <QueryClientProvider client={client}>{node}</QueryClientProvider>
+  )
+  const result = renderBare(wrap(ui))
+  return {
+    ...result,
+    rerender: (node: React.ReactElement) => result.rerender(wrap(node)),
+  }
+}
 
 vi.mock("@tanstack/react-router", () => ({
   Link: ({
