@@ -1,7 +1,9 @@
 import { Link, useNavigate, useParams } from "@tanstack/react-router"
 import { File } from "lucide-react"
+import { LiveCountChip } from "@/components/live-badge"
 import { Input } from "@/components/ui/input"
 import { SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar"
+import { useLiveDrawing } from "@/features/collab/queries"
 import {
   useRenameDrawing,
   useToggleStarDrawing,
@@ -39,6 +41,7 @@ export function DrawingItem({ drawing }: DrawingItemProps) {
 
   const trashDrawing = useTrashDrawing()
   const starMutation = useToggleStarDrawing()
+  const live = useLiveDrawing(drawing.id)
 
   const handleTrash = () => {
     // Instant, no confirm — the mutation shows the undo toast itself
@@ -58,7 +61,16 @@ export function DrawingItem({ drawing }: DrawingItemProps) {
       {rename.isRenaming ? (
         <Input {...rename.inputProps} className="h-5 rounded px-1 text-sm" />
       ) : (
-        <span className="truncate transition-colors">{drawing.name}</span>
+        <>
+          <span className="truncate transition-colors">{drawing.name}</span>
+          {/* mr-4 clears the row's overflow trigger, which is absolutely
+              positioned over the right edge and always visible on touch —
+              so the chip never ends up underneath it. */}
+          <LiveCountChip
+            live={live}
+            className="mr-4 ml-auto animate-in fade-in-0 duration-200"
+          />
+        </>
       )}
     </>
   )

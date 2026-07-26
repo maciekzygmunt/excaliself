@@ -26,6 +26,12 @@ import { drawingsQueryOptions } from "@/features/drawings/queries"
 import { getDrawings, setDrawingStarred } from "@/features/drawings/server"
 import { StarredSection } from "./StarredSection"
 
+// Cards and rows poll for live sessions (spec §1.5); these tests are not
+// about the badge, so the poll answers "nobody".
+vi.mock("@/features/collab/server", () => ({
+  getLiveDrawings: vi.fn(async () => []),
+}))
+
 vi.mock("@tanstack/react-router", () => ({
   Link: ({
     to,

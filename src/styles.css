@@ -73,6 +73,11 @@ code {
   --iris-strong: #453da5;
   --iris-muted: rgba(111, 102, 201, 0.1);
   --iris-ring: rgba(111, 102, 201, 0.14);
+  /* The palette's one green, spent only on the live badge (canvas sharing
+     spec §1.5) — "someone else is in this drawing right now". Iris is the
+     accent; this reads as a different kind of fact, not a second accent. */
+  --live: #047857;
+  --live-muted: rgba(5, 150, 105, 0.13);
   /* Surface recipes (spec: etched-redesign — values are the decision). */
   --panel-shadow:
     0 1px 2px rgba(0, 0, 0, 0.04), 0 16px 40px rgba(0, 0, 0, 0.05);
@@ -144,6 +149,9 @@ code {
   --iris-strong: #b6b0e8;
   --iris-muted: rgba(141, 133, 214, 0.14);
   --iris-ring: rgba(141, 133, 214, 0.2);
+  /* Lifted for AA on the dark sidebar, like iris above it. */
+  --live: #6ee7b7;
+  --live-muted: rgba(52, 211, 153, 0.15);
   --panel-shadow: 0 16px 40px rgba(0, 0, 0, 0.4);
   --keycap-from: #2b2b33;
   --keycap-to: #232329;
@@ -209,6 +217,8 @@ code {
   --color-iris-strong: var(--iris-strong);
   --color-iris-muted: var(--iris-muted);
   --color-iris-ring: var(--iris-ring);
+  --color-live: var(--live);
+  --color-live-muted: var(--live-muted);
   --color-keycap-from: var(--keycap-from);
   --color-keycap-to: var(--keycap-to);
   --color-keycap-to-active: var(--keycap-to-active);
