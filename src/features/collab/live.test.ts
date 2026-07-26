@@ -16,6 +16,7 @@ const fakePeer = (id: string): RoomPeer => ({
   send: (_data: ServerMessage) => {},
   publish: (_topic: string, _data: ServerMessage) => {},
   subscribe: (_topic: string) => {},
+  close: (_code: number, _reason: string) => {},
 })
 
 /** Every drawing in these tests belongs to OWNER unless a test says otherwise. */
@@ -30,10 +31,15 @@ const registryOf = (load: SceneLoader = ownedByOwner) =>
   createRoomRegistry(load, async () => {})
 
 const member = (userId: string, displayName: string) => ({
+  authorizedAt: Number.MAX_SAFE_INTEGER,
   userId,
   displayName,
 })
-const guest = (displayName: string) => ({ userId: null, displayName })
+const guest = (displayName: string) => ({
+  userId: null,
+  displayName,
+  authorizedAt: Number.MAX_SAFE_INTEGER,
+})
 
 test("a room with someone else in it becomes one badge", async () => {
   const registry = registryOf()

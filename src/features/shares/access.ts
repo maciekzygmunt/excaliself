@@ -4,6 +4,14 @@
 
 export type ShareAudience = "members" | "anyone"
 
+/**
+ * Whether this audience lets in a visitor who never signed in. The one place
+ * the two values are told apart, so the rule that turns a session-less visit
+ * into the sign-in gate and the rule that evicts guests when a link tightens
+ * cannot drift out of step (spec §4.1, §4.2).
+ */
+export const admitsGuests = (audience: ShareAudience) => audience === "anyone"
+
 export type ShareAccess =
   /** Valid link, audience satisfied — open the drawing. */
   | "ok"
@@ -25,6 +33,6 @@ export function resolveShareAccess(input: {
   const { share, drawing, hasSession } = input
   if (!share || !drawing) return "dead"
   if (drawing.deletedAt !== null) return "dead"
-  if (share.audience === "members" && !hasSession) return "signin"
+  if (!admitsGuests(share.audience) && !hasSession) return "signin"
   return "ok"
 }

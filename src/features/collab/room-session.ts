@@ -18,7 +18,12 @@
 
 import { guestNameForConnection, pickParticipantColor } from "./identity"
 import type { Participant, SceneElement, ServerMessage } from "./protocol"
-import { parseClientMessage, ROOM_TOPIC } from "./protocol"
+import {
+  LINK_DEAD_CLOSE_CODE,
+  LINK_DEAD_CLOSE_REASON,
+  parseClientMessage,
+  ROOM_TOPIC,
+} from "./protocol"
 import { getSceneVersion, reconcileElements } from "./reconcile"
 import type { StoredScene } from "./scene-store"
 
@@ -30,6 +35,12 @@ export interface RoomPeer {
   /** Fans out to the rest of the namespace; never echoes to the sender. */
   publish(topic: string, data: ServerMessage): void
   subscribe(topic: string): void
+  /**
+   * Hangs up on this socket. The code is the whole message — a browser hands
+   * the page nothing else it can act on — so the two the client reads
+   * (`LINK_DEAD_CLOSE_CODE`, `ROOM_FULL_CLOSE_CODE`) are the vocabulary.
+   */
+  close(code: number, reason: string): void
 }
 
 /**
@@ -40,6 +51,16 @@ export interface RoomPeer {
 export type ParticipantIdentity = {
   userId: string | null
   displayName: string | null
+  /**
+   * The registry stamp the upgrade drew *before* it looked the token up, from
+   * {@link nextAuthorization}. It exists because a socket is not seated at
+   * the moment it is authorized: the upgrade's database round trip, the
+   * handshake, and the `open` hook all sit between the two, and a link that
+   * dies in that gap finds no Room to evict this connection from — it hasn't
+   * joined one yet. Comparing this against what the link has done since is
+   * how such a join is refused instead (spec §4.2).
+   */
+  authorizedAt: number
 }
 
 /** Reads a drawing's stored scene when its Room first spins up. */
@@ -119,6 +140,85 @@ export type RoomRegistry = {
   saveScene: SceneSaver
   /** Injected so the ghost sweep of spec §5.3 is drivable from a test. */
   now: () => number
+  /**
+   * Hands out {@link ParticipantIdentity.authorizedAt} and stamps every link
+   * change, so the two are ordered against each other by one sequence. A
+   * clock cannot do this job: an upgrade and the stop-sharing that outran it
+   * routinely land in the same millisecond, and a tie is exactly the case
+   * this has to decide.
+   *
+   * "One sequence" is only true because there is one registry per process —
+   * the websocket route draws the stamps and the server functions record the
+   * changes, and those are separate bundles. That is what the `Symbol.for`
+   * pin in `room-registry.ts` exists for; two registries would put the two
+   * halves on counters that mean nothing to each other.
+   */
+  authorizations: number
+  /**
+   * Links that changed while sockets may still have been dialing them, keyed
+   * by drawing id. Only ever read by a join (see {@link joinRoom}) and swept
+   * as it grows, so it holds a handful of entries at most.
+   */
+  linkChanges: Map<string, LinkChange>
+}
+
+/**
+ * A link change, stamped from the registry's authorization sequence. `all` is
+ * stop, regenerate, and trash — no join authorized before it may take a seat.
+ * `guests` is an audience tightened to members, which refuses only the joins
+ * with no member behind them.
+ */
+type LinkChange = {
+  all: number
+  guests: number
+  /** Wall clock, for the sweep below and nothing else. */
+  recordedAt: number
+}
+
+/**
+ * How long a link change is remembered for the sake of sockets that were
+ * already dialing when it landed. It only has to outlive one websocket
+ * handshake — the gap between the upgrade's decision and the `open` hook —
+ * and a minute is orders of magnitude more than that. Without the sweep the
+ * map would keep an entry for every drawing ever stopped, regenerated, or
+ * trashed, for the life of the process.
+ */
+export const LINK_CHANGE_MEMORY_MS = 60_000
+
+/**
+ * The next stamp in the registry's sequence. Drawn by the upgrade before it
+ * validates a token, and by every link change as it lands.
+ */
+export function nextAuthorization(registry: RoomRegistry): number {
+  registry.authorizations += 1
+  return registry.authorizations
+}
+
+/**
+ * Record what a link just did to the sockets still dialing it. Swept on every
+ * write rather than on a timer: writes are rare (a link change is a human
+ * clicking a button), and a timer would be one more thing to own and shut
+ * down.
+ */
+function recordLinkChange(
+  registry: RoomRegistry,
+  roomId: string,
+  scope: "all" | "guests",
+) {
+  const now = registry.now()
+  for (const [id, change] of registry.linkChanges)
+    if (now - change.recordedAt > LINK_CHANGE_MEMORY_MS)
+      registry.linkChanges.delete(id)
+
+  const previous = registry.linkChanges.get(roomId)
+  const stamp = nextAuthorization(registry)
+  registry.linkChanges.set(roomId, {
+    // Each field only ever moves forward: a tighten after a stop must not
+    // narrow the stop back down to guests.
+    all: scope === "all" ? stamp : (previous?.all ?? 0),
+    guests: stamp,
+    recordedAt: now,
+  })
 }
 
 export function createRoomRegistry(
@@ -126,7 +226,14 @@ export function createRoomRegistry(
   saveScene: SceneSaver,
   now: () => number = () => Date.now(),
 ): RoomRegistry {
-  return { rooms: new Map(), loadScene, saveScene, now }
+  return {
+    rooms: new Map(),
+    loadScene,
+    saveScene,
+    now,
+    authorizations: 0,
+    linkChanges: new Map(),
+  }
 }
 
 /**
@@ -321,22 +428,68 @@ export const PARTICIPANT_IDLE_TIMEOUT_MS = 90_000
 function forgetSilentParticipants(room: Room, now: number) {
   for (const [connectionId, lastSeenAt] of room.lastSeenAt) {
     if (now - lastSeenAt < PARTICIPANT_IDLE_TIMEOUT_MS) continue
-    room.participants.delete(connectionId)
-    room.peers.delete(connectionId)
-    // Every map keyed by connection id, or the live badge would keep counting
-    // a ghost against its owner (spec §1.5).
-    room.userIds.delete(connectionId)
-    room.follows.delete(connectionId)
-    room.lastSeenAt.delete(connectionId)
-    for (const [follower, followed] of room.follows)
-      if (followed === connectionId) room.follows.delete(follower)
+    forgetConnection(room, connectionId)
   }
+}
+
+/**
+ * Drop one connection from every map the Room keys by connection id — the
+ * single answer to "this socket is no longer in the room", however it got
+ * there: it left, it went silent, or its link died under it.
+ *
+ * All five have to go together. A leftover in `userIds` keeps the live badge
+ * counting a seat nobody is in (spec §1.5); a leftover in `follows` relays
+ * viewports into a socket that is gone; a leftover in `lastSeenAt` is a ghost
+ * the sweep will keep re-forgetting.
+ *
+ * The peer this one was trailing is told its audience shrank. The other
+ * direction needs no message: Excalidraw drops `userToFollow` by itself once
+ * the followed collaborator falls out of the roster.
+ */
+function forgetConnection(room: Room, connectionId: string) {
+  room.participants.delete(connectionId)
+  room.peers.delete(connectionId)
+  room.userIds.delete(connectionId)
+  room.lastSeenAt.delete(connectionId)
+
+  const wasFollowing = room.follows.get(connectionId) ?? null
+  room.follows.delete(connectionId)
+  for (const follower of followersOf(room, connectionId))
+    room.follows.delete(follower)
+  if (wasFollowing) sendFollowedBy(room, wasFollowing)
 }
 
 export type RoomJoinResult =
   | { status: "ok" }
   /** The Room is at its cap; the visitor gets the "drawing full" page. */
   | { status: "full" }
+  /**
+   * The link changed while this socket was still dialing. Indistinguishable
+   * to the visitor from any other dead link — it is one.
+   */
+  | { status: "refused" }
+
+/**
+ * Whether the link outran this socket: it was authorized to join, and then
+ * the link it was authorized against was stopped, regenerated, trashed, or
+ * tightened out from under it before it ever took a seat.
+ *
+ * This is the half of the eviction that `terminateRoom` cannot do. Evicting
+ * works through the Room's roster, and a socket still in its handshake is in
+ * no roster — for a drawing nobody else is in, there is not even a Room to
+ * look in, so the termination finds nothing, returns, and the join a moment
+ * later builds a fresh Room around a link that is already dead.
+ */
+function outrunByLinkChange(
+  registry: RoomRegistry,
+  roomId: string,
+  identity: ParticipantIdentity,
+): boolean {
+  const change = registry.linkChanges.get(roomId)
+  if (!change) return false
+  if (change.all > identity.authorizedAt) return true
+  return identity.userId === null && change.guests > identity.authorizedAt
+}
 
 export async function joinRoom(
   registry: RoomRegistry,
@@ -344,6 +497,12 @@ export async function joinRoom(
   peer: RoomPeer,
   identity: ParticipantIdentity,
 ): Promise<RoomJoinResult> {
+  // Ahead of everything else, including the cap: a socket the link has
+  // already disowned must not be told the drawing is full, and must not
+  // start a scene read.
+  if (outrunByLinkChange(registry, roomId, identity))
+    return { status: "refused" }
+
   // Checked before the Room is created, so a refused join never leaves an
   // empty one behind — and never starts a scene read for a peer that is
   // about to be turned away. Ghosts are swept first: a seat nobody is
@@ -610,19 +769,8 @@ export async function leaveRoom(
   peer: RoomPeer,
 ) {
   const room = registry.rooms.get(roomId)
-  if (!room?.participants.delete(peer.id)) return
-  room.peers.delete(peer.id)
-  room.userIds.delete(peer.id)
-  room.lastSeenAt.delete(peer.id)
-
-  // A departing peer both stops following and stops being followed. Its own
-  // followers need no message — Excalidraw drops `userToFollow` by itself
-  // once the followed collaborator falls out of the roster.
-  const wasFollowing = room.follows.get(peer.id) ?? null
-  room.follows.delete(peer.id)
-  for (const followerId of followersOf(room, peer.id))
-    room.follows.delete(followerId)
-  if (wasFollowing) sendFollowedBy(room, wasFollowing)
+  if (!room?.participants.has(peer.id)) return
+  forgetConnection(room, peer.id)
 
   // The last socket out writes the scene before the Room is torn down
   // (spec §2.3) — otherwise everything since the last throttle tick would
@@ -636,4 +784,132 @@ export async function leaveRoom(
     return
   }
   peer.publish(ROOM_TOPIC, rosterMessage(room))
+}
+
+// --- link lifecycle (spec §4.2, §5.1) -----------------------------------
+
+/** The one thing an evicted socket is told, whatever killed its link. */
+const closeAsDead = (peer: RoomPeer) =>
+  peer.close(LINK_DEAD_CLOSE_CODE, LINK_DEAD_CLOSE_REASON)
+
+/**
+ * End a Room and hang up on everyone in it — the single termination path
+ * behind stop sharing, regenerate, and trash (spec §4.2, §4.3, §5.1). All
+ * three differ only in what they did to the `shares` row first; from here on
+ * they are the same three steps in the same order.
+ *
+ * The Room is frozen, then written, and only then hung up on. The write
+ * comes before the closes and is awaited, which is what makes "guest work up
+ * to the moment of trash is preserved" true; it is also what lets the owner's
+ * tab resume classic autosave the instant the mutation resolves (spec §5.5),
+ * because by then the Room has written what it had.
+ *
+ * The Room is then dropped rather than left standing empty, so re-sharing
+ * later spins one up that reads the drawing fresh. `reapIfIdle` keeps the one
+ * exception it always keeps: a write the database refused is retried on the
+ * throttle, and a Room that still owes one keeps its place until it lands.
+ * That is the case where "written before the sockets close" is best effort
+ * rather than a guarantee — a retry can land after the owner has resumed
+ * autosave and overwrite it with the scene as the Room last saw it. The
+ * alternative is holding sockets open on a link that is already dead while a
+ * database that is refusing writes comes back, which is worse; and the owner
+ * is not editing blind through it, because their own saves are failing too
+ * and say so.
+ */
+export async function terminateRoom(
+  registry: RoomRegistry,
+  roomId: string,
+): Promise<void> {
+  // Recorded before the early return, because the early return is exactly
+  // the case it covers: no Room means nobody has joined *yet*, which includes
+  // the socket whose handshake is in flight right now (see `joinRoom`).
+  recordLinkChange(registry, roomId, "all")
+
+  const room = registry.rooms.get(roomId)
+  if (!room) return
+
+  // An edit that arrived before this call is still queued behind the scene
+  // read (see `receiveFromPeer`), and waiting on the same promise puts this
+  // behind it — so the flush below carries it rather than leaving it to a
+  // throttle tick after the sockets are already gone.
+  await room.loaded
+
+  // Then the roster goes, *before* the flush rather than after it. Emptying
+  // it is what freezes the Room: `receiveFromPeer` answers a frame from a
+  // connection with no seat with "evicted" and merges nothing, so the scene
+  // handed to the write below is the last one there will ever be.
+  //
+  // Clearing afterwards instead leaves a window the length of a database
+  // round trip in which a peer still has a seat: its edit merges into a Room
+  // whose write is already in flight with the previous array, marks the Room
+  // dirty again, and survives only as a 15 s retry — landing after the owner
+  // has resumed classic autosave (spec §5.5) and overwriting whatever they
+  // have saved since. The stroke that loses the race is lost either way; what
+  // this decides is whether it takes later work down with it.
+  //
+  // The peers are captured first because closing a socket is what fires the
+  // route's `close` hook — `leaveRoom`, which must find nothing left to do
+  // rather than taking itself for the last participant out and flushing again.
+  const peers = [...room.peers.values()]
+  room.participants.clear()
+  room.peers.clear()
+  room.userIds.clear()
+  room.follows.clear()
+  room.lastSeenAt.clear()
+
+  await flushRoom(registry, room)
+  reapIfIdle(registry, room)
+
+  for (const peer of peers) closeAsDead(peer)
+}
+
+/**
+ * Tightening a link's audience to `members` (spec §4.2): close the sockets
+ * that never authenticated one, and leave everyone else exactly where they
+ * are, mid-stroke. Loosening evicts nobody — it only affects who may join
+ * next — so callers reach this for `members` and nothing else.
+ *
+ * Membership is read from `userIds`, which is what the *upgrade* established,
+ * never from the roster's `isGuest`: the roster is the copy that goes on the
+ * wire, and a client is exactly the thing that must not get a say in this.
+ */
+export async function evictNonMembers(
+  registry: RoomRegistry,
+  roomId: string,
+): Promise<void> {
+  // Same reason as `terminateRoom`, narrowed to who the link stopped
+  // admitting: a guest authorized under `anyone` and still mid-handshake is
+  // in no roster to evict.
+  recordLinkChange(registry, roomId, "guests")
+
+  const room = registry.rooms.get(roomId)
+  if (!room) return
+
+  // Same reason as `terminateRoom`: a guest's last stroke, sent a moment
+  // before the audience tightened, merges before its seat is taken away.
+  await room.loaded
+
+  const evicted: RoomPeer[] = []
+  for (const connectionId of [...room.participants.keys()]) {
+    // A member's id is a non-empty string; a guest's is null.
+    if (room.userIds.get(connectionId)) continue
+    const peer = room.peers.get(connectionId)
+    forgetConnection(room, connectionId)
+    if (peer) evicted.push(peer)
+  }
+  if (evicted.length === 0) return
+
+  if (room.participants.size === 0) {
+    // The guests were the whole room: this is last-leave, and the scene has
+    // to be written before the Room is let go.
+    await flushRoom(registry, room)
+    reapIfIdle(registry, room)
+  } else {
+    // Sent rather than published: the peers whose sockets could have fanned
+    // this out are the ones being closed.
+    const message = rosterMessage(room)
+    for (const peer of room.peers.values()) peer.send(message)
+  }
+
+  for (const peer of evicted) closeAsDead(peer)
 }

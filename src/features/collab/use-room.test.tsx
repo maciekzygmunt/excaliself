@@ -787,8 +787,8 @@ test("an image that never gets an answer eventually gives up", async () => {
 test.each([
   ["a server error", 500],
   // The link was stopped or regenerated mid-session. That says nothing about
-  // the picture, and the socket may well still be live (#121 does the
-  // eviction) — so the room must not be told the image is broken.
+  // the picture, and the socket may well still be live — the eviction that
+  // follows is a separate frame — so the room must not be told it is broken.
   ["an authorization refusal", 401],
 ])("%s is a blip, not a verdict on the image", async (_label, status) => {
   const calls = stubFetch({ ok: false, status })

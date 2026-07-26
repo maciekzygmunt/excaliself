@@ -42,6 +42,14 @@ export const ROOM_FULL_CLOSE_CODE = 4029
  */
 export const LINK_DEAD_CLOSE_CODE = 4010
 
+/**
+ * The reason string that rides along with it. Nothing reads it — the code is
+ * the whole message — but the two places that hang up on a dead link (a
+ * refused upgrade, and a link killed under a live socket) say the same thing
+ * in the logs.
+ */
+export const LINK_DEAD_CLOSE_REASON = "Link no longer active"
+
 /** Cursor and avatar color, in Excalidraw's `Collaborator["color"]` shape. */
 export type ParticipantColor = { background: string; stroke: string }
 

@@ -6,6 +6,8 @@ import { and, desc, eq, isNotNull, isNull } from "drizzle-orm"
 import { z } from "zod"
 import { db } from "@/db"
 import { drawingFiles, drawings, folders } from "@/db/schema"
+import { rooms } from "@/features/collab/room-registry"
+import { terminateRoom } from "@/features/collab/room-session"
 import { findNearestLiveAncestorId } from "@/features/folders/subtree"
 import { authMiddleware } from "@/middleware/auth"
 import { writeDrawingScene } from "./scene-write"
@@ -168,6 +170,14 @@ export const trashDrawing = createServerFn({ method: "POST" })
       )
       .returning({ id: drawings.id })
     if (trashed.length === 0) throw new Error("Drawing not found")
+
+    // Trashing mid-session reuses the stop-sharing termination path verbatim
+    // (spec §5.1): the Room writes what the session produced — so restoring
+    // brings all of it back — and every socket is closed. The `shares` row
+    // survives, which is what makes restore revive the existing link; the
+    // evicted guests re-validate, hit the `deletedAt` check, and land on the
+    // same generic dead-link page a stopped link gets.
+    await terminateRoom(rooms, id)
   })
 
 /**
