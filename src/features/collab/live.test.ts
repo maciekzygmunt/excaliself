@@ -16,6 +16,7 @@ const fakePeer = (id: string): RoomPeer => ({
   send: (_data: ServerMessage) => {},
   publish: (_topic: string, _data: ServerMessage) => {},
   subscribe: (_topic: string) => {},
+  close: (_code: number, _reason: string) => {},
 })
 
 /** Every drawing in these tests belongs to OWNER unless a test says otherwise. */

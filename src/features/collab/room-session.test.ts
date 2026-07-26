@@ -1,9 +1,10 @@
 import { expect, test, vi } from "vitest"
 import { guestNameForConnection } from "./identity"
 import type { SceneElement, ServerMessage } from "./protocol"
-import { ROOM_TOPIC } from "./protocol"
+import { LINK_DEAD_CLOSE_CODE, ROOM_TOPIC } from "./protocol"
 import {
   createRoomRegistry,
+  evictNonMembers,
   flushAllRooms,
   joinRoom,
   leaveRoom,
@@ -15,6 +16,7 @@ import {
   receiveFromPeer,
   type SceneLoader,
   type SceneSaver,
+  terminateRoom,
 } from "./room-session"
 
 const ROOM = "drawing-1"
@@ -24,15 +26,18 @@ function fakePeer(id: string) {
   const sent: ServerMessage[] = []
   const published: { topic: string; data: ServerMessage }[] = []
   const topics: string[] = []
+  const closes: { code: number; reason: string }[] = []
   const peer: RoomPeer & {
     sent: ServerMessage[]
     published: typeof published
     topics: string[]
+    closes: typeof closes
   } = {
     id,
     sent,
     published,
     topics,
+    closes,
     send: (data) => {
       sent.push(data)
     },
@@ -41,6 +46,9 @@ function fakePeer(id: string) {
     },
     subscribe: (topic) => {
       topics.push(topic)
+    },
+    close: (code, reason) => {
+      closes.push({ code, reason })
     },
   }
   return peer
@@ -1153,4 +1161,238 @@ test("an edit that wins on the nonce tie-break is still persisted", async () => 
   } finally {
     vi.useRealTimers()
   }
+})
+
+// --- link lifecycle (spec §4.2, §5.1) -----------------------------------
+
+test("a terminated room writes the session's work before any socket closes", async () => {
+  const registry = recordingRegistry()
+  const ada = fakePeer("peer-ada")
+  const grace = fakePeer("peer-grace")
+  await joinRoom(registry, ROOM, ada, member("Ada"))
+  await joinRoom(registry, ROOM, grace, guest)
+  await receiveFromPeer(registry, ROOM, grace, sceneUpdate([element("g", 1)]))
+
+  // What the guest drew has to be in the database by the time its socket
+  // learns the link is gone — that is the whole promise of spec §5.1.
+  let writesWhenClosed: number | null = null
+  grace.close = () => {
+    writesWhenClosed = registry.writes.length
+  }
+
+  await terminateRoom(registry, ROOM)
+
+  expect(registry.writes.map(idsOf)).toEqual([["g"]])
+  expect(writesWhenClosed).toBe(1)
+})
+
+test("terminating closes every socket with the dead-link code", async () => {
+  const registry = recordingRegistry()
+  const ada = fakePeer("peer-ada")
+  const grace = fakePeer("peer-grace")
+  await joinRoom(registry, ROOM, ada, member("Ada"))
+  await joinRoom(registry, ROOM, grace, guest)
+
+  await terminateRoom(registry, ROOM)
+
+  // Owner and guest alike: stop, regenerate, and trash evict everyone.
+  expect(ada.closes).toEqual([
+    { code: LINK_DEAD_CLOSE_CODE, reason: "Link no longer active" },
+  ])
+  expect(grace.closes).toEqual([
+    { code: LINK_DEAD_CLOSE_CODE, reason: "Link no longer active" },
+  ])
+})
+
+test("a terminated room is gone, so re-sharing reads the drawing fresh", async () => {
+  let reads = 0
+  const registry = registryFrom(async () => {
+    reads += 1
+    return { elements: [], ownerId: "owner-1", readable: true }
+  })
+  await joinRoom(registry, ROOM, fakePeer("peer-ada"), member("Ada"))
+
+  await terminateRoom(registry, ROOM)
+  expect(registry.rooms.has(ROOM)).toBe(false)
+
+  await joinRoom(registry, ROOM, fakePeer("peer-nina"), member("Nina"))
+  expect(reads).toBe(2)
+})
+
+test("terminating a drawing nobody is in is a no-op", async () => {
+  const registry = recordingRegistry()
+
+  await terminateRoom(registry, ROOM)
+
+  expect(registry.writes).toEqual([])
+  expect(registry.rooms.has(ROOM)).toBe(false)
+})
+
+test("the close hooks a termination fires don't write a second time", async () => {
+  const registry = recordingRegistry()
+  const ada = fakePeer("peer-ada")
+  await joinRoom(registry, ROOM, ada, member("Ada"))
+  await receiveFromPeer(registry, ROOM, ada, sceneUpdate([element("a", 1)]))
+
+  await terminateRoom(registry, ROOM)
+  // The browser answers the close by firing the route's `close` hook, which
+  // is `leaveRoom` — for a room that no longer has it, or no longer exists.
+  await leaveRoom(registry, ROOM, ada)
+
+  expect(registry.writes.map(idsOf)).toEqual([["a"]])
+})
+
+test("a termination whose final write fails keeps the room until it lands", async () => {
+  vi.useFakeTimers()
+  const errors = vi.spyOn(console, "error").mockImplementation(() => {})
+  try {
+    let fail = true
+    const registry = recordingRegistry([], async () => {
+      if (fail) throw new Error("database is down")
+    })
+    const ada = fakePeer("peer-ada")
+    await joinRoom(registry, ROOM, ada, member("Ada"))
+    await receiveFromPeer(registry, ROOM, ada, sceneUpdate([element("a", 1)]))
+
+    await terminateRoom(registry, ROOM)
+    // The link is dead either way — that is a database row, not a socket —
+    // but the edits are still only in memory, so the Room stays to retry.
+    expect(ada.closes).toHaveLength(1)
+    expect(registry.rooms.has(ROOM)).toBe(true)
+
+    fail = false
+    await vi.advanceTimersByTimeAsync(ROOM_FLUSH_INTERVAL_MS)
+    expect(registry.writes.map(idsOf)).toEqual([["a"], ["a"]])
+    expect(registry.rooms.has(ROOM)).toBe(false)
+  } finally {
+    errors.mockRestore()
+    vi.useRealTimers()
+  }
+})
+
+test("tightening to members closes the guests and leaves the members", async () => {
+  const registry = recordingRegistry()
+  const ada = fakePeer("peer-ada")
+  const grace = fakePeer("peer-grace")
+  await joinRoom(registry, ROOM, ada, member("Ada"))
+  await joinRoom(registry, ROOM, grace, guest)
+
+  await evictNonMembers(registry, ROOM)
+
+  expect(grace.closes).toEqual([
+    { code: LINK_DEAD_CLOSE_CODE, reason: "Link no longer active" },
+  ])
+  expect(ada.closes).toEqual([])
+  expect(registry.rooms.get(ROOM)?.participants.size).toBe(1)
+})
+
+test("the members left behind are told the guests are gone", async () => {
+  const registry = recordingRegistry()
+  const ada = fakePeer("peer-ada")
+  const grace = fakePeer("peer-grace")
+  await joinRoom(registry, ROOM, ada, member("Ada"))
+  await joinRoom(registry, ROOM, grace, guest)
+
+  await evictNonMembers(registry, ROOM)
+
+  // Sent, not published: the only peers that could have fanned this out are
+  // the ones being closed.
+  expect(rosterOf(ada.sent.at(-1))).toEqual(["Ada"])
+})
+
+test("a room of members loses nobody to a tighten", async () => {
+  const registry = recordingRegistry()
+  const ada = fakePeer("peer-ada")
+  const nina = fakePeer("peer-nina")
+  await joinRoom(registry, ROOM, ada, member("Ada"))
+  await joinRoom(registry, ROOM, nina, member("Nina"))
+  const rosterFrames = framesOf(ada, "PARTICIPANTS").length
+
+  await evictNonMembers(registry, ROOM)
+
+  expect(ada.closes).toEqual([])
+  expect(nina.closes).toEqual([])
+  // Nothing changed, so nobody is told anything.
+  expect(framesOf(ada, "PARTICIPANTS")).toHaveLength(rosterFrames)
+})
+
+test("a tighten that empties the room writes the scene and takes the room with it", async () => {
+  const registry = recordingRegistry()
+  const grace = fakePeer("peer-grace")
+  await joinRoom(registry, ROOM, grace, guest)
+  await receiveFromPeer(registry, ROOM, grace, sceneUpdate([element("g", 1)]))
+
+  await evictNonMembers(registry, ROOM)
+
+  expect(registry.writes.map(idsOf)).toEqual([["g"]])
+  expect(registry.rooms.has(ROOM)).toBe(false)
+})
+
+test("an evicted guest takes its follow edges with it", async () => {
+  const registry = recordingRegistry()
+  const ada = fakePeer("peer-ada")
+  const grace = fakePeer("peer-grace")
+  await joinRoom(registry, ROOM, ada, member("Ada"))
+  await joinRoom(registry, ROOM, grace, guest)
+  await receiveFromPeer(
+    registry,
+    ROOM,
+    grace,
+    JSON.stringify({
+      type: "USER_FOLLOW",
+      payload: { followedConnectionId: "peer-ada" },
+    }),
+  )
+
+  await evictNonMembers(registry, ROOM)
+
+  // Ada is told her audience is empty, and her viewport reaches nobody.
+  expect(framesOf(ada, "FOLLOWED_BY").at(-1)).toMatchObject({
+    payload: { connectionIds: [] },
+  })
+  expect(registry.rooms.get(ROOM)?.follows.size).toBe(0)
+})
+
+test("a stroke still in flight rides out on the final write", async () => {
+  let release: (() => void) | undefined
+  const loaded = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  const writes: SceneElement[][] = []
+  const registry = registryFrom(
+    async () => {
+      await loaded
+      return { elements: [], ownerId: "owner-1", readable: true }
+    },
+    async (_roomId, elements) => {
+      writes.push(elements)
+    },
+  )
+  const grace = fakePeer("peer-grace")
+  const joined = joinRoom(registry, ROOM, grace, guest)
+  // Sent while the Room is still reading its drawing — it waits for the load
+  // rather than merging into an empty scene.
+  const drawing = receiveFromPeer(
+    registry,
+    ROOM,
+    grace,
+    sceneUpdate([element("g", 1)]),
+  )
+
+  const terminated = terminateRoom(registry, ROOM)
+  release?.()
+  await Promise.all([joined, drawing, terminated])
+
+  // The queued stroke merged first, so the termination's write carries it
+  // instead of leaving it to a throttle tick nobody is left to hear.
+  expect(writes.map(idsOf)).toEqual([["g"]])
+  expect(registry.rooms.has(ROOM)).toBe(false)
+})
+
+test("evicting from a drawing nobody is in is a no-op", async () => {
+  const registry = recordingRegistry()
+
+  await evictNonMembers(registry, ROOM)
+
+  expect(registry.writes).toEqual([])
 })

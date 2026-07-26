@@ -53,6 +53,7 @@ function toRoomPeer(peer: {
   send: (data: unknown) => unknown
   publish: (topic: string, data: unknown) => unknown
   subscribe: (topic: string) => unknown
+  close: (code?: number, reason?: string) => unknown
 }): RoomPeer {
   return {
     id: peer.id,
@@ -64,6 +65,12 @@ function toRoomPeer(peer: {
     },
     subscribe: (topic) => {
       peer.subscribe(topic)
+    },
+    // What the Room reaches for when a link dies under a live socket
+    // (spec §4.2): the adapter stored at join time is the only handle it has
+    // on a connection, and a server function is where that decision is made.
+    close: (code, reason) => {
+      peer.close(code, reason)
     },
   }
 }
