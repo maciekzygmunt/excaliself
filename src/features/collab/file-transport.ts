@@ -10,17 +10,28 @@ import type { BinaryFileData } from "@excalidraw/excalidraw/types"
 import { parseFilePayload, type RoomFileUpload } from "./room-files"
 import { roomFileUrl } from "./room-url"
 
+/**
+ * The only answers that are about the *image*: too big, too often, or not an
+ * image at all. Everything else a failed request can mean is about the
+ * request — a 401 once a link has been stopped or regenerated, a 5xx, a
+ * dropped connection — and none of those are grounds for telling the whole
+ * room that someone's picture is broken.
+ */
+const IMAGE_VERDICTS = new Set([400, 413, 429])
+
 export type UploadOutcome =
   | "stored"
   /**
    * The server looked at this image and said no — too large (413), too
-   * frequent (429), or malformed. A verdict: retrying changes nothing, so the
-   * image earns excalidraw's errored placeholder (spec §5.4).
+   * frequent (429), or malformed (400). A verdict: retrying changes nothing,
+   * so the image earns excalidraw's errored placeholder (spec §5.4).
    */
   | "refused"
   /**
-   * The request never got an answer — offline, a dropped connection, a 5xx.
-   * Says nothing about the image, so it must not condemn it.
+   * The request got no answer, or an answer about itself rather than about
+   * the image — offline, a dropped connection, a 5xx, a 401 from a link that
+   * has just been stopped. Says nothing about the picture, so it must not
+   * condemn it.
    */
   | "failed"
 
@@ -35,9 +46,7 @@ export async function uploadRoomFile(
       body: JSON.stringify({ dataUrl: file.dataUrl }),
     })
     if (response.ok) return "stored"
-    // 4xx is the server ruling on the image; 5xx is the server having a bad
-    // day, which the next attempt may not.
-    return response.status < 500 ? "refused" : "failed"
+    return IMAGE_VERDICTS.has(response.status) ? "refused" : "failed"
   } catch {
     return "failed"
   }

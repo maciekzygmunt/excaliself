@@ -533,8 +533,14 @@ test("an image that never gets an answer eventually gives up", async () => {
   expect(calls).toHaveLength(3)
 })
 
-test("a server error is a blip; a 4xx is a verdict", async () => {
-  const calls = stubFetch({ ok: false, status: 500 })
+test.each([
+  ["a server error", 500],
+  // The link was stopped or regenerated mid-session. That says nothing about
+  // the picture, and the socket may well still be live (#121 does the
+  // eviction) — so the room must not be told the image is broken.
+  ["an authorization refusal", 401],
+])("%s is a blip, not a verdict on the image", async (_label, status) => {
+  const calls = stubFetch({ ok: false, status })
   const api = fakeExcalidraw()
   const { socket, change } = renderRoom(api)
   act(() => socket.receive({ type: "SCENE_INIT", payload: { elements: [] } }))
@@ -546,4 +552,22 @@ test("a server error is a blip; a 4xx is a verdict", async () => {
 
   expect(calls).toHaveLength(1)
   expect(api.scene().map((e) => e.status)).toEqual(["pending"])
+})
+
+test.each([
+  ["too large", 413],
+  ["too frequent", 429],
+])("%s is a verdict, and errors the image at once", async (_label, status) => {
+  const calls = stubFetch({ ok: false, status })
+  const api = fakeExcalidraw()
+  const { socket, change } = renderRoom(api)
+  act(() => socket.receive({ type: "SCENE_INIT", payload: { elements: [] } }))
+
+  change([image("img", 1, "file-1")], {
+    "file-1": { id: "file-1", dataURL: PNG },
+  })
+  await settle()
+
+  expect(calls).toHaveLength(1)
+  expect(api.scene().map((e) => e.status)).toEqual(["error"])
 })
