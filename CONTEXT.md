@@ -46,3 +46,6 @@ A one-way arrangement between two Participants in a Room: the follower's canvas 
 
 ### Live badge
 What the owner sees on a Drawing of theirs that has a Room with someone *else* in it: a stack of Participant avatars on the Gallery card, a count on the sidebar row. Their own connections never count, so a Drawing they alone have open wears no badge. Ambient rather than exact — it is polled, so it trails joins and leaves by up to half a minute, and it is not a control: clicking a badged card just opens the Drawing, which joins the Room.
+
+### Scene image
+An image on a Drawing's canvas, stored as bytes under a content-addressed file id that the image element on the scene points at. Bytes and elements travel separately in a Room: the element syncs like any other element, while the bytes go over a room-scoped HTTP endpoint the same Share link opens. An image is *saved* once its bytes are stored — which is the signal other Participants use to fetch them — *pending* until then, and *errored* when the store refused it (too large, or too many uploads), in which case nobody fetches it and everyone sees a placeholder.

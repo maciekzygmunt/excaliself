@@ -10,7 +10,6 @@
 
 import { defineWebSocketHandler } from "nitro"
 import { db } from "@/db"
-import { resolveRoomJoin } from "@/features/collab/join"
 import { ROOM_FULL_CLOSE_CODE } from "@/features/collab/protocol"
 import { rooms } from "@/features/collab/room-registry"
 import type {
@@ -22,9 +21,9 @@ import {
   leaveRoom,
   receiveFromPeer,
 } from "@/features/collab/room-session"
-import { resolveShareForRoom } from "@/features/shares/store"
+import { resolveRoomForToken } from "@/features/collab/room-token"
 import { allowTokenValidation } from "@/features/shares/token-rate-limit"
-import { auth } from "@/lib/auth"
+import { socketIpOf } from "@/lib/client-ip"
 
 type PeerContext = { roomId: string; identity: ParticipantIdentity }
 
@@ -72,7 +71,7 @@ export default defineWebSocketHandler({
     if (
       !allowTokenValidation({
         headers: request.headers,
-        socketIp: (request as { ip?: string }).ip ?? null,
+        socketIp: socketIpOf(request),
       })
     )
       throw new Response("Too Many Requests", { status: 429 })
@@ -83,14 +82,12 @@ export default defineWebSocketHandler({
       new URL(request.url).pathname.split("/").pop() || "",
     )
 
-    // Both checks run on every (re)connect, so stop, regenerate, an audience
-    // tighten, and trash all take effect on the next join (spec §4.1).
-    const [share, session] = await Promise.all([
-      token ? resolveShareForRoom(db, token) : null,
-      auth.api.getSession({ headers: request.headers }),
-    ])
-
-    const join = resolveRoomJoin({ share, user: session?.user ?? null })
+    // Runs on every (re)connect, so stop, regenerate, an audience tighten,
+    // and trash all take effect on the next join (spec §4.1). The room-scoped
+    // image endpoints call the same function, so the token, audience and
+    // deletedAt decision is literally shared — the per-IP budget above is not,
+    // and `$fileId.ts` says why.
+    const join = await resolveRoomForToken(db, token, request.headers)
     // One generic refusal for every reason, like the dead-link page: a
     // rejected upgrade never reveals whether the drawing exists.
     if (join.status !== "ok")
