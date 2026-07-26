@@ -8,7 +8,7 @@ import {
   joinRoom,
   receiveFromPeer,
 } from "@/features/collab/room-session"
-import { changeShareAudience, endShare, rotateShareToken } from "./lifecycle"
+import { regenerateShare, setShareAudience, stopSharing } from "./lifecycle"
 
 const OWNER = "user-1"
 const DRAWING = "d1"
@@ -59,7 +59,7 @@ function fakeDb(log: string[] = []) {
         return Promise.resolve()
       },
     }),
-  } as unknown as Parameters<typeof endShare>[0]
+  } as unknown as Parameters<typeof stopSharing>[0]
   return { db, calls }
 }
 
@@ -109,7 +109,7 @@ test("stopping deletes the row, writes the scene, then closes the sockets", asyn
     }),
   )
 
-  await endShare(db, registry, OWNER, DRAWING)
+  await stopSharing(db, registry, OWNER, DRAWING)
 
   // The row is gone before anyone is closed, which is what makes the closed
   // sockets unreplaceable: a redial re-validates and is refused. The guest's
@@ -132,7 +132,7 @@ test("stopping deletes the row, writes the scene, then closes the sockets", asyn
 test("stopping a drawing nobody is in still deletes the row", async () => {
   const { db, calls } = fakeDb()
 
-  await endShare(db, registryWith([]), OWNER, DRAWING)
+  await stopSharing(db, registryWith([]), OWNER, DRAWING)
 
   expect(calls.map((call) => call.kind)).toEqual(["select", "delete"])
 })
@@ -152,11 +152,11 @@ test("stopping refuses a drawing the caller doesn't own, and closes nobody", asy
         return chain
       },
     }),
-  } as unknown as Parameters<typeof endShare>[0]
+  } as unknown as Parameters<typeof stopSharing>[0]
 
-  await expect(endShare(db, registry, "someone-else", DRAWING)).rejects.toThrow(
-    "Drawing not found",
-  )
+  await expect(
+    stopSharing(db, registry, "someone-else", DRAWING),
+  ).rejects.toThrow("Drawing not found")
   expect(ada.closes).toEqual([])
   expect(registry.rooms.has(DRAWING)).toBe(true)
 })
@@ -170,7 +170,7 @@ test("regenerating hands back the new link and evicts everyone", async () => {
   await joinRoom(registry, DRAWING, ada, member)
   await joinRoom(registry, DRAWING, grace, guest)
 
-  const share = await rotateShareToken(db, registry, OWNER, DRAWING)
+  const share = await regenerateShare(db, registry, OWNER, DRAWING)
 
   // The token is replaced first; the sockets it admitted go after.
   expect(calls.map((call) => call.kind)).toEqual(["select", "update"])
@@ -180,7 +180,7 @@ test("regenerating hands back the new link and evicts everyone", async () => {
   expect(grace.closes).toHaveLength(1)
 })
 
-test("tightening to members closes the guests and leaves the members", async () => {
+test("tightening the audience evicts the guests the row no longer admits", async () => {
   const log: string[] = []
   const { db } = fakeDb()
   const registry = registryWith(log)
@@ -189,13 +189,7 @@ test("tightening to members closes the guests and leaves the members", async () 
   await joinRoom(registry, DRAWING, ada, member)
   await joinRoom(registry, DRAWING, grace, guest)
 
-  const share = await changeShareAudience(
-    db,
-    registry,
-    OWNER,
-    DRAWING,
-    "members",
-  )
+  const share = await setShareAudience(db, registry, OWNER, DRAWING, "members")
 
   expect(share.audience).toBe("members")
   expect(grace.closes).toHaveLength(1)
@@ -211,7 +205,7 @@ test("loosening to anyone evicts nobody", async () => {
   await joinRoom(registry, DRAWING, ada, member)
   await joinRoom(registry, DRAWING, grace, guest)
 
-  await changeShareAudience(db, registry, OWNER, DRAWING, "anyone")
+  await setShareAudience(db, registry, OWNER, DRAWING, "anyone")
 
   expect(ada.closes).toEqual([])
   expect(grace.closes).toEqual([])
@@ -222,7 +216,7 @@ test("the ownership gate reads drawings, not shares", async () => {
   const log: string[] = []
   const { db, calls } = fakeDb()
 
-  await changeShareAudience(db, registryWith(log), OWNER, DRAWING, "members")
+  await setShareAudience(db, registryWith(log), OWNER, DRAWING, "members")
 
   expect(calls[0]).toEqual({ kind: "select", table: drawings })
 })

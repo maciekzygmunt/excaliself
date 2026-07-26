@@ -9,8 +9,14 @@
  * From the moment the row is gone (or its token replaced), every upgrade
  * re-validation refuses, so the sockets closed a beat later cannot be
  * replaced by new ones dialing the same dead link. Doing it the other way
- * around leaves exactly that window open, and a guest who slipped through it
- * would sit in a Room nothing is ever going to close.
+ * around leaves exactly that window open, and a socket that slipped through
+ * it would sit in a Room nothing is ever going to close. (Spec §5.5 words the
+ * stop-sharing reverse the other way round — "Room flushes → row deleted →
+ * sockets close" — which closes a much narrower window instead: the moment
+ * between the delete and the flush, in which the classic-write guard of
+ * `scene-write.ts` is open. §4.2's order wins because a stuck socket is
+ * unrecoverable and that write is not: every tab that could make it is in the
+ * Room, so what it writes is a subset of what the Room flushes.)
  *
  * Kept out of `server.ts` — which imports the live db and the process's
  * registry — so the ordering is drivable by tests with a fake db and a
@@ -21,7 +27,7 @@ import type { NodePgDatabase } from "drizzle-orm/node-postgres"
 import type * as schema from "@/db/schema"
 import type { RoomRegistry } from "@/features/collab/room-session"
 import { evictNonMembers, terminateRoom } from "@/features/collab/room-session"
-import type { ShareAudience } from "./access"
+import { admitsGuests, type ShareAudience } from "./access"
 import {
   regenerateShareLink,
   setShareLinkAudience,
@@ -36,8 +42,13 @@ type Db = NodePgDatabase<typeof schema>
  * Their clients answer by re-resolving the token: guests land on the
  * dead-link page, and the owner falls back to solo editing with classic
  * autosave, which the deleted row has just re-permitted (spec §5.5).
+ *
+ * "Written" here is the Room's best effort, not a guarantee: a flush the
+ * database refuses is retried on the throttle rather than raised, so on that
+ * path the caller resolves while the Room still owes a write (see
+ * `terminateRoom`).
  */
-export async function endShare(
+export async function stopSharing(
   db: Db,
   registry: RoomRegistry,
   userId: string,
@@ -59,7 +70,7 @@ export async function endShare(
  * reload away, and the alternative ordering leaves a guest on a dead link
  * with nobody left to evict them.
  */
-export async function rotateShareToken(
+export async function regenerateShare(
   db: Db,
   registry: RoomRegistry,
   userId: string,
@@ -76,12 +87,12 @@ export async function rotateShareToken(
  * loosening evicts nobody, since it only widens who may join next.
  *
  * The check is on the resulting audience rather than on a before/after
- * comparison: `members` means "no guests in this room", and enforcing that
- * outright also mops up a guest left over from an earlier audience — a
- * connection the room may not admit is a connection the room may not admit,
- * however it got there.
+ * comparison: an audience that admits no guests means there are none in the
+ * Room, and enforcing that outright also mops up a guest left over from an
+ * earlier audience — a connection the link may not admit is a connection the
+ * link may not admit, however it got there.
  */
-export async function changeShareAudience(
+export async function setShareAudience(
   db: Db,
   registry: RoomRegistry,
   userId: string,
@@ -89,6 +100,6 @@ export async function changeShareAudience(
   audience: ShareAudience,
 ) {
   const share = await setShareLinkAudience(db, userId, drawingId, audience)
-  if (share.audience === "members") await evictNonMembers(registry, drawingId)
+  if (!admitsGuests(share.audience)) await evictNonMembers(registry, drawingId)
   return share
 }

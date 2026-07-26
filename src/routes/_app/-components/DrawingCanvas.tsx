@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button"
 import { useSidebar } from "@/components/ui/sidebar"
 import { useRoom } from "@/features/collab/use-room"
 import { useRenameDrawing } from "@/features/drawings/mutations"
+import { drawingQueryOptions } from "@/features/drawings/queries"
 import {
   buildScenePayload,
   getScenePayloadSignature,
@@ -111,16 +112,27 @@ export function DrawingCanvas({ drawingId, readOnly = false }: Props) {
 
   /**
    * The link died under this tab — the owner stopped or regenerated it in
-   * another tab, or the drawing was trashed. Re-reading the share row is the
-   * whole answer: with no row, `token` goes null, the socket effect tears
+   * another tab, or the drawing was trashed. Re-reading the share row answers
+   * the first two: with no row, `token` goes null, the socket effect tears
    * down, and classic autosave picks up from this tab's in-memory scene,
    * which is the stop-sharing reverse of spec §5.5. A regenerated link comes
    * back with a new token and the socket redials on it.
+   *
+   * Trash is the third, and the share row alone cannot see it: trashing keeps
+   * the row (that is what makes restore revive the same link, spec §4.3), so
+   * the token comes back unchanged and nothing about this tab would move.
+   * Re-reading the drawing is what flips it to the read-only trashed view of
+   * spec §5.1 — without it the canvas stays editable and every stroke after
+   * this goes nowhere, since the socket is gone and the server refuses
+   * classic writes for a trashed drawing.
    */
   const queryClient = useQueryClient()
   const handleLinkDead = useCallback(() => {
     void queryClient.invalidateQueries({
       queryKey: drawingShareQueryOptions(drawingId).queryKey,
+    })
+    void queryClient.invalidateQueries({
+      queryKey: drawingQueryOptions(drawingId).queryKey,
     })
   }, [queryClient, drawingId])
 

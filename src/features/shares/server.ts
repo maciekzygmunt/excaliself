@@ -11,7 +11,10 @@ import { db } from "@/db"
 import { rooms } from "@/features/collab/room-registry"
 import { auth } from "@/lib/auth"
 import { authMiddleware } from "@/middleware/auth"
-import { changeShareAudience, endShare, rotateShareToken } from "./lifecycle"
+// Namespaced because the three server functions below carry the same domain
+// verbs — which is the point: this is that operation, with what it owes the
+// running Room attached.
+import * as lifecycle from "./lifecycle"
 import {
   createShareLink,
   getShareLink,
@@ -46,21 +49,21 @@ export const stopSharing = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
   .inputValidator(z.string())
   .handler(async ({ data: drawingId, context }) => {
-    await endShare(db, rooms, context.session.user.id, drawingId)
+    await lifecycle.stopSharing(db, rooms, context.session.user.id, drawingId)
   })
 
 export const regenerateShare = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
   .inputValidator(z.string())
   .handler(async ({ data: drawingId, context }) =>
-    rotateShareToken(db, rooms, context.session.user.id, drawingId),
+    lifecycle.regenerateShare(db, rooms, context.session.user.id, drawingId),
   )
 
 export const setShareAudience = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
   .inputValidator(z.object({ drawingId: z.string(), audience: audienceSchema }))
   .handler(async ({ data, context }) =>
-    changeShareAudience(
+    lifecycle.setShareAudience(
       db,
       rooms,
       context.session.user.id,

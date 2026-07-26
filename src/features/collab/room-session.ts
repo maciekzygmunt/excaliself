@@ -20,6 +20,7 @@ import { guestNameForConnection, pickParticipantColor } from "./identity"
 import type { Participant, SceneElement, ServerMessage } from "./protocol"
 import {
   LINK_DEAD_CLOSE_CODE,
+  LINK_DEAD_CLOSE_REASON,
   parseClientMessage,
   ROOM_TOPIC,
 } from "./protocol"
@@ -660,7 +661,7 @@ export async function leaveRoom(
 
 /** The one thing an evicted socket is told, whatever killed its link. */
 const closeAsDead = (peer: RoomPeer) =>
-  peer.close(LINK_DEAD_CLOSE_CODE, "Link no longer active")
+  peer.close(LINK_DEAD_CLOSE_CODE, LINK_DEAD_CLOSE_REASON)
 
 /**
  * End a Room and hang up on everyone in it — the single termination path
@@ -671,13 +672,19 @@ const closeAsDead = (peer: RoomPeer) =>
  * The final write comes first and is awaited, which is what makes "guest work
  * up to the moment of trash is preserved" true. It is also what lets the
  * owner's tab resume classic autosave the instant the mutation resolves
- * (spec §5.5): by the time the caller answers its client, the Room has
- * written what it had and will never write again.
+ * (spec §5.5): by then the Room has written what it had.
  *
  * The Room is then dropped rather than left standing empty, so re-sharing
  * later spins one up that reads the drawing fresh. `reapIfIdle` keeps the one
- * exception it always keeps: a final write that failed is retried, and a Room
- * that still owes the database keeps its place until the write lands.
+ * exception it always keeps: a write the database refused is retried on the
+ * throttle, and a Room that still owes one keeps its place until it lands.
+ * That is the case where "written before the sockets close" is best effort
+ * rather than a guarantee — a retry can land after the owner has resumed
+ * autosave and overwrite it with the scene as the Room last saw it. The
+ * alternative is holding sockets open on a link that is already dead while a
+ * database that is refusing writes comes back, which is worse; and the owner
+ * is not editing blind through it, because their own saves are failing too
+ * and say so.
  */
 export async function terminateRoom(
   registry: RoomRegistry,

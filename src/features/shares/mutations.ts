@@ -44,9 +44,9 @@ export function useCreateShare(
 /**
  * The server function does not answer until the Room has written what the
  * session produced and closed every socket in it (spec §4.2), so by the time
- * this cache write lands there is no second writer: the share query empties,
- * the socket effect tears down, and the paused autosave hook picks up on the
- * merged scene the tab is already holding (spec §5.5).
+ * this cache write lands the Room has stopped writing: the share query
+ * empties, the socket effect tears down, and the paused autosave hook picks
+ * up on the merged scene the tab is already holding (spec §5.5).
  */
 export function useStopSharing(drawingId: string) {
   const queryClient = useQueryClient()

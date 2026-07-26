@@ -16,6 +16,7 @@ import {
 } from "@/features/collab/frame-cap"
 import {
   LINK_DEAD_CLOSE_CODE,
+  LINK_DEAD_CLOSE_REASON,
   ROOM_FULL_CLOSE_CODE,
 } from "@/features/collab/protocol"
 import { rooms } from "@/features/collab/room-registry"
@@ -143,7 +144,7 @@ export default defineWebSocketHandler({
     // The dead-link answer of spec §5.3, and the one close the reconnect loop
     // treats as final: retrying a link that is gone would spin forever.
     if (wasRefused(peer))
-      return peer.close(LINK_DEAD_CLOSE_CODE, "Link no longer active")
+      return peer.close(LINK_DEAD_CLOSE_CODE, LINK_DEAD_CLOSE_REASON)
 
     const context = roomContextOf(peer)
     if (!context) return peer.close(1011, "Room unavailable")
