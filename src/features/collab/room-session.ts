@@ -669,10 +669,11 @@ const closeAsDead = (peer: RoomPeer) =>
  * three differ only in what they did to the `shares` row first; from here on
  * they are the same three steps in the same order.
  *
- * The final write comes first and is awaited, which is what makes "guest work
- * up to the moment of trash is preserved" true. It is also what lets the
- * owner's tab resume classic autosave the instant the mutation resolves
- * (spec §5.5): by then the Room has written what it had.
+ * The Room is frozen, then written, and only then hung up on. The write
+ * comes before the closes and is awaited, which is what makes "guest work up
+ * to the moment of trash is preserved" true; it is also what lets the owner's
+ * tab resume classic autosave the instant the mutation resolves (spec §5.5),
+ * because by then the Room has written what it had.
  *
  * The Room is then dropped rather than left standing empty, so re-sharing
  * later spins one up that reads the drawing fresh. `reapIfIdle` keeps the one
@@ -696,21 +697,33 @@ export async function terminateRoom(
   // An edit that arrived before this call is still queued behind the scene
   // read (see `receiveFromPeer`), and waiting on the same promise puts this
   // behind it — so the flush below carries it rather than leaving it to a
-  // throttle tick after the sockets are already gone. Anything that arrives
-  // *after* queues behind this instead, finds no seat, and is refused.
+  // throttle tick after the sockets are already gone.
   await room.loaded
-  await flushRoom(registry, room)
 
-  // Captured before the roster is emptied, because closing a socket is what
-  // fires the route's `close` hook — `leaveRoom`, which must find nothing
-  // left to do rather than taking itself for the last participant out and
-  // flushing a second time.
+  // Then the roster goes, *before* the flush rather than after it. Emptying
+  // it is what freezes the Room: `receiveFromPeer` answers a frame from a
+  // connection with no seat with "evicted" and merges nothing, so the scene
+  // handed to the write below is the last one there will ever be.
+  //
+  // Clearing afterwards instead leaves a window the length of a database
+  // round trip in which a peer still has a seat: its edit merges into a Room
+  // whose write is already in flight with the previous array, marks the Room
+  // dirty again, and survives only as a 15 s retry — landing after the owner
+  // has resumed classic autosave (spec §5.5) and overwriting whatever they
+  // have saved since. The stroke that loses the race is lost either way; what
+  // this decides is whether it takes later work down with it.
+  //
+  // The peers are captured first because closing a socket is what fires the
+  // route's `close` hook — `leaveRoom`, which must find nothing left to do
+  // rather than taking itself for the last participant out and flushing again.
   const peers = [...room.peers.values()]
   room.participants.clear()
   room.peers.clear()
   room.userIds.clear()
   room.follows.clear()
   room.lastSeenAt.clear()
+
+  await flushRoom(registry, room)
   reapIfIdle(registry, room)
 
   for (const peer of peers) closeAsDead(peer)

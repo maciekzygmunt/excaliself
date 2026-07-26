@@ -1389,6 +1389,54 @@ test("a stroke still in flight rides out on the final write", async () => {
   expect(registry.rooms.has(ROOM)).toBe(false)
 })
 
+// Regression: the roster was emptied *after* the final write, leaving a
+// window the length of a database round trip in which a peer still had a
+// seat. Its edit merged into a Room whose write was already in flight,
+// marked the Room dirty again, and survived only as a 15 s retry — landing
+// after the owner had resumed classic autosave and overwriting it.
+test("an edit sent during the final write is refused, not left owing", async () => {
+  let beginSave: (() => void) | undefined
+  const saveStarted = new Promise<void>((resolve) => {
+    beginSave = resolve
+  })
+  let finishSave: (() => void) | undefined
+  const saveFinished = new Promise<void>((resolve) => {
+    finishSave = resolve
+  })
+  const writes: SceneElement[][] = []
+  const registry = registryFrom(
+    async () => ({ elements: [], ownerId: "owner-1", readable: true }),
+    async (_roomId, elements) => {
+      writes.push(elements)
+      beginSave?.()
+      await saveFinished
+    },
+  )
+  const grace = fakePeer("peer-grace")
+  await joinRoom(registry, ROOM, grace, guest)
+  await receiveFromPeer(registry, ROOM, grace, sceneUpdate([element("g", 1)]))
+
+  const terminated = terminateRoom(registry, ROOM)
+  await saveStarted
+
+  // Mid-write, and the socket does not know yet that its link is gone.
+  const outcome = await receiveFromPeer(
+    registry,
+    ROOM,
+    grace,
+    sceneUpdate([element("h", 1)]),
+  )
+  expect(outcome).toBe("evicted")
+
+  finishSave?.()
+  await terminated
+
+  // One write, and nothing left behind owing another: no Room in the
+  // registry means no armed retry to land on the owner's next solo save.
+  expect(writes.map(idsOf)).toEqual([["g"]])
+  expect(registry.rooms.has(ROOM)).toBe(false)
+})
+
 test("evicting from a drawing nobody is in is a no-op", async () => {
   const registry = recordingRegistry()
 
