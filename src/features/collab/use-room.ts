@@ -284,6 +284,14 @@ export function useRoom(options: {
     let disposed = false
     /** The current socket's heartbeat, so unmounting can stop it too. */
     let beat: Heartbeat | null = null
+    /**
+     * Whether this tab has ever been seated in the room. It is what separates
+     * a visitor the cap turned away — who belongs on the "drawing full" page
+     * — from a participant whose seat was taken while it was reconnecting,
+     * who is holding a scene and must not be sent anywhere (see the close
+     * handler).
+     */
+    let everJoined = false
 
     const connect = () => {
       const socket = new WebSocket(roomSocketUrl(token, window.location))
@@ -318,6 +326,7 @@ export function useRoom(options: {
           // would otherwise read as a healthy connection and reset the wait
           // that keeps a crash-looping server from being hammered.
           backoff.reset()
+          everJoined = true
           setConnectionStatus("connected")
           selfConnectionIdRef.current = message.payload.connectionId
           setSelfConnectionId(message.payload.connectionId)
@@ -359,13 +368,22 @@ export function useRoom(options: {
 
       socket.addEventListener("close", (event: CloseEvent) => {
         ownBeat.stop()
-        if (socketRef.current === socket) socketRef.current = null
+        // A close from a socket this effect has finished with says nothing
+        // about the connection that is live now. Closes are asynchronous, so
+        // navigating from one share link to another can land the old one's
+        // close *after* the new socket has joined — and resetting there would
+        // wipe the new connection's roster and broadcaster, quietly stopping
+        // every local edit from going out until the next reconnect.
+        if (disposed || socketRef.current !== socket) return
+        socketRef.current = null
         forgetConnection()
-        if (disposed) return
 
-        // The room was full: this tab never got in, and dialing again would
-        // only be refused again. The page shows the "drawing full" state.
-        if (event.code === ROOM_FULL_CLOSE_CODE) {
+        // The cap turned this tab away. Terminal only for a visitor who never
+        // got in — for one that had a seat, this is a reconnect arriving
+        // before the server let go of its old one, and the "drawing full"
+        // page would unmount the canvas and take the scene it drew during the
+        // outage with it. So it waits for a seat instead (spec §5.3).
+        if (event.code === ROOM_FULL_CLOSE_CODE && !everJoined) {
           onRoomFullRef.current()
           return
         }

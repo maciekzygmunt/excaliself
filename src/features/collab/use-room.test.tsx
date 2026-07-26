@@ -67,6 +67,17 @@ class FakeSocket {
     this.emit("close", { code })
   }
 
+  /**
+   * Deliver a close event whatever the state already says. Stands for the
+   * one thing a guarded `close()` cannot model: a real close event is
+   * asynchronous, so it can arrive after the effect that opened the socket
+   * has torn down and a replacement has already joined.
+   */
+  emitClose(code = 1006) {
+    this.readyState = 3
+    this.emit("close", { code })
+  }
+
   private emit(type: string, event: unknown) {
     for (const listener of [...(this.listeners.get(type) ?? [])])
       listener(event)
@@ -146,9 +157,9 @@ function renderRoom(api: ReturnType<typeof fakeExcalidraw>) {
   let status: ConnectionStatus = "connecting"
   const onRoomFull = vi.fn()
   const onLinkDead = vi.fn()
-  function Harness() {
+  function Harness({ token }: { token: string }) {
     const room = useRoom({
-      token: TOKEN,
+      token,
       name: "Ada",
       // The hook only ever reaches for the handful of methods above.
       excalidrawAPI: api as never,
@@ -159,13 +170,15 @@ function renderRoom(api: ReturnType<typeof fakeExcalidraw>) {
     status = room.connectionStatus
     return null
   }
-  render(<Harness />)
+  const { rerender } = render(<Harness token={TOKEN} />)
   // Wire the fake's updateScene back into the hook, the way Excalidraw does.
   api.onChange = (elements) => onChange?.(elements)
   const socket = sockets[0]
   act(() => socket.open())
   return {
     socket,
+    /** Navigating from one share link to another, component still mounted. */
+    retoken: (next: string) => act(() => rerender(<Harness token={next} />)),
     onRoomFull,
     onLinkDead,
     status: () => status,
@@ -436,4 +449,48 @@ test("unmounting ends the retries", () => {
   waitOutBackoff()
 
   expect(sockets).toHaveLength(1)
+})
+
+test("a rejoin refused by the cap waits for a seat instead of losing the scene", () => {
+  // The tab's old seat is still held server-side when it comes back. Sending
+  // it to the "drawing full" page would unmount the canvas and take
+  // everything it drew during the outage with it.
+  const { socket, onRoomFull, status, latest } = renderRoom(fakeExcalidraw())
+  act(() => socket.receive(joined()))
+
+  act(() => socket.close(ROOM_FULL_CLOSE_CODE))
+
+  expect(onRoomFull).not.toHaveBeenCalled()
+  expect(status()).toBe("reconnecting")
+  waitOutBackoff()
+  expect(sockets).toHaveLength(2)
+
+  // And it gets in once the stale seat is reclaimed.
+  act(() => latest().open())
+  act(() => latest().receive(joined()))
+  expect(status()).toBe("connected")
+})
+
+test("a late close from a socket the hook has moved on from leaves the live one alone", () => {
+  // Navigating from one share link to another keeps this component mounted.
+  // The old socket's close is asynchronous and can land after the new one
+  // has joined; resetting there would wipe the live connection's broadcaster
+  // and quietly stop every local edit from going out.
+  const api = fakeExcalidraw()
+  const { socket, change, latest, retoken } = renderRoom(api)
+  act(() => socket.receive(joined()))
+
+  retoken("another-share-token")
+  const next = latest()
+  expect(next).not.toBe(socket)
+  act(() => next.open())
+  act(() => next.receive({ type: "SCENE_INIT", payload: { elements: [] } }))
+
+  // The abandoned socket's close arrives now, out of order.
+  act(() => socket.emitClose(1006))
+
+  change([element("drawn-after", 1)])
+  expect(next.scenesSent.map((els) => els.map((e) => e.id))).toEqual([
+    ["drawn-after"],
+  ])
 })

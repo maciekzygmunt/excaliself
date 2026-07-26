@@ -804,3 +804,56 @@ test("a forgotten peer is gone from the roster the next joiner is handed", async
     ["Ada"],
   )
 })
+
+test("a forgotten peer is told to rejoin rather than answered", async () => {
+  // Its socket outlived the sweep. A PONG here would tell the client the
+  // connection is healthy while the Room drops everything else it sends.
+  const { registry, advance } = clockedRegistry()
+  const ghost = fakePeer("peer-ghost")
+  await joinRoom(registry, ROOM, ghost, guest)
+
+  advance(PARTICIPANT_IDLE_TIMEOUT_MS + 1)
+  await joinRoom(registry, ROOM, fakePeer("peer-new"), guest)
+  ghost.sent.length = 0
+
+  const outcome = await receiveFromPeer(
+    registry,
+    ROOM,
+    ghost,
+    '{"type":"PING","payload":{}}',
+  )
+
+  expect(outcome).toBe("evicted")
+  expect(ghost.sent).toEqual([])
+})
+
+test("a seated peer's heartbeat is answered and holds its seat", async () => {
+  const { registry } = clockedRegistry()
+  const peer = fakePeer("peer-a")
+  await joinRoom(registry, ROOM, peer, guest)
+  peer.sent.length = 0
+
+  const outcome = await receiveFromPeer(
+    registry,
+    ROOM,
+    peer,
+    '{"type":"PING","payload":{}}',
+  )
+
+  expect(outcome).toBe("ok")
+  expect(peer.sent).toEqual([{ type: "PONG", payload: {} }])
+})
+
+test("a frame for a drawing with no room at all is not an eviction", async () => {
+  const registry = emptyRegistry()
+  const stranger = fakePeer("peer-stranger")
+
+  expect(
+    await receiveFromPeer(
+      registry,
+      ROOM,
+      stranger,
+      '{"type":"PING","payload":{}}',
+    ),
+  ).toBe("ok")
+})

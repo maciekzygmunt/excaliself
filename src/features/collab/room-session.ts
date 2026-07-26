@@ -334,46 +334,64 @@ function applySceneUpdate(
     peer.send({ type: "SCENE_UPDATE", payload: { elements: corrections } })
 }
 
+/**
+ * What the transport should do with a socket after handing over a frame.
+ *
+ * `evicted` is the one answer it must act on: the Room has forgotten this
+ * connection — its seat swept as a ghost while the socket was suspended —
+ * so everything the socket sends from here would be dropped on the floor,
+ * silently, forever. Closing it is what turns a client that believes it is
+ * connected into one that rejoins.
+ */
+export type FrameOutcome = "ok" | "evicted"
+
 export async function receiveFromPeer(
   registry: RoomRegistry,
   roomId: string,
   peer: RoomPeer,
   raw: string,
-) {
+): Promise<FrameOutcome> {
   const message = parseClientMessage(raw)
-  if (!message) return
+  if (!message) return "ok"
 
   const room = registry.rooms.get(roomId)
+  // No Room at all is not an eviction — the socket belongs to a drawing
+  // nobody is in, and the close hook will tidy it up on its own.
+  if (!room) return "ok"
+
+  const participant = room.participants.get(peer.id)
+  if (!participant) return "evicted"
+
   // Any frame at all is proof of life, and `PING` most of all: it is the only
-  // one a room where nobody is drawing will ever produce.
-  if (room?.participants.has(peer.id))
-    room.lastSeenAt.set(peer.id, registry.now())
+  // one a room where nobody is drawing will ever produce. Stamped before the
+  // answer goes out, so the seat this heartbeat is defending is held for the
+  // full window rather than the window minus a round trip.
+  room.lastSeenAt.set(peer.id, registry.now())
 
-  // Answered ahead of the participant check, so the heartbeat works in the
-  // window between the socket opening and the join landing (spec §5.3). A
-  // beat that went unanswered there would be read as a dead socket, and the
-  // client would drop a connection that was only still reading its scene.
-  if (message.type === "PING") return peer.send({ type: "PONG", payload: {} })
-
-  const participant = room?.participants.get(peer.id)
-  if (!room || !participant) return
+  // Only ever answered for a peer that still has a seat. A `PONG` to an
+  // evicted socket would tell its client the connection is healthy while the
+  // Room ignores every scene and cursor frame it sends.
+  if (message.type === "PING") {
+    peer.send({ type: "PONG", payload: {} })
+    return "ok"
+  }
 
   if (message.type === "JOIN") {
     // Only guests name themselves. A member's name is whatever the session
     // says, so a compromised client can't pose as someone else in the room.
     if (!participant.isGuest || participant.name === message.payload.name)
-      return
+      return "ok"
     room.participants.set(peer.id, {
       ...participant,
       name: message.payload.name,
     })
     broadcastRoster(peer, room)
-    return
+    return "ok"
   }
 
   if (message.type === "USER_FOLLOW") {
     setFollowTarget(room, peer.id, message.payload.followedConnectionId)
-    return
+    return "ok"
   }
 
   if (message.type === "USER_VISIBLE_SCENE_BOUNDS") {
@@ -388,7 +406,7 @@ export async function receiveFromPeer(
         payload: { connectionId: peer.id, bounds: message.payload.bounds },
       })
     }
-    return
+    return "ok"
   }
 
   if (message.type === "SCENE_UPDATE") {
@@ -397,15 +415,16 @@ export async function receiveFromPeer(
     // delta waits for the load — deltas keep their order because they all
     // queue behind the same settled promise.
     await room.loaded
-    if (!room.participants.has(peer.id)) return
+    if (!room.participants.has(peer.id)) return "evicted"
     applySceneUpdate(room, peer, message.payload.elements)
-    return
+    return "ok"
   }
 
   peer.publish(ROOM_TOPIC, {
     type: "MOUSE_LOCATION",
     payload: { ...message.payload, connectionId: peer.id },
   })
+  return "ok"
 }
 
 export function leaveRoom(

@@ -179,12 +179,17 @@ export default defineWebSocketHandler({
     if (exceedsFrameCap(message.rawData))
       return peer.close(FRAME_TOO_LARGE_CLOSE_CODE, "Frame too large")
 
-    await receiveFromPeer(
+    const outcome = await receiveFromPeer(
       rooms,
       context.roomId,
       toRoomPeer(peer),
       message.text(),
     )
+    // The Room forgot this connection while its socket stayed open — a seat
+    // swept out from under a tab that was only suspended. A normal close, so
+    // the client's reconnect treats it like any other drop and rejoins with a
+    // fresh seat; leaving it open would have it talking to nobody forever.
+    if (outcome === "evicted") peer.close(1000, "Rejoin")
   },
 
   close(peer) {
