@@ -29,6 +29,7 @@ import { Route as AppSettingsInvitesRouteImport } from './routes/_app/settings/i
 import { Route as AppSettingsInstanceRouteImport } from './routes/_app/settings/instance'
 import { Route as AppFolderIdRouteImport } from './routes/_app/folder.$id'
 import { Route as AppDrawIdRouteImport } from './routes/_app/draw/$id'
+import { Route as ApiRoomsTokenFilesFileIdRouteImport } from './routes/api/rooms/$token/files/$fileId'
 
 const SetupRoute = SetupRouteImport.update({
   id: '/setup',
@@ -129,6 +130,12 @@ const AppDrawIdRoute = AppDrawIdRouteImport.update({
   path: '/draw/$id',
   getParentRoute: () => AppRouteRoute,
 } as any)
+const ApiRoomsTokenFilesFileIdRoute =
+  ApiRoomsTokenFilesFileIdRouteImport.update({
+    id: '/api/rooms/$token/files/$fileId',
+    path: '/api/rooms/$token/files/$fileId',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -150,6 +157,7 @@ export interface FileRoutesByFullPath {
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/draw/': typeof AppDrawIndexRoute
   '/settings/': typeof AppSettingsIndexRoute
+  '/api/rooms/$token/files/$fileId': typeof ApiRoomsTokenFilesFileIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -170,6 +178,7 @@ export interface FileRoutesByTo {
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/draw': typeof AppDrawIndexRoute
   '/settings': typeof AppSettingsIndexRoute
+  '/api/rooms/$token/files/$fileId': typeof ApiRoomsTokenFilesFileIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -193,6 +202,7 @@ export interface FileRoutesById {
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/_app/draw/': typeof AppDrawIndexRoute
   '/_app/settings/': typeof AppSettingsIndexRoute
+  '/api/rooms/$token/files/$fileId': typeof ApiRoomsTokenFilesFileIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -216,6 +226,7 @@ export interface FileRouteTypes {
     | '/api/auth/$'
     | '/draw/'
     | '/settings/'
+    | '/api/rooms/$token/files/$fileId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -236,6 +247,7 @@ export interface FileRouteTypes {
     | '/api/auth/$'
     | '/draw'
     | '/settings'
+    | '/api/rooms/$token/files/$fileId'
   id:
     | '__root__'
     | '/'
@@ -258,6 +270,7 @@ export interface FileRouteTypes {
     | '/api/auth/$'
     | '/_app/draw/'
     | '/_app/settings/'
+    | '/api/rooms/$token/files/$fileId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -271,6 +284,7 @@ export interface RootRouteChildren {
   ApiHealthRoute: typeof ApiHealthRoute
   ShareTokenRoute: typeof ShareTokenRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
+  ApiRoomsTokenFilesFileIdRoute: typeof ApiRoomsTokenFilesFileIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -415,6 +429,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppDrawIdRouteImport
       parentRoute: typeof AppRouteRoute
     }
+    '/api/rooms/$token/files/$fileId': {
+      id: '/api/rooms/$token/files/$fileId'
+      path: '/api/rooms/$token/files/$fileId'
+      fullPath: '/api/rooms/$token/files/$fileId'
+      preLoaderRoute: typeof ApiRoomsTokenFilesFileIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -468,6 +489,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiHealthRoute: ApiHealthRoute,
   ShareTokenRoute: ShareTokenRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
+  ApiRoomsTokenFilesFileIdRoute: ApiRoomsTokenFilesFileIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

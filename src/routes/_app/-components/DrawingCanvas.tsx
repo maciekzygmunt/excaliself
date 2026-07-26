@@ -7,7 +7,7 @@ import type {
 } from "@excalidraw/excalidraw/types"
 import { useQuery } from "@tanstack/react-query"
 import { PanelLeftIcon, Share2Icon } from "lucide-react"
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
 import {
   FooterRightPortal,
@@ -73,6 +73,12 @@ export function DrawingCanvas({ drawingId, readOnly = false }: Props) {
 
   const { drawing, initialData, isDataCorrupt } = useDrawingScene(drawingId)
   const saveScenePayload = useSaveScenePayload(drawingId)
+  // Referentially stable, as `useRoom` requires: the detail query's `files`
+  // only changes identity when the drawing's images actually do.
+  const storedFileIds = useMemo(
+    () => (drawing?.files ?? []).map((file) => file.fileId),
+    [drawing?.files],
+  )
   const renameMutation = useRenameDrawing()
   const [excalidrawAPI, setExcalidrawAPI] =
     useState<ExcalidrawImperativeAPI | null>(null)
@@ -115,6 +121,9 @@ export function DrawingCanvas({ drawingId, readOnly = false }: Props) {
     name: null,
     excalidrawAPI,
     onRoomFull: handleRoomFull,
+    // The drawing's images as this tab loaded them: already in the database,
+    // so the room is owed nothing for them (spec §2.4).
+    storedFileIds,
   })
   // `undefined` is "the share query hasn't answered yet", and autosave stays
   // live through that window: the server refuses the write if the drawing
@@ -182,8 +191,10 @@ export function DrawingCanvas({ drawingId, readOnly = false }: Props) {
     ) => {
       handleChange({ elements, appState, files })
       // A no-op until the socket is up and SCENE_INIT has landed, so it costs
-      // an unshared drawing one call per change and nothing else.
-      roomChange(elements)
+      // an unshared drawing one call per change and nothing else. `files` is
+      // what the image upload rides on (spec §2.4), so it has to come through
+      // here too rather than being dropped as it was before #124.
+      roomChange(elements, appState, files)
     },
     [handleChange, roomChange],
   )

@@ -69,6 +69,13 @@ export type Room = {
    * the pub/sub topic can only do the latter.
    */
   peers: Map<string, RoomPeer>
+  /**
+   * Connection id → the authenticated userId behind it, null for a guest.
+   * Kept beside the roster rather than on the {@link Participant} because the
+   * roster goes on the wire and userIds must not (spec §1.5) — the live badge
+   * is the only thing that reads this, to drop the caller's own connections.
+   */
+  userIds: Map<string, string | null>
   /** Follower connection id → the connection id it is trailing (spec §1.3). */
   follows: Map<string, string>
   /** Resolves when the stored scene has been read (or failed to read). */
@@ -126,6 +133,7 @@ function ensureRoom(registry: RoomRegistry, roomId: string): Room {
     id: roomId,
     participants: new Map(),
     peers: new Map(),
+    userIds: new Map(),
     follows: new Map(),
     loaded: Promise.resolve(),
     persistable: false,
@@ -307,6 +315,7 @@ export async function joinRoom(
   }
   room.participants.set(peer.id, participant)
   room.peers.set(peer.id, peer)
+  room.userIds.set(peer.id, identity.userId)
 
   peer.subscribe(ROOM_TOPIC)
   // Presence goes out before the scene read so avatars never wait on the
@@ -518,6 +527,7 @@ export async function leaveRoom(
   const room = registry.rooms.get(roomId)
   if (!room?.participants.delete(peer.id)) return
   room.peers.delete(peer.id)
+  room.userIds.delete(peer.id)
 
   // A departing peer both stops following and stops being followed. Its own
   // followers need no message — Excalidraw drops `userToFollow` by itself

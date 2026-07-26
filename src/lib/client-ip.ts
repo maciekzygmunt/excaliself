@@ -25,6 +25,15 @@
 /** Every request whose address can't be read shares this one bucket. */
 const UNKNOWN_KEY = "unknown"
 
+/**
+ * The peer address srvx hangs off a `Request` in the built server. Not part
+ * of the standard type, and absent under the vite dev server — the one cast
+ * every raw-Request caller would otherwise write for itself.
+ */
+export function socketIpOf(request: Request): string | null {
+  return (request as Request & { ip?: string }).ip ?? null
+}
+
 /** Blank is as good as absent — a header a proxy set to "" names nobody. */
 const address = (value: string | null | undefined) => value?.trim() || null
 
