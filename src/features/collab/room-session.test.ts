@@ -7,8 +7,10 @@ import {
   evictNonMembers,
   flushAllRooms,
   joinRoom,
+  LINK_CHANGE_MEMORY_MS,
   leaveRoom,
   MAX_ROOM_PARTICIPANTS,
+  nextAuthorization,
   PARTICIPANT_IDLE_TIMEOUT_MS,
   ROOM_FLUSH_INTERVAL_MS,
   type RoomPeer,
@@ -68,11 +70,20 @@ const emptyRegistry = (load?: SceneLoader) =>
     load ?? (async () => ({ elements: [], ownerId: null, readable: true })),
   )
 
-const member = (displayName: string) => ({
+/**
+ * Test identities are authorized "just now" unless a test says otherwise — a
+ * stamp above anything the registry could have handed out, so only the tests
+ * that deliberately drive the still-dialing race care about link changes.
+ * Those draw a real stamp from `nextAuthorization` instead.
+ */
+const JUST_NOW = Number.MAX_SAFE_INTEGER
+
+const member = (displayName: string, authorizedAt = JUST_NOW) => ({
   userId: `u:${displayName}`,
   displayName,
+  authorizedAt,
 })
-const guest = { userId: null, displayName: null }
+const guest = { userId: null, displayName: null, authorizedAt: JUST_NOW }
 
 const rosterOf = (message: ServerMessage | undefined) =>
   message && "participants" in message.payload
@@ -1435,6 +1446,100 @@ test("an edit sent during the final write is refused, not left owing", async () 
   // registry means no armed retry to land on the owner's next solo save.
   expect(writes.map(idsOf)).toEqual([["g"]])
   expect(registry.rooms.has(ROOM)).toBe(false)
+})
+
+// --- sockets still dialing when the link changed -------------------------
+//
+// A socket is authorized by the upgrade and seated by `open`, with a database
+// round trip and a handshake in between. A link that dies in that gap finds
+// no roster to evict this connection from — for a drawing nobody else is in,
+// not even a Room — so the eviction is a no-op and the join that follows
+// builds a fresh Room around a link that is already dead.
+
+test("a socket authorized before a stop is refused when it finally lands", async () => {
+  const registry = recordingRegistry()
+  const grace = fakePeer("peer-grace")
+  // The upgrade validated the token and stamped this socket…
+  const dialing = { ...guest, authorizedAt: nextAuthorization(registry) }
+  // …and the owner stopped sharing before the handshake finished. There is no
+  // Room at all: nobody else was in the drawing.
+  await terminateRoom(registry, ROOM)
+
+  expect(await joinRoom(registry, ROOM, grace, dialing)).toEqual({
+    status: "refused",
+  })
+  expect(registry.rooms.has(ROOM)).toBe(false)
+  // Refused before anything happened to it: no seat, no topic, no scene.
+  expect(grace.sent).toEqual([])
+  expect(grace.topics).toEqual([])
+})
+
+test("a socket authorized after the stop is let in — the drawing was re-shared", async () => {
+  const registry = recordingRegistry()
+  await terminateRoom(registry, ROOM)
+
+  const fresh = { ...guest, authorizedAt: nextAuthorization(registry) }
+  expect(await joinRoom(registry, ROOM, fakePeer("peer-nina"), fresh)).toEqual({
+    status: "ok",
+  })
+})
+
+test("a tighten refuses a guest still dialing, and lets a member through", async () => {
+  const registry = recordingRegistry()
+  const dialingGuest = { ...guest, authorizedAt: nextAuthorization(registry) }
+  const dialingMember = member("Ada", nextAuthorization(registry))
+  await evictNonMembers(registry, ROOM)
+
+  expect(
+    await joinRoom(registry, ROOM, fakePeer("peer-grace"), dialingGuest),
+  ).toEqual({ status: "refused" })
+  // The audience still admits her, so nothing about her join changed.
+  expect(
+    await joinRoom(registry, ROOM, fakePeer("peer-ada"), dialingMember),
+  ).toEqual({ status: "ok" })
+})
+
+test("a tighten after a stop does not narrow the stop back down to guests", async () => {
+  const registry = recordingRegistry()
+  const dialing = member("Ada", nextAuthorization(registry))
+  await terminateRoom(registry, ROOM)
+  await evictNonMembers(registry, ROOM)
+
+  expect(await joinRoom(registry, ROOM, fakePeer("peer-ada"), dialing)).toEqual(
+    { status: "refused" },
+  )
+})
+
+test("a refused join is answered before the participant cap is even consulted", async () => {
+  const registry = recordingRegistry()
+  const dialing = { ...guest, authorizedAt: nextAuthorization(registry) }
+  await terminateRoom(registry, ROOM)
+  // Fill the drawing right up, so "full" would be the answer if the link
+  // change weren't checked first.
+  for (let i = 0; i < MAX_ROOM_PARTICIPANTS; i++)
+    await joinRoom(registry, ROOM, fakePeer(`peer-${i}`), guest)
+
+  expect(
+    await joinRoom(registry, ROOM, fakePeer("peer-late"), dialing),
+  ).toEqual({ status: "refused" })
+})
+
+test("link changes are forgotten once no socket could still be dialing them", async () => {
+  let clock = 1_000
+  const registry = createRoomRegistry(
+    async () => ({ elements: [], ownerId: null, readable: true }),
+    async () => {},
+    () => clock,
+  )
+  await terminateRoom(registry, "drawing-1")
+  expect(registry.linkChanges.size).toBe(1)
+
+  // A second change, long enough after the first that no handshake from
+  // before it can still be in flight, sweeps the first away.
+  clock += LINK_CHANGE_MEMORY_MS + 1
+  await terminateRoom(registry, "drawing-2")
+
+  expect([...registry.linkChanges.keys()]).toEqual(["drawing-2"])
 })
 
 test("evicting from a drawing nobody is in is a no-op", async () => {

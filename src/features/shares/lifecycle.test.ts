@@ -88,8 +88,9 @@ const registryWith = (log: string[]) =>
     },
   )
 
-const member = { userId: "u:ada", displayName: "Ada" }
-const guest = { userId: null, displayName: null }
+const AUTHORIZED = Number.MAX_SAFE_INTEGER
+const member = { userId: "u:ada", displayName: "Ada", authorizedAt: AUTHORIZED }
+const guest = { userId: null, displayName: null, authorizedAt: AUTHORIZED }
 
 test("stopping deletes the row, writes the scene, then closes the sockets", async () => {
   const log: string[] = []
