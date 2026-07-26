@@ -4,7 +4,7 @@
 // shares/store.ts.
 
 import { randomUUID } from "node:crypto"
-import { and, eq, inArray, isNull } from "drizzle-orm"
+import { and, eq, inArray, isNull, notExists, sql } from "drizzle-orm"
 import type { NodePgDatabase } from "drizzle-orm/node-postgres"
 import type * as schema from "@/db/schema"
 import { drawingFiles, drawings, shares } from "@/db/schema"
@@ -65,10 +65,32 @@ export async function writeDrawingScene(
     if (!target) throw new Error("Drawing not found")
     if (target.shareId) return { status: "shared" as const }
 
-    await tx
+    // The no-share condition rides on the UPDATE as well, not just the gate
+    // above: another tab of the owner's can mint a link between the two, and
+    // this write would then land on a drawing the Room had already loaded.
+    // Zero rows means exactly that happened.
+    //
+    // It narrows the window rather than closing it — a share created after
+    // this statement takes its snapshot still slips through. That residue is
+    // what spec §5.5's "join-time reconcile is the safety net" covers: this
+    // tab joins the room moments later and pushes the scene it is holding,
+    // so the edits arrive by the socket instead of being lost.
+    const written = await tx
       .update(drawings)
       .set({ data: sceneData, updatedAt: now })
-      .where(eq(drawings.id, id))
+      .where(
+        and(
+          eq(drawings.id, id),
+          notExists(
+            tx
+              .select({ one: sql`1` })
+              .from(shares)
+              .where(eq(shares.drawingId, id)),
+          ),
+        ),
+      )
+      .returning({ id: drawings.id })
+    if (written.length === 0) return { status: "shared" as const }
 
     const existing = await tx
       .select({ fileId: drawingFiles.fileId })

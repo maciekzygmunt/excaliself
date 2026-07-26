@@ -99,10 +99,14 @@ export function useAutoSave<TData, TPayload>({
         return
       }
       pendingSigRef.current = sig
-      // mutateAsync rather than mutate purely so `flush` has a handle on the
-      // write; failures are still reported by the mutation's own onError, and
-      // the catch here only keeps them from surfacing as unhandled rejections.
-      inFlightRef.current = mutateAsync({ payload, sig }).catch(() => {})
+      // mutateAsync rather than mutate so `flush` has a handle on the write —
+      // and, crucially, on its failure. The rejection is kept intact for
+      // `flush`; the separate catch below is only for the background saves
+      // nobody awaits, which report through the mutation's own onError and
+      // would otherwise surface as unhandled rejections.
+      const settled = mutateAsync({ payload, sig })
+      settled.catch(() => {})
+      inFlightRef.current = settled
     },
     [mutateAsync],
   )
@@ -116,6 +120,10 @@ export function useAutoSave<TData, TPayload>({
    * caller that needs this is a handoff — sharing a drawing moves ownership
    * of its data to the collab room, and the last solo save has to be in the
    * database before that happens (canvas sharing spec §5.5).
+   *
+   * **Rejects if the write failed.** That is the whole point: a handoff that
+   * proceeds on a failed flush hands the Room a drawing it will load from
+   * stale data, and the caller has to be able to stop.
    *
    * A save can chain another from its own onSuccess (the user kept editing
    * while it was in flight), so this waits until nothing new appears.

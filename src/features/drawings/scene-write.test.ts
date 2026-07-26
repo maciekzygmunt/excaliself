@@ -6,7 +6,7 @@ import { writeDrawingScene } from "./scene-write"
 
 type Call =
   | { kind: "select"; table: unknown; where: SQL }
-  | { kind: "update"; table: unknown; set: Record<string, unknown> }
+  | { kind: "update"; table: unknown; set: Record<string, unknown>; where: SQL }
   | { kind: "insert"; table: unknown; values: Record<string, unknown>[] }
   | { kind: "delete"; table: unknown; where: SQL }
 
@@ -19,6 +19,8 @@ function fakeDb(options: {
   target?: { id: string; shareId: string | null }
   /** Rows already in drawing_files for this drawing. */
   storedFileIds?: string[]
+  /** When false, the guarded UPDATE matches nothing — a share landed first. */
+  updateHits?: boolean
 }) {
   const calls: Call[] = []
   const tx = {
@@ -40,10 +42,14 @@ function fakeDb(options: {
     }),
     update: (table: unknown) => ({
       set: (set: Record<string, unknown>) => ({
-        where: () => {
-          calls.push({ kind: "update", table, set })
-          return Promise.resolve()
-        },
+        where: (where: SQL) => ({
+          returning: () => {
+            calls.push({ kind: "update", table, set, where })
+            return Promise.resolve(
+              options.updateHits === false ? [] : [{ id: "d1" }],
+            )
+          },
+        }),
       }),
     }),
     insert: (table: unknown) => ({
@@ -141,4 +147,27 @@ test("files still reconcile: new ones are inserted, unreferenced ones dropped", 
   expect(
     (inserted?.values as Record<string, unknown>[]).map((row) => row.fileId),
   ).toEqual(["add"])
+})
+
+// Spec §5.5's single-writer invariant has to survive another tab of the
+// owner's minting a link between the gate and the write.
+test("a share created between the gate and the write still refuses the save", async () => {
+  const { db, calls } = fakeDb({
+    target: { id: "d1", shareId: null },
+    updateHits: false,
+  })
+
+  const result = await writeDrawingScene(db, "user-1", {
+    id: "d1",
+    data: SCENE,
+    files: [file("f1")],
+  })
+
+  expect(result).toEqual({ status: "shared" })
+  // The UPDATE carries the no-share condition itself, so it matched nothing —
+  // and the files must not be reconciled behind a write that never landed.
+  const update = calls.find((call) => call.kind === "update")
+  expect(toSql(update?.where as SQL)).toContain("not exists")
+  expect(calls.some((call) => call.kind === "insert")).toBe(false)
+  expect(calls.some((call) => call.kind === "delete")).toBe(false)
 })

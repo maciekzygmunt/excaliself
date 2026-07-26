@@ -14,6 +14,7 @@ function Harness({
   onChangeRef,
   flushRef,
   savedRef,
+  onError,
   paused = false,
   skipInitialChange = false,
 }: {
@@ -21,6 +22,7 @@ function Harness({
   onChangeRef: { current: ((data: string) => void) | null }
   flushRef?: { current: (() => Promise<void>) | null }
   savedRef?: { current: boolean }
+  onError?: (error: unknown) => void
   paused?: boolean
   skipInitialChange?: boolean
 }) {
@@ -28,6 +30,7 @@ function Harness({
     toPayload: (d) => d,
     getSignature: (p) => p,
     onSave,
+    onError,
     paused,
     skipInitialChange,
   })
@@ -350,4 +353,28 @@ test("a write that stored nothing neither claims Saved nor counts as committed",
   expect(onSave).toHaveBeenCalledTimes(2)
   expect(onSave).toHaveBeenLastCalledWith("refused")
   expect(savedRef.current).toBe(true)
+})
+
+// Regression: flush() swallowed the rejection, so a handoff proceeded on a
+// save that never landed — the Room would then load the drawing from stale
+// data, and scene-level state and files are not something the socket carries.
+test("flush rejects when the write failed, so a handoff can stop", async () => {
+  const onSave = vi.fn(() => Promise.reject(new Error("network down")))
+  const onChangeRef = { current: null as ((data: string) => void) | null }
+  const flushRef = { current: null as (() => Promise<void>) | null }
+
+  render(
+    <Harness
+      onSave={onSave}
+      onChangeRef={onChangeRef}
+      flushRef={flushRef}
+      onError={() => {}}
+    />,
+    { wrapper },
+  )
+
+  act(() => onChangeRef.current?.("edit"))
+  await act(async () => {
+    await expect(flushRef.current?.()).rejects.toThrow("network down")
+  })
 })

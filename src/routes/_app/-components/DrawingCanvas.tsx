@@ -87,13 +87,19 @@ export function DrawingCanvas({ drawingId, readOnly = false }: Props) {
   })
 
   // The cap is 25, so this is a corner the owner should almost never see —
-  // but while it lasts they are genuinely offline: the room refused them and
-  // the server refuses classic writes for a shared drawing, so saying so is
-  // the only honest thing to do.
+  // but while it lasts they are genuinely offline: the room refused them, and
+  // the server refuses classic writes for a shared drawing.
+  //
+  // The message says *reload* rather than "wait for a slot" because nothing
+  // here retries the socket — a refused join stays refused until the page is
+  // loaded again (auto-reconnect is #126). Telling someone their work will
+  // come back on its own, when it won't, is how the work gets lost.
   const handleRoomFull = useCallback(() => {
     toast.error("This drawing has too many people in it right now", {
       id: `room-full:${drawingId}`,
-      description: "Your changes won't be saved until someone leaves.",
+      duration: Number.POSITIVE_INFINITY,
+      description:
+        "Your changes aren't being saved. Reload the page to try joining again.",
     })
   }, [drawingId])
 
