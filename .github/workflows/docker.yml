@@ -55,6 +55,12 @@ jobs:
           docker compose -p coolify -f docker-compose.coolify.yaml exec -T excaliself sh -c \
             'wget -qO- http://127.0.0.1:3000/api/health && wget -qO /dev/null http://127.0.0.1:3000/login'
 
+      - name: Validate docker-compose.build.yaml
+        env:
+          POSTGRES_PASSWORD: smoke-password
+          BETTER_AUTH_SECRET: smoke-secret-at-least-32-characters-long
+        run: docker compose -f docker-compose.build.yaml config --quiet
+
       - name: Logs on failure
         if: failure()
         run: |
