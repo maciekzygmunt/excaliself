@@ -29,4 +29,7 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm lint
       - run: pnpm test
+      # Node's default heap on the runner (~2GB) is too small for the build.
       - run: pnpm build
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
