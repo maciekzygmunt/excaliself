@@ -50,7 +50,7 @@ Put a reverse proxy with HTTPS in front of port 3000 for anything public.
 To update, run `docker compose pull && docker compose up -d`. To pin a release,
 set `EXCALISELF_VERSION` (e.g. `1.0.0`) in `.env`. To build the image from
 source instead (needs about 4 GB of RAM), clone the repo and run
-`docker compose -f docker-compose.yaml -f docker-compose.build.yaml up -d --build`.
+`docker compose -f docker-compose.build.yaml up -d --build`.
 [docs/deployment.md](./docs/deployment.md) has the details.
 
 ### Coolify

@@ -63,7 +63,7 @@ To build the image on the server instead of pulling it (needs ~4 GB RAM),
 clone the repo and run:
 
 ```bash
-docker compose -f docker-compose.yaml -f docker-compose.build.yaml up -d --build
+docker compose -f docker-compose.build.yaml up -d --build
 ```
 
 ## Coolify
@@ -83,6 +83,14 @@ port: `https://draw.example.com:3000`. After deploy, check under
 Only Coolify's proxy can reach the app; Postgres stays on the internal
 network. To pin a version, set `EXCALISELF_VERSION` in the resource's
 environment variables and redeploy.
+
+### Deploy every push to main
+
+Coolify's auto-deploy fires on push, before CI publishes the new image. To
+run the pushed commit, build it on the server instead: set **Docker Compose
+Location** to `/docker-compose.build.yaml` and keep **Auto Deploy** on. Set
+`POSTGRES_PASSWORD`, `BETTER_AUTH_SECRET` and `BASE_URL` in the resource's
+environment variables (see the table above). The build needs ~4 GB of RAM.
 
 ## Local development
 

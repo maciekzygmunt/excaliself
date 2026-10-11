@@ -1,7 +1,36 @@
-# Build the app image from source instead of pulling it:
-#   docker compose -f docker-compose.yaml -f docker-compose.build.yaml up -d --build
+# Same as docker-compose.yaml, but builds the app image from source:
+#   docker compose -f docker-compose.build.yaml up -d --build
+# Also works as a Coolify compose file to deploy every push to main.
 # The build needs ~4 GB of RAM; prefer the prebuilt image on small servers.
 services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-excaliself}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-excaliself}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
   excaliself:
     image: excaliself:local
     build: .
+    ports:
+      - "${EXCALISELF_PORT:-3000}:3000"
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-excaliself}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-excaliself}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?Set BETTER_AUTH_SECRET in .env}
+      BASE_URL: ${BASE_URL:-http://localhost:3000}
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  pgdata:
