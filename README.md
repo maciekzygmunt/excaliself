@@ -28,22 +28,30 @@
 ## Deploy
 
 Both paths run the app and its Postgres database together from one compose file.
-The app applies database migrations when it starts, so updating is a redeploy.
+They pull the prebuilt image `ghcr.io/maciekzygmunt/selfhosted-excalidraw`
+(amd64 and arm64), so nothing is built on your server. `latest` is the newest
+release. The app applies database migrations when it starts, so updating is a
+redeploy.
 
 ### Docker Compose
 
-Building the image from source needs about 4 GB of RAM.
-
 ```bash
-git clone https://github.com/maciekzygmunt/selfhosted-excalidraw.git
-cd selfhosted-excalidraw
-cp .env.example .env   # set BETTER_AUTH_SECRET, POSTGRES_PASSWORD, and BASE_URL
+mkdir excaliself && cd excaliself
+curl -fsSLO https://raw.githubusercontent.com/maciekzygmunt/selfhosted-excalidraw/main/docker-compose.yaml
+curl -fsSL -o .env https://raw.githubusercontent.com/maciekzygmunt/selfhosted-excalidraw/main/.env.example
+# set POSTGRES_PASSWORD, BETTER_AUTH_SECRET, and BASE_URL in .env
 docker compose up -d
 ```
 
 Open `BASE_URL` (default <http://localhost:3000>). The first visit takes you to
-`/setup` to create the admin account. Put a reverse proxy with HTTPS in front of
-port 3000 for anything public.
+`/setup` to create the admin account. Postgres is not published on the host.
+Put a reverse proxy with HTTPS in front of port 3000 for anything public.
+
+To update, run `docker compose pull && docker compose up -d`. To pin a release,
+set `EXCALISELF_VERSION` (e.g. `1.0.0`) in `.env`. To build the image from
+source instead (needs about 4 GB of RAM), clone the repo and run
+`docker compose -f docker-compose.yaml -f docker-compose.build.yaml up -d --build`.
+[docs/deployment.md](./docs/deployment.md) has the details.
 
 ### Coolify
 
@@ -54,19 +62,24 @@ port 3000 for anything public.
 3. Click **Deploy**.
 
 Coolify creates the database, generates the secrets, and assigns a domain, so
-there is nothing to configure. Open the domain to create the admin account.
+there is nothing to configure. If your server has no wildcard domain, first set a
+domain on the `excaliself` service with the container port, e.g.
+`https://draw.example.com:3000`. Open the domain to create the admin account.
 To pin a release instead of `latest`, set
 `EXCALISELF_VERSION` (e.g. `1.0.0`) in the resource's environment variables.
 Drawings live in the `pgdata` volume and survive redeploys.
 
 ### Configuration
 
+Docker Compose reads these from `.env`. Coolify sets them for you.
+
 | Variable | Required | Description |
 |---|---|---|
-| `BETTER_AUTH_SECRET` | Yes | Session signing secret, at least 32 characters |
+| `POSTGRES_PASSWORD` | Yes | Password for the bundled Postgres. Use hex (`openssl rand -hex 24`): it goes into a connection URL |
+| `BETTER_AUTH_SECRET` | Yes | Session signing secret, at least 32 characters (`openssl rand -base64 32`) |
 | `BASE_URL` | Yes in production | Public URL of the instance (default `http://localhost:3000`) |
-| `DATABASE_URL` | Yes | Postgres connection string (Docker Compose builds it for you) |
-| `POSTGRES_PASSWORD` | Docker Compose | Password for the bundled Postgres |
+| `EXCALISELF_VERSION` | No | Image tag to run: `latest` (default), a release like `1.0.0` or `1.0`, or `main` |
+| `EXCALISELF_PORT` | No | Host port for the app (default `3000`). `127.0.0.1:3000` keeps it local to a reverse proxy |
 | `POSTGRES_USER`, `POSTGRES_DB` | No | Bundled Postgres user and database (default `excaliself`) |
 
 `GET /api/health` returns `200` when the app is up and can reach Postgres.
@@ -87,13 +100,14 @@ Requires Node 22, pnpm, and Docker.
 
 ```bash
 pnpm install
-cp .env.example .env   # fill in the values; DATABASE_URL points at localhost
-docker compose up -d db
-pnpm dev               # http://localhost:3000
+cp .env.dev.example .env                           # works as-is
+docker compose -f docker-compose.dev.yaml up -d    # Postgres on 127.0.0.1:5432
+pnpm dev                                           # http://localhost:3000
 ```
 
 `pnpm test`, `pnpm typecheck`, and `pnpm lint` run the checks.
 `pnpm db:generate` creates a migration after a schema change.
+Releases are cut from git tags; see [docs/releasing.md](./docs/releasing.md).
 
 ## License
 
