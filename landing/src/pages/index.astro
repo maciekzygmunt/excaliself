@@ -1,36 +1,54 @@
 ---
+import Layout from "../layouts/Layout.astro"
+import Icon from "../components/Icon.astro"
+
 const repo = "https://github.com/maciekzygmunt/excaliself"
 
 const features = [
   {
+    icon: "pencil-simple",
     title: "The full Excalidraw editor",
-    body: "The same canvas you already know, with auto-save. Images you paste into a drawing are stored too.",
-    icon: `<path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/>`,
+    body: "The same canvas you already know, with autosave. Images you paste into a drawing are stored too.",
   },
   {
+    icon: "folders",
     title: "Folders, stars, and recents",
     body: "Nest folders as deep as you like and drag drawings between them in the sidebar.",
-    icon: `<path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/>`,
   },
   {
+    icon: "command",
     title: "Command palette",
     body: "Press ⌘K and fuzzy search across drawings, folders, and actions without touching the mouse.",
-    icon: `<path d="M15 6v12a3 3 0 1 0 3-3H6a3 3 0 1 0 3 3V6a3 3 0 1 0-3 3h12a3 3 0 1 0-3-3"/>`,
   },
   {
+    icon: "trash-simple",
     title: "Trash with restore",
     body: "Deleted drawings wait 30 days before they are purged, so a wrong click costs nothing.",
-    icon: `<path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><path d="M10 11v6"/><path d="M14 11v6"/>`,
   },
   {
-    title: "Invite-only accounts",
-    body: "The first visitor becomes the admin. Everyone else joins by invite link. No public sign-up page.",
-    icon: `<rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>`,
+    icon: "lock-key",
+    title: "Accounts by invite",
+    body: "The first visitor becomes the admin. Everyone else joins by invite link. No public signup page.",
   },
   {
+    icon: "circle-half",
     title: "Light and dark",
     body: "Both themes for the app, with an optional separate theme for the canvas itself.",
-    icon: `<path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.9 4.9 1.4 1.4"/><path d="m17.7 17.7 1.4 1.4"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.3 17.7-1.4 1.4"/><path d="m19.1 4.9-1.4 1.4"/><path d="M12 8a2.83 2.83 0 0 0 4 4 4 4 0 1 1-4-4"/>`,
+  },
+]
+
+const steps = [
+  {
+    title: "Download two files",
+    body: "The compose file and an example env file. Both come straight from the repository.",
+  },
+  {
+    title: "Set three variables",
+    body: "A Postgres password, a session secret, and your public URL. Nothing else is required.",
+  },
+  {
+    title: "Start it and open the URL",
+    body: "The first visit creates the admin account. Share invite links from Settings.",
   },
 ]
 
@@ -38,55 +56,87 @@ const compose = `mkdir excaliself && cd excaliself
 curl -fsSLO https://raw.githubusercontent.com/maciekzygmunt/excaliself/main/docker-compose.yaml
 curl -fsSL -o .env https://raw.githubusercontent.com/maciekzygmunt/excaliself/main/.env.example
 docker compose up -d`
+
+const faq = [
+  {
+    q: "Is this a fork of Excalidraw?",
+    a: "No. Excaliself embeds the official Excalidraw editor package unchanged and adds accounts, folders, search, and trash around it. Editor updates arrive with each release.",
+  },
+  {
+    q: "What do I need to run it?",
+    a: "A server with Docker. The compose file starts the app and a Postgres database together. The prebuilt image runs on amd64 and arm64 and needs no build step.",
+  },
+  {
+    q: "Where are my drawings stored?",
+    a: "In your own Postgres database, including pasted images. Back up the single pgdata volume and you have everything. Nothing is sent to a third party.",
+  },
+  {
+    q: "How do updates work?",
+    a: "Pull the new image and start it again. Database migrations run when the app starts. Pin a release with EXCALISELF_VERSION or follow latest.",
+  },
+  {
+    q: "Can I use it on Coolify?",
+    a: "Yes. Add the repository as a Docker Compose resource, point it at docker-compose.coolify.yaml, and click Deploy. Coolify creates the database, the secrets, and a domain.",
+  },
+  {
+    q: "How do people join?",
+    a: "The first visitor creates the admin account. Admins send invite links from Settings and can manage members, roles, and password resets there. There is no public signup.",
+  },
+  {
+    q: "Does it support live collaboration?",
+    a: "Not yet. Each drawing has one editor at a time, and changes save automatically. Sharing and collaboration are on the roadmap in the repository.",
+  },
+  {
+    q: "What does it cost?",
+    a: "Nothing. Excaliself is open source under the MIT license. You pay only for the server you run it on.",
+  },
+]
+
+const faqSchema = {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  mainEntity: faq.map((f) => ({
+    "@type": "Question",
+    name: f.q,
+    acceptedAnswer: { "@type": "Answer", text: f.a },
+  })),
+}
+
+const tagline = ["Your drawings, your database.", "Back up one volume", "and you have everything."]
 ---
 
 <Layout
-  title="Excaliself — your team's whiteboard, on your server"
-  description="The Excalidraw canvas in a small self-hosted app: accounts, folders, search, and a trash can, with every drawing stored in your own Postgres."
+  title="Excaliself: your team's whiteboard, on your server"
+  description="The Excalidraw canvas in a small app you host yourself: accounts, folders, search, and a trash can, with every drawing stored in your own Postgres."
 >
-  <header class="mx-auto flex max-w-6xl items-center justify-between px-6 py-5">
-    <a href="/" class="flex items-center gap-2.5 font-semibold" aria-label="Excaliself home">
-      <img src="/favicon.svg" alt="" width="28" height="28" class="rounded-md" />
-      Excaliself
-    </a>
-    <nav class="flex items-center gap-1 text-sm">
-      <a href="#features" class="rounded-md px-3 py-1.5 text-muted-foreground transition-colors hover:bg-well hover:text-foreground">Features</a>
-      <a href="#deploy" class="rounded-md px-3 py-1.5 text-muted-foreground transition-colors hover:bg-well hover:text-foreground">Deploy</a>
-      <a href={repo} class="keycap ml-2 inline-flex items-center gap-2 px-3 py-1.5 font-medium">
-        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M12 .3a12 12 0 0 0-3.8 23.4c.6.1.8-.3.8-.6v-2c-3.3.7-4-1.6-4-1.6-.6-1.4-1.4-1.8-1.4-1.8-1-.7.1-.7.1-.7 1.2 0 1.9 1.2 1.9 1.2 1 1.8 2.8 1.3 3.5 1 0-.8.4-1.3.7-1.6-2.7-.3-5.5-1.3-5.5-6 0-1.2.5-2.3 1.3-3.1-.2-.4-.6-1.6 0-3.2 0 0 1-.3 3.4 1.2a11.5 11.5 0 0 1 6 0c2.3-1.5 3.3-1.2 3.3-1.2.6 1.6.2 2.8 0 3.2.9.8 1.3 1.9 1.3 3.1 0 4.6-2.8 5.6-5.5 5.9.5.4.9 1 .9 2.2v3.3c0 .3.1.7.8.6A12 12 0 0 0 12 .3"/></svg>
-        GitHub
-      </a>
-    </nav>
-  </header>
+  <Fragment slot="head">
+    <script type="application/ld+json" set:html={JSON.stringify(faqSchema)} />
+  </Fragment>
 
   <main id="main">
     <section class="mx-auto max-w-6xl px-6 pt-16 pb-12 md:pt-24">
-      <div class="mx-auto max-w-3xl text-center">
+      <div class="mx-auto flex max-w-[680px] flex-col items-center text-center">
         <p class="inline-flex items-center gap-2 rounded-full border bg-well px-3 py-1 text-xs font-medium text-muted-foreground shadow-well">
-          <span class="size-1.5 rounded-full bg-iris"></span>
-          Open source · MIT · one Docker image
+          <span class="size-2 rounded-full bg-iris"></span>
+          Open source, MIT licensed, one Docker image
         </p>
-        <h1 class="mt-6 text-4xl font-semibold tracking-tight md:text-6xl">
+        <h1 class="mt-6 text-5xl font-semibold tracking-tight md:text-6xl">
           Your team's whiteboard,<br />on your server.
         </h1>
-        <p class="mx-auto mt-5 max-w-2xl text-lg text-muted-foreground">
-          Excaliself wraps the Excalidraw canvas in a small self-hosted app:
+        <p class="mt-6 text-lg text-muted-foreground">
+          Excaliself wraps the Excalidraw canvas in a small app you host yourself:<br class="hidden md:block" />{" "}
           accounts, folders, search, and a trash can. Every drawing lives in your own Postgres.
         </p>
         <div class="mt-8 flex flex-wrap items-center justify-center gap-3">
-          <a
-            href="#deploy"
-            class="inline-flex h-10 items-center rounded-md bg-iris px-5 text-sm font-semibold text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.2)] transition-[background-color,scale] duration-150 hover:bg-iris-strong active:scale-[0.98]"
-          >
-            Deploy in five minutes
-          </a>
-          <a href={repo} class="keycap inline-flex h-10 items-center px-5 text-sm font-medium">
+          <a href="#deploy" class="button-primary">Deploy in five minutes</a>
+          <a href={repo} class="keycap inline-flex items-center gap-2 px-3 py-2 text-base font-semibold">
+            <Icon name="github-logo" size={18} />
             Read the source
           </a>
         </div>
       </div>
 
-      <figure class="mt-14 rounded-xl border bg-panel p-1.5 shadow-panel md:mt-20" data-reveal>
+      <figure class="mt-16 rounded-2xl border bg-panel p-2 shadow-panel md:mt-20" data-reveal>
         <div class="compare rounded-lg">
           <img
             src="/home-light.png"
@@ -105,7 +155,7 @@ docker compose up -d`
           <div class="compare-handle" aria-hidden="true"></div>
           <input type="range" min="0" max="100" value="62" aria-label="Compare light and dark theme" />
         </div>
-        <figcaption class="flex items-center justify-between px-3 pt-2.5 pb-1 text-xs text-muted-foreground">
+        <figcaption class="flex items-center justify-between px-3 py-2 text-xs text-muted-foreground">
           <span>Light theme</span>
           <span class="font-medium">Drag to compare</span>
           <span>Dark theme</span>
@@ -119,78 +169,118 @@ docker compose up -d`
       </script>
     </section>
 
-    <section id="features" class="mx-auto max-w-6xl scroll-mt-16 px-6 py-20">
+    <section id="features" class="mx-auto max-w-6xl scroll-mt-24 px-6 py-20">
       <div class="max-w-xl">
-        <h2 class="text-2xl font-semibold tracking-tight md:text-3xl">Everything around the canvas, nothing on top of it</h2>
+        <h2 class="text-3xl font-semibold tracking-tight md:text-4xl">Everything around the canvas, nothing on top of it</h2>
         <p class="mt-3 text-muted-foreground">
           Excalidraw stays untouched. Excaliself adds the parts a team needs to keep drawings for years.
         </p>
       </div>
       <ul class="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {features.map((f) => (
-          <li class="card p-5" data-reveal>
-            <span class="inline-flex size-9 items-center justify-center rounded-md bg-iris-muted text-iris">
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" set:html={f.icon} />
+          <li class="card p-6" data-reveal>
+            <span class="inline-flex size-10 items-center justify-center rounded-md bg-iris-muted text-iris">
+              <Icon name={f.icon} size={20} />
             </span>
             <h3 class="mt-4 font-semibold">{f.title}</h3>
-            <p class="mt-1.5 text-sm text-muted-foreground">{f.body}</p>
+            <p class="mt-2 text-sm text-muted-foreground">{f.body}</p>
           </li>
         ))}
       </ul>
     </section>
 
-    <section id="deploy" class="mx-auto max-w-6xl scroll-mt-16 px-6 py-20">
-      <div class="grid items-start gap-10 lg:grid-cols-[1fr_1.2fr]">
-        <div data-reveal>
-          <h2 class="text-2xl font-semibold tracking-tight md:text-3xl">One compose file. That is the whole install.</h2>
+    <section aria-label="Tagline" class="mx-auto max-w-6xl px-6 py-20">
+      <p class="mx-auto max-w-[680px] text-center text-4xl font-semibold tracking-tight md:text-5xl" data-tagline>
+        {tagline.map((line, i) => (
+          <>
+            {i > 0 && <br />}
+            {line.split(" ").map((w) => <span class="tagline-word inline-block">{w}&nbsp;</span>)}
+          </>
+        ))}
+      </p>
+      <script>
+        // Each word brightens as it crosses a line 35% up from the bottom
+        // of the viewport, with a small per-word delay for reading order.
+        const words = [...document.querySelectorAll<HTMLElement>("[data-tagline] .tagline-word")]
+        const io = new IntersectionObserver(
+          (entries) => {
+            for (const e of entries) {
+              if (!e.isIntersecting) continue
+              const el = e.target as HTMLElement
+              el.style.transitionDelay = `${(words.indexOf(el) % 6) * 60}ms`
+              el.classList.add("is-visible")
+              io.unobserve(el)
+            }
+          },
+          { rootMargin: "0px 0px -35% 0px" },
+        )
+        for (const w of words) io.observe(w)
+      </script>
+    </section>
+
+    <section id="deploy" class="mx-auto max-w-6xl scroll-mt-24 px-6 py-20">
+      <div class="max-w-xl">
+        <h2 class="text-3xl font-semibold tracking-tight md:text-4xl">One compose file.<br />That is the whole install.</h2>
+        <p class="mt-3 text-muted-foreground">
+          The prebuilt image runs on amd64 and arm64 and bundles Postgres. Migrations apply on start, so an update is a redeploy.
+        </p>
+      </div>
+      <div class="mt-10 grid items-start gap-10 lg:grid-cols-[1fr_1.2fr]">
+        <ol class="flex flex-col gap-6">
+          {steps.map((s, i) => (
+            <li class="flex gap-4" data-reveal>
+              <span class="flex size-8 shrink-0 items-center justify-center rounded-full bg-iris-muted font-mono text-sm font-semibold text-iris">
+                {i + 1}
+              </span>
+              <div>
+                <h3 class="font-semibold">{s.title}</h3>
+                <p class="mt-2 text-sm text-muted-foreground">{s.body}</p>
+              </div>
+            </li>
+          ))}
+          <li class="flex gap-4" data-reveal>
+            <span class="size-8 shrink-0"></span>
+            <a href={`${repo}#deploy`} class="inline-flex items-center gap-2 text-sm font-semibold text-iris transition-colors duration-300 ease-fluid hover:text-iris-strong">
+              Full deployment guide, including Coolify
+              <Icon name="arrow-right" size={16} />
+            </a>
+          </li>
+        </ol>
+        <pre class="overflow-x-auto rounded-xl border bg-panel p-6 font-mono text-xs leading-relaxed shadow-panel md:text-sm" data-reveal><code>{compose}</code></pre>
+      </div>
+    </section>
+
+    <section id="faq" class="mx-auto max-w-6xl scroll-mt-24 px-6 py-20">
+      <div class="grid gap-10 lg:grid-cols-[1fr_1.6fr]">
+        <div>
+          <h2 class="text-3xl font-semibold tracking-tight md:text-4xl">Questions before you deploy</h2>
           <p class="mt-3 text-muted-foreground">
-            The prebuilt image runs on amd64 and arm64 and bundles Postgres. Migrations apply on start, so an update is a redeploy.
+            Anything missing? <a href={`${repo}/issues`} class="font-medium text-iris transition-colors duration-300 ease-fluid hover:text-iris-strong">Open an issue</a> and it gets answered there.
           </p>
-          <ul class="mt-6 space-y-3 text-sm">
-            <li class="flex gap-3">
-              <span class="mt-2 size-1.5 shrink-0 rounded-full bg-iris"></span>
-              <span>Set three variables in <code class="rounded bg-well px-1 font-mono text-xs">.env</code> and the first visit creates the admin account.</span>
-            </li>
-            <li class="flex gap-3">
-              <span class="mt-2 size-1.5 shrink-0 rounded-full bg-iris"></span>
-              <span>On Coolify, point a Docker Compose resource at the repo and click Deploy. Secrets and domain are set for you.</span>
-            </li>
-            <li class="flex gap-3">
-              <span class="mt-2 size-1.5 shrink-0 rounded-full bg-iris"></span>
-              <span>Pin a release with <code class="rounded bg-well px-1 font-mono text-xs">EXCALISELF_VERSION</code> or follow <code class="rounded bg-well px-1 font-mono text-xs">latest</code>.</span>
-            </li>
-          </ul>
-          <a href={`${repo}#deploy`} class="mt-6 inline-flex text-sm font-medium text-iris hover:text-iris-strong">
-            Full deployment guide →
-          </a>
         </div>
-        <pre class="overflow-x-auto rounded-xl border bg-panel p-5 font-mono text-xs leading-relaxed shadow-panel md:text-sm" data-reveal><code>{compose}</code></pre>
+        <div class="card divide-y divide-hairline" data-reveal>
+          {faq.map((f) => (
+            <details class="group px-6">
+              <summary class="flex cursor-pointer items-center justify-between gap-4 py-4 font-semibold">
+                {f.q}
+                <Icon name="caret-down" size={16} class="faq-caret shrink-0 text-muted-foreground" />
+              </summary>
+              <p class="pb-4 text-sm text-muted-foreground">{f.a}</p>
+            </details>
+          ))}
+        </div>
       </div>
     </section>
 
     <section class="mx-auto max-w-6xl px-6 py-20">
-      <div class="card flex flex-col items-center gap-5 px-6 py-12 text-center" data-reveal>
+      <div class="card flex flex-col items-center gap-6 px-6 py-12 text-center" data-reveal>
         <img src="/favicon.svg" alt="" width="40" height="40" class="rounded-lg" />
-        <h2 class="text-2xl font-semibold tracking-tight md:text-3xl">Your drawings, your database.</h2>
+        <h2 class="max-w-[680px] text-3xl font-semibold tracking-tight md:text-4xl">Nothing to sign up for. Nothing to export later.</h2>
         <p class="max-w-md text-muted-foreground">
-          No accounts with a third party, no telemetry, no exports to remember. Back up one Postgres volume and you have everything.
+          No third party accounts, no telemetry, no lock in. Stop the container and your drawings are still in your Postgres.
         </p>
-        <a
-          href={repo}
-          class="inline-flex h-10 items-center rounded-md bg-iris px-5 text-sm font-semibold text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.2)] transition-[background-color,scale] duration-150 hover:bg-iris-strong active:scale-[0.98]"
-        >
-          Get Excaliself on GitHub
-        </a>
+        <a href="#deploy" class="button-primary">Deploy in five minutes</a>
       </div>
     </section>
   </main>
-
-  <footer class="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 border-t px-6 py-8 text-sm text-muted-foreground">
-    <p>Excaliself is MIT licensed. Not affiliated with Excalidraw.</p>
-    <nav class="flex gap-5">
-      <a href={repo} class="hover:text-foreground">GitHub</a>
-      <a href={`${repo}/blob/main/LICENSE`} class="hover:text-foreground">License</a>
-      <a href={`${repo}/issues`} class="hover:text-foreground">Issues</a>
-    </nav>
-  </footer>
 </Layout>
