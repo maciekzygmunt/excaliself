@@ -7,6 +7,6 @@ const repo = "https://github.com/maciekzygmunt/excaliself"
   <nav aria-label="Footer" class="flex gap-6">
     <a href={repo} class="transition-colors duration-300 ease-fluid hover:text-foreground">GitHub</a>
     <a href={`${repo}/blob/main/LICENSE`} class="transition-colors duration-300 ease-fluid hover:text-foreground">License</a>
-    <a href="/privacy" class="transition-colors duration-300 ease-fluid hover:text-foreground">Privacy</a>
+    <a href={`${import.meta.env.BASE_URL}privacy/`} class="transition-colors duration-300 ease-fluid hover:text-foreground">Privacy</a>
   </nav>
 </footer>
