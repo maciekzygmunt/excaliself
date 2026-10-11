@@ -3,6 +3,12 @@ import Layout from "../layouts/Layout.astro"
 import Icon from "../components/Icon.astro"
 import FoldersFigure from "../components/FoldersFigure.astro"
 import TrashFigure from "../components/TrashFigure.astro"
+import { Image } from "astro:assets"
+import homeLight from "../assets/home-light.png"
+import homeDark from "../assets/home-dark.png"
+import editorShot from "../assets/shots/editor.png"
+import paletteShot from "../assets/shots/palette.png"
+import membersShot from "../assets/shots/members.png"
 
 const repo = "https://github.com/maciekzygmunt/excaliself"
 
@@ -11,18 +17,16 @@ const showcase = [
     icon: "pencil-simple",
     title: "The editor you already know",
     body: "The full Excalidraw canvas, unchanged. Every stroke saves on its own, and images you paste are stored with the drawing.",
-    image: "/shots/editor.png",
+    image: editorShot,
     width: 1120,
-    height: 500,
     alt: "The Excalidraw toolbar above a signup flowchart in the Excaliself editor",
   },
   {
     icon: "command",
     title: "Press ⌘K and jump anywhere",
     body: "Fuzzy search over drawings, folders, and actions. Type a few letters, press enter, and keep your hands on the keyboard.",
-    image: "/shots/palette.png",
+    image: paletteShot,
     width: 760,
-    height: 340,
     alt: "The command palette filtering drawings and folders by the word retro",
   },
   {
@@ -41,9 +45,8 @@ const showcase = [
     icon: "lock-key",
     title: "Your team only",
     body: "The first visitor becomes the admin. Everyone else joins through a single use invite link. Admins manage roles and password resets from Settings.",
-    image: "/shots/members.png",
+    image: membersShot,
     width: 920,
-    height: 285,
     alt: "The members list in Settings with admin and member roles",
   },
 ]
@@ -106,6 +109,20 @@ const faq = [
   },
 ]
 
+const appSchema = {
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  name: "Excaliself",
+  description: "Self-hosted Excalidraw for teams, with accounts, folders, search, and a trash can.",
+  url: Astro.site?.href,
+  image: new URL("/og.png", Astro.site).href,
+  applicationCategory: "DesignApplication",
+  operatingSystem: "Docker",
+  license: "https://opensource.org/licenses/MIT",
+  codeRepository: repo,
+  offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+}
+
 const faqSchema = {
   "@context": "https://schema.org",
   "@type": "FAQPage",
@@ -116,14 +133,18 @@ const faqSchema = {
   })),
 }
 
+// The hero figure is the page width minus padding, so 2560px covers 2x screens.
+const heroSizes = "(min-width: 1152px) 1088px, calc(100vw - 64px)"
+
 const tagline = ["Your drawings, your database.", "Back up one volume", "and you have everything."]
 ---
 
 <Layout
-  title="Excaliself: your team's whiteboard, on your server"
-  description="The Excalidraw canvas in a small app you host yourself: accounts, folders, search, and a trash can, with every drawing stored in your own Postgres."
+  title="Excaliself: self-hosted Excalidraw for your team"
+  description="Self-hosted Excalidraw for your team: the full canvas with accounts, folders, search, and a trash can. Every drawing is stored in your own Postgres."
 >
   <Fragment slot="head">
+    <script type="application/ld+json" set:html={JSON.stringify(appSchema)} />
     <script type="application/ld+json" set:html={JSON.stringify(faqSchema)} />
   </Fragment>
 
@@ -138,8 +159,8 @@ const tagline = ["Your drawings, your database.", "Back up one volume", "and you
           Your team's whiteboard,<br />on your server.
         </h1>
         <p class="mt-6 text-lg text-muted-foreground">
-          Excaliself wraps the Excalidraw canvas in a small app you host yourself:<br class="hidden md:block" />{" "}
-          accounts, folders, search, and a trash can. Every drawing lives in your own Postgres.
+          Excaliself is self-hosted Excalidraw: the full canvas, plus accounts,<br class="hidden md:block" />{" "}
+          folders, search, and a trash can. Every drawing lives in your own Postgres.
         </p>
         <div class="mt-8 flex flex-wrap items-center justify-center gap-3">
           <a href="#deploy" class="button-primary">Deploy in five minutes</a>
@@ -152,18 +173,20 @@ const tagline = ["Your drawings, your database.", "Back up one volume", "and you
 
       <figure class="mt-16 rounded-2xl border bg-panel p-2 shadow-panel md:mt-20" data-reveal>
         <div class="compare rounded-lg">
-          <img
-            src="/home-light.png"
-            width="2560"
-            height="1280"
+          <Image
+            src={homeLight}
+            widths={[1280, 2560]}
+            sizes={heroSizes}
             alt="Excaliself home screen in the light theme: a sidebar with starred drawings and folders next to a grid of drawing previews"
+            loading="eager"
             fetchpriority="high"
           />
-          <img
-            src="/home-dark.png"
-            width="2560"
-            height="1280"
+          <Image
+            src={homeDark}
+            widths={[1280, 2560]}
+            sizes={heroSizes}
             alt="The same home screen in the dark theme"
+            loading="eager"
             class="compare-dark"
           />
           <div class="compare-handle" aria-hidden="true"></div>
@@ -200,14 +223,14 @@ const tagline = ["Your drawings, your database.", "Back up one volume", "and you
               <h3 class="mt-4 text-2xl font-semibold tracking-tight">{f.title}</h3>
               <p class="mt-3 text-muted-foreground">{f.body}</p>
             </div>
-            {f.figure === "folders" ? (
-              <FoldersFigure />
-            ) : f.figure === "trash" ? (
-              <TrashFigure />
-            ) : (
+            {f.image ? (
               <figure class="flex justify-center overflow-hidden rounded-2xl border bg-panel p-2 shadow-panel">
-                <img src={f.image} width={f.width} height={f.height} alt={f.alt} loading="lazy" decoding="async" class="h-auto max-w-full rounded-lg" style={`width: ${f.width}px`} />
+                <Image src={f.image} width={f.width} densities={[1, 2]} alt={f.alt} class="h-auto max-w-full rounded-lg" style={`width: ${f.width}px`} />
               </figure>
+            ) : f.figure === "folders" ? (
+              <FoldersFigure />
+            ) : (
+              <TrashFigure />
             )}
           </article>
         ))}
