@@ -11,6 +11,10 @@
 </p>
 
 <p align="center">
+  <a href="https://preview.zygmunt.xyz/excaliself/"><b>Website</b></a>
+</p>
+
+<p align="center">
   <img src="docs/images/home-light.png" width="49%" alt="Excaliself home screen in the light theme: a sidebar with starred drawings and folders next to a grid of drawing previews">
   <img src="docs/images/home-dark.png" width="49%" alt="The same home screen in the dark theme">
 </p>
