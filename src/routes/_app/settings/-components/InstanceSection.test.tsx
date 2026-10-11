@@ -48,7 +48,7 @@ test("the releases link points at the project's GitHub releases", () => {
   renderSection()
   const link = screen.getByRole("link", { name: "Release notes on GitHub" })
   expect(link.getAttribute("href")).toBe(
-    "https://github.com/maciekzygmunt/selfhosted-excalidraw/releases",
+    "https://github.com/maciekzygmunt/excaliself/releases",
   )
 })
 

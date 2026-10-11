@@ -2,7 +2,7 @@
 
 The `Docker` workflow (`.github/workflows/docker.yml`) builds the image and
 boots both deploy compose files against it on every PR and push. Pushes then
-publish to `ghcr.io/maciekzygmunt/selfhosted-excalidraw`:
+publish to `ghcr.io/maciekzygmunt/excaliself`:
 
 - push to `main` → `:main`
 - tag `v1.2.3` → `:1.2.3`, `:1.2` and `:latest`
@@ -22,4 +22,4 @@ Then write release notes on the GitHub release for that tag.
 The first publish creates the package as private. Make it public once under
 the package's **Settings → Danger Zone → Change visibility**, or anonymous
 pulls (and Coolify) fail. Check with `docker logout ghcr.io && docker pull
-ghcr.io/maciekzygmunt/selfhosted-excalidraw:main`.
+ghcr.io/maciekzygmunt/excaliself:main`.

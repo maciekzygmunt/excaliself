@@ -1,4 +1,4 @@
-# selfhosted-excalidraw
+# excaliself
 
 ## Agent skills
 

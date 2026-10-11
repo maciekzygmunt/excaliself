@@ -1,4 +1,4 @@
-# documentation: https://github.com/maciekzygmunt/selfhosted-excalidraw
+# documentation: https://github.com/maciekzygmunt/excaliself
 # slogan: Self-hosted Excalidraw whiteboards with accounts and persistent storage.
 # category: productivity
 # tags: whiteboard, excalidraw, drawing, diagrams
@@ -9,7 +9,7 @@
 # set EXCALISELF_VERSION in the Coolify UI to pin a release.
 services:
   excaliself:
-    image: ghcr.io/maciekzygmunt/selfhosted-excalidraw:${EXCALISELF_VERSION:-latest}
+    image: ghcr.io/maciekzygmunt/excaliself:${EXCALISELF_VERSION:-latest}
     environment:
       - SERVICE_URL_EXCALISELF_3000
       - BASE_URL=${SERVICE_URL_EXCALISELF_3000}
