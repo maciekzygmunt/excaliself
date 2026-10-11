@@ -6,6 +6,7 @@ import { and, desc, eq, inArray, isNotNull, isNull } from "drizzle-orm"
 import { z } from "zod"
 import { db } from "@/db"
 import { drawingFiles, drawings, folders } from "@/db/schema"
+import { assertFolderTarget } from "@/features/folders/ownership"
 import { findNearestLiveAncestorId } from "@/features/folders/subtree"
 import { authMiddleware } from "@/middleware/auth"
 
@@ -58,6 +59,7 @@ export const createDrawing = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const userId = context.session.user.id
+    if (data.folderId) await assertFolderTarget(db, userId, data.folderId)
     const id = randomUUID()
     const now = new Date()
 
@@ -88,6 +90,9 @@ export const updateDrawing = createServerFn({ method: "POST" })
   )
   .handler(async ({ data: { id, updateData }, context }) => {
     const userId = context.session.user.id
+    if (updateData.folderId) {
+      await assertFolderTarget(db, userId, updateData.folderId)
+    }
     // Ownership is enforced in the statement itself; zero rows means "not
     // found" so non-owners can't tell the resource exists. Trashed drawings
     // are treated the same — no edits while in the trash.
