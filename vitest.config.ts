@@ -9,7 +9,6 @@ export default defineConfig({
       "@": fileURLToPath(new URL("./src", import.meta.url)),
     },
   },
-  esbuild: { jsx: "automatic" },
   test: {
     environment: "jsdom",
     include: ["src/**/*.test.{ts,tsx}"],
