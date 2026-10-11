@@ -114,8 +114,8 @@ const appSchema = {
   "@type": "SoftwareApplication",
   name: "Excaliself",
   description: "Self-hosted Excalidraw for teams, with accounts, folders, search, and a trash can.",
-  url: Astro.site?.href,
-  image: new URL("/og.png", Astro.site).href,
+  url: new URL(import.meta.env.BASE_URL, Astro.site).href,
+  image: new URL(`${import.meta.env.BASE_URL}og.png`, Astro.site).href,
   applicationCategory: "DesignApplication",
   operatingSystem: "Docker",
   license: "https://opensource.org/licenses/MIT",
@@ -351,7 +351,7 @@ const tagline = ["Your drawings, your database.", "Back up one volume", "and you
 
     <section class="mx-auto max-w-6xl px-6 py-20">
       <div class="card flex flex-col items-center gap-6 px-6 py-12 text-center" data-reveal>
-        <img src="/favicon.svg" alt="" width="40" height="40" class="rounded-lg" />
+        <img src={`${import.meta.env.BASE_URL}favicon.svg`} alt="" width="40" height="40" class="rounded-lg" />
         <h2 class="max-w-[680px] text-3xl font-semibold tracking-tight md:text-4xl">Nothing to sign up for. Nothing to export later.</h2>
         <p class="max-w-md text-muted-foreground">
           No third party accounts, no telemetry, no lock in. Stop the container and your drawings are still in your Postgres.

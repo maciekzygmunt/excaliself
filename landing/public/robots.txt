@@ -1,4 +1,0 @@
-User-agent: *
-Allow: /
-
-Sitemap: https://excaliself.app/sitemap-index.xml
