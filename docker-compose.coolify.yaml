@@ -1,0 +1,37 @@
+# documentation: https://github.com/maciekzygmunt/selfhosted-excalidraw
+# slogan: Self-hosted Excalidraw whiteboards with accounts and persistent storage.
+# category: productivity
+# tags: whiteboard, excalidraw, drawing, diagrams
+# port: 3000
+
+# Coolify deploy: add a Docker Compose resource pointing at this file.
+# Coolify generates the secrets and domain (SERVICE_* magic variables);
+# set EXCALISELF_VERSION in the Coolify UI to pin a release.
+services:
+  excaliself:
+    image: ghcr.io/maciekzygmunt/selfhosted-excalidraw:${EXCALISELF_VERSION:-latest}
+    environment:
+      - SERVICE_URL_EXCALISELF_3000
+      - BASE_URL=${SERVICE_URL_EXCALISELF_3000}
+      - BETTER_AUTH_SECRET=${SERVICE_PASSWORD_64_AUTH}
+      - DATABASE_URL=postgresql://excaliself:${SERVICE_PASSWORD_POSTGRES}@db:5432/excaliself
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: postgres:17-alpine
+    environment:
+      - POSTGRES_USER=excaliself
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_DB=excaliself
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  pgdata:
