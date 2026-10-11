@@ -13,9 +13,5 @@ export default defineConfig({
   test: {
     environment: "jsdom",
     include: ["src/**/*.test.{ts,tsx}"],
-    // Node 25+ ships a global localStorage that shadows jsdom's.
-    poolOptions: {
-      forks: { execArgv: ["--no-experimental-webstorage"] },
-    },
   },
 })
