@@ -5,7 +5,6 @@ import { tanstackStart } from "@tanstack/react-start/plugin/vite"
 import viteReact from "@vitejs/plugin-react"
 import { nitro } from "nitro/vite"
 import { defineConfig } from "vite"
-import viteTsConfigPaths from "vite-tsconfig-paths"
 
 const config = defineConfig({
   resolve: {
@@ -16,9 +15,17 @@ const config = defineConfig({
   plugins: [
     tailwindcss(),
     devtools(),
-    nitro(),
-    viteTsConfigPaths({
-      projects: ["./tsconfig.json"],
+    nitro({
+      rolldownConfig: {
+        checks: {
+          // The server bundle inlines client libraries; their "use client"
+          // directives mean nothing there and Rolldown warns on each one.
+          moduleLevelDirective: false,
+          // Nitro's chunk groups have no debugName, so the timing report
+          // only adds a warning about the missing label.
+          bundlerTimings: false,
+        },
+      },
     }),
     tanstackStart({
       router: {
