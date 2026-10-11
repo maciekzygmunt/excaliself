@@ -28,7 +28,7 @@
 ## Deploy
 
 Both paths run the app and its Postgres database together from one compose file.
-They pull the prebuilt image `ghcr.io/maciekzygmunt/selfhosted-excalidraw`
+They pull the prebuilt image `ghcr.io/maciekzygmunt/excaliself`
 (amd64 and arm64), so nothing is built on your server. `latest` is the newest
 release. The app applies database migrations when it starts, so updating is a
 redeploy.
@@ -37,8 +37,8 @@ redeploy.
 
 ```bash
 mkdir excaliself && cd excaliself
-curl -fsSLO https://raw.githubusercontent.com/maciekzygmunt/selfhosted-excalidraw/main/docker-compose.yaml
-curl -fsSL -o .env https://raw.githubusercontent.com/maciekzygmunt/selfhosted-excalidraw/main/.env.example
+curl -fsSLO https://raw.githubusercontent.com/maciekzygmunt/excaliself/main/docker-compose.yaml
+curl -fsSL -o .env https://raw.githubusercontent.com/maciekzygmunt/excaliself/main/.env.example
 # set POSTGRES_PASSWORD, BETTER_AUTH_SECRET, and BASE_URL in .env
 docker compose up -d
 ```
@@ -56,7 +56,7 @@ source instead (needs about 4 GB of RAM), clone the repo and run
 ### Coolify
 
 1. Add a new resource from the public repository
-   `https://github.com/maciekzygmunt/selfhosted-excalidraw`, branch `main`.
+   `https://github.com/maciekzygmunt/excaliself`, branch `main`.
 2. Choose the **Docker Compose** build pack and set **Docker Compose Location** to
    `/docker-compose.coolify.yaml`.
 3. Click **Deploy**.

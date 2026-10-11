@@ -5,7 +5,7 @@ import { instanceStatsQueryOptions } from "@/features/instance/queries"
 import { useDelayedVisible } from "@/hooks/use-delayed-visible"
 
 const RELEASES_URL =
-  "https://github.com/maciekzygmunt/selfhosted-excalidraw/releases"
+  "https://github.com/maciekzygmunt/excaliself/releases"
 
 // Read-only About page (spec §5.15): zero settings — instance behavior is
 // deliberately hardcoded, so this page only answers "what version am I on,

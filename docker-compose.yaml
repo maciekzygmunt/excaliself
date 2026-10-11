@@ -17,7 +17,7 @@ services:
     restart: unless-stopped
 
   excaliself:
-    image: ghcr.io/maciekzygmunt/selfhosted-excalidraw:${EXCALISELF_VERSION:-latest}
+    image: ghcr.io/maciekzygmunt/excaliself:${EXCALISELF_VERSION:-latest}
     ports:
       - "${EXCALISELF_PORT:-3000}:3000"
     environment:

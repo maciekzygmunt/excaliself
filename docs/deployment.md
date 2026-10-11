@@ -3,7 +3,7 @@
 Excaliself ships as a prebuilt multi-arch (amd64, arm64) image:
 
 ```
-ghcr.io/maciekzygmunt/selfhosted-excalidraw
+ghcr.io/maciekzygmunt/excaliself
 ```
 
 | Tag | Tracks |
@@ -22,8 +22,8 @@ its container healthcheck.
 
 ```bash
 mkdir excaliself && cd excaliself
-curl -fsSLO https://raw.githubusercontent.com/maciekzygmunt/selfhosted-excalidraw/main/docker-compose.yaml
-curl -fsSL -o .env https://raw.githubusercontent.com/maciekzygmunt/selfhosted-excalidraw/main/.env.example
+curl -fsSLO https://raw.githubusercontent.com/maciekzygmunt/excaliself/main/docker-compose.yaml
+curl -fsSL -o .env https://raw.githubusercontent.com/maciekzygmunt/excaliself/main/.env.example
 # fill in POSTGRES_PASSWORD, BETTER_AUTH_SECRET and BASE_URL in .env
 docker compose up -d
 ```
@@ -69,7 +69,7 @@ docker compose -f docker-compose.build.yaml up -d --build
 ## Coolify
 
 1. In your project, add a new resource: **Public Repository**, URL
-   `https://github.com/maciekzygmunt/selfhosted-excalidraw`, branch `main`.
+   `https://github.com/maciekzygmunt/excaliself`, branch `main`.
 2. Set **Build Pack** to **Docker Compose** and **Docker Compose Location** to
    `/docker-compose.coolify.yaml`.
 3. Deploy.
