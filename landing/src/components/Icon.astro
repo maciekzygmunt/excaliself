@@ -1,6 +1,11 @@
 ---
-// Inlines a Phosphor icon (regular weight) from @phosphor-icons/core.
-const icons = import.meta.glob<string>("/node_modules/@phosphor-icons/core/assets/regular/*.svg", {
+// Inlines a Phosphor icon from @phosphor-icons/core (regular or fill weight).
+const regular = import.meta.glob<string>("/node_modules/@phosphor-icons/core/assets/regular/*.svg", {
+  query: "?raw",
+  import: "default",
+  eager: true,
+})
+const fill = import.meta.glob<string>("/node_modules/@phosphor-icons/core/assets/fill/*.svg", {
   query: "?raw",
   import: "default",
   eager: true,
@@ -10,10 +15,14 @@ interface Props {
   name: string
   size?: number
   class?: string
+  weight?: "regular" | "fill"
 }
-const { name, size = 20, class: className } = Astro.props
-const file = icons[`/node_modules/@phosphor-icons/core/assets/regular/${name}.svg`]
-if (!file) throw new Error(`Unknown Phosphor icon: ${name}`)
+const { name, size = 20, class: className, weight = "regular" } = Astro.props
+const file =
+  weight === "fill"
+    ? fill[`/node_modules/@phosphor-icons/core/assets/fill/${name}-fill.svg`]
+    : regular[`/node_modules/@phosphor-icons/core/assets/regular/${name}.svg`]
+if (!file) throw new Error(`Unknown Phosphor icon: ${name} (${weight})`)
 const inner = file.replace(/^<svg[^>]*>/, "").replace(/<\/svg>\s*$/, "")
 ---
 

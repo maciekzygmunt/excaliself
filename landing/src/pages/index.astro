@@ -1,39 +1,50 @@
 ---
 import Layout from "../layouts/Layout.astro"
 import Icon from "../components/Icon.astro"
+import FoldersFigure from "../components/FoldersFigure.astro"
+import TrashFigure from "../components/TrashFigure.astro"
 
 const repo = "https://github.com/maciekzygmunt/excaliself"
 
-const features = [
+const showcase = [
   {
     icon: "pencil-simple",
-    title: "The full Excalidraw editor",
-    body: "The same canvas you already know, with autosave. Images you paste into a drawing are stored too.",
-  },
-  {
-    icon: "folders",
-    title: "Folders, stars, and recents",
-    body: "Nest folders as deep as you like and drag drawings between them in the sidebar.",
+    title: "The editor you already know",
+    body: "The full Excalidraw canvas, unchanged. Every stroke saves on its own, and images you paste are stored with the drawing.",
+    image: "/shots/editor.png",
+    width: 1120,
+    height: 500,
+    alt: "The Excalidraw toolbar above a signup flowchart in the Excaliself editor",
   },
   {
     icon: "command",
-    title: "Command palette",
-    body: "Press ⌘K and fuzzy search across drawings, folders, and actions without touching the mouse.",
+    title: "Press ⌘K and jump anywhere",
+    body: "Fuzzy search over drawings, folders, and actions. Type a few letters, press enter, and keep your hands on the keyboard.",
+    image: "/shots/palette.png",
+    width: 760,
+    height: 340,
+    alt: "The command palette filtering drawings and folders by the word retro",
+  },
+  {
+    icon: "folders",
+    title: "Folders that nest as deep as you like",
+    body: "Drag drawings between folders in the sidebar, star the ones you open daily, and switch the app and canvas to dark separately.",
+    figure: "folders",
   },
   {
     icon: "trash-simple",
-    title: "Trash with restore",
-    body: "Deleted drawings wait 30 days before they are purged, so a wrong click costs nothing.",
+    title: "A wrong click costs nothing",
+    body: "Deleted drawings wait in the trash for 30 days with a one click restore. After that they are purged for good.",
+    figure: "trash",
   },
   {
     icon: "lock-key",
-    title: "Accounts by invite",
-    body: "The first visitor becomes the admin. Everyone else joins by invite link. No public signup page.",
-  },
-  {
-    icon: "circle-half",
-    title: "Light and dark",
-    body: "Both themes for the app, with an optional separate theme for the canvas itself.",
+    title: "Your team only",
+    body: "The first visitor becomes the admin. Everyone else joins through a single use invite link. Admins manage roles and password resets from Settings.",
+    image: "/shots/members.png",
+    width: 920,
+    height: 285,
+    alt: "The members list in Settings with admin and member roles",
   },
 ]
 
@@ -52,10 +63,13 @@ const steps = [
   },
 ]
 
-const compose = `mkdir excaliself && cd excaliself
-curl -fsSLO https://raw.githubusercontent.com/maciekzygmunt/excaliself/main/docker-compose.yaml
-curl -fsSL -o .env https://raw.githubusercontent.com/maciekzygmunt/excaliself/main/.env.example
-docker compose up -d`
+const compose = [
+  "mkdir excaliself && cd excaliself",
+  "curl -fsSLO https://raw.githubusercontent.com/maciekzygmunt/excaliself/main/docker-compose.yaml",
+  "curl -fsSL -o .env https://raw.githubusercontent.com/maciekzygmunt/excaliself/main/.env.example",
+  "# set POSTGRES_PASSWORD, BETTER_AUTH_SECRET, and BASE_URL in .env",
+  "docker compose up -d",
+]
 
 const faq = [
   {
@@ -176,17 +190,28 @@ const tagline = ["Your drawings, your database.", "Back up one volume", "and you
           Excalidraw stays untouched. Excaliself adds the parts a team needs to keep drawings for years.
         </p>
       </div>
-      <ul class="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {features.map((f) => (
-          <li class="card p-6" data-reveal>
-            <span class="inline-flex size-10 items-center justify-center rounded-md bg-iris-muted text-iris">
-              <Icon name={f.icon} size={20} />
-            </span>
-            <h3 class="mt-4 font-semibold">{f.title}</h3>
-            <p class="mt-2 text-sm text-muted-foreground">{f.body}</p>
-          </li>
+      <div class="mt-16 flex flex-col gap-20">
+        {showcase.map((f, i) => (
+          <article class={`grid items-center gap-8 lg:gap-12 ${i % 2 ? "lg:grid-cols-[1.5fr_1fr]" : "lg:grid-cols-[1fr_1.5fr]"}`} data-reveal>
+            <div class={i % 2 ? "lg:order-last" : ""}>
+              <span class="inline-flex size-10 items-center justify-center rounded-md bg-iris-muted text-iris">
+                <Icon name={f.icon} size={20} />
+              </span>
+              <h3 class="mt-4 text-2xl font-semibold tracking-tight">{f.title}</h3>
+              <p class="mt-3 text-muted-foreground">{f.body}</p>
+            </div>
+            {f.figure === "folders" ? (
+              <FoldersFigure />
+            ) : f.figure === "trash" ? (
+              <TrashFigure />
+            ) : (
+              <figure class="flex justify-center overflow-hidden rounded-2xl border bg-panel p-2 shadow-panel">
+                <img src={f.image} width={f.width} height={f.height} alt={f.alt} loading="lazy" decoding="async" class="h-auto max-w-full rounded-lg" style={`width: ${f.width}px`} />
+              </figure>
+            )}
+          </article>
         ))}
-      </ul>
+      </div>
     </section>
 
     <section aria-label="Tagline" class="mx-auto max-w-6xl px-6 py-20">
@@ -246,7 +271,36 @@ const tagline = ["Your drawings, your database.", "Back up one volume", "and you
             </a>
           </li>
         </ol>
-        <pre class="overflow-x-auto rounded-xl border bg-panel p-6 font-mono text-xs leading-relaxed shadow-panel md:text-sm" data-reveal><code>{compose}</code></pre>
+        <div class="overflow-hidden rounded-xl bg-[#181818] text-neutral-200 shadow-panel" data-reveal data-terminal>
+          <div class="flex items-center justify-between border-b border-white/10 px-4 py-2">
+            <span class="font-mono text-xs text-neutral-500">Terminal</span>
+            <button
+              type="button"
+              class="inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold text-neutral-300 transition-[background-color,color,scale] duration-300 ease-fluid hover:bg-white/10 hover:text-white active:scale-[0.98]"
+              data-copy
+            >
+              <Icon name="copy" size={16} />
+              <span data-copy-label>Copy</span>
+            </button>
+          </div>
+          <pre class="overflow-x-auto p-4 font-mono text-xs leading-relaxed md:text-sm"><code>{compose.map((line) => line.startsWith("#") ? <span class="block whitespace-pre-wrap break-all text-neutral-500">{line}</span> : <span class="block whitespace-pre-wrap break-all"><span class="text-iris select-none">$ </span>{line}</span>)}</code></pre>
+        </div>
+        <script>
+          for (const el of document.querySelectorAll<HTMLElement>("[data-terminal]")) {
+            const button = el.querySelector<HTMLButtonElement>("[data-copy]")!
+            const label = el.querySelector<HTMLElement>("[data-copy-label]")!
+            const text = [...el.querySelectorAll("code > span")].map((l) => l.textContent?.replace(/^\$ /, "") ?? "").join("\n")
+            button.addEventListener("click", async () => {
+              try {
+                await navigator.clipboard.writeText(text)
+                label.textContent = "Copied"
+              } catch {
+                label.textContent = "Select and copy"
+              }
+              setTimeout(() => (label.textContent = "Copy"), 2000)
+            })
+          }
+        </script>
       </div>
     </section>
 
