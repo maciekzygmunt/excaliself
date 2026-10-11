@@ -11,7 +11,8 @@ RUN pnpm install --frozen-lockfile
 
 COPY . .
 
-RUN pnpm build
+# Node's default heap scales with host RAM; the Vite build needs ~4 GB
+RUN NODE_OPTIONS=--max-old-space-size=4096 pnpm build
 
 FROM node:22-alpine AS runner
 
