@@ -7,6 +7,7 @@ import { z } from "zod"
 import { db } from "@/db"
 import { drawings, folders } from "@/db/schema"
 import { authMiddleware } from "@/middleware/auth"
+import { assertFolderTarget } from "./ownership"
 import { collectFolderSubtreeIds, findNearestLiveAncestorId } from "./subtree"
 
 export const getFolders = createServerFn({ method: "GET" })
@@ -33,6 +34,7 @@ export const createFolder = createServerFn({ method: "POST" })
     const id = randomUUID()
     const now = new Date()
     const parentId = data.parentId ?? null
+    if (parentId) await assertFolderTarget(db, userId, parentId)
 
     await db.insert(folders).values({
       id,
@@ -68,6 +70,8 @@ export const updateFolder = createServerFn({ method: "POST" })
     const updateFields: { name?: string; parentId?: string | null } = {}
     if (data.name !== undefined) updateFields.name = data.name
     if (data.parentId !== undefined) updateFields.parentId = data.parentId
+    if (data.parentId)
+      await assertFolderTarget(db, userId, data.parentId, data.id)
 
     // Ownership is enforced in the statement itself; zero rows means "not
     // found" so non-owners can't tell the resource exists. Trashed folders
