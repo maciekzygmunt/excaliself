@@ -23,7 +23,7 @@ export const getFolders = createServerFn({ method: "GET" })
 
 export const createFolder = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
-  .inputValidator(
+  .validator(
     z.object({
       name: z.string().min(1),
       parentId: z.string().nullable().optional(),
@@ -57,7 +57,7 @@ export const createFolder = createServerFn({ method: "POST" })
 
 export const updateFolder = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
-  .inputValidator(
+  .validator(
     z.object({
       id: z.string(),
       name: z.string().min(1).optional(),
@@ -99,7 +99,7 @@ export const updateFolder = createServerFn({ method: "POST" })
  */
 export const trashFolder = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
-  .inputValidator(z.string())
+  .validator(z.string())
   .handler(async ({ data: id, context }) => {
     const userId = context.session.user.id
     const now = new Date()
@@ -147,7 +147,7 @@ export const trashFolder = createServerFn({ method: "POST" })
  */
 export const restoreFolder = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
-  .inputValidator(z.string())
+  .validator(z.string())
   .handler(async ({ data: id, context }) => {
     const userId = context.session.user.id
 
