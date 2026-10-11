@@ -154,16 +154,14 @@ test("bootstrap: a legacy 'system' value falls back to Light", () => {
   expect(appliedDark()).toBe(false)
 })
 
-test.each([
-  "/login",
-  "/setup",
-  "/invite",
-  "/reset-password",
-])("bootstrap: %s is always light, even with a stored dark choice", (path) => {
-  window.history.replaceState({}, "", path)
-  window.localStorage.setItem("theme", "dark")
-  document.documentElement.classList.add("dark")
-  runBootstrap()
-  expect(appliedDark()).toBe(false)
-  expect(meta.content).toBe(THEME_COLORS.light)
-})
+test.each(["/login", "/setup", "/invite", "/reset-password"])(
+  "bootstrap: %s is always light, even with a stored dark choice",
+  (path) => {
+    window.history.replaceState({}, "", path)
+    window.localStorage.setItem("theme", "dark")
+    document.documentElement.classList.add("dark")
+    runBootstrap()
+    expect(appliedDark()).toBe(false)
+    expect(meta.content).toBe(THEME_COLORS.light)
+  },
+)

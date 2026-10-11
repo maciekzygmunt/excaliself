@@ -44,7 +44,7 @@ export type ChangeEmailResult =
  */
 export const changeEmail = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
-  .inputValidator(
+  .validator(
     z.object({
       newEmail: z.email().trim().toLowerCase().max(255),
       currentPassword: z.string().min(1),
@@ -102,7 +102,7 @@ function isUniqueViolation(error: unknown): boolean {
 // to null so the email-prefix fallback takes over everywhere.
 export const updateProfile = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
-  .inputValidator(z.object({ name: z.string().trim().max(120) }))
+  .validator(z.object({ name: z.string().trim().max(120) }))
   .handler(async ({ data, context }) => {
     await db
       .update(users)
@@ -134,7 +134,7 @@ export const listActiveSessions = createServerFn({ method: "GET" })
 // can't strand the user; revoking it here is rejected outright.
 export const revokeSessionById = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
-  .inputValidator(z.object({ id: z.string() }))
+  .validator(z.object({ id: z.string() }))
   .handler(async ({ data, context }) => {
     if (data.id === context.session.session.id) {
       throw new Error("The current session cannot be revoked")

@@ -9,44 +9,33 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as SetupRouteImport } from './routes/setup'
-import { Route as ResetPasswordRouteImport } from './routes/reset-password'
-import { Route as LoginRouteImport } from './routes/login'
-import { Route as InviteRouteImport } from './routes/invite'
-import { Route as AdminRouteImport } from './routes/admin'
-import { Route as AppRouteRouteImport } from './routes/_app/route'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as ApiHealthRouteImport } from './routes/api/health'
-import { Route as AppTrashRouteImport } from './routes/_app/trash'
+import { Route as AppRouteRouteImport } from './routes/_app/route'
+import { Route as AdminRouteImport } from './routes/admin'
+import { Route as InviteRouteImport } from './routes/invite'
+import { Route as LoginRouteImport } from './routes/login'
+import { Route as ResetPasswordRouteImport } from './routes/reset-password'
+import { Route as SetupRouteImport } from './routes/setup'
 import { Route as AppDrawingsRouteImport } from './routes/_app/drawings'
 import { Route as AppSettingsRouteRouteImport } from './routes/_app/settings/route'
-import { Route as AppSettingsIndexRouteImport } from './routes/_app/settings/index'
+import { Route as AppTrashRouteImport } from './routes/_app/trash'
+import { Route as ApiHealthRouteImport } from './routes/api/health'
 import { Route as AppDrawIndexRouteImport } from './routes/_app/draw/index'
-import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
-import { Route as AppSettingsMembersRouteImport } from './routes/_app/settings/members'
-import { Route as AppSettingsInvitesRouteImport } from './routes/_app/settings/invites'
-import { Route as AppSettingsInstanceRouteImport } from './routes/_app/settings/instance'
-import { Route as AppFolderIdRouteImport } from './routes/_app/folder.$id'
 import { Route as AppDrawIdRouteImport } from './routes/_app/draw/$id'
+import { Route as AppFolderIdRouteImport } from './routes/_app/folder.$id'
+import { Route as AppSettingsIndexRouteImport } from './routes/_app/settings/index'
+import { Route as AppSettingsInstanceRouteImport } from './routes/_app/settings/instance'
+import { Route as AppSettingsInvitesRouteImport } from './routes/_app/settings/invites'
+import { Route as AppSettingsMembersRouteImport } from './routes/_app/settings/members'
+import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 
-const SetupRoute = SetupRouteImport.update({
-  id: '/setup',
-  path: '/setup',
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ResetPasswordRoute = ResetPasswordRouteImport.update({
-  id: '/reset-password',
-  path: '/reset-password',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const LoginRoute = LoginRouteImport.update({
-  id: '/login',
-  path: '/login',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const InviteRoute = InviteRouteImport.update({
-  id: '/invite',
-  path: '/invite',
+const AppRouteRoute = AppRouteRouteImport.update({
+  id: '/_app',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminRoute = AdminRouteImport.update({
@@ -54,24 +43,25 @@ const AdminRoute = AdminRouteImport.update({
   path: '/admin',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AppRouteRoute = AppRouteRouteImport.update({
-  id: '/_app',
+const InviteRoute = InviteRouteImport.update({
+  id: '/invite',
+  path: '/invite',
   getParentRoute: () => rootRouteImport,
 } as any)
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiHealthRoute = ApiHealthRouteImport.update({
-  id: '/api/health',
-  path: '/api/health',
+const ResetPasswordRoute = ResetPasswordRouteImport.update({
+  id: '/reset-password',
+  path: '/reset-password',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AppTrashRoute = AppTrashRouteImport.update({
-  id: '/trash',
-  path: '/trash',
-  getParentRoute: () => AppRouteRoute,
+const SetupRoute = SetupRouteImport.update({
+  id: '/setup',
+  path: '/setup',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const AppDrawingsRoute = AppDrawingsRouteImport.update({
   id: '/drawings',
@@ -83,29 +73,34 @@ const AppSettingsRouteRoute = AppSettingsRouteRouteImport.update({
   path: '/settings',
   getParentRoute: () => AppRouteRoute,
 } as any)
-const AppSettingsIndexRoute = AppSettingsIndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => AppSettingsRouteRoute,
+const AppTrashRoute = AppTrashRouteImport.update({
+  id: '/trash',
+  path: '/trash',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const ApiHealthRoute = ApiHealthRouteImport.update({
+  id: '/api/health',
+  path: '/api/health',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const AppDrawIndexRoute = AppDrawIndexRouteImport.update({
   id: '/draw/',
   path: '/draw/',
   getParentRoute: () => AppRouteRoute,
 } as any)
-const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
-  id: '/api/auth/$',
-  path: '/api/auth/$',
-  getParentRoute: () => rootRouteImport,
+const AppDrawIdRoute = AppDrawIdRouteImport.update({
+  id: '/draw/$id',
+  path: '/draw/$id',
+  getParentRoute: () => AppRouteRoute,
 } as any)
-const AppSettingsMembersRoute = AppSettingsMembersRouteImport.update({
-  id: '/members',
-  path: '/members',
-  getParentRoute: () => AppSettingsRouteRoute,
+const AppFolderIdRoute = AppFolderIdRouteImport.update({
+  id: '/folder/$id',
+  path: '/folder/$id',
+  getParentRoute: () => AppRouteRoute,
 } as any)
-const AppSettingsInvitesRoute = AppSettingsInvitesRouteImport.update({
-  id: '/invites',
-  path: '/invites',
+const AppSettingsIndexRoute = AppSettingsIndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => AppSettingsRouteRoute,
 } as any)
 const AppSettingsInstanceRoute = AppSettingsInstanceRouteImport.update({
@@ -113,15 +108,20 @@ const AppSettingsInstanceRoute = AppSettingsInstanceRouteImport.update({
   path: '/instance',
   getParentRoute: () => AppSettingsRouteRoute,
 } as any)
-const AppFolderIdRoute = AppFolderIdRouteImport.update({
-  id: '/folder/$id',
-  path: '/folder/$id',
-  getParentRoute: () => AppRouteRoute,
+const AppSettingsInvitesRoute = AppSettingsInvitesRouteImport.update({
+  id: '/invites',
+  path: '/invites',
+  getParentRoute: () => AppSettingsRouteRoute,
 } as any)
-const AppDrawIdRoute = AppDrawIdRouteImport.update({
-  id: '/draw/$id',
-  path: '/draw/$id',
-  getParentRoute: () => AppRouteRoute,
+const AppSettingsMembersRoute = AppSettingsMembersRouteImport.update({
+  id: '/members',
+  path: '/members',
+  getParentRoute: () => AppSettingsRouteRoute,
+} as any)
+const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
+  id: '/api/auth/$',
+  path: '/api/auth/$',
+  getParentRoute: () => rootRouteImport,
 } as any)
 
 export interface FileRoutesByFullPath {
@@ -262,39 +262,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/setup': {
-      id: '/setup'
-      path: '/setup'
-      fullPath: '/setup'
-      preLoaderRoute: typeof SetupRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/reset-password': {
-      id: '/reset-password'
-      path: '/reset-password'
-      fullPath: '/reset-password'
-      preLoaderRoute: typeof ResetPasswordRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/login': {
-      id: '/login'
-      path: '/login'
-      fullPath: '/login'
-      preLoaderRoute: typeof LoginRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/invite': {
-      id: '/invite'
-      path: '/invite'
-      fullPath: '/invite'
-      preLoaderRoute: typeof InviteRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/admin': {
-      id: '/admin'
-      path: '/admin'
-      fullPath: '/admin'
-      preLoaderRoute: typeof AdminRouteImport
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_app': {
@@ -304,26 +276,40 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/health': {
-      id: '/api/health'
-      path: '/api/health'
-      fullPath: '/api/health'
-      preLoaderRoute: typeof ApiHealthRouteImport
+    '/invite': {
+      id: '/invite'
+      path: '/invite'
+      fullPath: '/invite'
+      preLoaderRoute: typeof InviteRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/_app/trash': {
-      id: '/_app/trash'
-      path: '/trash'
-      fullPath: '/trash'
-      preLoaderRoute: typeof AppTrashRouteImport
-      parentRoute: typeof AppRouteRoute
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reset-password': {
+      id: '/reset-password'
+      path: '/reset-password'
+      fullPath: '/reset-password'
+      preLoaderRoute: typeof ResetPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/setup': {
+      id: '/setup'
+      path: '/setup'
+      fullPath: '/setup'
+      preLoaderRoute: typeof SetupRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/_app/drawings': {
       id: '/_app/drawings'
@@ -339,12 +325,19 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppSettingsRouteRouteImport
       parentRoute: typeof AppRouteRoute
     }
-    '/_app/settings/': {
-      id: '/_app/settings/'
-      path: '/'
-      fullPath: '/settings/'
-      preLoaderRoute: typeof AppSettingsIndexRouteImport
-      parentRoute: typeof AppSettingsRouteRoute
+    '/_app/trash': {
+      id: '/_app/trash'
+      path: '/trash'
+      fullPath: '/trash'
+      preLoaderRoute: typeof AppTrashRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/api/health': {
+      id: '/api/health'
+      path: '/api/health'
+      fullPath: '/api/health'
+      preLoaderRoute: typeof ApiHealthRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/_app/draw/': {
       id: '/_app/draw/'
@@ -353,25 +346,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppDrawIndexRouteImport
       parentRoute: typeof AppRouteRoute
     }
-    '/api/auth/$': {
-      id: '/api/auth/$'
-      path: '/api/auth/$'
-      fullPath: '/api/auth/$'
-      preLoaderRoute: typeof ApiAuthSplatRouteImport
-      parentRoute: typeof rootRouteImport
+    '/_app/draw/$id': {
+      id: '/_app/draw/$id'
+      path: '/draw/$id'
+      fullPath: '/draw/$id'
+      preLoaderRoute: typeof AppDrawIdRouteImport
+      parentRoute: typeof AppRouteRoute
     }
-    '/_app/settings/members': {
-      id: '/_app/settings/members'
-      path: '/members'
-      fullPath: '/settings/members'
-      preLoaderRoute: typeof AppSettingsMembersRouteImport
-      parentRoute: typeof AppSettingsRouteRoute
+    '/_app/folder/$id': {
+      id: '/_app/folder/$id'
+      path: '/folder/$id'
+      fullPath: '/folder/$id'
+      preLoaderRoute: typeof AppFolderIdRouteImport
+      parentRoute: typeof AppRouteRoute
     }
-    '/_app/settings/invites': {
-      id: '/_app/settings/invites'
-      path: '/invites'
-      fullPath: '/settings/invites'
-      preLoaderRoute: typeof AppSettingsInvitesRouteImport
+    '/_app/settings/': {
+      id: '/_app/settings/'
+      path: '/'
+      fullPath: '/settings/'
+      preLoaderRoute: typeof AppSettingsIndexRouteImport
       parentRoute: typeof AppSettingsRouteRoute
     }
     '/_app/settings/instance': {
@@ -381,19 +374,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppSettingsInstanceRouteImport
       parentRoute: typeof AppSettingsRouteRoute
     }
-    '/_app/folder/$id': {
-      id: '/_app/folder/$id'
-      path: '/folder/$id'
-      fullPath: '/folder/$id'
-      preLoaderRoute: typeof AppFolderIdRouteImport
-      parentRoute: typeof AppRouteRoute
+    '/_app/settings/invites': {
+      id: '/_app/settings/invites'
+      path: '/invites'
+      fullPath: '/settings/invites'
+      preLoaderRoute: typeof AppSettingsInvitesRouteImport
+      parentRoute: typeof AppSettingsRouteRoute
     }
-    '/_app/draw/$id': {
-      id: '/_app/draw/$id'
-      path: '/draw/$id'
-      fullPath: '/draw/$id'
-      preLoaderRoute: typeof AppDrawIdRouteImport
-      parentRoute: typeof AppRouteRoute
+    '/_app/settings/members': {
+      id: '/_app/settings/members'
+      path: '/members'
+      fullPath: '/settings/members'
+      preLoaderRoute: typeof AppSettingsMembersRouteImport
+      parentRoute: typeof AppSettingsRouteRoute
+    }
+    '/api/auth/$': {
+      id: '/api/auth/$'
+      path: '/api/auth/$'
+      fullPath: '/api/auth/$'
+      preLoaderRoute: typeof ApiAuthSplatRouteImport
+      parentRoute: typeof rootRouteImport
     }
   }
 }

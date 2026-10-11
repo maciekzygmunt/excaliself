@@ -21,7 +21,7 @@ const pendingResetsForUser = (userId: string) =>
 
 export const createPasswordReset = createServerFn({ method: "POST" })
   .middleware([adminMiddleware])
-  .inputValidator(z.object({ userId: z.string().min(1) }))
+  .validator(z.object({ userId: z.string().min(1) }))
   .handler(async ({ data, context }) => {
     const [target] = await db
       .select({ id: users.id })
@@ -65,7 +65,7 @@ export const createPasswordReset = createServerFn({ method: "POST" })
 
 export const revokePasswordReset = createServerFn({ method: "POST" })
   .middleware([adminMiddleware])
-  .inputValidator(z.object({ userId: z.string().min(1) }))
+  .validator(z.object({ userId: z.string().min(1) }))
   .handler(async ({ data }) => {
     await db.delete(passwordResets).where(pendingResetsForUser(data.userId))
   })
@@ -92,7 +92,7 @@ export const getPendingPasswordResets = createServerFn({ method: "GET" })
  * never the reset row itself.
  */
 export const validatePasswordReset = createServerFn({ method: "GET" })
-  .inputValidator(z.string())
+  .validator(z.string())
   .handler(async ({ data: token }) => {
     const [reset] = await db
       .select({ email: users.email })
@@ -104,7 +104,7 @@ export const validatePasswordReset = createServerFn({ method: "GET" })
   })
 
 export const resetPasswordWithToken = createServerFn({ method: "POST" })
-  .inputValidator(
+  .validator(
     z.object({ token: z.string().min(1), password: z.string().min(8) }),
   )
   .handler(async ({ data }) => {

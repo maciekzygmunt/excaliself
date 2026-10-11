@@ -24,7 +24,7 @@ const usableInvite = (token: string) =>
  * invite row itself.
  */
 export const validateInvite = createServerFn({ method: "GET" })
-  .inputValidator(z.string())
+  .validator(z.string())
   .handler(async ({ data: token }) => {
     const [invite] = await db
       .select({ inviterName: users.name, inviterEmail: users.email })
@@ -45,7 +45,7 @@ export const validateInvite = createServerFn({ method: "GET" })
   })
 
 export const registerWithInvite = createServerFn({ method: "POST" })
-  .inputValidator(registerFieldsSchema.extend({ token: z.string().min(1) }))
+  .validator(registerFieldsSchema.extend({ token: z.string().min(1) }))
   .handler(async ({ data }) => {
     const [invite] = await db
       .select({ id: invites.id })
@@ -120,7 +120,7 @@ export const getPendingInvites = createServerFn({ method: "GET" })
 
 export const deleteInvite = createServerFn({ method: "POST" })
   .middleware([adminMiddleware])
-  .inputValidator(z.string())
+  .validator(z.string())
   .handler(async ({ data: id }) => {
     await db.delete(invites).where(eq(invites.id, id))
   })
