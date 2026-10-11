@@ -1,4 +1,5 @@
 import { Link } from "@tanstack/react-router"
+import { createClientOnlyFn } from "@tanstack/react-start"
 import {
   Folder as FolderIcon,
   MoreHorizontal,
@@ -34,6 +35,10 @@ export const CARD_HOVER_CLASS =
   "transition-[box-shadow,border-color,scale] duration-150 hover:border-card-border-hover hover:shadow-card-hover"
 
 const DEFAULT_SKELETON_COUNT = 8
+
+// Client-only: @excalidraw/excalidraw is not server-safe, and this keeps it
+// out of the server bundle and the gallery's initial chunk
+const loadPreview = createClientOnlyFn(() => import("./preview"))
 
 /**
  * The app's one drawing grid: preview cards sorted newest-edited first, with
@@ -240,9 +245,7 @@ export function Preview({ name, data }: { name: string; data: string }) {
 
   useEffect(() => {
     let cancelled = false
-    // Dynamic import: @excalidraw/excalidraw is not server-safe, and this
-    // keeps it out of the SSR bundle and the gallery's initial chunk
-    import("./preview")
+    loadPreview()
       .then(({ renderPreviewSvg }) => renderPreviewSvg(data))
       .then((svg) => {
         if (cancelled) return
