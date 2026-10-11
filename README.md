@@ -105,3 +105,5 @@ no contribution support is promised — feel free to fork and adapt.
 ## License
 
 [MIT](./LICENSE)
+
+Built on [Excalidraw](https://github.com/excalidraw/excalidraw), MIT © Excalidraw.
