@@ -21,10 +21,12 @@ folders, search, and a trash can, with every drawing stored in your own Postgres
 
 ## Deploy
 
-Both paths build the image from source, which needs about 4 GB of RAM.
-The app applies database migrations when it starts, so updating is a rebuild and restart.
+Both paths run the app and its Postgres database together from one compose file.
+The app applies database migrations when it starts, so updating is a redeploy.
 
 ### Docker Compose
+
+Building the image from source needs about 4 GB of RAM.
 
 ```bash
 git clone https://github.com/maciekzygmunt/selfhosted-excalidraw.git
@@ -39,14 +41,17 @@ port 3000 for anything public.
 
 ### Coolify
 
-1. Create a **PostgreSQL** database resource.
-2. Add an **Application** from the public repository
-   `https://github.com/maciekzygmunt/selfhosted-excalidraw`, branch `main`,
-   with the **Dockerfile** build pack and port `3000`.
-3. Set the environment variables, then deploy:
-   - `DATABASE_URL`: the database's internal connection URL
-   - `BETTER_AUTH_SECRET`: at least 32 characters (`openssl rand -base64 32`)
-   - `BASE_URL`: the domain you gave the app, e.g. `https://draw.example.com`
+1. Add a new resource from the public repository
+   `https://github.com/maciekzygmunt/selfhosted-excalidraw`, branch `main`.
+2. Choose the **Docker Compose** build pack and set **Docker Compose Location** to
+   `/docker-compose.coolify.yaml`.
+3. Click **Deploy**.
+
+Coolify creates the database, generates the secrets, and assigns a domain, so
+there is nothing to configure. Open the domain to create the admin account.
+To pin a release instead of `latest`, set
+`EXCALISELF_VERSION` (e.g. `1.0.0`) in the resource's environment variables.
+Drawings live in the `pgdata` volume and survive redeploys.
 
 ### Configuration
 
