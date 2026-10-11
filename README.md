@@ -1,13 +1,19 @@
-# Excaliself
+<p align="center">
+  <img src="public/favicon.svg" width="72" height="72" alt="">
+</p>
 
-Your team's whiteboard, on your server. Excaliself wraps the
-[Excalidraw](https://excalidraw.com) canvas in a small self-hosted app: accounts,
-folders, search, and a trash can, with every drawing stored in your own Postgres.
+<h1 align="center">Excaliself</h1>
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/images/home-dark.png">
-  <img alt="Excaliself home screen: a sidebar with starred drawings and folders next to a grid of drawing previews" src="docs/images/home-light.png">
-</picture>
+<p align="center">
+  Your team's whiteboard, on your server.<br>
+  The <a href="https://excalidraw.com">Excalidraw</a> canvas in a small self-hosted app: accounts, folders, search,
+  and a trash can, with every drawing stored in your own Postgres.
+</p>
+
+<p align="center">
+  <img src="docs/images/home-light.png" width="49%" alt="Excaliself home screen in the light theme: a sidebar with starred drawings and folders next to a grid of drawing previews">
+  <img src="docs/images/home-dark.png" width="49%" alt="The same home screen in the dark theme">
+</p>
 
 ## Features
 
