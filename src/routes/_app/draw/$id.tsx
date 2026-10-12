@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query"
 import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router"
+import { createClientOnlyFn } from "@tanstack/react-start"
 import { lazy, Suspense, useEffect } from "react"
 import { toast } from "sonner"
 import { Mark } from "@/components/identity"
@@ -11,7 +12,10 @@ import { useDocumentTitle } from "@/lib/document-title"
 import { DrawingPaletteContext } from "../-components/DrawingPaletteContext"
 import { TrashedDrawingBanner } from "../-components/TrashedDrawingBanner"
 
-const DrawingCanvas = lazy(() => import("../-components/DrawingCanvas"))
+// Client-only so the server bundle never includes @excalidraw/excalidraw
+const DrawingCanvas = lazy(
+  createClientOnlyFn(() => import("../-components/DrawingCanvas")),
+)
 
 // The branded canvas loader (spec §4.3): the iris spark mark alone, gently
 // pulsing — no text, static under reduced motion.

@@ -1,107 +1,123 @@
-# Excaliself
+<p align="center">
+  <img src="public/favicon.svg" width="72" height="72" alt="">
+</p>
 
-A self-hostable whiteboard app built on top of [Excalidraw](https://excalidraw.com),
-with persistent storage, user accounts, and an admin panel.
+<h1 align="center">Excaliself</h1>
 
-> Not affiliated with Excalidraw, Inc. "Excalidraw" is a trademark of its
-> respective owner; this project uses the open-source `@excalidraw/excalidraw`
-> React component.
+<p align="center">
+  Your team's whiteboard, on your server.<br>
+  The <a href="https://excalidraw.com">Excalidraw</a> canvas in a small self-hosted app: accounts, folders, search,
+  and a trash can, with every drawing stored in your own Postgres.
+</p>
+
+<p align="center">
+  <a href="https://preview.zygmunt.xyz/excaliself/"><b>Website</b></a>
+</p>
+
+<p align="center">
+  <img src="docs/images/home-light.png" width="49%" alt="Excaliself home screen in the light theme: a sidebar with starred drawings and folders next to a grid of drawing previews">
+  <img src="docs/images/home-dark.png" width="49%" alt="The same home screen in the dark theme">
+</p>
 
 ## Features
 
-- Full Excalidraw canvas with auto-save
-- User authentication with invite-only registration
-- Admin panel for user and invite management
-- PostgreSQL storage with Drizzle migrations
-- Docker Compose deployment
+- **The full Excalidraw editor**, with auto-save. Images pasted into a drawing are stored too.
+- **Folders, stars, and recents.** Nest folders and drag drawings between them in the sidebar.
+- **Command palette** (<kbd>⌘K</kbd> / <kbd>Ctrl K</kbd>) with fuzzy search over drawings, folders, and actions.
+- **Trash** with restore. Deleted items are purged automatically after 30 days.
+- **Invite-only accounts.** The first visitor creates the admin account; everyone else joins by invite link.
+- **Admin tools** under Settings: manage members and roles, create password-reset links, and see instance stats.
+- **Light and dark themes**, with an optional separate theme for the canvas.
 
-## Quick start
+## Deploy
 
-### Docker (recommended)
+Both paths run the app and its Postgres database together from one compose file.
+They pull the prebuilt image `ghcr.io/maciekzygmunt/excaliself`
+(amd64 and arm64), so nothing is built on your server. `latest` is the newest
+release. The app applies database migrations when it starts, so updating is a
+redeploy.
+
+### Docker Compose
 
 ```bash
-git clone https://github.com/maciekzygmunt/excaliself.git
-cd excaliself
-cp .env.example .env
-# fill in BETTER_AUTH_SECRET and POSTGRES_PASSWORD (see .env.example)
+mkdir excaliself && cd excaliself
+curl -fsSLO https://raw.githubusercontent.com/maciekzygmunt/excaliself/main/docker-compose.yaml
+curl -fsSL -o .env https://raw.githubusercontent.com/maciekzygmunt/excaliself/main/.env.example
+# set POSTGRES_PASSWORD, BETTER_AUTH_SECRET, and BASE_URL in .env
 docker compose up -d
 ```
 
-Open <http://localhost:3000> and create your admin account at `/setup`.
+Open `BASE_URL` (default <http://localhost:3000>). The first visit takes you to
+`/setup` to create the admin account. Postgres is not published on the host.
+Put a reverse proxy with HTTPS in front of port 3000 for anything public.
 
-### Local development
+To update, run `docker compose pull && docker compose up -d`. To pin a release,
+set `EXCALISELF_VERSION` (e.g. `1.0.0`) in `.env`. To build the image from
+source instead (needs about 4 GB of RAM), clone the repo and run
+`docker compose -f docker-compose.build.yaml up -d --build`.
+[docs/deployment.md](./docs/deployment.md) has the details.
 
-```bash
-pnpm install
-cp .env.example .env
-docker compose up -d db
-pnpm dev
-```
+### Coolify
 
-## First-run setup
+1. Add a new resource from the public repository
+   `https://github.com/maciekzygmunt/excaliself`, branch `main`.
+2. Choose the **Docker Compose** build pack and set **Docker Compose Location** to
+   `/docker-compose.coolify.yaml`.
+3. Click **Deploy**.
 
-1. Visit `http://localhost:3000`
-2. You'll be redirected to `/setup` to create the admin account
-3. After setup, sign in and visit `/admin` to invite new users
+Coolify creates the database, generates the secrets, and assigns a domain, so
+there is nothing to configure. If your server has no wildcard domain, first set a
+domain on the `excaliself` service with the container port, e.g.
+`https://draw.example.com:3000`. Open the domain to create the admin account.
+To pin a release instead of `latest`, set
+`EXCALISELF_VERSION` (e.g. `1.0.0`) in the resource's environment variables.
+Drawings live in the `pgdata` volume and survive redeploys.
 
-## Admin lockout recovery
+### Configuration
 
-Lost passwords are normally recovered with an admin-generated reset link
-(Settings → Members). If no admin can sign in — the sole admin lost their
-password — follow the
-[break-glass recovery recipe](./docs/break-glass-recovery.md).
+Docker Compose reads these from `.env`. Coolify sets them for you.
 
-## Environment variables
+| Variable | Required | Description |
+|---|---|---|
+| `POSTGRES_PASSWORD` | Yes | Password for the bundled Postgres. Use hex (`openssl rand -hex 24`): it goes into a connection URL |
+| `BETTER_AUTH_SECRET` | Yes | Session signing secret, at least 32 characters (`openssl rand -base64 32`) |
+| `BASE_URL` | Yes in production | Public URL of the instance (default `http://localhost:3000`) |
+| `EXCALISELF_VERSION` | No | Image tag to run: `latest` (default), a release like `1.0.0` or `1.0`, or `main` |
+| `EXCALISELF_PORT` | No | Host port for the app (default `3000`). `127.0.0.1:3000` keeps it local to a reverse proxy |
+| `POSTGRES_USER`, `POSTGRES_DB` | No | Bundled Postgres user and database (default `excaliself`) |
 
-| Variable | Required | Default | Description |
-|---|---|---|---|
-| `BETTER_AUTH_SECRET` | Yes | — | Auth signing secret (min 32 chars) |
-| `BASE_URL` | No | `http://localhost:3000` | Public URL of your instance |
-| `DATABASE_URL` | Yes | — | PostgreSQL connection string (local dev) |
-| `POSTGRES_USER` | No | `excaliself` | Postgres user (Docker Compose) |
-| `POSTGRES_PASSWORD` | Yes | — | Postgres password (Docker Compose) |
-| `POSTGRES_DB` | No | `excaliself` | Postgres database name (Docker Compose) |
-| `POSTGRES_PORT` | No | `5432` | Host port for local dev outside Docker |
+`GET /api/health` returns `200` when the app is up and can reach Postgres.
+
+If the only admin loses their password, see
+[break-glass recovery](./docs/break-glass-recovery.md).
 
 ## Stack
 
-- **Frontend** — TanStack Start (React 19, file-based router, server functions)
-- **UI** — shadcn/ui + Tailwind CSS 4
-- **Auth** — Better Auth
-- **Database** — PostgreSQL + Drizzle ORM
-- **Canvas** — `@excalidraw/excalidraw`
+[TanStack Start](https://tanstack.com/start) · React 19 ·
+[Better Auth](https://www.better-auth.com) · Postgres + [Drizzle](https://orm.drizzle.team) ·
+Tailwind CSS 4 + shadcn/ui on [Base UI](https://base-ui.com) ·
+[`@excalidraw/excalidraw`](https://github.com/excalidraw/excalidraw)
 
-## Scripts
+## Local development
 
-| Command | Description |
-|---|---|
-| `pnpm dev` | Start development server |
-| `pnpm build` | Build for production |
-| `pnpm preview` | Preview production build |
-| `pnpm typecheck` | Run TypeScript type-check |
-| `pnpm lint` | Run Biome linter |
-| `pnpm db:push` | Push schema to database |
-| `pnpm db:studio` | Open Drizzle Studio |
+Requires Node 22, pnpm, and Docker.
 
-## Project layout
-
-```
-src/
-├── routes/           # TanStack file-based router
-│   ├── draw/         # Drawing editor
-│   └── admin/        # Admin panel
-├── features/         # Domain features: drawings, folders, auth, admin
-├── components/ui/    # shadcn/ui primitives
-├── hooks/            # Shared generic hooks
-├── lib/              # Shared utilities
-└── db/               # Drizzle client + schema
+```bash
+pnpm install
+cp .env.dev.example .env                           # works as-is
+docker compose -f docker-compose.dev.yaml up -d    # Postgres on 127.0.0.1:5432
+pnpm dev                                           # http://localhost:3000
 ```
 
-## Status
-
-It's MIT-licensed and self-hostable, but
-no contribution support is promised — feel free to fork and adapt.
+`pnpm test`, `pnpm typecheck`, and `pnpm lint` run the checks.
+`pnpm db:generate` creates a migration after a schema change.
+Releases are cut from git tags; see [docs/releasing.md](./docs/releasing.md).
 
 ## License
 
-[MIT](./LICENSE)
+[MIT](./LICENSE). There is no promise of support or reviews for contributions,
+so feel free to fork it and make it yours.
+
+Built on [Excalidraw](https://github.com/excalidraw/excalidraw), MIT © Excalidraw.
+Excaliself is not affiliated with Excalidraw. "Excalidraw" is a trademark of
+its owner; this project uses the open-source `@excalidraw/excalidraw` package.

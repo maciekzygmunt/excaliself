@@ -1,0 +1,25 @@
+---
+import Layout from "../layouts/Layout.astro"
+---
+
+<Layout title="Privacy: Excaliself" description="What this website and the Excaliself app collect. In short: anonymous page views, and nothing from the app.">
+  <main id="main" class="mx-auto max-w-6xl px-6 pt-16 pb-20 md:pt-24">
+    <article class="mx-auto max-w-[680px]">
+      <h1 class="text-5xl font-semibold tracking-tight">Privacy</h1>
+      <div class="mt-8 flex flex-col gap-6 text-muted-foreground">
+        <section>
+          <h2 class="text-xl font-semibold text-foreground">This website</h2>
+          <p class="mt-2">Static pages and no cookies. Self-hosted OpenPanel counts page views and outgoing link clicks without cookies or personal data. The host also sees ordinary request logs.</p>
+        </section>
+        <section>
+          <h2 class="text-xl font-semibold text-foreground">The Excaliself app</h2>
+          <p class="mt-2">You run it on your own server. Accounts, drawings, and pasted images are stored in your Postgres database. The app does not phone home and sends no telemetry.</p>
+        </section>
+        <section>
+          <h2 class="text-xl font-semibold text-foreground">Questions</h2>
+          <p class="mt-2">Open an issue on <a href="https://github.com/maciekzygmunt/excaliself/issues" class="font-medium text-iris transition-colors duration-300 ease-fluid hover:text-iris-strong">GitHub</a>.</p>
+        </section>
+      </div>
+    </article>
+  </main>
+</Layout>

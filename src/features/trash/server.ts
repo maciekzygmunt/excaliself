@@ -99,7 +99,7 @@ export const getTrashItems = createServerFn({ method: "GET" })
  */
 export const deleteTrashUnitForever = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
-  .inputValidator(z.string())
+  .validator(z.string())
   .handler(async ({ data: id, context }) => {
     await destroyTrashUnit(db, context.session.user.id, id)
   })

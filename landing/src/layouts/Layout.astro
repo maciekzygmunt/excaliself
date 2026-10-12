@@ -1,0 +1,82 @@
+---
+import "../styles/global.css"
+import Nav from "../components/Nav.astro"
+import Footer from "../components/Footer.astro"
+
+interface Props {
+  title: string
+  description: string
+  noindex?: boolean
+}
+const { title, description, noindex = false } = Astro.props
+const base = import.meta.env.BASE_URL
+const ogImage = new URL(`${base}og.png`, Astro.site)
+const ogImageAlt = "Self-hosted Excalidraw for your team, next to the Excaliself home screen"
+const canonical = new URL(Astro.url.pathname, Astro.site)
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    {noindex && <meta name="robots" content="noindex" />}
+    <link rel="canonical" href={canonical} />
+    <link rel="icon" href={`${base}favicon.svg`} type="image/svg+xml" />
+    <link rel="apple-touch-icon" href={`${base}apple-touch-icon.png`} />
+    <link rel="sitemap" href={`${base}sitemap-index.xml`} />
+    <meta name="theme-color" content="#ebebee" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Excaliself" />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:image" content={ogImage} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content={ogImageAlt} />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:image:alt" content={ogImageAlt} />
+    <script is:inline>document.documentElement.classList.add("js")</script>
+    <!-- Self-hosted OpenPanel analytics. The client ID is public. -->
+    <script is:inline>
+      window.op = window.op || function (...args) { (window.op.q = window.op.q || []).push(args) }
+      window.op("init", {
+        apiUrl: "https://opapi-yf0jp9nzepqci8mttg2j5lt7.zygmunt.xyz",
+        clientId: "b97e80e5-148d-484a-8b6f-1511d1f75acb",
+        trackScreenViews: true,
+        trackOutgoingLinks: true,
+        trackAttributes: true,
+      })
+    </script>
+    <script is:inline src="https://analytics.zygmunt.xyz/op1.js" defer async></script>
+    <slot name="head" />
+  </head>
+  <body class="min-h-dvh">
+    <a
+      href="#main"
+      class="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-[60] focus:rounded-md focus:bg-panel focus:px-3 focus:py-2 focus:text-sm"
+    >
+      Skip to content
+    </a>
+    <Nav />
+    <slot />
+    <Footer />
+    <script>
+      const io = new IntersectionObserver(
+        (entries) => {
+          for (const e of entries) {
+            if (e.isIntersecting) {
+              e.target.classList.add("is-visible")
+              io.unobserve(e.target)
+            }
+          }
+        },
+        { rootMargin: "0px 0px -10% 0px" },
+      )
+      for (const el of document.querySelectorAll("[data-reveal]")) io.observe(el)
+    </script>
+  </body>
+</html>

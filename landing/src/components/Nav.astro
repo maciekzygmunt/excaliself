@@ -1,0 +1,92 @@
+---
+import Icon from "./Icon.astro"
+
+const repo = "https://github.com/maciekzygmunt/excaliself"
+const base = import.meta.env.BASE_URL
+const links = [
+  { href: `${base}#features`, label: "Features" },
+  { href: `${base}#deploy`, label: "Deploy" },
+  { href: `${base}#faq`, label: "FAQ" },
+]
+const linkClass =
+  "rounded-full px-3 py-2 text-sm font-semibold text-muted-foreground transition-[background-color,color] duration-300 ease-fluid hover:bg-well hover:text-foreground aria-[current=true]:text-foreground"
+---
+
+<header class="pointer-events-none sticky top-0 z-50 pt-6">
+  <nav
+    aria-label="Main"
+    class="pointer-events-auto mx-auto flex w-max items-center gap-1 rounded-full border border-keycap-border bg-panel/70 p-2 shadow-panel backdrop-blur-xl"
+  >
+    <a href={base} class="flex items-center gap-2 rounded-full py-1 pr-3 pl-1 font-semibold" aria-label="Excaliself home">
+      <img src={`${base}favicon.svg`} alt="" width="28" height="28" class="rounded-full" />
+      Excaliself
+    </a>
+    <span class="hidden h-6 w-px bg-hairline sm:block"></span>
+    <div class="hidden items-center gap-1 sm:flex" data-nav-links>
+      {links.map((l) => <a href={l.href} class={linkClass}>{l.label}</a>)}
+    </div>
+    <a href={repo} class="keycap ml-1 hidden items-center gap-2 !rounded-full px-3 py-2 text-sm font-semibold sm:inline-flex">
+      <Icon name="github-logo" size={16} />
+      GitHub
+    </a>
+    <button
+      type="button"
+      class="relative size-9 rounded-full transition-colors duration-300 ease-fluid hover:bg-well sm:hidden"
+      aria-expanded="false"
+      aria-controls="menu"
+      aria-label="Open menu"
+      data-menu-toggle
+    >
+      <span class="menu-line"></span>
+      <span class="menu-line"></span>
+    </button>
+  </nav>
+</header>
+
+<div id="menu" class="menu-overlay fixed inset-0 z-40 flex flex-col justify-center bg-white/80 px-6 backdrop-blur-3xl sm:hidden" data-menu-overlay>
+  <nav aria-label="Menu" class="flex flex-col gap-3 text-4xl font-semibold tracking-tight">
+    {links.map((l, i) => (
+      <a href={l.href} class={`rounded-md py-2 ${["delay-100", "delay-150", "delay-200", "delay-300"][i]}`}>{l.label}</a>
+    ))}
+    <a href={repo} class="flex items-center gap-3 rounded-md py-2 text-muted-foreground delay-300">
+      <Icon name="github-logo" size={32} />
+      GitHub
+    </a>
+  </nav>
+</div>
+
+<script>
+  const toggle = document.querySelector<HTMLButtonElement>("[data-menu-toggle]")!
+  const overlay = document.querySelector<HTMLElement>("[data-menu-overlay]")!
+
+  function setOpen(open: boolean) {
+    toggle.setAttribute("aria-expanded", String(open))
+    toggle.setAttribute("aria-label", open ? "Close menu" : "Open menu")
+    overlay.classList.toggle("is-open", open)
+    document.body.style.overflow = open ? "hidden" : ""
+  }
+  toggle.addEventListener("click", () => setOpen(toggle.getAttribute("aria-expanded") !== "true"))
+  overlay.addEventListener("click", (e) => {
+    if ((e.target as HTMLElement).closest("a")) setOpen(false)
+  })
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") setOpen(false)
+  })
+
+  // Mark the section in view as current in the pill nav.
+  const navLinks = [...document.querySelectorAll<HTMLAnchorElement>("[data-nav-links] a")]
+  const sections = navLinks.map((a) => document.getElementById(a.hash.slice(1))).filter(Boolean) as HTMLElement[]
+  if (sections.length) {
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) {
+          const link = navLinks.find((a) => a.hash === `#${e.target.id}`)
+          link?.toggleAttribute("aria-current", e.isIntersecting)
+          if (e.isIntersecting) link?.setAttribute("aria-current", "true")
+        }
+      },
+      { rootMargin: "-40% 0px -50% 0px" },
+    )
+    for (const s of sections) io.observe(s)
+  }
+</script>

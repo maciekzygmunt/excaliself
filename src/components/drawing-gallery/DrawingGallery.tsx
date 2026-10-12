@@ -1,4 +1,5 @@
 import { Link } from "@tanstack/react-router"
+import { createClientOnlyFn } from "@tanstack/react-start"
 import {
   Folder as FolderIcon,
   MoreHorizontal,
@@ -37,6 +38,10 @@ export const CARD_HOVER_CLASS =
 
 const DEFAULT_SKELETON_COUNT = 8
 
+// Client-only: @excalidraw/excalidraw is not server-safe, and this keeps it
+// out of the server bundle and the gallery's initial chunk
+const loadPreview = createClientOnlyFn(() => import("./preview"))
+
 /**
  * The app's one drawing grid: preview cards sorted newest-edited first, with
  * a delayed skeleton while loading and an `empty` slot for the zero state.
@@ -48,6 +53,7 @@ export function DrawingGallery({
   isPending,
   limit,
   sort = DEFAULT_SORT,
+  query,
   loadingLabel,
   onTrash,
   empty,
@@ -63,6 +69,8 @@ export function DrawingGallery({
   limit?: number
   /** Grid order — browse's sort dropdown; everywhere else keeps Recent. */
   sort?: SortOrder
+  /** The browse search, so title matches sort ahead of scene-text matches. */
+  query?: string
   /** Accessible name for the loading grid. */
   loadingLabel: string
   /** Card overflow action "Move to trash" (spec §5.11): tier-1 destructive,
@@ -77,9 +85,9 @@ export function DrawingGallery({
   const showSkeleton = useDelayedVisible(isPending)
 
   const sorted = useMemo(() => {
-    const ordered = [...drawings].sort(compareDrawings(sort))
+    const ordered = [...drawings].sort(compareDrawings(sort, query))
     return limit === undefined ? ordered : ordered.slice(0, limit)
-  }, [drawings, limit, sort])
+  }, [drawings, limit, sort, query])
 
   const foldersById = useMemo(
     () => new Map((folders ?? []).map((folder) => [folder.id, folder])),
@@ -255,9 +263,7 @@ export function Preview({ name, data }: { name: string; data: string }) {
 
   useEffect(() => {
     let cancelled = false
-    // Dynamic import: @excalidraw/excalidraw is not server-safe, and this
-    // keeps it out of the SSR bundle and the gallery's initial chunk
-    import("./preview")
+    loadPreview()
       .then(({ renderPreviewSvg }) => renderPreviewSvg(data))
       .then((svg) => {
         if (cancelled) return

@@ -8,6 +8,7 @@ import { db } from "@/db"
 import { drawingFiles, drawings, folders } from "@/db/schema"
 import { rooms } from "@/features/collab/room-registry"
 import { terminateRoom } from "@/features/collab/room-session"
+import { assertFolderTarget } from "@/features/folders/ownership"
 import { findNearestLiveAncestorId } from "@/features/folders/subtree"
 import { authMiddleware } from "@/middleware/auth"
 import { writeDrawingScene } from "./scene-write"
@@ -31,7 +32,7 @@ export const getDrawings = createServerFn({ method: "GET" })
 
 export const getDrawingWithFiles = createServerFn({ method: "GET" })
   .middleware([authMiddleware])
-  .inputValidator((id: string) => id)
+  .validator((id: string) => id)
   .handler(async ({ data: id, context }) => {
     const userId = context.session.user.id
     // Trashed drawings load too (deletedAt set) so /draw/$id can render the
@@ -53,7 +54,7 @@ export const getDrawingWithFiles = createServerFn({ method: "GET" })
 
 export const createDrawing = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
-  .inputValidator(
+  .validator(
     z.object({
       name: z.string().min(1).optional(),
       folderId: z.string().nullable().optional(),
@@ -61,6 +62,7 @@ export const createDrawing = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const userId = context.session.user.id
+    if (data.folderId) await assertFolderTarget(db, userId, data.folderId)
     const id = randomUUID()
     const now = new Date()
 
@@ -79,7 +81,7 @@ export const createDrawing = createServerFn({ method: "POST" })
 
 export const updateDrawing = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
-  .inputValidator(
+  .validator(
     z.object({
       id: z.string(),
       updateData: z.object({
@@ -90,6 +92,9 @@ export const updateDrawing = createServerFn({ method: "POST" })
   )
   .handler(async ({ data: { id, updateData }, context }) => {
     const userId = context.session.user.id
+    if (updateData.folderId) {
+      await assertFolderTarget(db, userId, updateData.folderId)
+    }
     // Ownership is enforced in the statement itself; zero rows means "not
     // found" so non-owners can't tell the resource exists. Trashed drawings
     // are treated the same — no edits while in the trash.
@@ -109,7 +114,7 @@ export const updateDrawing = createServerFn({ method: "POST" })
 
 export const setDrawingStarred = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
-  .inputValidator(
+  .validator(
     z.object({
       id: z.string(),
       starred: z.boolean(),
@@ -135,7 +140,7 @@ export const setDrawingStarred = createServerFn({ method: "POST" })
 
 export const saveDrawingScene = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
-  .inputValidator(
+  .validator(
     z.object({
       id: z.string(),
       data: z.string(),
@@ -152,7 +157,7 @@ export const saveDrawingScene = createServerFn({ method: "POST" })
 
 export const trashDrawing = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
-  .inputValidator(z.string())
+  .validator(z.string())
   .handler(async ({ data: id, context }) => {
     const userId = context.session.user.id
     // Soft delete: the row keeps its folderId so undo restores it in place.
@@ -189,7 +194,7 @@ export const trashDrawing = createServerFn({ method: "POST" })
  */
 export const restoreDrawing = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
-  .inputValidator(z.string())
+  .validator(z.string())
   .handler(async ({ data: id, context }) => {
     const userId = context.session.user.id
 

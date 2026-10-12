@@ -1,0 +1,107 @@
+name: Docker
+
+# PRs: build the image and boot every deploy compose file against it.
+# main / v*.*.* tags: same smoke test, then publish multi-arch to GHCR.
+on:
+  pull_request:
+  push:
+    branches: [main]
+    tags: ["v*.*.*"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docker-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          # must match the image name in the compose files
+          tags: ghcr.io/maciekzygmunt/excaliself:smoke
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Boot docker-compose.yaml
+        env:
+          EXCALISELF_VERSION: smoke
+          EXCALISELF_PORT: 127.0.0.1:3000
+          POSTGRES_PASSWORD: smoke-password
+          BETTER_AUTH_SECRET: smoke-secret-at-least-32-characters-long
+        run: |
+          docker compose -p universal up -d --wait --wait-timeout 120
+          curl -fsS http://127.0.0.1:3000/api/health
+          curl -fsSL -o /dev/null http://127.0.0.1:3000/login
+
+      - name: Boot docker-compose.coolify.yaml
+        env:
+          EXCALISELF_VERSION: smoke
+          SERVICE_URL_EXCALISELF_3000: http://127.0.0.1:3000
+          SERVICE_PASSWORD_64_AUTH: smoke-secret-at-least-32-characters-long
+          SERVICE_PASSWORD_POSTGRES: smoke-password
+        run: |
+          docker compose -p coolify -f docker-compose.coolify.yaml up -d --wait --wait-timeout 120
+          docker compose -p coolify -f docker-compose.coolify.yaml exec -T excaliself sh -c \
+            'wget -qO- http://127.0.0.1:3000/api/health && wget -qO /dev/null http://127.0.0.1:3000/login'
+
+      - name: Validate docker-compose.build.yaml
+        env:
+          POSTGRES_PASSWORD: smoke-password
+          BETTER_AUTH_SECRET: smoke-secret-at-least-32-characters-long
+        run: docker compose -f docker-compose.build.yaml config --quiet
+
+      - name: Logs on failure
+        if: failure()
+        run: |
+          docker compose -p universal logs
+          docker compose -p coolify -f docker-compose.coolify.yaml logs
+
+  publish:
+    needs: smoke
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # main → :main; v1.2.3 → :1.2.3, :1.2 and :latest (stable tags only)
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+
+      # The Dockerfile builds on the native platform, so arm64 needs no QEMU
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

@@ -27,16 +27,22 @@ test.each([
 test.each([
   ["Mark", <Mark key="mark" />],
   ["Lockup", <Lockup key="lockup" />],
-])("%s is decorative — hidden from the accessibility tree", (_name, element) => {
-  const svg = renderSvg(element)
-  expect(svg.getAttribute("aria-hidden")).toBe("true")
-})
+])(
+  "%s is decorative — hidden from the accessibility tree",
+  (_name, element) => {
+    const svg = renderSvg(element)
+    expect(svg.getAttribute("aria-hidden")).toBe("true")
+  },
+)
 
 test.each([
   ["Mark", <Mark key="mark" className="h-5 text-iris" />],
   ["Lockup", <Lockup key="lockup" className="h-5 text-iris" />],
-])("%s is sizable and colorable from the outside via className", (_name, element) => {
-  const svg = renderSvg(element)
-  expect(svg.classList.contains("h-5")).toBe(true)
-  expect(svg.classList.contains("text-iris")).toBe(true)
-})
+])(
+  "%s is sizable and colorable from the outside via className",
+  (_name, element) => {
+    const svg = renderSvg(element)
+    expect(svg.classList.contains("h-5")).toBe(true)
+    expect(svg.classList.contains("text-iris")).toBe(true)
+  },
+)

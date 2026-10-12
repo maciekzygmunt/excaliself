@@ -55,3 +55,19 @@ export function findNearestLiveAncestorId(
   }
   return null
 }
+
+/**
+ * Whether `targetId` is a legal landing folder for the owner's live folders:
+ * it must exist in `liveFolders`, and when moving a folder (`movingId`) it
+ * must not be that folder or one of its descendants — a cycle would make the
+ * subtree unreachable from root and loop every ancestor walk.
+ */
+export function isValidFolderTarget(
+  liveFolders: FolderRef[],
+  targetId: string,
+  movingId?: string,
+): boolean {
+  if (!liveFolders.some((folder) => folder.id === targetId)) return false
+  if (movingId === undefined) return true
+  return !collectFolderSubtreeIds(liveFolders, movingId).has(targetId)
+}

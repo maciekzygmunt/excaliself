@@ -20,7 +20,7 @@ export const getUserCount = createServerFn({ method: "GET" }).handler(
 )
 
 export const setupAdmin = createServerFn({ method: "POST" })
-  .inputValidator(setupFieldsSchema)
+  .validator(setupFieldsSchema)
   .handler(async ({ data }) => {
     const userCount = await getUserCount()
     if (userCount > 0) {
@@ -64,9 +64,7 @@ export const getAllUsers = createServerFn({ method: "GET" })
 
 export const setUserRole = createServerFn({ method: "POST" })
   .middleware([adminMiddleware])
-  .inputValidator(
-    z.object({ userId: z.string(), role: z.enum(["admin", "user"]) }),
-  )
+  .validator(z.object({ userId: z.string(), role: z.enum(["admin", "user"]) }))
   .handler(async ({ data, context }) => {
     const callerId = context.session.user.id
     await db.transaction(async (tx) => {
@@ -115,7 +113,7 @@ export const setUserRole = createServerFn({ method: "POST" })
 
 export const deleteUser = createServerFn({ method: "POST" })
   .middleware([adminMiddleware])
-  .inputValidator(z.string())
+  .validator(z.string())
   .handler(async ({ data: userId, context }) => {
     await deleteUserAccount(db, context.session.user.id, userId)
   })
@@ -124,5 +122,5 @@ export const deleteUser = createServerFn({ method: "POST" })
 // their 23 drawings and 4 folders").
 export const getUserContentCounts = createServerFn({ method: "GET" })
   .middleware([adminMiddleware])
-  .inputValidator(z.string())
+  .validator(z.string())
   .handler(async ({ data: userId }) => countOwnedContent(db, userId))

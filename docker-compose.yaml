@@ -1,3 +1,5 @@
+# Production deploy: pulls the prebuilt image. Configure via .env (see .env.example).
+# To build from source instead, use docker-compose.build.yaml.
 services:
   db:
     image: postgres:17-alpine
@@ -5,22 +7,26 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-excaliself}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
       POSTGRES_DB: ${POSTGRES_DB:-excaliself}
-    ports:
-      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
     restart: unless-stopped
 
   excaliself:
-    build: .
+    image: ghcr.io/maciekzygmunt/excaliself:${EXCALISELF_VERSION:-latest}
     ports:
-      - "3000:3000"
+      - "${EXCALISELF_PORT:-3000}:3000"
     environment:
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-excaliself}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@db:5432/${POSTGRES_DB:-excaliself}
-      - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET:?Set BETTER_AUTH_SECRET in .env}
-      - BASE_URL=${BASE_URL:-http://localhost:3000}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-excaliself}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-excaliself}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?Set BETTER_AUTH_SECRET in .env}
+      BASE_URL: ${BASE_URL:-http://localhost:3000}
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     restart: unless-stopped
 
 volumes:

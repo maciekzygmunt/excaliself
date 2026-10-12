@@ -1,5 +1,9 @@
 import { expect, test } from "vitest"
-import { collectFolderSubtreeIds, findNearestLiveAncestorId } from "./subtree"
+import {
+  collectFolderSubtreeIds,
+  findNearestLiveAncestorId,
+  isValidFolderTarget,
+} from "./subtree"
 
 const folder = (id: string, parentId: string | null = null) => ({
   id,
@@ -68,4 +72,17 @@ test("a chain that dead-ends in a missing row lands at root", () => {
 test("a parentId cycle terminates at root instead of looping", () => {
   const folders = [trashable("a", "b", TRASHED), trashable("b", "a", TRASHED)]
   expect(findNearestLiveAncestorId(folders, "a")).toBeNull()
+})
+
+test("a folder target must be one of the owner's live folders", () => {
+  const folders = [folder("a"), folder("b", "a")]
+  expect(isValidFolderTarget(folders, "b")).toBe(true)
+  expect(isValidFolderTarget(folders, "someone-elses")).toBe(false)
+})
+
+test("a folder can't move into itself or a descendant", () => {
+  const folders = [folder("a"), folder("b", "a"), folder("c", "b"), folder("x")]
+  expect(isValidFolderTarget(folders, "x", "a")).toBe(true)
+  expect(isValidFolderTarget(folders, "a", "a")).toBe(false)
+  expect(isValidFolderTarget(folders, "c", "a")).toBe(false)
 })

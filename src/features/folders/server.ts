@@ -9,6 +9,7 @@ import { drawings, folders } from "@/db/schema"
 import { rooms } from "@/features/collab/room-registry"
 import { terminateRoom } from "@/features/collab/room-session"
 import { authMiddleware } from "@/middleware/auth"
+import { assertFolderTarget } from "./ownership"
 import { collectFolderSubtreeIds, findNearestLiveAncestorId } from "./subtree"
 
 export const getFolders = createServerFn({ method: "GET" })
@@ -24,7 +25,7 @@ export const getFolders = createServerFn({ method: "GET" })
 
 export const createFolder = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
-  .inputValidator(
+  .validator(
     z.object({
       name: z.string().min(1),
       parentId: z.string().nullable().optional(),
@@ -35,6 +36,7 @@ export const createFolder = createServerFn({ method: "POST" })
     const id = randomUUID()
     const now = new Date()
     const parentId = data.parentId ?? null
+    if (parentId) await assertFolderTarget(db, userId, parentId)
 
     await db.insert(folders).values({
       id,
@@ -57,7 +59,7 @@ export const createFolder = createServerFn({ method: "POST" })
 
 export const updateFolder = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
-  .inputValidator(
+  .validator(
     z.object({
       id: z.string(),
       name: z.string().min(1).optional(),
@@ -70,6 +72,8 @@ export const updateFolder = createServerFn({ method: "POST" })
     const updateFields: { name?: string; parentId?: string | null } = {}
     if (data.name !== undefined) updateFields.name = data.name
     if (data.parentId !== undefined) updateFields.parentId = data.parentId
+    if (data.parentId)
+      await assertFolderTarget(db, userId, data.parentId, data.id)
 
     // Ownership is enforced in the statement itself; zero rows means "not
     // found" so non-owners can't tell the resource exists. Trashed folders
@@ -97,7 +101,7 @@ export const updateFolder = createServerFn({ method: "POST" })
  */
 export const trashFolder = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
-  .inputValidator(z.string())
+  .validator(z.string())
   .handler(async ({ data: id, context }) => {
     const userId = context.session.user.id
     const now = new Date()
@@ -151,7 +155,7 @@ export const trashFolder = createServerFn({ method: "POST" })
  */
 export const restoreFolder = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
-  .inputValidator(z.string())
+  .validator(z.string())
   .handler(async ({ data: id, context }) => {
     const userId = context.session.user.id
 

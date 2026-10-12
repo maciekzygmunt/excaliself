@@ -79,6 +79,7 @@ export function AllDrawings({ isAdmin }: { isAdmin: boolean }) {
           folders={liveScope === "all" ? folders : undefined}
           isPending={isPending}
           sort={sort}
+          query={query}
           loadingLabel="Loading drawings"
           onTrash={trashDrawing}
           empty={

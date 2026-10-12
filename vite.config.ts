@@ -5,7 +5,6 @@ import { tanstackStart } from "@tanstack/react-start/plugin/vite"
 import viteReact from "@vitejs/plugin-react"
 import { nitro } from "nitro/vite"
 import { defineConfig } from "vite"
-import viteTsConfigPaths from "vite-tsconfig-paths"
 
 const config = defineConfig({
   resolve: {
@@ -19,12 +18,21 @@ const config = defineConfig({
     // `serverDir` turns on nitro's own file-based routing for the room
     // websocket (the app's pages stay with TanStack Start); `features.websocket`
     // wires the upgrade onto the app's existing port — no new ports, no new
-    // env vars. Do NOT upgrade TanStack Start past this pinned nitro plugin
-    // without re-running docs/collab-websocket-smoke-test.md in both dev and
-    // the built container.
-    nitro({ serverDir: "server", features: { websocket: true } }),
-    viteTsConfigPaths({
-      projects: ["./tsconfig.json"],
+    // env vars. Re-run docs/collab-websocket-smoke-test.md in both dev and the
+    // built container after any nitro or TanStack Start upgrade.
+    nitro({
+      serverDir: "server",
+      features: { websocket: true },
+      rolldownConfig: {
+        checks: {
+          // The server bundle inlines client libraries; their "use client"
+          // directives mean nothing there and Rolldown warns on each one.
+          moduleLevelDirective: false,
+          // Nitro's chunk groups have no debugName, so the timing report
+          // only adds a warning about the missing label.
+          bundlerTimings: false,
+        },
+      },
     }),
     tanstackStart({
       router: {

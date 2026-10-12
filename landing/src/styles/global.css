@@ -1,0 +1,258 @@
+@import "tailwindcss";
+@import "@fontsource-variable/geist/wght.css";
+@import "@fontsource-variable/geist-mono/wght.css";
+
+/* Etched light tokens, copied from the app's src/styles.css so the page
+   matches the product. The page is light only. */
+:root {
+  --background: #ebebee;
+  --foreground: #18181b;
+  --panel: #ffffff;
+  --muted-foreground: #68686f;
+  --border: rgba(9, 9, 11, 0.1);
+  --iris: #6f66c9;
+  --iris-strong: #453da5;
+  --iris-muted: rgba(111, 102, 201, 0.1);
+  --panel-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.04), 0 16px 40px rgba(0, 0, 0, 0.05);
+  --keycap-border: rgba(9, 9, 11, 0.13);
+  --keycap-border-hover: rgba(9, 9, 11, 0.2);
+  --keycap-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9), 0 1px 2px rgba(0, 0, 0, 0.06);
+  --card-border: rgba(9, 9, 11, 0.09);
+  --card-border-hover: rgba(9, 9, 11, 0.16);
+  --card-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.8), 0 1px 2px rgba(0, 0, 0, 0.05);
+  --card-hover-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.8), 0 3px 10px rgba(0, 0, 0, 0.07);
+  --well: rgba(24, 24, 27, 0.05);
+  --well-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.04);
+  --hairline: rgba(9, 9, 11, 0.06);
+  color-scheme: light;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-panel: var(--panel);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-iris: var(--iris);
+  --color-iris-strong: var(--iris-strong);
+  --color-iris-muted: var(--iris-muted);
+  --color-keycap-border: var(--keycap-border);
+  --color-keycap-border-hover: var(--keycap-border-hover);
+  --color-card-border: var(--card-border);
+  --color-card-border-hover: var(--card-border-hover);
+  --color-well: var(--well);
+  --color-hairline: var(--hairline);
+  --shadow-panel: var(--panel-shadow);
+  --shadow-keycap: var(--keycap-shadow);
+  --shadow-card: var(--card-shadow);
+  --shadow-card-hover: var(--card-hover-shadow);
+  --shadow-well: var(--well-shadow);
+  --font-sans: "Geist Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: "Geist Mono Variable", ui-monospace, SFMono-Regular, Menlo, monospace;
+  /* One easing for every transition on the page. */
+  --ease-fluid: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  html {
+    @apply bg-background text-foreground font-sans antialiased;
+    scroll-behavior: smooth;
+  }
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+  p,
+  li {
+    text-wrap: pretty;
+  }
+  :focus-visible {
+    outline: 2px solid var(--iris);
+    outline-offset: 2px;
+  }
+}
+
+/* Raised secondary button, flat panel colour with the Etched edge. */
+@utility keycap {
+  @apply rounded-md border border-keycap-border bg-panel text-foreground shadow-keycap transition-[border-color,scale,background-color] duration-300 ease-fluid hover:border-keycap-border-hover active:scale-[0.98] active:bg-well;
+}
+
+/* Primary button. */
+@utility button-primary {
+  @apply inline-flex items-center justify-center gap-2 rounded-md bg-iris px-3 py-2 text-base font-semibold text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.2)] transition-[background-color,scale] duration-300 ease-fluid hover:bg-iris-strong active:scale-[0.98];
+}
+
+@utility card {
+  @apply rounded-xl border border-card-border bg-panel shadow-card transition-[border-color,box-shadow] duration-300 ease-fluid hover:border-card-border-hover hover:shadow-card-hover;
+}
+
+/* Scroll reveal: starts hidden only when JS is present, so no-JS still reads. */
+.js [data-reveal] {
+  opacity: 0;
+  translate: 0 64px;
+  filter: blur(8px);
+  transition:
+    opacity 800ms var(--ease-fluid),
+    translate 800ms var(--ease-fluid),
+    filter 800ms var(--ease-fluid);
+}
+.js [data-reveal].is-visible {
+  opacity: 1;
+  translate: 0 0;
+  filter: blur(0);
+}
+
+/* Tagline reveal: each word brightens as it crosses the trigger line. */
+.js .tagline-word {
+  opacity: 0.3;
+  transition: opacity 700ms var(--ease-fluid);
+}
+.js .tagline-word.is-visible {
+  opacity: 1;
+}
+
+/* Island nav: hamburger lines morph into an X, menu links slide up staggered. */
+.menu-line {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 16px;
+  height: 2px;
+  margin-left: -8px;
+  border-radius: 9999px;
+  background: currentColor;
+  transition:
+    translate 700ms var(--ease-fluid),
+    rotate 700ms var(--ease-fluid);
+}
+.menu-line:first-child {
+  translate: 0 -4px;
+}
+.menu-line:last-child {
+  translate: 0 3px;
+}
+[aria-expanded="true"] .menu-line:first-child {
+  translate: 0 -1px;
+  rotate: 45deg;
+}
+[aria-expanded="true"] .menu-line:last-child {
+  translate: 0 -1px;
+  rotate: -45deg;
+}
+.menu-overlay {
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity 700ms var(--ease-fluid),
+    visibility 0s linear 700ms;
+}
+.menu-overlay.is-open {
+  opacity: 1;
+  visibility: visible;
+  transition-delay: 0s;
+}
+.menu-overlay a {
+  opacity: 0;
+  translate: 0 48px;
+  transition:
+    opacity 700ms var(--ease-fluid),
+    translate 700ms var(--ease-fluid);
+}
+.menu-overlay.is-open a {
+  opacity: 1;
+  translate: 0 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .js [data-reveal],
+  .js .tagline-word,
+  .menu-overlay,
+  .menu-overlay a {
+    opacity: 1;
+    translate: none;
+    filter: none;
+    transition: none;
+  }
+  .menu-line {
+    transition: none;
+  }
+  html {
+    scroll-behavior: auto;
+  }
+}
+
+/* FAQ: rotate the caret when open, no marker. */
+details > summary {
+  list-style: none;
+}
+details > summary::-webkit-details-marker {
+  display: none;
+}
+details .faq-caret {
+  transition: rotate 700ms var(--ease-fluid);
+}
+details[open] .faq-caret {
+  rotate: 180deg;
+}
+
+/* Light/dark screenshot comparison: the dark image sits on top and is
+   clipped at --pos; an invisible range input drives the position. */
+.compare {
+  --pos: 62%;
+  position: relative;
+  overflow: hidden;
+  user-select: none;
+}
+.compare > img {
+  display: block;
+  width: 100%;
+}
+.compare .compare-dark {
+  position: absolute;
+  inset: 0;
+  clip-path: inset(0 0 0 var(--pos));
+}
+.compare .compare-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: var(--pos);
+  width: 2px;
+  margin-left: -1px;
+  background: var(--iris);
+  pointer-events: none;
+}
+.compare .compare-handle::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 32px;
+  height: 32px;
+  translate: -50% -50%;
+  border-radius: 9999px;
+  background: var(--panel);
+  border: 1px solid var(--keycap-border);
+  box-shadow: var(--keycap-shadow);
+}
+.compare input[type="range"] {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: ew-resize;
+}
+.compare:has(input:focus-visible) {
+  outline: 2px solid var(--iris);
+  outline-offset: 2px;
+}
