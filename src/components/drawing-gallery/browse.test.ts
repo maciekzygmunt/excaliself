@@ -118,6 +118,35 @@ describe("compareDrawings", () => {
     ])
   })
 
+  test("while searching, title matches lead scene-text matches in sort order", () => {
+    const scene = JSON.stringify({ elements: [{ type: "text", text: "map" }] })
+    const newerByText = makeDrawing({
+      id: "a",
+      data: scene,
+      updatedAt: new Date(4000),
+    })
+    const olderByTitle = makeDrawing({
+      id: "b",
+      name: "Roadmap",
+      updatedAt: new Date(1000),
+    })
+    const newerByTitle = makeDrawing({
+      id: "c",
+      name: "Map",
+      updatedAt: new Date(3000),
+    })
+    const olderByText = makeDrawing({
+      id: "d",
+      data: scene,
+      updatedAt: new Date(2000),
+    })
+    expect(
+      [newerByText, olderByTitle, newerByTitle, olderByText].sort(
+        compareDrawings("last-edited", " MAP "),
+      ),
+    ).toEqual([newerByTitle, olderByTitle, newerByText, olderByText])
+  })
+
   test("comparators survive string timestamps from a serialized cache", () => {
     const older = makeDrawing({
       id: "a",

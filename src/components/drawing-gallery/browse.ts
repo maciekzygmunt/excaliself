@@ -34,9 +34,9 @@ const byName = new Intl.Collator(undefined, {
   numeric: true,
 })
 
-export function compareDrawings(
-  sort: SortOrder,
-): (a: Drawing, b: Drawing) => number {
+type Comparator = (a: Drawing, b: Drawing) => number
+
+function bySortOrder(sort: SortOrder): Comparator {
   switch (sort) {
     case "last-edited":
       return (a, b) => timestamp(b.updatedAt) - timestamp(a.updatedAt)
@@ -45,6 +45,21 @@ export function compareDrawings(
     case "name":
       return (a, b) => byName.compare(a.name, b.name)
   }
+}
+
+function nameMatches(drawing: Drawing, needle: string) {
+  return drawing.name.toLowerCase().includes(needle)
+}
+
+/** Grid order. While searching, title matches lead scene-text matches; each
+ * group keeps the sort order. */
+export function compareDrawings(sort: SortOrder, query = ""): Comparator {
+  const order = bySortOrder(sort)
+  const needle = query.trim().toLowerCase()
+  if (needle === "") return order
+  return (a, b) =>
+    Number(nameMatches(b, needle)) - Number(nameMatches(a, needle)) ||
+    order(a, b)
 }
 
 /** On-page grid filter: substring search over the name and the scene's text,
@@ -60,7 +75,7 @@ export function filterDrawings(
     if (folderId !== null && drawing.folderId !== folderId) return false
     return (
       needle === "" ||
-      drawing.name.toLowerCase().includes(needle) ||
+      nameMatches(drawing, needle) ||
       findInScene(drawing, needle) !== null
     )
   })
