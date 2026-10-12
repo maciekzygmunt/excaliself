@@ -10,26 +10,26 @@ type StoredElement = {
 /**
  * The words in a stored scene: every live text element, which includes labels
  * bound to shapes and arrows. Whitespace is collapsed so wrapped lines read as
- * one line. Empty for an empty or unparseable scene.
+ * one line. Empty for an empty, unparseable or malformed scene.
  */
 export function extractSceneText(data: string): string {
-  let elements: StoredElement[]
+  // The server stores any string, so a bad scene must not throw mid-render
   try {
-    elements =
+    const elements =
       (JSON.parse(data) as { elements?: StoredElement[] } | null)?.elements ??
       []
+    return (
+      elements
+        .filter((element) => element.type === "text" && !element.isDeleted)
+        // originalText is the unwrapped source; text has container wrapping
+        .map((element) => element.originalText ?? element.text ?? "")
+        .join(" ")
+        .replace(/\s+/g, " ")
+        .trim()
+    )
   } catch {
     return ""
   }
-  return (
-    elements
-      .filter((element) => element.type === "text" && !element.isDeleted)
-      // originalText is the unwrapped source; text has container wrapping
-      .map((element) => element.originalText ?? element.text ?? "")
-      .join(" ")
-      .replace(/\s+/g, " ")
-      .trim()
-  )
 }
 
 // Keyed by the cached row: React Query keeps unchanged rows referentially

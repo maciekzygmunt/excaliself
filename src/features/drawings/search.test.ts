@@ -39,9 +39,11 @@ describe("extractSceneText", () => {
     )
   })
 
-  test("empty and corrupt scenes have no text", () => {
+  test("empty, corrupt and malformed scenes have no text", () => {
     expect(extractSceneText("{}")).toBe("")
     expect(extractSceneText("{not json")).toBe("")
+    expect(extractSceneText('{"elements":{}}')).toBe("")
+    expect(extractSceneText('{"elements":[null]}')).toBe("")
   })
 })
 
