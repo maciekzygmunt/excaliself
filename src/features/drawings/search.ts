@@ -45,7 +45,7 @@ function sceneText(drawing: Pick<Drawing, "data">): string {
   return text
 }
 
-// Short lead: gallery cards fit ~24 characters before the CSS ellipsis
+// Short lead keeps the match in view next to a long title in the palette
 const SNIPPET_LEAD = 12
 const SNIPPET_LENGTH = 80
 
