@@ -26,6 +26,7 @@ import {
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { Kbd } from "@/components/ui/kbd"
 import { drawingsQueryOptions } from "@/features/drawings/queries"
+import { findInScene } from "@/features/drawings/search"
 import { foldersQueryOptions } from "@/features/folders/queries"
 import { useCommandPaletteShortcut } from "@/hooks/use-command-palette-shortcut"
 import { authClient } from "@/lib/auth-client"
@@ -65,6 +66,8 @@ type PaletteRow =
       kind: "goto"
       id: string
       label: string
+      // Muted trailing text: why a drawing matched when it wasn't its title
+      detail?: string
       icon: LucideIcon
       to: string
       params?: { id: string }
@@ -175,9 +178,11 @@ export function CommandPalette({
   // Empty input is the launcher: the 5 most recent drawings lead the list, so
   // ⌘K → Enter reopens the last-edited drawing from anywhere (spec §3.2).
   // Sorted here rather than trusting cache order, since only updatedAt defines
-  // "most recent". Typing swaps the section to a fuzzy search over everything,
-  // best match first.
-  const drawingRows: PaletteRow[] = (
+  // "most recent". Typing swaps the section to a fuzzy search over titles,
+  // best match first, then drawings whose scene text contains the query.
+  // Scene text is substring-only: fuzzy over a whole scene matches nearly
+  // anything.
+  const titleMatches =
     q === ""
       ? [...visibleDrawings]
           .sort(
@@ -186,10 +191,20 @@ export function CommandPalette({
           )
           .slice(0, 5)
       : rankedByFuzzy(visibleDrawings, (d) => d.name)
-  ).map((d) => ({
+  const titleMatchIds = new Set(titleMatches.map((d) => d.id))
+  const sceneMatches = visibleDrawings.flatMap((d) => {
+    if (titleMatchIds.has(d.id)) return []
+    const snippet = findInScene(d, q)
+    return snippet === null ? [] : [{ drawing: d, snippet }]
+  })
+  const drawingRows: PaletteRow[] = [
+    ...titleMatches.map((drawing) => ({ drawing, snippet: undefined })),
+    ...sceneMatches,
+  ].map(({ drawing: d, snippet }) => ({
     kind: "goto",
     id: `drawing-${d.id}`,
     label: d.name,
+    detail: snippet,
     icon: File,
     to: "/draw/$id",
     params: { id: d.id },
@@ -395,6 +410,11 @@ export function CommandPalette({
                         )}
                       />
                       <span className="truncate">{row.label}</span>
+                      {row.kind === "goto" && row.detail && (
+                        <span className="min-w-0 flex-1 truncate text-muted-foreground/70">
+                          {row.detail}
+                        </span>
+                      )}
                     </button>
                   )
                 })}

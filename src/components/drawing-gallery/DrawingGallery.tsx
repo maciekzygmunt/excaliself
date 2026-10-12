@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Skeleton } from "@/components/ui/skeleton"
 import type { Drawing } from "@/features/drawings/queries"
+import { findInScene } from "@/features/drawings/search"
 import type { Folder } from "@/features/folders/queries"
 import { useDelayedVisible } from "@/hooks/use-delayed-visible"
 import { formatAgo } from "@/lib/relative-time"
@@ -51,6 +52,7 @@ export function DrawingGallery({
   isPending,
   limit,
   sort = DEFAULT_SORT,
+  query = "",
   loadingLabel,
   onTrash,
   empty,
@@ -66,6 +68,8 @@ export function DrawingGallery({
   limit?: number
   /** Grid order — browse's sort dropdown; everywhere else keeps Recent. */
   sort?: SortOrder
+  /** The browse search; cards found by scene text show the matching words. */
+  query?: string
   /** Accessible name for the loading grid. */
   loadingLabel: string
   /** Card overflow action "Move to trash" (spec §5.11): tier-1 destructive,
@@ -111,6 +115,7 @@ export function DrawingGallery({
           folder={
             drawing.folderId ? foldersById.get(drawing.folderId) : undefined
           }
+          query={query}
           onTrash={() => onTrash(drawing)}
         />
       ))}
@@ -152,12 +157,21 @@ export function LoadingGrid({
 function DrawingCard({
   drawing,
   folder,
+  query,
   onTrash,
 }: {
   drawing: Drawing
   folder?: Folder
+  query: string
   onTrash: () => void
 }) {
+  // A title match explains itself; only a scene-text match needs a snippet
+  const snippet = drawing.name
+    .toLowerCase()
+    .includes(query.trim().toLowerCase())
+    ? null
+    : findInScene(drawing, query)
+
   return (
     <div
       className={cn(
@@ -180,6 +194,11 @@ function DrawingCard({
           <span className="truncate text-[13px] font-medium text-foreground">
             {drawing.name}
           </span>
+          {snippet && (
+            <span className="truncate text-xs text-muted-foreground">
+              {snippet}
+            </span>
+          )}
           <span className="flex items-center gap-1 text-xs text-muted-foreground">
             {folder && (
               <>

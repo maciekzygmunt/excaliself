@@ -43,6 +43,19 @@ describe("filterDrawings", () => {
     expect(filterDrawings(all, { query: "   ", scope: "all" })).toEqual(all)
   })
 
+  test("query also matches text inside the scene", () => {
+    const flow = makeDrawing({
+      id: "d4",
+      name: "Untitled",
+      data: JSON.stringify({
+        elements: [{ type: "text", text: "Login flow" }],
+      }),
+    })
+    expect(
+      filterDrawings([...all, flow], { query: "login", scope: "all" }),
+    ).toEqual([flow])
+  })
+
   test("Unfiled scope keeps only drawings without a folder", () => {
     expect(filterDrawings(all, { query: "", scope: "unfiled" })).toEqual([
       sketch,

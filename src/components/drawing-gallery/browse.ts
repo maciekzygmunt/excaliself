@@ -1,4 +1,5 @@
 import type { Drawing } from "@/features/drawings/queries"
+import { findInScene } from "@/features/drawings/search"
 
 /** Sort orders offered by the browse toolbar (spec §5.2). */
 export type SortOrder = "last-edited" | "date-created" | "name"
@@ -46,7 +47,8 @@ export function compareDrawings(
   }
 }
 
-/** On-page grid filter: name substring search composed with a folder scope. */
+/** On-page grid filter: substring search over the name and the scene's text,
+ * composed with a folder scope. */
 export function filterDrawings(
   drawings: Drawing[],
   { query, scope }: { query: string; scope: GalleryScope },
@@ -56,6 +58,10 @@ export function filterDrawings(
   return drawings.filter((drawing) => {
     if (scope === "unfiled" && drawing.folderId !== null) return false
     if (folderId !== null && drawing.folderId !== folderId) return false
-    return needle === "" || drawing.name.toLowerCase().includes(needle)
+    return (
+      needle === "" ||
+      drawing.name.toLowerCase().includes(needle) ||
+      findInScene(drawing, needle) !== null
+    )
   })
 }

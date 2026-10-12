@@ -369,6 +369,23 @@ test("drawing matches rank best match first, not cache order", () => {
   expect(optionLabels()).toEqual(["Map", "Roadmap sketches"])
 })
 
+test("scene-text matches follow title matches and show the matching words", () => {
+  const input = renderOpenPalette({
+    drawings: [
+      makeDrawing({
+        id: "d1",
+        name: "Architecture",
+        data: JSON.stringify({
+          elements: [{ type: "text", text: "Roadmap review" }],
+        }),
+      }),
+      makeDrawing({ id: "d2", name: "Roadmap" }),
+    ],
+  })
+  fireEvent.change(input, { target: { value: "roadmap" } })
+  expect(optionLabels()).toEqual(["Roadmap", "ArchitectureRoadmap review"])
+})
+
 test("selecting a drawing opens it and closes the palette", () => {
   const input = renderOpenPalette({
     drawings: [makeDrawing({ id: "d1", name: "Roadmap" })],
