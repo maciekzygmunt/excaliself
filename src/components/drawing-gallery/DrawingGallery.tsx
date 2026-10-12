@@ -51,6 +51,7 @@ export function DrawingGallery({
   isPending,
   limit,
   sort = DEFAULT_SORT,
+  query,
   loadingLabel,
   onTrash,
   empty,
@@ -66,6 +67,8 @@ export function DrawingGallery({
   limit?: number
   /** Grid order — browse's sort dropdown; everywhere else keeps Recent. */
   sort?: SortOrder
+  /** The browse search, so title matches sort ahead of scene-text matches. */
+  query?: string
   /** Accessible name for the loading grid. */
   loadingLabel: string
   /** Card overflow action "Move to trash" (spec §5.11): tier-1 destructive,
@@ -80,9 +83,9 @@ export function DrawingGallery({
   const showSkeleton = useDelayedVisible(isPending)
 
   const sorted = useMemo(() => {
-    const ordered = [...drawings].sort(compareDrawings(sort))
+    const ordered = [...drawings].sort(compareDrawings(sort, query))
     return limit === undefined ? ordered : ordered.slice(0, limit)
-  }, [drawings, limit, sort])
+  }, [drawings, limit, sort, query])
 
   const foldersById = useMemo(
     () => new Map((folders ?? []).map((folder) => [folder.id, folder])),

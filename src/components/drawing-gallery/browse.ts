@@ -1,4 +1,5 @@
 import type { Drawing } from "@/features/drawings/queries"
+import { findInScene } from "@/features/drawings/search"
 
 /** Sort orders offered by the browse toolbar (spec §5.2). */
 export type SortOrder = "last-edited" | "date-created" | "name"
@@ -33,9 +34,9 @@ const byName = new Intl.Collator(undefined, {
   numeric: true,
 })
 
-export function compareDrawings(
-  sort: SortOrder,
-): (a: Drawing, b: Drawing) => number {
+type Comparator = (a: Drawing, b: Drawing) => number
+
+function bySortOrder(sort: SortOrder): Comparator {
   switch (sort) {
     case "last-edited":
       return (a, b) => timestamp(b.updatedAt) - timestamp(a.updatedAt)
@@ -46,7 +47,23 @@ export function compareDrawings(
   }
 }
 
-/** On-page grid filter: name substring search composed with a folder scope. */
+function nameMatches(drawing: Drawing, needle: string) {
+  return drawing.name.toLowerCase().includes(needle)
+}
+
+/** Grid order. While searching, title matches lead scene-text matches; each
+ * group keeps the sort order. */
+export function compareDrawings(sort: SortOrder, query = ""): Comparator {
+  const order = bySortOrder(sort)
+  const needle = query.trim().toLowerCase()
+  if (needle === "") return order
+  return (a, b) =>
+    Number(nameMatches(b, needle)) - Number(nameMatches(a, needle)) ||
+    order(a, b)
+}
+
+/** On-page grid filter: substring search over the name and the scene's text,
+ * composed with a folder scope. */
 export function filterDrawings(
   drawings: Drawing[],
   { query, scope }: { query: string; scope: GalleryScope },
@@ -56,6 +73,10 @@ export function filterDrawings(
   return drawings.filter((drawing) => {
     if (scope === "unfiled" && drawing.folderId !== null) return false
     if (folderId !== null && drawing.folderId !== folderId) return false
-    return needle === "" || drawing.name.toLowerCase().includes(needle)
+    return (
+      needle === "" ||
+      nameMatches(drawing, needle) ||
+      findInScene(drawing, needle) !== null
+    )
   })
 }

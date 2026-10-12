@@ -81,6 +81,7 @@ export function FolderPage({ folderId }: { folderId: string }) {
           drawings={filtered}
           isPending={isPending}
           sort={sort}
+          query={query}
           loadingLabel="Loading drawings"
           onTrash={trashDrawing}
           empty={
