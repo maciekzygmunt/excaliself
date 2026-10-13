@@ -1,5 +1,7 @@
-import { Excalidraw, MainMenu } from "@excalidraw/excalidraw"
+import { Excalidraw, MainMenu, useDevice } from "@excalidraw/excalidraw"
 import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types"
+import { useNavigate } from "@tanstack/react-router"
+import { LogInIcon } from "lucide-react"
 import { useCallback, useMemo, useState } from "react"
 import {
   FooterRightPortal,
@@ -50,8 +52,13 @@ export function SharedCanvas({
   onLinkDead,
   onSceneUnreadable,
 }: Props) {
+  // The owner's view doesn't fit a phone, so open on the content instead.
   const initialData = useMemo(
-    () => buildInitialSceneData({ data: drawing.data, files }).initialData,
+    () =>
+      buildInitialSceneData(
+        { data: drawing.data, files },
+        { width: window.innerWidth, height: window.innerHeight },
+      ).initialData,
     [drawing.data, files],
   )
   // Already stored, so this tab must not upload them again.
@@ -124,6 +131,11 @@ export function SharedCanvas({
       >
         {/* A custom menu replaces the default, so its items are restated. */}
         <MainMenu>
+          {/* Stands in for the top-left title where that one is hidden. */}
+          <div className="lg:hidden">
+            <GuestTitle name={drawing.name} className="px-2 py-2" />
+            <MainMenu.Separator />
+          </div>
           <MenuReconnecting
             status={room.connectionStatus}
             className={PRESENCE_MENU_ROW_CLASS}
@@ -139,6 +151,7 @@ export function SharedCanvas({
             />
             <MainMenu.Separator />
           </div>
+          {isGuest && <MenuSignIn token={token} />}
           <MainMenu.DefaultItems.Export />
           <MainMenu.DefaultItems.SaveAsImage />
           <MainMenu.DefaultItems.SearchMenu />
@@ -149,7 +162,7 @@ export function SharedCanvas({
           </MainMenu.Group>
         </MainMenu>
         <TopLeftPortal>
-          <GuestTitle name={drawing.name} />
+          <GuestTitle name={drawing.name} className="hidden lg:flex" />
         </TopLeftPortal>
         <FooterRightPortal>
           <GuestAttribution token={token} showSignIn={isGuest} />
@@ -158,6 +171,22 @@ export function SharedCanvas({
       {/* Outside Excalidraw so the ring sits above portaled chrome. */}
       <FollowModeOverlay room={room} />
     </div>
+  )
+}
+
+// The mobile layout drops the footer and its Sign in link, so it moves here.
+function MenuSignIn({ token }: { token: string }) {
+  const navigate = useNavigate()
+  if (!useDevice().editor.isMobile) return null
+  return (
+    <MainMenu.Item
+      icon={<LogInIcon className="h-4 w-4" />}
+      onSelect={() =>
+        navigate({ to: "/login", search: { redirect: `/share/${token}` } })
+      }
+    >
+      Sign in
+    </MainMenu.Item>
   )
 }
 

@@ -1,8 +1,11 @@
 import {
   CaptureUpdateAction,
+  getCommonBounds,
+  getNonDeletedElements,
   hashString,
   restore,
   serializeAsJSON,
+  zoomToFitBounds,
 } from "@excalidraw/excalidraw"
 import type { ExcalidrawElement } from "@excalidraw/excalidraw/element/types"
 import type {
@@ -144,8 +147,13 @@ function parseSceneData(raw: string | undefined | null): {
   }
 }
 
+/**
+ * `fitTo` opens the view centered on the content, zoomed out to fit that
+ * viewport. Saved scenes carry no scroll or zoom, so it opens at the origin.
+ */
 export function buildInitialSceneData(
   drawing: { data: string; files?: PersistedFile[] | null } | null | undefined,
+  fitTo?: { width: number; height: number },
 ): { initialData: ExcalidrawInitialDataState; isDataCorrupt: boolean } {
   const files = toBinaryFiles(drawing?.files)
   const { parsed, isCorrupt } = parseSceneData(drawing?.data)
@@ -159,6 +167,17 @@ export function buildInitialSceneData(
   // JSON persistence flattens collaborators to a plain object; Excalidraw
   // requires a Map.
   restored.appState.collaborators = new Map()
+  const elements = fitTo ? getNonDeletedElements(restored.elements) : []
+  if (fitTo && elements.length > 0) {
+    // Without fitToViewport it never zooms in past 100%.
+    const { scrollX, scrollY, zoom } = zoomToFitBounds({
+      appState: { ...restored.appState, ...fitTo, offsetTop: 0, offsetLeft: 0 },
+      bounds: getCommonBounds(elements),
+      fitToViewport: false,
+      viewportZoomFactor: 0.9,
+    }).appState
+    restored.appState = { ...restored.appState, scrollX, scrollY, zoom }
+  }
   return { initialData: { ...restored, files }, isDataCorrupt: isCorrupt }
 }
 
