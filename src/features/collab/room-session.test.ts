@@ -16,6 +16,7 @@ import {
   receiveFromPeer,
   type SceneLoader,
   type SceneSaver,
+  sweepSilentParticipants,
   terminateRoom,
 } from "./room-session"
 
@@ -888,6 +889,61 @@ test("a forgotten peer is told to rejoin rather than answered", async () => {
 
   expect(outcome).toBe("evicted")
   expect(ghost.sent).toEqual([])
+})
+
+test("the sweep drops a silent peer without anyone joining", async () => {
+  // A closed laptop lid: no close frame ever comes, and nobody else joins.
+  const { registry, advance } = clockedRegistry()
+  const ada = fakePeer("peer-ada")
+  const ghost = fakePeer("peer-ghost")
+  await joinRoom(registry, ROOM, ada, member("Ada"))
+  await joinRoom(registry, ROOM, ghost, member("Wren"))
+
+  advance(PARTICIPANT_IDLE_TIMEOUT_MS - 1)
+  await receiveFromPeer(registry, ROOM, ada, '{"type":"PING","payload":{}}')
+  advance(2)
+  await sweepSilentParticipants(registry)
+
+  expect(rosterOf(ada.sent.at(-1))).toEqual(["Ada"])
+  expect(ghost.closes).toEqual([{ code: 1000, reason: "Rejoin" }])
+  expect(ada.closes).toEqual([])
+  expect([...(registry.rooms.get(ROOM)?.seats.keys() ?? [])]).toEqual([
+    "peer-ada",
+  ])
+})
+
+test("the sweep leaves a room alone while everyone is still talking", async () => {
+  const { registry, advance } = clockedRegistry()
+  const ada = fakePeer("peer-ada")
+  await joinRoom(registry, ROOM, ada, member("Ada"))
+  const frames = ada.sent.length
+
+  advance(PARTICIPANT_IDLE_TIMEOUT_MS - 1)
+  await sweepSilentParticipants(registry)
+
+  expect(ada.sent).toHaveLength(frames)
+  expect(ada.closes).toEqual([])
+})
+
+test("a sweep that empties the room writes the scene and takes the room with it", async () => {
+  let clock = 1_000_000
+  const writes: string[][] = []
+  const registry = createRoomRegistry(
+    async () => ({ elements: [], ownerId: null, readable: true }),
+    async (_, elements) => {
+      writes.push(elements.map((el) => el.id))
+    },
+    () => clock,
+  )
+  const ghost = fakePeer("peer-ghost")
+  await joinRoom(registry, ROOM, ghost, guest)
+  await receiveFromPeer(registry, ROOM, ghost, sceneUpdate([element("g", 1)]))
+
+  clock += PARTICIPANT_IDLE_TIMEOUT_MS + 1
+  await sweepSilentParticipants(registry)
+
+  expect(writes).toEqual([["g"]])
+  expect(registry.rooms.has(ROOM)).toBe(false)
 })
 
 test("a seated peer's heartbeat is answered and holds its seat", async () => {

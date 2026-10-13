@@ -211,15 +211,53 @@ export const MAX_ROOM_PARTICIPANTS = 25
 /** About 3.5 missed heartbeats. */
 export const PARTICIPANT_IDLE_TIMEOUT_MS = 90_000
 
-/**
- * Ghost seats would fill the cap and refuse a reconnect. Swept on join, the
- * only time they cost anything; never reaps, as the joiner takes a seat next.
- */
-function forgetSilentParticipants(room: Room, now: number) {
+/** How often `sweepSilentParticipants` runs. */
+export const PARTICIPANT_SWEEP_INTERVAL_MS = 30_000
+
+/** Drops seats silent past the timeout; returns their peers to close. */
+function forgetSilentParticipants(room: Room, now: number): RoomPeer[] {
+  const silent: RoomPeer[] = []
   for (const [connectionId, seat] of room.seats) {
     if (now - seat.lastSeenAt < PARTICIPANT_IDLE_TIMEOUT_MS) continue
     forgetConnection(room, connectionId)
+    silent.push(seat.peer)
   }
+  return silent
+}
+
+/** Matches the ws route's eviction close, so a live client rejoins. */
+const closeToRejoin = (peer: RoomPeer) => peer.close(1000, "Rejoin")
+
+/**
+ * Ghost seats (a socket that died without a close) would hold a seat, the
+ * roster and the live badge. Runs on a timer, so nobody has to join first.
+ */
+export async function sweepSilentParticipants(
+  registry: RoomRegistry,
+): Promise<void> {
+  const now = registry.now()
+  await Promise.all(
+    [...registry.rooms.values()].map(async (room) => {
+      const silent = forgetSilentParticipants(room, now)
+      if (silent.length === 0) return
+      await settleAfterForget(registry, room)
+      for (const peer of silent) closeToRejoin(peer)
+    }),
+  )
+}
+
+/**
+ * After seats were dropped without their own close: last-leave if empty,
+ * else the new roster. Sent, not published: the dropped peers can't fan out.
+ */
+async function settleAfterForget(registry: RoomRegistry, room: Room) {
+  if (room.seats.size === 0) {
+    await flushRoom(registry, room)
+    reapIfIdle(registry, room)
+    return
+  }
+  const message = rosterMessage(room)
+  for (const { peer } of room.seats.values()) peer.send(message)
 }
 
 function forgetConnection(room: Room, connectionId: string) {
@@ -243,12 +281,19 @@ export async function joinRoom(
   // Before `ensureRoom`, so a refused join creates no Room and no read.
   const existing = registry.rooms.get(roomId)
   if (existing) {
-    forgetSilentParticipants(existing, registry.now())
+    // Also swept on join, so a full Room never waits on the timer. The
+    // joiner's own roster publish tells the others.
+    const silent = forgetSilentParticipants(existing, registry.now())
+    for (const peer of silent) closeToRejoin(peer)
     // Everyone else stops one short, so guests can't lock the owner out.
     const isOwner =
       identity.userId !== null && identity.userId === existing.ownerId
     const cap = isOwner ? MAX_ROOM_PARTICIPANTS : MAX_ROOM_PARTICIPANTS - 1
-    if (existing.seats.size >= cap) return { status: "full" }
+    if (existing.seats.size >= cap) {
+      // No joiner publish follows, so tell the others here.
+      if (silent.length > 0) await settleAfterForget(registry, existing)
+      return { status: "full" }
+    }
   }
 
   const room = ensureRoom(registry, roomId)
@@ -511,15 +556,6 @@ export async function evictNonMembers(
   }
   if (evicted.length === 0) return
 
-  if (room.seats.size === 0) {
-    // Guests were everyone: this is last-leave.
-    await flushRoom(registry, room)
-    reapIfIdle(registry, room)
-  } else {
-    // Sent, not published: the publishing peers are the ones being closed.
-    const message = rosterMessage(room)
-    for (const { peer } of room.seats.values()) peer.send(message)
-  }
-
+  await settleAfterForget(registry, room)
   for (const peer of evicted) closeAsDead(peer)
 }

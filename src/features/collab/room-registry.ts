@@ -5,7 +5,9 @@ import { processSingleton } from "@/lib/process-singleton"
 import {
   createRoomRegistry,
   flushAllRooms,
+  PARTICIPANT_SWEEP_INTERVAL_MS,
   type RoomRegistry,
+  sweepSilentParticipants,
   terminateRoom,
 } from "./room-session"
 import { loadRoomScene, saveRoomScene } from "./scene-store"
@@ -18,6 +20,11 @@ export const rooms: RoomRegistry = processSingleton("collab-rooms", () => {
     (roomId, elements) => saveRoomScene(db, roomId, elements),
   )
   registerShutdownFlush(() => flushAllRooms(registry))
+  // Unref'd, so it never holds the process open.
+  setInterval(
+    () => void sweepSilentParticipants(registry),
+    PARTICIPANT_SWEEP_INTERVAL_MS,
+  ).unref()
   return registry
 })
 
