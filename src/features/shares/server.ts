@@ -8,18 +8,19 @@ import {
 } from "@tanstack/react-start/server"
 import { z } from "zod"
 import { db } from "@/db"
-import { rooms } from "@/features/collab/room-registry"
+import { endRooms, rooms } from "@/features/collab/room-registry"
+import { evictNonMembers } from "@/features/collab/room-session"
 import { auth } from "@/lib/auth"
 import { authMiddleware } from "@/middleware/auth"
-// Namespaced because the three server functions below carry the same domain
-// verbs — which is the point: this is that operation, with what it owes the
-// running Room attached.
-import * as lifecycle from "./lifecycle"
+import { admitsGuests } from "./access"
 import {
   createShareLink,
   getShareLink,
+  regenerateShareLink,
   resolveShareVisit,
   type ShareResolution,
+  setShareLinkAudience,
+  stopSharingDrawing,
 } from "./store"
 import { allowTokenValidation } from "./token-rate-limit"
 
@@ -39,38 +40,44 @@ export const createShare = createServerFn({ method: "POST" })
     createShareLink(db, context.session.user.id, data.drawingId, data.audience),
   )
 
-// The three mutations that act on a *live* link go through `lifecycle.ts`,
-// which pairs each database write with what it owes the running Room — the
-// final flush and the evictions of spec §4.2. Each one only answers its
-// client once that has happened, so the owner's tab never resumes classic
-// autosave while the Room is still writing (spec §5.5).
+// Each mutation below writes the row first, then updates the live Room. In
+// that order, a socket that joins between the two steps cannot keep its seat.
 
 export const stopSharing = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
   .validator(z.string())
   .handler(async ({ data: drawingId, context }) => {
-    await lifecycle.stopSharing(db, rooms, context.session.user.id, drawingId)
+    await stopSharingDrawing(db, context.session.user.id, drawingId)
+    await endRooms([drawingId])
   })
 
 export const regenerateShare = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
   .validator(z.string())
-  .handler(async ({ data: drawingId, context }) =>
-    lifecycle.regenerateShare(db, rooms, context.session.user.id, drawingId),
-  )
+  .handler(async ({ data: drawingId, context }) => {
+    const share = await regenerateShareLink(
+      db,
+      context.session.user.id,
+      drawingId,
+    )
+    await endRooms([drawingId])
+    return share
+  })
 
 export const setShareAudience = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
   .validator(z.object({ drawingId: z.string(), audience: audienceSchema }))
-  .handler(async ({ data, context }) =>
-    lifecycle.setShareAudience(
+  .handler(async ({ data, context }) => {
+    const share = await setShareLinkAudience(
       db,
-      rooms,
       context.session.user.id,
       data.drawingId,
       data.audience,
-    ),
-  )
+    )
+    if (!admitsGuests(share.audience))
+      await evictNonMembers(rooms, data.drawingId)
+    return share
+  })
 
 /**
  * What the /share/$token loader gets back. `throttled` is the limiter's
