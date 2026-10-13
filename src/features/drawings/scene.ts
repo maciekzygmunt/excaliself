@@ -155,7 +155,7 @@ export function useSaveScenePayload(id: string) {
         await queryClient.invalidateQueries({
           queryKey: drawingShareQueryOptions(id).queryKey,
         })
-        return { committed: false }
+        return "skipped"
       }
       // Mirror the committed payload into the caches instead of invalidating:
       // refetching the detail query would re-download every base64 blob the
@@ -189,6 +189,7 @@ export function useSaveScenePayload(id: string) {
             : drawing,
         ),
       )
+      return "saved"
     },
     [id, queryClient],
   )

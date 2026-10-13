@@ -6,14 +6,11 @@ const DEBOUNCE_MS = 300
 const SAVED_INDICATOR_MS = 2000
 
 /**
- * What `onSave` may report back. `{ committed: false }` means the server
- * accepted the call but stored nothing (a drawing that has moved to the collab
- * socket, canvas sharing spec §5.5) — the hook then neither claims "Saved" nor
- * treats that payload as the state on disk, so whatever makes writes possible
- * again saves it for real. Anything else, `undefined` included, is a save.
+ * What `onSave` reports. "skipped" means the server stored nothing (the
+ * drawing moved to the collab socket): no "Saved", and the payload is saved
+ * again once writes work.
  */
-// biome-ignore lint/suspicious/noConfusingVoidType: most savers return nothing, and `void` is the only type an async function with no return statement satisfies
-export type SaveOutcome = { committed?: boolean } | void
+export type SaveOutcome = "saved" | "skipped"
 
 type Options<TData, TPayload> = {
   /** Build the exact payload that gets persisted. Runs once per save attempt. */
@@ -75,7 +72,7 @@ export function useAutoSave<TData, TPayload>({
       // A call that stored nothing is not a save: claiming "Saved" would be a
       // lie, and recording its signature would let the dedup skip the state
       // later, once writing is possible again.
-      if (result?.committed !== false) {
+      if (result === "saved") {
         lastSavedSigRef.current = sig
         setSaved(true)
       }

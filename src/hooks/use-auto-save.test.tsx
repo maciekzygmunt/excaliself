@@ -18,7 +18,8 @@ function Harness({
   paused = false,
   skipInitialChange = false,
 }: {
-  onSave: (payload: string) => Promise<SaveOutcome>
+  /** Anything but "skipped" counts as "saved". */
+  onSave: (payload: string) => Promise<unknown>
   onChangeRef: { current: ((data: string) => void) | null }
   flushRef?: { current: (() => Promise<void>) | null }
   savedRef?: { current: boolean }
@@ -29,7 +30,8 @@ function Harness({
   const { handleChange, flush, saved } = useAutoSave<string, string>({
     toPayload: (d) => d,
     getSignature: (p) => p,
-    onSave,
+    onSave: async (payload) =>
+      (await onSave(payload)) === "skipped" ? "skipped" : "saved",
     onError,
     paused,
     skipInitialChange,
@@ -322,7 +324,7 @@ test("flush with nothing outstanding resolves immediately", async () => {
 // not become the signature the dedup compares against, or the state would be
 // skipped once writing is possible again.
 test("a write that stored nothing neither claims Saved nor counts as committed", async () => {
-  const onSave = vi.fn(async () => ({ committed: false }))
+  const onSave = vi.fn(async (): Promise<SaveOutcome> => "skipped")
   const onChangeRef = { current: null as ((data: string) => void) | null }
   const savedRef = { current: false }
   const flushRef = { current: null as (() => Promise<void>) | null }
@@ -345,7 +347,7 @@ test("a write that stored nothing neither claims Saved nor counts as committed",
   expect(savedRef.current).toBe(false)
 
   // Writing works again; the same state must go out rather than be deduped.
-  onSave.mockImplementation(async () => ({ committed: true }))
+  onSave.mockImplementation(async () => "saved")
   act(() => onChangeRef.current?.("refused"))
   await act(async () => {
     await flushRef.current?.()
@@ -401,7 +403,7 @@ test("flush retries a failed save instead of rethrowing the old failure", async 
     await expect(flushRef.current?.()).rejects.toThrow("network down")
   })
 
-  onSave.mockImplementation(async () => {})
+  onSave.mockImplementation(async () => "saved")
   await act(async () => {
     await flushRef.current?.()
   })
