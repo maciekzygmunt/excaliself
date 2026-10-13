@@ -284,6 +284,13 @@ code {
   display: none;
 }
 
+/* While following, the leader drives the viewport, so "Scroll back to
+   content" only jumps until their next pan — and it sat on top of the
+   follow chip. The chip is the way out. */
+.excalidraw:has(div.follow-mode) .scroll-back-to-content {
+  display: none;
+}
+
 /* Same for Excalidraw's collaborator list, in the top row and the mobile
    menu: our avatars and menu rows replace it. */
 .excalidraw div.UserList__wrapper,
