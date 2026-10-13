@@ -13,24 +13,14 @@
  */
 
 import { clientIpKey } from "@/lib/client-ip"
-import { createRateLimiter, type RateLimiter } from "@/lib/rate-limit"
+import { processSingleton } from "@/lib/process-singleton"
+import { createRateLimiter } from "@/lib/rate-limit"
 
 export const IMAGE_UPLOADS_PER_MINUTE = 30
 
-/**
- * Registered on `globalThis` for the same reason the token limiter is: the
- * build splits the app across bundles, and a plain module-level `const` would
- * hand each output a budget of its own.
- */
-const LIMITER = Symbol.for("excaliself.room-upload-rate-limit")
-type Host = typeof globalThis & { [LIMITER]?: RateLimiter }
-
-const host = globalThis as Host
-host[LIMITER] ??= createRateLimiter({
-  limit: IMAGE_UPLOADS_PER_MINUTE,
-  windowMs: 60_000,
-})
-const limiter: RateLimiter = host[LIMITER]
+const limiter = processSingleton("room-upload-rate-limit", () =>
+  createRateLimiter({ limit: IMAGE_UPLOADS_PER_MINUTE, windowMs: 60_000 }),
+)
 
 /** Counts one upload for this IP in this room and says whether to serve it. */
 export function allowImageUpload(
