@@ -1,11 +1,15 @@
 import { expect, test, vi } from "vitest"
 import { guestNameForConnection } from "./identity"
 import type { SceneElement, ServerMessage } from "./protocol"
-import { LINK_DEAD_CLOSE_CODE, ROOM_TOPIC } from "./protocol"
 import {
+  LINK_DEAD_CLOSE_CODE,
+  ROOM_TOPIC,
+  SERVER_RESTART_CLOSE_CODE,
+} from "./protocol"
+import {
+  closeAllRooms,
   createRoomRegistry,
   evictNonMembers,
-  flushAllRooms,
   joinRoom,
   leaveRoom,
   MAX_ROOM_PARTICIPANTS,
@@ -1143,7 +1147,7 @@ test("a failed write is retried, and the empty room stays until it lands", async
   }
 })
 
-test("flushAllRooms writes every room holding unsaved work", async () => {
+test("shutdown writes every room holding unsaved work, then asks peers to reconnect", async () => {
   const registry = recordingRegistry()
   const ada = fakePeer("peer-ada")
   const grace = fakePeer("peer-grace")
@@ -1162,11 +1166,59 @@ test("flushAllRooms writes every room holding unsaved work", async () => {
     sceneUpdate([element("b", 1)]),
   )
 
-  await flushAllRooms(registry)
+  await closeAllRooms(registry)
 
   expect(registry.writes.map(idsOf).sort()).toEqual([["a"], ["b"]])
-  // The process is going away; the sockets close with it.
-  expect(registry.rooms.size).toBe(2)
+  // Not the dead-link code: the client must retry and reach the new process.
+  for (const peer of [ada, grace])
+    expect(peer.closes.map((c) => c.code)).toEqual([SERVER_RESTART_CLOSE_CODE])
+})
+
+test("an edit sent during the shutdown write is refused, so its sender keeps it", async () => {
+  let finishSave: (() => void) | undefined
+  const saveFinished = new Promise<void>((resolve) => {
+    finishSave = resolve
+  })
+  const registry = recordingRegistry([], () => saveFinished)
+  const ada = fakePeer("peer-ada")
+  const grace = fakePeer("peer-grace")
+  await joinRoom(registry, ROOM, ada, member("Ada"))
+  await joinRoom(registry, ROOM, grace, guest)
+  await receiveFromPeer(registry, ROOM, ada, sceneUpdate([element("a", 1)]))
+
+  const closing = closeAllRooms(registry)
+  const outcome = await receiveFromPeer(
+    registry,
+    ROOM,
+    ada,
+    sceneUpdate([element("late", 1)]),
+  )
+  finishSave?.()
+  await closing
+
+  // Not merged, so nobody heard it and nothing in memory is left unwritten.
+  expect(outcome).toBe("evicted")
+  expect(
+    ada.published.flatMap(({ data }) =>
+      data.type === "SCENE_UPDATE" ? idsOf(data.payload.elements) : [],
+    ),
+  ).toEqual(["a"])
+  expect(registry.writes.map(idsOf)).toEqual([["a"]])
+  expect(registry.rooms.size).toBe(0)
+})
+
+test("a join during shutdown is refused and starts no room", async () => {
+  const registry = recordingRegistry()
+  const closing = closeAllRooms(registry)
+
+  const ada = fakePeer("peer-ada")
+  expect(await joinRoom(registry, ROOM, ada, member("Ada"))).toEqual({
+    status: "closing",
+  })
+  await closing
+
+  expect(ada.sent).toEqual([])
+  expect(registry.rooms.size).toBe(0)
 })
 
 test("a rejoin during the final write keeps the room alive", async () => {

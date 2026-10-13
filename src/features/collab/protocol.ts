@@ -11,6 +11,11 @@ export const LINK_DEAD_CLOSE_CODE = 4010
 
 export const LINK_DEAD_CLOSE_REASON = "Link no longer active"
 
+/** Standard "Service Restart". The client retries it like any outage. */
+export const SERVER_RESTART_CLOSE_CODE = 1012
+
+export const SERVER_RESTART_CLOSE_REASON = "Server restarting"
+
 /** Excalidraw's `Collaborator["color"]` shape. */
 export type ParticipantColor = { background: string; stroke: string }
 

@@ -1,4 +1,4 @@
-// Flush every Room on SIGTERM. Never exit here: srvx has its own handler
+// Flush and close every Room on SIGTERM. Never exit here: srvx has its own handler
 // that drains in-flight requests, and exiting would cut that short.
 
 /** The slice of `process` this needs. */

@@ -8,6 +8,8 @@ import {
   LINK_DEAD_CLOSE_REASON,
   parseClientMessage,
   ROOM_TOPIC,
+  SERVER_RESTART_CLOSE_CODE,
+  SERVER_RESTART_CLOSE_REASON,
 } from "./protocol"
 import { reconcileElements } from "./reconcile"
 import type { StoredScene } from "./scene-store"
@@ -74,6 +76,8 @@ export type RoomRegistry = {
   saveScene: SceneSaver
   /** Injected for the ghost sweep. */
   now: () => number
+  /** Set on shutdown: joins are refused from then on. */
+  closing: boolean
 }
 
 export function createRoomRegistry(
@@ -86,6 +90,7 @@ export function createRoomRegistry(
     loadScene,
     saveScene,
     now,
+    closing: false,
   }
 }
 
@@ -183,10 +188,18 @@ function flushRoom(registry: RoomRegistry, room: Room): Promise<void> {
   return room.flushing
 }
 
-/** Final write for shutdown. Rooms stay put; the process is going away. */
-export async function flushAllRooms(registry: RoomRegistry): Promise<void> {
+/**
+ * Shutdown: refuse joins, then end every Room. Edits after the final write
+ * are refused, so they stay on the client and are re-sent after the restart.
+ */
+export async function closeAllRooms(registry: RoomRegistry): Promise<void> {
+  registry.closing = true
   await Promise.all(
-    [...registry.rooms.values()].map((room) => flushRoom(registry, room)),
+    [...registry.rooms.keys()].map((roomId) =>
+      endRoom(registry, roomId, (peer) =>
+        peer.close(SERVER_RESTART_CLOSE_CODE, SERVER_RESTART_CLOSE_REASON),
+      ),
+    ),
   )
 }
 
@@ -270,7 +283,10 @@ function forgetConnection(room: Room, connectionId: string) {
   if (wasFollowing) sendFollowedBy(room, wasFollowing)
 }
 
-export type RoomJoinResult = { status: "ok" } | { status: "full" }
+export type RoomJoinResult =
+  | { status: "ok" }
+  | { status: "full" }
+  | { status: "closing" }
 
 export async function joinRoom(
   registry: RoomRegistry,
@@ -278,6 +294,9 @@ export async function joinRoom(
   peer: RoomPeer,
   identity: ParticipantIdentity,
 ): Promise<RoomJoinResult> {
+  // A Room made now would never get its final write.
+  if (registry.closing) return { status: "closing" }
+
   // Before `ensureRoom`, so a refused join creates no Room and no read.
   const existing = registry.rooms.get(roomId)
   if (existing) {
@@ -512,9 +531,18 @@ const closeAsDead = (peer: RoomPeer) =>
  * Stop, regenerate and trash all end here: freeze, write, then hang up. The
  * awaited write lets the owner resume autosave once the mutation resolves.
  */
-export async function terminateRoom(
+export function terminateRoom(
   registry: RoomRegistry,
   roomId: string,
+): Promise<void> {
+  return endRoom(registry, roomId, closeAsDead)
+}
+
+/** Freeze, write, then hang up each peer with `hangUp`. */
+async function endRoom(
+  registry: RoomRegistry,
+  roomId: string,
+  hangUp: (peer: RoomPeer) => void,
 ): Promise<void> {
   const room = registry.rooms.get(roomId)
   if (!room) return
@@ -531,7 +559,7 @@ export async function terminateRoom(
   await flushRoom(registry, room)
   reapIfIdle(registry, room)
 
-  for (const { peer } of seats) closeAsDead(peer)
+  for (const { peer } of seats) hangUp(peer)
 }
 
 /**

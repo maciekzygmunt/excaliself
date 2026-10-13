@@ -3,8 +3,8 @@
 import { db } from "@/db"
 import { processSingleton } from "@/lib/process-singleton"
 import {
+  closeAllRooms,
   createRoomRegistry,
-  flushAllRooms,
   PARTICIPANT_SWEEP_INTERVAL_MS,
   type RoomRegistry,
   sweepSilentParticipants,
@@ -13,13 +13,13 @@ import {
 import { loadRoomScene, saveRoomScene } from "./scene-store"
 import { registerShutdownFlush } from "./shutdown"
 
-/** One per process, so SIGTERM gets one flush handler, not one per bundle. */
+/** One per process, so SIGTERM gets one shutdown handler, not one per bundle. */
 export const rooms: RoomRegistry = processSingleton("collab-rooms", () => {
   const registry = createRoomRegistry(
     (roomId) => loadRoomScene(db, roomId),
     (roomId, elements) => saveRoomScene(db, roomId, elements),
   )
-  registerShutdownFlush(() => flushAllRooms(registry))
+  registerShutdownFlush(() => closeAllRooms(registry))
   // Unref'd, so it never holds the process open.
   setInterval(
     () => void sweepSilentParticipants(registry),

@@ -10,6 +10,8 @@ import {
   LINK_DEAD_CLOSE_CODE,
   LINK_DEAD_CLOSE_REASON,
   ROOM_FULL_CLOSE_CODE,
+  SERVER_RESTART_CLOSE_CODE,
+  SERVER_RESTART_CLOSE_REASON,
 } from "@/features/collab/protocol"
 import { rooms } from "@/features/collab/room-registry"
 import type { ParticipantIdentity } from "@/features/collab/room-session"
@@ -89,8 +91,10 @@ export default defineWebSocketHandler({
     }
     // The cap is checked here, not at the upgrade: a refused handshake
     // reaches the browser as an opaque 1006.
-    if ((await joining).status === "full")
-      peer.close(ROOM_FULL_CLOSE_CODE, "Room full")
+    const { status } = await joining
+    if (status === "full") peer.close(ROOM_FULL_CLOSE_CODE, "Room full")
+    if (status === "closing")
+      peer.close(SERVER_RESTART_CLOSE_CODE, SERVER_RESTART_CLOSE_REASON)
   },
 
   async message(peer, message) {
