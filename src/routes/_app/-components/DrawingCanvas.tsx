@@ -29,6 +29,7 @@ import {
   getScenePayloadSignature,
   selectOversizedImages,
   useDrawingScene,
+  useReloadSceneAfterRoom,
   useSaveScenePayload,
 } from "@/features/drawings/scene"
 import { drawingShareQueryOptions } from "@/features/shares/queries"
@@ -123,6 +124,11 @@ export function DrawingCanvas({ drawingId, readOnly = false }: Props) {
   // Autosave stays live until the share query answers; the server refuses the
   // write if the drawing is shared.
   const isShared = share != null && !readOnly
+  const reloadingScene = useReloadSceneAfterRoom(
+    drawingId,
+    isShared,
+    excalidrawAPI,
+  )
 
   // A corrupt stored scene opens as an empty canvas; pause autosave until the
   // user acknowledges, so the next save doesn't silently overwrite the data.
@@ -164,8 +170,9 @@ export function DrawingCanvas({ drawingId, readOnly = false }: Props) {
     skipInitialChange: true,
     // `readOnly` also unwires onChange below; pausing here is belt and
     // braces so no code path can flush a save for a trashed drawing.
-    // While shared the room saves; changes are still recorded for when it stops.
-    paused: autoSavePaused || readOnly || isShared,
+    // While shared the room saves; changes are still recorded for when it
+    // stops. After it stops, the stored scene replaces them first.
+    paused: autoSavePaused || readOnly || isShared || reloadingScene,
     onError: () => {
       toast.error("Failed to save drawing", { id: "drawing-save-error" })
     },

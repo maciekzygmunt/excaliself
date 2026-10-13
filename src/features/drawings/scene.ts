@@ -1,12 +1,19 @@
-import { hashString, restore, serializeAsJSON } from "@excalidraw/excalidraw"
+import {
+  CaptureUpdateAction,
+  hashString,
+  restore,
+  serializeAsJSON,
+} from "@excalidraw/excalidraw"
 import type { ExcalidrawElement } from "@excalidraw/excalidraw/element/types"
 import type {
   AppState,
   BinaryFiles,
+  ExcalidrawImperativeAPI,
   ExcalidrawInitialDataState,
 } from "@excalidraw/excalidraw/types"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
-import { useCallback, useMemo } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
+import { toast } from "sonner"
 import { parseFileUpload } from "@/features/collab/room-files"
 import { drawingShareQueryOptions } from "@/features/shares/queries"
 import { drawingQueryOptions, drawingsQueryOptions } from "./queries"
@@ -166,6 +173,64 @@ export function useDrawingScene(id: string) {
     initialData: scene?.initialData ?? null,
     isDataCorrupt: scene?.isDataCorrupt ?? false,
   }
+}
+
+/**
+ * After a room ends (link stopped, dead, or gone on reconnect), this tab's
+ * scene may be stale: guests drew while it slept. Loads the stored scene into
+ * the canvas. True from the render the share goes away until that lands;
+ * autosave must stay paused meanwhile, or the stale scene overwrites theirs.
+ */
+export function useReloadSceneAfterRoom(
+  drawingId: string,
+  isShared: boolean,
+  excalidrawAPI: ExcalidrawImperativeAPI | null,
+) {
+  const queryClient = useQueryClient()
+  const [wasShared, setWasShared] = useState(isShared)
+  const [reloading, setReloading] = useState(false)
+  // Set during render, so the same commit already holds autosave.
+  if (wasShared !== isShared) {
+    setWasShared(isShared)
+    if (!isShared) setReloading(true)
+  }
+
+  useEffect(() => {
+    if (!reloading || !excalidrawAPI) return
+    let cancelled = false
+    queryClient
+      .fetchQuery({ ...drawingQueryOptions(drawingId), staleTime: 0 })
+      .then(
+        (drawing) => {
+          // Gone: nothing to load, and nothing may be saved.
+          if (cancelled || !drawing) return
+          const { initialData, isDataCorrupt } = buildInitialSceneData(drawing)
+          // The corrupt-scene pause guards that case; don't blank the canvas.
+          if (!isDataCorrupt) {
+            excalidrawAPI.addFiles(Object.values(initialData.files ?? {}))
+            excalidrawAPI.updateScene({
+              elements: initialData.elements,
+              captureUpdate: CaptureUpdateAction.NEVER,
+            })
+          }
+          setReloading(false)
+        },
+        () => {
+          if (cancelled) return
+          toast.error("Couldn't load the latest version of this drawing", {
+            id: `scene-reload:${drawingId}`,
+            duration: Number.POSITIVE_INFINITY,
+            description:
+              "Your changes aren't being saved. Reload the page to continue.",
+          })
+        },
+      )
+    return () => {
+      cancelled = true
+    }
+  }, [reloading, excalidrawAPI, drawingId, queryClient])
+
+  return reloading
 }
 
 export function useSaveScenePayload(id: string) {

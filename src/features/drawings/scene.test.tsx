@@ -4,22 +4,34 @@
  */
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
-import { act, render } from "@testing-library/react"
+import { act, render, renderHook, waitFor } from "@testing-library/react"
 import type { ReactNode } from "react"
 import { expect, test, vi } from "vitest"
 import { drawingQueryOptions } from "./queries"
-import { type ScenePayload, useSaveScenePayload } from "./scene"
-import { saveDrawingScene } from "./server"
+import {
+  type ScenePayload,
+  useReloadSceneAfterRoom,
+  useSaveScenePayload,
+} from "./scene"
+import { getDrawingWithFiles, saveDrawingScene } from "./server"
 
 // `@excalidraw/excalidraw` can't be loaded outside the browser build; the
 // helpers this module imports from it are not on the path under test.
 vi.mock("@excalidraw/excalidraw", () => ({
+  CaptureUpdateAction: { NEVER: "NEVER" },
   hashString: (value: string) => value.length,
-  restore: () => ({ elements: [], appState: {}, files: {} }),
+  restore: (data: { elements?: unknown[] } | null) => ({
+    elements: data?.elements ?? [],
+    appState: {},
+    files: {},
+  }),
   serializeAsJSON: () => "{}",
 }))
 
-vi.mock("./server", () => ({ saveDrawingScene: vi.fn() }))
+vi.mock("./server", () => ({
+  getDrawingWithFiles: vi.fn(),
+  saveDrawingScene: vi.fn(),
+}))
 // Reached through the share query options; its module body opens the live db.
 vi.mock("@/features/shares/server", () => ({ getDrawingShare: vi.fn() }))
 
@@ -127,4 +139,65 @@ test("images the server reports missing are sent again", async () => {
 
   expect(sentFileIds(0)).toEqual([])
   expect(sentFileIds(1)).toEqual(["old"])
+})
+
+// A tab asleep while guests drew wakes to a dead link with its old scene.
+function renderReload() {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  })
+  const api = { addFiles: vi.fn(), updateScene: vi.fn() }
+  const hook = renderHook(
+    ({ isShared }) => useReloadSceneAfterRoom("d1", isShared, api as never),
+    {
+      initialProps: { isShared: true },
+      wrapper: ({ children }: { children: ReactNode }) => (
+        <QueryClientProvider client={queryClient}>
+          {children}
+        </QueryClientProvider>
+      ),
+    },
+  )
+  return { api, hook }
+}
+
+test("leaving a room holds autosave until the stored scene is on the canvas", async () => {
+  let answer = (_drawing: unknown) => {}
+  vi.mocked(getDrawingWithFiles).mockReturnValue(
+    new Promise((resolve) => {
+      answer = resolve
+    }) as never,
+  )
+  const { api, hook } = renderReload()
+  expect(hook.result.current).toBe(false)
+
+  hook.rerender({ isShared: false })
+  expect(hook.result.current).toBe(true)
+  expect(api.updateScene).not.toHaveBeenCalled()
+
+  answer({
+    ...DRAWING,
+    data: '{"elements":[{"id":"guest"}]}',
+    files: [file("img")],
+  })
+  await waitFor(() => expect(hook.result.current).toBe(false))
+  expect(api.addFiles).toHaveBeenCalledWith([
+    expect.objectContaining({ id: "img" }),
+  ])
+  expect(api.updateScene).toHaveBeenCalledWith({
+    elements: [{ id: "guest" }],
+    captureUpdate: "NEVER",
+  })
+})
+
+test("a failed reload keeps autosave held", async () => {
+  vi.mocked(getDrawingWithFiles).mockRejectedValue(new Error("offline"))
+  const { api, hook } = renderReload()
+
+  hook.rerender({ isShared: false })
+  await waitFor(() => expect(getDrawingWithFiles).toHaveBeenCalled())
+  await act(async () => {})
+
+  expect(hook.result.current).toBe(true)
+  expect(api.updateScene).not.toHaveBeenCalled()
 })
