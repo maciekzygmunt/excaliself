@@ -11,6 +11,8 @@ export type UploadOutcome =
   | "stored"
   /** 400/413/429: final, the image shows as errored. */
   | "refused"
+  /** 409: the drawing's image cap is full. Final, like `refused`. */
+  | "full"
   /** No verdict on the image (network, 5xx, 401); retryable. */
   | "failed"
 
@@ -25,6 +27,7 @@ export async function uploadRoomFile(
       body: JSON.stringify({ dataUrl: file.dataUrl }),
     })
     if (response.ok) return "stored"
+    if (response.status === 409) return "full"
     return IMAGE_VERDICTS.has(response.status) ? "refused" : "failed"
   } catch {
     return "failed"

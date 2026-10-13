@@ -5,7 +5,9 @@ import { and, eq, inArray, isNull, notExists, sql } from "drizzle-orm"
 import type { NodePgDatabase } from "drizzle-orm/node-postgres"
 import type * as schema from "@/db/schema"
 import { drawingFiles, drawings, shares } from "@/db/schema"
+import { storedImageBytes } from "@/features/collab/room-file-store"
 import {
+  MAX_DRAWING_IMAGE_BYTES,
   parseFileUpload,
   type RoomFileUpload,
 } from "@/features/collab/room-files"
@@ -19,7 +21,12 @@ export type SceneWriteResult =
    * `missingFileIds`: live images with no stored bytes that this save didn't
    * carry either — the client believed they were stored. It resends them.
    */
-  | { status: "saved"; missingFileIds: string[] }
+  | {
+      status: "saved"
+      missingFileIds: string[]
+      /** Not stored: over `MAX_DRAWING_IMAGE_BYTES`. The client flags them `error`. */
+      overCapFileIds: string[]
+    }
   /** Refused: the room owns the data. Not an error; the client joins it. */
   | { status: "shared" }
 
@@ -96,9 +103,7 @@ export async function writeDrawingScene(
     const fileIdsToRemove = referenced
       ? [...existingFileIds].filter((fileId) => !referenced.has(fileId))
       : []
-    const filesToInsert = files.filter(
-      (file) => !existingFileIds.has(file.fileId),
-    )
+    const newFiles = files.filter((file) => !existingFileIds.has(file.fileId))
 
     if (fileIdsToRemove.length > 0) {
       await tx
@@ -111,27 +116,43 @@ export async function writeDrawingScene(
         )
     }
 
-    if (filesToInsert.length > 0) {
-      await tx.insert(drawingFiles).values(
-        filesToInsert.map((file) => ({
-          id: randomUUID(),
-          drawingId: id,
-          fileId: file.fileId,
-          mimeType: file.mimeType,
-          bytes: dataUrlToBytes(file.dataUrl),
-          createdAt: now,
-        })),
-      )
+    // Measured after the delete, so removing images frees room for new ones.
+    let budget =
+      newFiles.length > 0
+        ? MAX_DRAWING_IMAGE_BYTES - (await storedImageBytes(tx, id))
+        : 0
+    const rowsToInsert = []
+    const overCapFileIds: string[] = []
+    for (const file of newFiles) {
+      const bytes = dataUrlToBytes(file.dataUrl)
+      if (bytes.length > budget) {
+        overCapFileIds.push(file.fileId)
+        continue
+      }
+      budget -= bytes.length
+      rowsToInsert.push({
+        id: randomUUID(),
+        drawingId: id,
+        fileId: file.fileId,
+        mimeType: file.mimeType,
+        bytes,
+        createdAt: now,
+      })
+    }
+
+    if (rowsToInsert.length > 0) {
+      await tx.insert(drawingFiles).values(rowsToInsert)
     }
 
     const stored = new Set([
       ...existingFileIds,
-      ...filesToInsert.map((file) => file.fileId),
+      ...rowsToInsert.map((row) => row.fileId),
     ])
+    const overCap = new Set(overCapFileIds)
     const missingFileIds = [...(referenced ?? [])].filter(
-      (fileId) => !stored.has(fileId),
+      (fileId) => !stored.has(fileId) && !overCap.has(fileId),
     )
-    return { status: "saved" as const, missingFileIds }
+    return { status: "saved" as const, missingFileIds, overCapFileIds }
   })
 }
 

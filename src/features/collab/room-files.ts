@@ -6,6 +6,12 @@
 /** Measured on decoded bytes, not base64, so "a 2 MB photo" fits. */
 export const MAX_IMAGE_BYTES = 2 * 1024 * 1024
 
+/**
+ * Stored image bytes per drawing (20 MB). A load sends them all as base64 in
+ * one server fn response, which TanStack Start caps at 32 MiB; this is ~27.
+ */
+export const MAX_DRAWING_IMAGE_BYTES = 10 * MAX_IMAGE_BYTES
+
 /** Refused on `content-length` alone: max image as base64, plus envelope. */
 export const MAX_UPLOAD_BODY_BYTES = Math.ceil((MAX_IMAGE_BYTES * 4) / 3) + 1024
 

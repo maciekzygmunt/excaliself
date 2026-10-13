@@ -233,7 +233,11 @@ export function useReloadSceneAfterRoom(
   return reloading
 }
 
-export function useSaveScenePayload(id: string) {
+/** `onOverCap` gets images the server refused: the drawing's image cap is full. */
+export function useSaveScenePayload(
+  id: string,
+  onOverCap: (fileIds: string[]) => void,
+) {
   const queryClient = useQueryClient()
   return useCallback(
     async (payload: ScenePayload) => {
@@ -254,11 +258,15 @@ export function useSaveScenePayload(id: string) {
       let result = await send(
         payload.files.filter((file) => !stored.has(file.fileId)),
       )
-      // The server lost some (another tab removed them): send those too.
-      if (result.status === "saved" && result.missingFileIds.length > 0) {
+      const overCap = new Set<string>()
+      if (result.status === "saved") {
+        for (const fileId of result.overCapFileIds) overCap.add(fileId)
+        // The server lost some (another tab removed them): send those too.
         const missing = new Set(result.missingFileIds)
         const resend = payload.files.filter((file) => missing.has(file.fileId))
         if (resend.length > 0) result = await send(resend)
+        if (result.status === "saved")
+          for (const fileId of result.overCapFileIds) overCap.add(fileId)
       }
       // Shared elsewhere: refetching the share flips this canvas to collab,
       // and joining the room reconciles the local scene.
@@ -268,6 +276,7 @@ export function useSaveScenePayload(id: string) {
         })
         return "skipped"
       }
+      if (overCap.size > 0) onOverCap([...overCap])
       // Mirror the committed payload into the caches instead of invalidating:
       // refetching the detail query would re-download every base64 blob the
       // client just uploaded.
@@ -278,10 +287,10 @@ export function useSaveScenePayload(id: string) {
           ...prev,
           data: payload.data,
           updatedAt,
-          files: payload.files.map((file) => {
+          files: payload.files.flatMap((file) => {
+            if (overCap.has(file.fileId)) return []
             const existing = prev.files.find((f) => f.fileId === file.fileId)
-            if (existing) return existing
-            return { ...file, createdAt: updatedAt }
+            return [existing ?? { ...file, createdAt: updatedAt }]
           }),
         }
       })
@@ -298,6 +307,6 @@ export function useSaveScenePayload(id: string) {
       )
       return "saved"
     },
-    [id, queryClient],
+    [id, queryClient, onOverCap],
   )
 }

@@ -2,6 +2,7 @@ import type { SQL } from "drizzle-orm"
 import { PgDialect } from "drizzle-orm/pg-core"
 import { expect, test } from "vitest"
 import { loadRoomFile, saveRoomFile } from "./room-file-store"
+import { MAX_DRAWING_IMAGE_BYTES } from "./room-files"
 
 type Call =
   | { kind: "select"; where: SQL }
@@ -22,14 +23,17 @@ const ROW = {
   bytes: Buffer.from("ABCD"),
 }
 
-function fakeDb(rows: unknown[] = []) {
+/** `storedBytes` answers the size query; `rows` every other select. */
+function fakeDb(rows: unknown[] = [], storedBytes = 0) {
   const calls: Call[] = []
   const db = {
-    select: () => ({
+    select: (fields: Record<string, unknown>) => ({
       from: () => ({
         where: (where: SQL) => {
           calls.push({ kind: "select", where })
-          return Promise.resolve(rows)
+          return Promise.resolve(
+            "total" in fields ? [{ total: storedBytes }] : rows,
+          )
         },
       }),
     }),
@@ -76,6 +80,19 @@ test("the existence check is scoped to the drawing and the file", async () => {
   const select = calls.find((call) => call.kind === "select")
   expect(toSql(select?.where as SQL)).toContain(`"drawingId"`)
   expect(toSql(select?.where as SQL)).toContain(`"fileId"`)
+})
+
+test("an image that would take the drawing over its cap is not stored", async () => {
+  // FILE is 4 bytes: it fits exactly into the last 4, not into 3.
+  const fits = fakeDb([], MAX_DRAWING_IMAGE_BYTES - 4)
+  const over = fakeDb([], MAX_DRAWING_IMAGE_BYTES - 3)
+
+  await expect(saveRoomFile(fits.db, "drawing-1", FILE)).resolves.toBe("stored")
+  await expect(saveRoomFile(over.db, "drawing-1", FILE)).resolves.toBe("full")
+
+  expect(over.calls.some((call) => call.kind === "insert")).toBe(false)
+  const sizeQuery = over.calls.at(-1) as Extract<Call, { kind: "select" }>
+  expect(toSql(sizeQuery.where)).toContain(`"drawingId"`)
 })
 
 test("a read is scoped to the room, so one token can't read another's images", async () => {

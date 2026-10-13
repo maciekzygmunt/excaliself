@@ -118,7 +118,10 @@ export async function postRoomFile({
   if (parsed.status === "invalid")
     return new Response("Bad Request", { status: 400 })
 
-  await saveRoomFile(db, roomId, parsed.file)
+  // 409, not 413: the image is fine, the drawing is full.
+  const saved = await saveRoomFile(db, roomId, parsed.file)
+  if (saved === "full")
+    return new Response("Drawing image limit reached", { status: 409 })
   return new Response(null, { status: 204 })
 }
 

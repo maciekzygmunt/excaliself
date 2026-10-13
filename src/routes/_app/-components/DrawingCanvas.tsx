@@ -21,7 +21,10 @@ import { ReconnectingIndicator } from "@/components/reconnecting-indicator"
 import { Button } from "@/components/ui/button"
 import { useSidebar } from "@/components/ui/sidebar"
 import { useRoom } from "@/features/collab/use-room"
-import { markImageStatus } from "@/features/collab/use-room-files"
+import {
+  markImageStatus,
+  toastImageCapFull,
+} from "@/features/collab/use-room-files"
 import { useRenameDrawing } from "@/features/drawings/mutations"
 import { drawingQueryOptions } from "@/features/drawings/queries"
 import {
@@ -71,7 +74,6 @@ export function DrawingCanvas({ drawingId, readOnly = false }: Props) {
   const canvasTheme = useCanvasTheme()
 
   const { drawing, initialData, isDataCorrupt } = useDrawingScene(drawingId)
-  const saveScenePayload = useSaveScenePayload(drawingId)
   // `useRoom` needs a stable reference.
   const storedFileIds = useMemo(
     () => (drawing?.files ?? []).map((file) => file.fileId),
@@ -81,6 +83,18 @@ export function DrawingCanvas({ drawingId, readOnly = false }: Props) {
   const renameMutation = useRenameDrawing()
   const [excalidrawAPI, setExcalidrawAPI] =
     useState<ExcalidrawImperativeAPI | null>(null)
+
+  // Flagged `error` as a room does, so autosave stops sending them.
+  const handleImagesOverCap = useCallback(
+    (fileIds: string[]) => {
+      if (!excalidrawAPI) return
+      for (const fileId of fileIds)
+        markImageStatus(excalidrawAPI, fileId, "error")
+      toastImageCapFull()
+    },
+    [excalidrawAPI],
+  )
+  const saveScenePayload = useSaveScenePayload(drawingId, handleImagesOverCap)
 
   const [shareOpen, setShareOpen] = useState(false)
   const { data: share } = useQuery({

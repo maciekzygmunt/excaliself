@@ -10,6 +10,7 @@ import type {
   ExcalidrawImperativeAPI,
 } from "@excalidraw/excalidraw/types"
 import { useCallback, useEffect, useRef } from "react"
+import { toast } from "sonner"
 import {
   type ImageStatus,
   selectMissingFileIds,
@@ -17,6 +18,7 @@ import {
 } from "./file-sync"
 import { fetchRoomFile, uploadRoomFile } from "./file-transport"
 import type { SceneElement } from "./protocol"
+import { MAX_DRAWING_IMAGE_BYTES } from "./room-files"
 
 const MAX_FETCH_ATTEMPTS = 3
 
@@ -25,6 +27,15 @@ const FETCH_RETRY_MS = 2_000
 
 // Counts only unanswered attempts; a refusal is final at once.
 const MAX_UPLOAD_ATTEMPTS = 3
+
+/** Solo saves and room uploads both refuse images past the drawing's cap. */
+export function toastImageCapFull() {
+  toast.error("This drawing can't hold more images", {
+    // One toast for a batch of refusals.
+    id: "image-cap-full",
+    description: `A drawing saves up to ${MAX_DRAWING_IMAGE_BYTES / 1024 / 1024} MB of images. Remove some to add more.`,
+  })
+}
 
 /** Version bump syncs the flip to peers; NEVER keeps it out of local undo. */
 export function markImageStatus(
@@ -108,6 +119,7 @@ export function useRoomFiles(options: {
           }
           const api = apiRef.current
           if (!api) return
+          if (outcome === "full") toastImageCapFull()
           markImageStatus(
             api,
             file.fileId,

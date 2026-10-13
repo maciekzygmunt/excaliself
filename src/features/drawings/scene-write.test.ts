@@ -2,6 +2,7 @@ import type { SQL } from "drizzle-orm"
 import { PgDialect } from "drizzle-orm/pg-core"
 import { expect, test } from "vitest"
 import { drawingFiles, drawings } from "@/db/schema"
+import { MAX_DRAWING_IMAGE_BYTES } from "@/features/collab/room-files"
 import { writeDrawingScene } from "./scene-write"
 
 type Call =
@@ -22,15 +23,19 @@ function fakeDb(options: {
   storedFileIds?: string[]
   /** When false, the guarded UPDATE matches nothing — a share landed first. */
   updateHits?: boolean
+  /** What the stored-size query answers. */
+  storedBytes?: number
 }) {
   const calls: Call[] = []
   const tx = {
-    select: () => ({
+    select: (fields: Record<string, unknown>) => ({
       from: (table: unknown) => {
         const chain = {
           leftJoin: () => chain,
           where: (where: SQL) => {
             calls.push({ kind: "select", table, where })
+            if ("total" in fields)
+              return Promise.resolve([{ total: options.storedBytes ?? 0 }])
             if (table === drawingFiles)
               return Promise.resolve(
                 (options.storedFileIds ?? []).map((fileId) => ({ fileId })),
@@ -87,7 +92,11 @@ test("a solo save writes the scene, its search text, and bumps updatedAt", async
     files: [],
   })
 
-  expect(result).toEqual({ status: "saved", missingFileIds: [] })
+  expect(result).toEqual({
+    status: "saved",
+    missingFileIds: [],
+    overCapFileIds: [],
+  })
   const update = calls.find((call) => call.kind === "update")
   expect(update?.set.data).toBe(scene)
   expect(update?.set.searchText).toBe("Login")
@@ -174,8 +183,35 @@ test("a used image with no stored bytes is reported missing", async () => {
     files: [{ fileId: "bad", dataUrl: "data:text/html;base64,QUJDRA==" }],
   })
 
-  expect(result).toEqual({ status: "saved", missingFileIds: ["lost", "bad"] })
+  expect(result).toEqual({
+    status: "saved",
+    missingFileIds: ["lost", "bad"],
+    overCapFileIds: [],
+  })
   expect(calls.some((call) => call.kind === "insert")).toBe(false)
+})
+
+// Each `file()` is 4 bytes: room for "fits", none left for "over".
+test("images past the drawing's image cap are not stored, and reported", async () => {
+  const { db, calls } = fakeDb({
+    target: { id: "d1", shareId: null },
+    storedBytes: MAX_DRAWING_IMAGE_BYTES - 4,
+  })
+
+  const result = await writeDrawingScene(db, "user-1", {
+    id: "d1",
+    data: JSON.stringify({ elements: [image("fits"), image("over")] }),
+    files: [file("fits"), file("over")],
+  })
+
+  // Not "missing" too: the client would only resend it to be refused again.
+  expect(result).toEqual({
+    status: "saved",
+    missingFileIds: [],
+    overCapFileIds: ["over"],
+  })
+  const inserted = calls.find((call) => call.kind === "insert")
+  expect(inserted?.values.map((row) => row.fileId)).toEqual(["fits"])
 })
 
 // Regression: a tab that had not fetched a guest's upload yet sent no bytes

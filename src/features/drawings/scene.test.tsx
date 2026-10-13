@@ -45,7 +45,10 @@ const DRAWING = {
   files: [],
 }
 
-function renderSaver(drawing: object = DRAWING) {
+function renderSaver(
+  drawing: object = DRAWING,
+  onOverCap: (fileIds: string[]) => void = () => {},
+) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   })
@@ -55,7 +58,7 @@ function renderSaver(drawing: object = DRAWING) {
     current: null as ((payload: typeof PAYLOAD) => Promise<unknown>) | null,
   }
   function Harness() {
-    saveRef.current = useSaveScenePayload("d1")
+    saveRef.current = useSaveScenePayload("d1", onOverCap)
     return null
   }
   const wrapper = ({ children }: { children: ReactNode }) => (
@@ -69,6 +72,7 @@ test("a committed save is mirrored into the drawing cache", async () => {
   vi.mocked(saveDrawingScene).mockResolvedValue({
     status: "saved",
     missingFileIds: [],
+    overCapFileIds: [],
   })
   const { queryClient, saveRef } = renderSaver()
 
@@ -115,6 +119,7 @@ test("image bytes go up once: stored images are not sent again", async () => {
   vi.mocked(saveDrawingScene).mockReset().mockResolvedValue({
     status: "saved",
     missingFileIds: [],
+    overCapFileIds: [],
   })
   const { saveRef } = renderSaver({ ...DRAWING, files: [file("old")] })
 
@@ -129,8 +134,16 @@ test("image bytes go up once: stored images are not sent again", async () => {
 test("images the server reports missing are sent again", async () => {
   vi.mocked(saveDrawingScene)
     .mockReset()
-    .mockResolvedValueOnce({ status: "saved", missingFileIds: ["old"] })
-    .mockResolvedValueOnce({ status: "saved", missingFileIds: [] })
+    .mockResolvedValueOnce({
+      status: "saved",
+      missingFileIds: ["old"],
+      overCapFileIds: [],
+    })
+    .mockResolvedValueOnce({
+      status: "saved",
+      missingFileIds: [],
+      overCapFileIds: [],
+    })
   const { saveRef } = renderSaver({ ...DRAWING, files: [file("old")] })
 
   await act(async () => {
@@ -200,4 +213,28 @@ test("a failed reload keeps autosave held", async () => {
 
   expect(hook.result.current).toBe(true)
   expect(api.updateScene).not.toHaveBeenCalled()
+})
+
+// Else the next save would skip them as stored, and they'd never show refused.
+test("images refused at the image cap are reported and kept out of the cache", async () => {
+  vi.mocked(saveDrawingScene)
+    .mockReset()
+    .mockResolvedValue({
+      status: "saved",
+      missingFileIds: [],
+      overCapFileIds: ["big"],
+    })
+  const onOverCap = vi.fn()
+  const { queryClient, saveRef } = renderSaver(DRAWING, onOverCap)
+
+  await act(async () => {
+    await saveRef.current?.({ ...PAYLOAD, files: [file("ok"), file("big")] })
+  })
+
+  expect(onOverCap).toHaveBeenCalledWith(["big"])
+  expect(
+    queryClient
+      .getQueryData(drawingQueryOptions("d1").queryKey)
+      ?.files.map((cached) => cached.fileId),
+  ).toEqual(["ok"])
 })

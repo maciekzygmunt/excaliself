@@ -68,6 +68,18 @@ test("stores an upload for a token the room admits", async () => {
   })
 })
 
+test("an upload past the drawing's image cap is refused with 409", async () => {
+  admits()
+  saveRoomFile.mockResolvedValueOnce("full")
+
+  const response = await postRoomFile({
+    request: upload({ dataUrl: PNG }),
+    params,
+  })
+
+  expect(response.status).toBe(409)
+})
+
 test("an over-cap image is refused with 413 and never stored", async () => {
   admits()
   const tooBig = `data:image/png;base64,${Buffer.alloc(MAX_IMAGE_BYTES + 1).toString("base64")}`
