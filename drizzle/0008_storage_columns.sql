@@ -27,14 +27,25 @@ BEGIN
   END LOOP;
 END $$;--> statement-breakpoint
 DO $$
-DECLARE r record;
+DECLARE r record; header text[]; body bytea; b64 text;
 BEGIN
+  -- Decodes like a browser loading the data URL into an <img>: percent-escapes
+  -- first, then base64 if the header says so, ignoring whitespace and padding.
   FOR r IN SELECT "id", "dataUrl" FROM "drawing_files"
-    WHERE "dataUrl" ~ '^data:[^;,]+;base64,' LOOP
+    WHERE "dataUrl" ~ '^data:[^,]*,.' LOOP
     BEGIN
+      header := string_to_array(substring(r."dataUrl" from '^data:([^,]*),'), ';');
+      SELECT decode(string_agg(coalesce(m[1], encode(convert_to(m[2], 'UTF8'), 'hex')), '' ORDER BY n), 'hex')
+        INTO body
+        FROM regexp_matches(substring(r."dataUrl" from position(',' in r."dataUrl") + 1),
+          '%([0-9A-Fa-f]{2})|([^%]+|%)', 'g') WITH ORDINALITY AS t(m, n);
+      IF lower(header[cardinality(header)]) = 'base64' THEN
+        b64 := rtrim(regexp_replace(convert_from(body, 'UTF8'), '\s', '', 'g'), '=');
+        body := decode(rpad(b64, (length(b64) + 3) / 4 * 4, '='), 'base64');
+      END IF;
       UPDATE "drawing_files" SET
-        "bytes" = decode(substring(r."dataUrl" from position(',' in r."dataUrl") + 1), 'base64'),
-        "mimeType" = substring(r."dataUrl" from '^data:([^;,]+);')
+        "bytes" = body,
+        "mimeType" = coalesce(nullif(lower(btrim(header[1])), ''), "mimeType")
       WHERE "id" = r."id";
     EXCEPTION WHEN others THEN NULL;
     END;

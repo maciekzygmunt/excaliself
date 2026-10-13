@@ -8,6 +8,12 @@ import * as schema from "./schema.ts"
 
 async function connect() {
   const db = drizzle(env.DATABASE_URL, { schema })
+  // Shows a migration's RAISE WARNING (e.g. images 0009 deletes) in the app log.
+  db.$client.on("connect", (client) =>
+    client.on("notice", (notice) => {
+      if (notice.severity === "WARNING") console.warn(notice.message)
+    }),
+  )
 
   try {
     await migrate(db, { migrationsFolder: "./drizzle" })
