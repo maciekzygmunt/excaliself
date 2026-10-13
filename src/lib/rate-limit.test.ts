@@ -36,6 +36,16 @@ test("one key's flood leaves every other key untouched", () => {
   expect(limiter.allow("5.6.7.8", 0)).toBe(true)
 })
 
+test("checking for exhaustion spends nothing", () => {
+  const limiter = createRateLimiter({ limit: 1, windowMs: MINUTE })
+
+  expect(limiter.exhausted("1.2.3.4", 0)).toBe(false)
+  expect(limiter.exhausted("1.2.3.4", 0)).toBe(false)
+  limiter.allow("1.2.3.4", 0)
+  expect(limiter.exhausted("1.2.3.4", 0)).toBe(true)
+  expect(limiter.exhausted("1.2.3.4", MINUTE)).toBe(false)
+})
+
 // A limiter keyed by IP is fed keys by strangers, so the map has to shed
 // expired entries — otherwise a long-lived process accumulates one entry per
 // address that ever knocked.

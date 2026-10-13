@@ -22,7 +22,10 @@ import {
   setShareLinkAudience,
   stopSharingDrawing,
 } from "./store"
-import { allowTokenValidation } from "./token-rate-limit"
+import {
+  recordFailedTokenLookup,
+  tokenLookupsBlocked,
+} from "./token-rate-limit"
 
 const audienceSchema = z.enum(["members", "anyone"])
 
@@ -86,15 +89,17 @@ export const resolveShareToken = createServerFn({ method: "GET" })
   .validator(z.string())
   .handler(async ({ data: token }): Promise<ShareVisit> => {
     const headers = getRequestHeaders()
-    // Counted before the lookup, so a flood costs the database nothing.
-    if (!allowTokenValidation({ headers, socketIp: getRequestIP() })) {
+    const visitor = { headers, socketIp: getRequestIP() }
+    if (tokenLookupsBlocked(visitor)) {
       setResponseStatus(429)
       return { status: "throttled" }
     }
 
-    return resolveShareVisit(
+    const visit = await resolveShareVisit(
       db,
       token,
       async () => (await auth.api.getSession({ headers })) !== null,
     )
+    if (visit.status === "dead") recordFailedTokenLookup(visitor)
+    return visit
   })

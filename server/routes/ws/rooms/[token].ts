@@ -19,7 +19,10 @@ import {
   receiveFromPeer,
 } from "@/features/collab/room-session"
 import { resolveRoomForToken } from "@/features/collab/room-token"
-import { allowTokenValidation } from "@/features/shares/token-rate-limit"
+import {
+  recordFailedTokenLookup,
+  tokenLookupsBlocked,
+} from "@/features/shares/token-rate-limit"
 import { socketIpOf } from "@/lib/client-ip"
 
 /** Keyed by drawing, not crossws's default pathname, so a new token keeps the room. */
@@ -39,13 +42,8 @@ function roomContextOf(peer: { context: Record<string, unknown> }) {
 
 export default defineWebSocketHandler({
   async upgrade(request) {
-    // Spent before the lookup, so a reconnect storm costs the db nothing.
-    if (
-      !allowTokenValidation({
-        headers: request.headers,
-        socketIp: socketIpOf(request),
-      })
-    )
+    const visitor = { headers: request.headers, socketIp: socketIpOf(request) }
+    if (tokenLookupsBlocked(visitor))
       throw new Response("Too Many Requests", { status: 429 })
 
     // Runs on every (re)connect, so link changes apply on the next join.
@@ -56,7 +54,10 @@ export default defineWebSocketHandler({
     )
     // Accept and close in `open`: a refused handshake is an opaque 1006 the
     // client can't tell from an outage, so it would retry forever.
-    if (join.status !== "ok") return
+    if (join.status !== "ok") {
+      recordFailedTokenLookup(visitor)
+      return
+    }
 
     return {
       namespace: namespaceFor(join.roomId),

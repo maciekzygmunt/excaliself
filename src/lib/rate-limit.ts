@@ -4,7 +4,10 @@
 type Window = { startedAt: number; count: number }
 
 export type RateLimiter = {
+  /** Spends one unit; false once the window's budget is gone. */
   allow(key: string, now: number): boolean
+  /** True when the budget is gone, without spending anything. */
+  exhausted(key: string, now: number): boolean
   trackedKeys(): number
 }
 
@@ -46,6 +49,10 @@ export function createRateLimiter(options: {
       if (windows.size > maxTrackedKeys) shed(now, key)
 
       return window.count <= limit
+    },
+    exhausted(key, now) {
+      const window = windows.get(key)
+      return !!window && !expired(window, now) && window.count >= limit
     },
     trackedKeys: () => windows.size,
   }

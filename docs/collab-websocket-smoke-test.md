@@ -86,10 +86,9 @@ port, so it exercises the same path a browser takes.
 - **Presence works but cursors don't arrive** — the peers are in different
   crossws namespaces. The upgrade hook pins the namespace to the drawing id;
   see `namespaceFor` in the route.
-- **Checks that passed a moment ago now fail with "connection refused"** — a
-  run spends about thirty token validations, so two back-to-back runs from one
-  host trip the 60/min per-IP limit of spec §4.5. Wait out the minute; the
-  limiter is working.
+- **Checks fail with "connection refused"** — the host has spent the 60/min
+  per-IP budget of failed token lookups (spec §4.5). A run spends only one, so
+  something else on the host is hitting dead links. Wait out the minute.
 - **Presence works but no `SCENE_INIT` arrives** — the Room could not read its
   drawing. It stays open on an empty scene by design; the reason is logged as
   `[collab] could not load scene for room <id>`.
