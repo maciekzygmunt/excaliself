@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs"
+import { readdir, readFile } from "node:fs/promises"
+import { join, relative } from "node:path"
 import { fileURLToPath, URL } from "node:url"
 import tailwindcss from "@tailwindcss/vite"
 import { devtools } from "@tanstack/devtools-vite"
@@ -40,6 +43,51 @@ export default (options) => nodeAdapter({
   }
 }
 
+/**
+ * Serve Excalidraw's fonts from the app instead of its esm.sh default, so
+ * visitors never reach a third party. Excalidraw fetches them from
+ * `${window.EXCALIDRAW_ASSET_PATH}fonts/...`; __root.tsx sets that global.
+ */
+function excalidrawFonts(): Plugin {
+  const pkgDir = fileURLToPath(
+    new URL("./node_modules/@excalidraw/excalidraw/", import.meta.url),
+  )
+  const { version } = JSON.parse(
+    readFileSync(join(pkgDir, "package.json"), "utf8"),
+  )
+  const fontsDir = join(pkgDir, "dist/prod/fonts")
+  // Under /assets/ for Nitro's immutable caching; versioned because some
+  // font file names carry no hash.
+  const buildBase = `assets/excalidraw-${version}/`
+  return {
+    name: "excalidraw-fonts",
+    config: (_, { command }) => ({
+      define: {
+        // Dev serves the fonts straight from node_modules.
+        __EXCALIDRAW_ASSET_PATH__: JSON.stringify(
+          command === "serve" ? `/@fs${pkgDir}dist/prod/` : `/${buildBase}`,
+        ),
+      },
+    }),
+    async generateBundle() {
+      if (this.environment.config.consumer !== "client") return
+      const entries = await readdir(fontsDir, {
+        recursive: true,
+        withFileTypes: true,
+      })
+      for (const entry of entries) {
+        if (!entry.isFile()) continue
+        const path = join(entry.parentPath, entry.name)
+        this.emitFile({
+          type: "asset",
+          fileName: `${buildBase}fonts/${relative(fontsDir, path)}`,
+          source: await readFile(path),
+        })
+      }
+    },
+  }
+}
+
 const config = defineConfig({
   resolve: {
     alias: {
@@ -77,6 +125,7 @@ const config = defineConfig({
       },
     }),
     viteReact(),
+    excalidrawFonts(),
   ],
 })
 
