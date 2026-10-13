@@ -27,7 +27,6 @@ import type {
 import {
   joinRoom,
   leaveRoom,
-  nextAuthorization,
   receiveFromPeer,
 } from "@/features/collab/room-session"
 import { resolveRoomForToken } from "@/features/collab/room-token"
@@ -120,12 +119,6 @@ export default defineWebSocketHandler({
     // image endpoints call the same function, so the token, audience and
     // deletedAt decision is literally shared — the per-IP budget above is not,
     // and `$fileId.ts` says why.
-    // Drawn *before* the lookup, not after: a link change that lands while
-    // the query below is in flight has to outrank this socket, and it only
-    // does if this stamp predates it (spec §4.2, and `joinRoom`'s
-    // `outrunByLinkChange`).
-    const authorizedAt = nextAuthorization(rooms)
-
     const join = await resolveRoomForToken(db, token, request.headers)
     // One generic refusal for every reason, like the dead-link page: nothing
     // here reveals whether the drawing exists. The socket is accepted anyway
@@ -140,7 +133,7 @@ export default defineWebSocketHandler({
       namespace: namespaceFor(join.roomId),
       context: {
         roomId: join.roomId,
-        identity: { ...join.identity, authorizedAt },
+        identity: join.identity,
       },
     }
   },
@@ -158,22 +151,20 @@ export default defineWebSocketHandler({
     const context = roomContextOf(peer)
     if (!context) return peer.close(1011, "Room unavailable")
 
-    const join = await joinRoom(
-      rooms,
-      context.roomId,
-      toRoomPeer(peer),
-      context.identity,
-    )
-    // The cap is enforced here rather than at the upgrade because a refused
-    // handshake reaches the browser as an opaque 1006; a close code the page
-    // can read is what turns this into the "drawing full" state.
-    if (join.status === "full") peer.close(ROOM_FULL_CLOSE_CODE, "Room full")
-    // The link died while this socket was still shaking hands, so the
-    // eviction that closed everyone else's could not reach it. Same answer
-    // as a refused upgrade: the page re-resolves the token and lands on the
-    // dead-link state.
-    if (join.status === "refused")
-      peer.close(LINK_DEAD_CLOSE_CODE, LINK_DEAD_CLOSE_REASON)
+    // Seat first, then check the link again. A link that died during the
+    // handshake either fails this check or finds the seat to evict.
+    const roomPeer = toRoomPeer(peer)
+    const joining = joinRoom(rooms, context.roomId, roomPeer, context.identity)
+    const token = new URL(peer.request.url).pathname.split("/").pop() || ""
+    const recheck = await resolveRoomForToken(db, token, peer.request.headers)
+    if (recheck.status !== "ok" || recheck.roomId !== context.roomId) {
+      await leaveRoom(rooms, context.roomId, roomPeer)
+      return peer.close(LINK_DEAD_CLOSE_CODE, LINK_DEAD_CLOSE_REASON)
+    }
+    // The cap is checked here, not at the upgrade: a refused handshake
+    // reaches the browser as an opaque 1006.
+    if ((await joining).status === "full")
+      peer.close(ROOM_FULL_CLOSE_CODE, "Room full")
   },
 
   async message(peer, message) {

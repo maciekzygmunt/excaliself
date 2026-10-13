@@ -21,16 +21,8 @@ export type SessionUser = {
   email?: string | null
 }
 
-/**
- * Who the upgrade decided this socket is. Everything a {@link
- * ParticipantIdentity} carries except `authorizedAt`, which is the *when* —
- * drawn from the registry by the hook that owns the clock, before it asks
- * this question at all.
- */
-export type ResolvedIdentity = Omit<ParticipantIdentity, "authorizedAt">
-
 export type RoomJoin =
-  | { status: "ok"; roomId: string; identity: ResolvedIdentity }
+  | { status: "ok"; roomId: string; identity: ParticipantIdentity }
   /**
    * Every refusal reason collapses to this one value, matching the share
    * page's single dead-link state — a rejected upgrade tells the caller
