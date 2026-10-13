@@ -63,21 +63,15 @@ export const registerWithInvite = createServerFn({ method: "POST" })
       body: {
         email: data.email,
         password: data.password,
-        // better-auth requires a name in the sign-up body; it's nulled just
-        // below — display names are only ever set in Settings, and the
-        // email-prefix fallback covers everyone else (spec §5.12).
-        name: data.email.split("@")[0],
+        // Display names are only ever set in Settings; "" means unset and
+        // the email-prefix fallback covers it (spec §5.12).
+        name: "",
       },
     })
 
     if (!result.user || !result.token) {
       throw new Error("Failed to create account")
     }
-
-    await db
-      .update(users)
-      .set({ name: null })
-      .where(eq(users.id, result.user.id))
 
     // Conditional update so two concurrent signups can't both consume the
     // same invite — only the one that wins the update completes registration.

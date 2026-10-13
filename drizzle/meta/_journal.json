@@ -71,6 +71,13 @@
       "when": 1791903732797,
       "tag": "0009_drop_base64_and_thumbnail",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1791919860204,
+      "tag": "0010_user_name_not_null",
+      "breakpoints": true
     }
   ]
 }

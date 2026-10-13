@@ -103,15 +103,15 @@ function isUniqueViolation(error: unknown): boolean {
   )
 }
 
-// Display name is optional (spec §5.12): an empty submission clears it back
-// to null so the email-prefix fallback takes over everywhere.
+// Display name is optional (spec §5.12): an empty submission clears it to ""
+// so the email-prefix fallback takes over everywhere.
 export const updateProfile = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
   .validator(z.object({ name: z.string().trim().max(120) }))
   .handler(async ({ data, context }) => {
     await db
       .update(users)
-      .set({ name: data.name === "" ? null : data.name, updatedAt: new Date() })
+      .set({ name: data.name, updatedAt: new Date() })
       .where(eq(users.id, context.session.user.id))
   })
 

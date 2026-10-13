@@ -13,7 +13,8 @@ export const users = pgTable("users", {
   id: text("id").primaryKey(),
   email: text("email").notNull().unique(),
   emailVerified: boolean("emailVerified").default(false),
-  name: text("name"),
+  // "" when unset. better-auth's cookie cache rejects a null name.
+  name: text("name").notNull(),
   image: text("image"),
   role: text("role", { enum: ["admin", "user"] })
     .notNull()

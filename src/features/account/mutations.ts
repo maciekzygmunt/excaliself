@@ -32,7 +32,7 @@ export function useUpdateProfile() {
       await queryClient.cancelQueries({ queryKey: currentUserKey })
       const previous = queryClient.getQueryData<CurrentUser>(currentUserKey)
       queryClient.setQueryData<CurrentUser>(currentUserKey, (current) =>
-        current ? { ...current, name: data.name || null } : current,
+        current ? { ...current, name: data.name } : current,
       )
       return { previous }
     },

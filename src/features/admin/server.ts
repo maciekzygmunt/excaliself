@@ -36,10 +36,9 @@ export const setupAdmin = createServerFn({ method: "POST" })
       body: {
         email: data.email,
         password: data.password,
-        // better-auth requires a name in the sign-up body; it's nulled just
-        // below — display names are only ever set in Settings, and the
-        // email-prefix fallback covers everyone else (spec §5.12).
-        name: data.email.split("@")[0],
+        // Display names are only ever set in Settings; "" means unset and
+        // the email-prefix fallback covers it (spec §5.12).
+        name: "",
       },
     })
 
@@ -49,7 +48,7 @@ export const setupAdmin = createServerFn({ method: "POST" })
 
     await db
       .update(users)
-      .set({ role: "admin", name: null })
+      .set({ role: "admin" })
       .where(eq(users.id, result.user.id))
 
     // The sign-up session was minted before the promotion, so its cookie

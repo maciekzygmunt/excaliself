@@ -70,7 +70,7 @@ const members: AdminUser[] = [
     id: "user-ada",
     email: "ada@example.com",
     emailVerified: true,
-    name: null,
+    name: "",
     image: null,
     role: "admin" as const,
     createdAt: new Date("2026-01-05T12:00:00Z"),
@@ -97,7 +97,7 @@ const twoAdmins: AdminUser[] = members.map((member) =>
 const viewer = {
   id: "user-ada",
   email: "ada@example.com",
-  name: null,
+  name: "",
   role: "admin" as const,
 }
 
