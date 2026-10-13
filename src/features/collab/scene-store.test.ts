@@ -1,7 +1,10 @@
 import type { SQL } from "drizzle-orm"
 import { PgDialect } from "drizzle-orm/pg-core"
-import { expect, test } from "vitest"
+import { afterEach, expect, test, vi } from "vitest"
+import { drawingFiles } from "@/db/schema"
+import type { SceneElement } from "./protocol"
 import {
+  FILE_GRACE_MS,
   mergeSceneElements,
   parseStoredScene,
   saveRoomScene,
@@ -100,10 +103,11 @@ test("a blank or corrupt stored scene is replaced rather than preserved", () => 
 type SaveCall =
   | { kind: "select"; where: SQL }
   | { kind: "update"; set: Record<string, unknown>; where: SQL }
+  | { kind: "delete"; table: unknown; where: SQL }
 
 function fakeDb(row: { data: string | null } | undefined) {
   const calls: SaveCall[] = []
-  const db = {
+  const tx = {
     select: () => ({
       from: () => ({
         where: (where: SQL) => {
@@ -120,6 +124,15 @@ function fakeDb(row: { data: string | null } | undefined) {
         },
       }),
     }),
+    delete: (table: unknown) => ({
+      where: (where: SQL) => {
+        calls.push({ kind: "delete", table, where })
+        return Promise.resolve()
+      },
+    }),
+  }
+  const db = {
+    transaction: (fn: (tx: unknown) => Promise<unknown>) => fn(tx),
   } as unknown as Parameters<typeof saveRoomScene>[0]
   return { db, calls }
 }
@@ -131,7 +144,7 @@ test("saveRoomScene writes the merged scene and bumps updatedAt", async () => {
 
   await saveRoomScene(db, "drawing-1", [element("new", 5)])
 
-  expect(calls.map((call) => call.kind)).toEqual(["select", "update"])
+  expect(calls.map((call) => call.kind)).toEqual(["select", "update", "delete"])
   const update = calls[1] as Extract<SaveCall, { kind: "update" }>
   expect(JSON.parse(update.set.data as string)).toEqual({
     appState: { gridSize: 20 },
@@ -163,5 +176,60 @@ test("saveRoomScene is not blocked by the trash — a trashed drawing keeps the 
   expect(new PgDialect().sqlToQuery(select.where).sql).not.toContain(
     "deletedAt",
   )
-  expect(calls.map((call) => call.kind)).toEqual(["select", "update"])
+  expect(calls.map((call) => call.kind)).toEqual(["select", "update", "delete"])
+})
+
+// --- dropping unused images -----------------------------------------------
+
+afterEach(() => {
+  vi.useRealTimers()
+})
+
+const NOW = new Date("2026-10-13T12:00:00Z")
+const HOUR = 60 * 60 * 1000
+
+const image = (fileId: string, deleted?: { updated?: number }) => ({
+  ...element(fileId, 1),
+  type: "image",
+  fileId,
+  ...(deleted && { isDeleted: true, updated: deleted.updated }),
+})
+
+async function flushDelete(elements: SceneElement[]) {
+  vi.useFakeTimers({ now: NOW })
+  const { db, calls } = fakeDb({ data: stored({ elements: [] }) })
+  await saveRoomScene(db, "drawing-1", elements)
+  const remove = calls.find((call) => call.kind === "delete")
+  if (remove?.kind !== "delete") throw new Error("no delete")
+  expect(remove.table).toBe(drawingFiles)
+  return new PgDialect().sqlToQuery(remove.where)
+}
+
+test("a flush drops this drawing's old image rows that no image uses", async () => {
+  const { sql, params } = await flushDelete([
+    image("live"),
+    image("just-deleted", { updated: NOW.getTime() - HOUR }),
+    image("deleted-long-ago", { updated: NOW.getTime() - 25 * HOUR }),
+    image("unstamped-tombstone", {}),
+  ])
+
+  expect(sql).toContain(`"drawing_files"."drawingId" =`)
+  expect(sql).toContain(`"drawing_files"."fileId" not in`)
+  expect(params).toContain("drawing-1")
+  // An undo brings a recently deleted image back with no re-upload.
+  expect(params).toEqual(expect.arrayContaining(["live", "just-deleted"]))
+  expect(params).not.toContain("deleted-long-ago")
+  expect(params).not.toContain("unstamped-tombstone")
+})
+
+// A guest's upload can land before the scene update that references it.
+test("rows newer than the grace period are kept even when no image uses them", async () => {
+  const { sql, params } = await flushDelete([])
+
+  expect(sql).toContain(`"drawing_files"."createdAt" <`)
+  expect(params).toContain(
+    new Date(NOW.getTime() - FILE_GRACE_MS).toISOString(),
+  )
+  // No image left: every old row goes.
+  expect(sql).not.toContain("not in")
 })
