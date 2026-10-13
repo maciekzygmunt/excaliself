@@ -63,11 +63,7 @@ export async function createShareLink(
   audience: ShareAudience,
 ) {
   await requireOwnedLiveDrawing(db, userId, drawingId)
-  // The unique index on drawingId is the arbiter: when a live link already
-  // exists (a concurrent create, or a stale dialog), keep its token — the
-  // circulating URL stays valid — but adopt the just-picked audience, so
-  // what the caller chose is always what the returned row shows.
-  const [share] = await db
+  const [created] = await db
     .insert(shares)
     .values({
       id: randomUUID(),
@@ -76,9 +72,11 @@ export async function createShareLink(
       audience,
       createdAt: new Date(),
     })
-    .onConflictDoUpdate({ target: shares.drawingId, set: { audience } })
+    .onConflictDoNothing({ target: shares.drawingId })
     .returning(shareColumns)
-  return share
+  // A link already exists (a stale dialog, or a race): return it unchanged.
+  // Only setShareLinkAudience may tighten it, because only it evicts guests.
+  return created ?? getShareLink(db, userId, drawingId)
 }
 
 /** Deletes the link. Idempotent: stopping an unshared drawing is a no-op. */

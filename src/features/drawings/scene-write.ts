@@ -97,11 +97,12 @@ export async function writeDrawingScene(
       .from(drawingFiles)
       .where(eq(drawingFiles.drawingId, id))
     const existingFileIds = new Set(existing.map((row) => row.fileId))
-    const incomingFileIds = new Set(files.map((file) => file.fileId))
-
-    const fileIdsToRemove = [...existingFileIds].filter(
-      (fileId) => !incomingFileIds.has(fileId),
-    )
+    // Drop only files no live image uses. The payload can miss some: a tab
+    // that hasn't fetched a guest's upload yet still keeps its image.
+    const referenced = referencedFileIds(sceneData)
+    const fileIdsToRemove = referenced
+      ? [...existingFileIds].filter((fileId) => !referenced.has(fileId))
+      : []
     const filesToInsert = files.filter(
       (file) => !existingFileIds.has(file.fileId),
     )
@@ -132,4 +133,22 @@ export async function writeDrawingScene(
 
     return { status: "saved" as const }
   })
+}
+
+type StoredElement = { type?: string; isDeleted?: boolean; fileId?: string }
+
+/** File ids of live images in the scene; null if it can't be parsed. */
+function referencedFileIds(sceneData: string): Set<string> | null {
+  try {
+    const { elements } = JSON.parse(sceneData) as {
+      elements?: StoredElement[]
+    }
+    return new Set(
+      (elements ?? []).flatMap((el) =>
+        el.type === "image" && !el.isDeleted && el.fileId ? [el.fileId] : [],
+      ),
+    )
+  } catch {
+    return null
+  }
 }

@@ -45,11 +45,7 @@ const unauthorized = () =>
  * read side to the 256-bit token.
  */
 async function resolveRoom(request: Request, token: string) {
-  const join = await resolveRoomForToken(
-    db,
-    decodeURIComponent(token),
-    request.headers,
-  )
+  const join = await resolveRoomForToken(db, token, request.headers)
   return join.status === "ok" ? join.roomId : null
 }
 
@@ -63,7 +59,7 @@ export async function getRoomFile({
   const roomId = await resolveRoom(request, params.token)
   if (!roomId) return unauthorized()
 
-  const file = await loadRoomFile(db, roomId, decodeURIComponent(params.fileId))
+  const file = await loadRoomFile(db, roomId, params.fileId)
   // A peer only fetches ids it has seen on a `saved` image, so a miss here is
   // a genuine 404 rather than the pending case — and it stays a 404 rather
   // than an empty body, so the client can tell "not there" from "no bytes".
@@ -157,7 +153,7 @@ export async function postRoomFile({
   // Unparseable is just another malformed body — `parseFileUpload` turns the
   // resulting null into the 400 below.
   const body = read.status === "ok" ? parseJson(read.text) : null
-  const parsed = parseFileUpload(decodeURIComponent(params.fileId), body)
+  const parsed = parseFileUpload(params.fileId, body)
   if (parsed.status === "too-large")
     return new Response("Payload Too Large", { status: 413 })
   if (parsed.status === "invalid")

@@ -1,4 +1,5 @@
 import { createFileRoute, useNavigate, useRouter } from "@tanstack/react-router"
+import { createClientOnlyFn } from "@tanstack/react-start"
 import { lazy, Suspense } from "react"
 import { Mark } from "@/components/identity"
 import { resolveShareToken } from "@/features/shares/server"
@@ -9,7 +10,10 @@ import { DrawingFull } from "./-components/DrawingFull"
 import { SignInGate } from "./-components/SignInGate"
 import { TooManyAttempts } from "./-components/TooManyAttempts"
 
-const SharedCanvas = lazy(() => import("./-components/SharedCanvas"))
+// Client-only, so Excalidraw stays out of the server bundle.
+const SharedCanvas = lazy(
+  createClientOnlyFn(() => import("./-components/SharedCanvas")),
+)
 
 // Same branded canvas loader as /draw/$id: the iris spark mark, pulsing.
 const LoadingState = () => (

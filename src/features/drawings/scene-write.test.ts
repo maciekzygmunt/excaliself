@@ -11,6 +11,7 @@ type Call =
   | { kind: "delete"; table: unknown; where: SQL }
 
 const toSql = (where: SQL) => new PgDialect().sqlToQuery(where).sql
+const toParams = (where: SQL) => new PgDialect().sqlToQuery(where).params
 
 const SCENE = '{"elements":[]}'
 
@@ -128,25 +129,48 @@ test("a drawing the caller doesn't own is not found, and nothing is written", as
   expect(calls.map((call) => call.kind)).toEqual(["select"])
 })
 
-test("files still reconcile: new ones are inserted, unreferenced ones dropped", async () => {
+const image = (fileId: string, isDeleted = false) => ({
+  type: "image",
+  fileId,
+  isDeleted,
+})
+
+test("files reconcile: new ones are inserted, unused ones dropped", async () => {
   const { db, calls } = fakeDb({
     target: { id: "d1", shareId: null },
-    storedFileIds: ["keep", "drop"],
+    storedFileIds: ["keep", "drop", "erased"],
   })
 
   await writeDrawingScene(db, "user-1", {
     id: "d1",
-    data: SCENE,
+    data: JSON.stringify({
+      elements: [image("keep"), image("add"), image("erased", true)],
+    }),
     files: [file("keep"), file("add")],
   })
 
   const removed = calls.find((call) => call.kind === "delete")
   expect(removed?.table).toBe(drawingFiles)
-  expect(toSql(removed?.where as SQL)).toContain(`"fileId" in`)
+  expect(toParams(removed?.where as SQL)).toEqual(["d1", "drop", "erased"])
   const inserted = calls.find((call) => call.kind === "insert")
-  expect(
-    (inserted?.values as Record<string, unknown>[]).map((row) => row.fileId),
-  ).toEqual(["add"])
+  expect(inserted?.values).toEqual([expect.objectContaining({ fileId: "add" })])
+})
+
+// Regression: a tab that had not fetched a guest's upload yet sent no bytes
+// for it, and its first solo save after a share deleted the stored row.
+test("a stored file the scene still uses is kept, even if the payload lacks it", async () => {
+  const { db, calls } = fakeDb({
+    target: { id: "d1", shareId: null },
+    storedFileIds: ["uploaded-by-guest"],
+  })
+
+  await writeDrawingScene(db, "user-1", {
+    id: "d1",
+    data: JSON.stringify({ elements: [image("uploaded-by-guest")] }),
+    files: [],
+  })
+
+  expect(calls.some((call) => call.kind === "delete")).toBe(false)
 })
 
 // Spec §5.5's single-writer invariant has to survive another tab of the

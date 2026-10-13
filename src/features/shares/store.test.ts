@@ -18,12 +18,7 @@ const HEX_256_BIT = /^[0-9a-f]{64}$/
 
 type Call =
   | { kind: "select"; table: unknown; where: SQL }
-  | {
-      kind: "insert"
-      table: unknown
-      values: Record<string, unknown>
-      onConflictSet: Record<string, unknown>
-    }
+  | { kind: "insert"; table: unknown; values: Record<string, unknown> }
   | {
       kind: "update"
       table: unknown
@@ -51,6 +46,8 @@ function fakeDb(options: {
   fileRows?: unknown[]
   /** When false, updates match zero rows. */
   updateHits?: boolean
+  /** When true, the insert hits the unique index and returns nothing. */
+  insertConflicts?: boolean
 }) {
   const calls: Call[] = []
   const db = {
@@ -74,9 +71,10 @@ function fakeDb(options: {
     }),
     insert: (table: unknown) => ({
       values: (values: Record<string, unknown>) => ({
-        onConflictDoUpdate: ({ set }: { set: Record<string, unknown> }) => ({
+        onConflictDoNothing: () => ({
           returning: () => {
-            calls.push({ kind: "insert", table, values, onConflictSet: set })
+            calls.push({ kind: "insert", table, values })
+            if (options.insertConflicts) return Promise.resolve([])
             return Promise.resolve([
               {
                 token: values.token,
@@ -146,15 +144,19 @@ test("createShareLink throws not-found for a drawing the caller doesn't own, wit
   expect(calls.map((call) => call.kind)).toEqual(["select"])
 })
 
-test("createShareLink on an already-shared drawing keeps the live token but adopts the picked audience", async () => {
-  const { db, calls } = fakeDb({ ownedDrawingIds: ["d1"] })
+// Regression: a stale dialog's create upserted the audience, so a link could
+// tighten to members while its live guests stayed connected.
+test("createShareLink on an already-shared drawing returns the live link unchanged", async () => {
+  const { db, calls } = fakeDb({
+    ownedDrawingIds: ["d1"],
+    shareRows: [SHARE_ROW],
+    insertConflicts: true,
+  })
 
-  await createShareLink(db, "user-1", "d1", "anyone")
+  const share = await createShareLink(db, "user-1", "d1", "anyone")
 
-  // The conflict clause is the one-link-per-drawing arbiter: it must touch
-  // only the audience, never replace the circulating token.
-  const insert = calls[1] as Extract<Call, { kind: "insert" }>
-  expect(insert.onConflictSet).toEqual({ audience: "anyone" })
+  expect(share).toEqual(SHARE_ROW)
+  expect(calls.map((call) => call.kind)).toEqual(["select", "insert", "select"])
 })
 
 test("getShareLink scopes the read to the drawing's owner", async () => {

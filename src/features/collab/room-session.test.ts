@@ -645,18 +645,22 @@ test("an edit that arrives before the scene has loaded still merges into it", as
   ])
 })
 
-test("a Room whose drawing cannot be read still opens, on an empty scene", async () => {
-  const registry = registryFrom(async () => {
-    throw new Error("database is down")
-  })
-  const ada = fakePeer("peer-ada")
+test("a Room whose drawing cannot be read hangs up, so clients retry a fresh read", async () => {
+  const errors = vi.spyOn(console, "error").mockImplementation(() => {})
+  try {
+    const registry = registryFrom(async () => {
+      throw new Error("database is down")
+    })
+    const ada = fakePeer("peer-ada")
 
-  await joinRoom(registry, ROOM, ada, member("Ada"))
+    await joinRoom(registry, ROOM, ada, member("Ada"))
 
-  // Cursors and presence keep working; an empty SCENE_INIT reconciles into a
-  // client's own copy without adding or deleting anything.
-  expect(elementsOf(framesOf(ada, "SCENE_INIT")[0])).toEqual([])
-  expect(registry.rooms.get(ROOM)?.participants.size).toBe(1)
+    expect(framesOf(ada, "SCENE_INIT")).toEqual([])
+    expect(ada.closes).toEqual([{ code: 1011, reason: "Scene unavailable" }])
+    expect(registry.rooms.has(ROOM)).toBe(false)
+  } finally {
+    errors.mockRestore()
+  }
 })
 
 test("a peer that left mid-load is not sent a scene", async () => {
@@ -1108,29 +1112,6 @@ test("a rejoin during the final write keeps the room alive", async () => {
   expect(elementsOf(framesOf(grace, "SCENE_INIT")[0])).toEqual([
     element("a", 1),
   ])
-})
-
-// Regression: a Room that may not write was still marked dirty on every edit,
-// and `reapIfIdle` refused to drop a dirty Room — so one transient read
-// failure left a Room in the registry for the life of the process, never
-// re-reading the drawing and never persisting anything again.
-test("a room that could not read its drawing is torn down like any other", async () => {
-  const errors = vi.spyOn(console, "error").mockImplementation(() => {})
-  try {
-    const registry = registryFrom(async () => {
-      throw new Error("database is down")
-    })
-    const ada = fakePeer("peer-ada")
-    await joinRoom(registry, ROOM, ada, member("Ada"))
-    await receiveFromPeer(registry, ROOM, ada, sceneUpdate([element("a", 1)]))
-
-    await leaveRoom(registry, ROOM, ada)
-
-    // Gone, so the next join re-reads the drawing and can persist again.
-    expect(registry.rooms.has(ROOM)).toBe(false)
-  } finally {
-    errors.mockRestore()
-  }
 })
 
 test("a drawing whose stored scene is unreadable is never written over", async () => {

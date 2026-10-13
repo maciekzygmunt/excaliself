@@ -378,3 +378,33 @@ test("flush rejects when the write failed, so a handoff can stop", async () => {
     await expect(flushRef.current?.()).rejects.toThrow("network down")
   })
 })
+
+test("flush retries a failed save instead of rethrowing the old failure", async () => {
+  const onSave = vi.fn(async (_payload: string): Promise<SaveOutcome> => {
+    throw new Error("network down")
+  })
+  const onChangeRef = { current: null as ((data: string) => void) | null }
+  const flushRef = { current: null as (() => Promise<void>) | null }
+
+  render(
+    <Harness
+      onSave={onSave}
+      onChangeRef={onChangeRef}
+      flushRef={flushRef}
+      onError={() => {}}
+    />,
+    { wrapper },
+  )
+
+  act(() => onChangeRef.current?.("edit"))
+  await act(async () => {
+    await expect(flushRef.current?.()).rejects.toThrow("network down")
+  })
+
+  onSave.mockImplementation(async () => {})
+  await act(async () => {
+    await flushRef.current?.()
+  })
+  expect(onSave).toHaveBeenCalledTimes(2)
+  expect(onSave).toHaveBeenLastCalledWith("edit")
+})

@@ -6,7 +6,7 @@
 import { count, eq, or } from "drizzle-orm"
 import type { NodePgDatabase } from "drizzle-orm/node-postgres"
 import type * as schema from "@/db/schema"
-import { drawings, folders, users, verifications } from "@/db/schema"
+import { drawings, folders, shares, users, verifications } from "@/db/schema"
 
 type Db = NodePgDatabase<typeof schema>
 
@@ -30,6 +30,16 @@ export async function countOwnedContent(
       .where(eq(folders.ownerId, userId)),
   ])
   return { drawings: drawingCount.count, folders: folderCount.count }
+}
+
+/** The user's shared drawings, whose live rooms must close on delete. */
+export async function sharedDrawingIds(db: Db, userId: string) {
+  const rows = await db
+    .select({ id: drawings.id })
+    .from(drawings)
+    .innerJoin(shares, eq(shares.drawingId, drawings.id))
+    .where(eq(drawings.ownerId, userId))
+  return rows.map((row) => row.id)
 }
 
 /**

@@ -112,9 +112,8 @@ export default defineWebSocketHandler({
 
     // The path is `/ws/rooms/<token>`; nitro's route params aren't exposed to
     // the upgrade hook, so read the token off the URL directly.
-    const token = decodeURIComponent(
-      new URL(request.url).pathname.split("/").pop() || "",
-    )
+    // Tokens are hex, so there is nothing to decode.
+    const token = new URL(request.url).pathname.split("/").pop() || ""
 
     // Runs on every (re)connect, so stop, regenerate, an audience tighten,
     // and trash all take effect on the next join (spec §4.1). The room-scoped

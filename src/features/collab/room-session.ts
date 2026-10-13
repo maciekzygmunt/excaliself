@@ -267,20 +267,24 @@ function ensureRoom(registry: RoomRegistry, roomId: string): Room {
       room.elements = stored.elements
       room.sceneVersion = getSceneVersion(stored.elements)
       room.ownerId = stored.ownerId
-      // Unreadable stored JSON leaves the Room open but mute, exactly like a
-      // read that threw: the drawing rendered as an empty canvas here, and
+      // Unreadable stored JSON leaves the Room open but mute: the drawing rendered as an empty canvas here, and
       // writing that emptiness back is how a recoverable file becomes an
       // empty one. It is the same call the solo canvas makes when it pauses
       // autosave over a corrupt scene.
       room.persistable = stored.readable
     },
     (error) => {
-      // The Room stays open on an empty scene: cursors and presence still
-      // work, and a client's own copy survives reconciliation untouched (an
-      // empty SCENE_INIT adds nothing and deletes nothing). `persistable`
-      // stays false, so nothing this Room accumulates is ever written — a
-      // flush here would put an empty scene over a real drawing.
+      // A Room that can't read can't save either. Drop it and hang up, so
+      // clients keep their copy and reconnect into a fresh read.
       console.error(`[collab] could not load scene for room ${roomId}`, error)
+      if (registry.rooms.get(roomId) === room) registry.rooms.delete(roomId)
+      const peers = [...room.peers.values()]
+      room.participants.clear()
+      room.peers.clear()
+      room.userIds.clear()
+      room.follows.clear()
+      room.lastSeenAt.clear()
+      for (const peer of peers) peer.close(1011, "Scene unavailable")
     },
   )
   return room
@@ -347,22 +351,20 @@ function flushRoom(registry: RoomRegistry, room: Room): Promise<void> {
   room.flushing = room.flushing.then(() =>
     // Read the scene inside the chain, not at call time: anything merged
     // while an earlier write was in flight rides along on this one.
-    registry
-      .saveScene(room.id, room.elements)
-      .then(
-        () => {
-          reapIfIdle(registry, room)
-        },
-        (error) => {
-          // A failed write is not lost work — the scene is still in memory. Mark
-          // it unwritten again and let the throttle retry; a Room whose last
-          // participant has already left keeps retrying (and stays in the
-          // registry) until the write lands rather than dropping the edits.
-          console.error(`[collab] could not flush room ${room.id}`, error)
-          room.dirty = true
-          armFlush(registry, room)
-        },
-      ),
+    registry.saveScene(room.id, room.elements).then(
+      () => {
+        reapIfIdle(registry, room)
+      },
+      (error) => {
+        // A failed write is not lost work — the scene is still in memory. Mark
+        // it unwritten again and let the throttle retry; a Room whose last
+        // participant has already left keeps retrying (and stays in the
+        // registry) until the write lands rather than dropping the edits.
+        console.error(`[collab] could not flush room ${room.id}`, error)
+        room.dirty = true
+        armFlush(registry, room)
+      },
+    ),
   )
   return room.flushing
 }

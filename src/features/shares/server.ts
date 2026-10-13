@@ -27,14 +27,14 @@ const audienceSchema = z.enum(["members", "anyone"])
 
 export const getDrawingShare = createServerFn({ method: "GET" })
   .middleware([authMiddleware])
-  .inputValidator(z.string())
+  .validator(z.string())
   .handler(async ({ data: drawingId, context }) =>
     getShareLink(db, context.session.user.id, drawingId),
   )
 
 export const createShare = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
-  .inputValidator(z.object({ drawingId: z.string(), audience: audienceSchema }))
+  .validator(z.object({ drawingId: z.string(), audience: audienceSchema }))
   .handler(async ({ data, context }) =>
     createShareLink(db, context.session.user.id, data.drawingId, data.audience),
   )
@@ -47,21 +47,21 @@ export const createShare = createServerFn({ method: "POST" })
 
 export const stopSharing = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
-  .inputValidator(z.string())
+  .validator(z.string())
   .handler(async ({ data: drawingId, context }) => {
     await lifecycle.stopSharing(db, rooms, context.session.user.id, drawingId)
   })
 
 export const regenerateShare = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
-  .inputValidator(z.string())
+  .validator(z.string())
   .handler(async ({ data: drawingId, context }) =>
     lifecycle.regenerateShare(db, rooms, context.session.user.id, drawingId),
   )
 
 export const setShareAudience = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
-  .inputValidator(z.object({ drawingId: z.string(), audience: audienceSchema }))
+  .validator(z.object({ drawingId: z.string(), audience: audienceSchema }))
   .handler(async ({ data, context }) =>
     lifecycle.setShareAudience(
       db,
@@ -86,7 +86,7 @@ export type ShareVisit = ShareResolution | { status: "throttled" }
  * the per-IP validation limit of spec §4.5.
  */
 export const resolveShareToken = createServerFn({ method: "GET" })
-  .inputValidator(z.string())
+  .validator(z.string())
   .handler(async ({ data: token }): Promise<ShareVisit> => {
     const headers = getRequestHeaders()
     // Counted before the token lookup, so a flood costs the database nothing.

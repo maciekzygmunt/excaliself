@@ -83,7 +83,7 @@ export function useAutoSave<TData, TPayload>({
       // saved state — while this save was in flight. If the latest state no
       // longer matches what was committed, save it now.
       const latest = latestDataRef.current
-      if (latest != null) performSaveRef.current(latest)
+      if (latest != null && !pausedRef.current) performSaveRef.current(latest)
     },
     onError: (err) => handlersRef.current.onError?.(err),
     onSettled: (_data, _err, { sig }) => {
@@ -130,12 +130,17 @@ export function useAutoSave<TData, TPayload>({
    */
   const flush = useCallback(async () => {
     flushDebouncedSave()
+    // Retry a save that failed; the dedup skips this if nothing is owed.
+    const latest = latestDataRef.current
+    if (latest != null && initializedRef.current && !pausedRef.current) {
+      performSave(latest)
+    }
     let awaited: Promise<unknown> | null = null
     while (inFlightRef.current && inFlightRef.current !== awaited) {
       awaited = inFlightRef.current
       await awaited
     }
-  }, [flushDebouncedSave])
+  }, [flushDebouncedSave, performSave])
 
   const handleChange = useCallback(
     (data: TData) => {

@@ -7,9 +7,15 @@ import z from "zod"
 import { db } from "@/db"
 import { sessions, users } from "@/db/schema"
 import { setupFieldsSchema } from "@/features/auth/schema"
+import { rooms } from "@/features/collab/room-registry"
+import { terminateRoom } from "@/features/collab/room-session"
 import { auth } from "@/lib/auth"
 import { adminMiddleware } from "@/middleware/admin"
-import { countOwnedContent, deleteUserAccount } from "./delete-user"
+import {
+  countOwnedContent,
+  deleteUserAccount,
+  sharedDrawingIds,
+} from "./delete-user"
 import { isLastAdmin } from "./roles"
 
 export const getUserCount = createServerFn({ method: "GET" }).handler(
@@ -115,7 +121,10 @@ export const deleteUser = createServerFn({ method: "POST" })
   .middleware([adminMiddleware])
   .validator(z.string())
   .handler(async ({ data: userId, context }) => {
+    const shared = await sharedDrawingIds(db, userId)
     await deleteUserAccount(db, context.session.user.id, userId)
+    // Hang up on live rooms; their flush finds no row and writes nothing.
+    for (const id of shared) await terminateRoom(rooms, id)
   })
 
 // Feeds the tier-3 confirm's count-aware copy ("…and permanently delete
