@@ -24,8 +24,9 @@ instance:
 5. Two peers see each other join, a name sent on `JOIN` reaches the other peer,
    a cursor is relayed to the other peer (and never echoed back to its sender),
    and closing one socket updates the other's roster.
-6. The socket past the room's participant cap is closed with the room-full
-   code (spec §4.5), and a departure reopens the slot.
+6. The guest socket past the room's participant cap (one seat is kept for the
+   owner) is closed with the room-full code (spec §4.5), and a departure
+   reopens the slot.
 7. A joiner is handed the room's scene as `SCENE_INIT`.
 8. An edit by one peer reaches the other, is never echoed back to its sender,
    and is what a third peer joining afterwards is initialized from.

@@ -370,8 +370,10 @@ const checks: {
     // Enforced after the upgrade: only a close code reaches the page.
     name: "the socket past the participant cap is closed, and its slot reopens",
     run: async (token, url) => {
+      // These peers are guests, and the last seat is kept for the owner.
+      const guestSeats = MAX_ROOM_PARTICIPANTS - 1
       const seated = await Promise.all(
-        Array.from({ length: MAX_ROOM_PARTICIPANTS }, () =>
+        Array.from({ length: guestSeats }, () =>
           Peer.connect(socketUrl(url, token)),
         ),
       )
@@ -389,7 +391,7 @@ const checks: {
 
         // Wait for the leave to land, or the replacement can race it.
         seated.pop()?.close()
-        await roomSettlesAt(seated[0], MAX_ROOM_PARTICIPANTS - 1)
+        await roomSettlesAt(seated[0], guestSeats - 1)
 
         const admitted = await Peer.connect(socketUrl(url, token))
         await admitted.expect("ROOM_JOINED")
