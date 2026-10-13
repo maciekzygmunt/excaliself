@@ -191,8 +191,8 @@ test("everyone in a room wears a different color", async () => {
   for (const peer of peers) await joinRoom(registry, ROOM, peer, guest)
 
   const roster = registry.rooms.get(ROOM)
-  const colors = [...(roster?.participants.values() ?? [])].map(
-    (p) => p.color.background,
+  const colors = [...(roster?.seats.values() ?? [])].map(
+    (seat) => seat.participant.color.background,
   )
   expect(new Set(colors).size).toBe(3)
 })
@@ -273,7 +273,7 @@ test("leaving drops the participant and tells the rest", async () => {
   await leaveRoom(registry, ROOM, grace)
 
   expect(rosterOf(grace.published.at(-1)?.data)).toEqual(["Ada"])
-  expect(registry.rooms.get(ROOM)?.participants.size).toBe(1)
+  expect(registry.rooms.get(ROOM)?.seats.size).toBe(1)
 })
 
 test("the last peer out takes the room with it", async () => {
@@ -494,8 +494,8 @@ test("rooms are isolated — a peer only ever sees its own drawing's roster", as
   await joinRoom(registry, "drawing-2", grace, member("Grace"))
 
   expect(rosterOf(grace.sent[0])).toEqual(["Grace"])
-  expect(registry.rooms.get("drawing-1")?.participants.size).toBe(1)
-  expect(registry.rooms.get("drawing-2")?.participants.size).toBe(1)
+  expect(registry.rooms.get("drawing-1")?.seats.size).toBe(1)
+  expect(registry.rooms.get("drawing-2")?.seats.size).toBe(1)
 })
 
 // --- the authoritative scene -------------------------------------------
@@ -700,9 +700,7 @@ test("a room fills up to the cap", async () => {
   const registry = emptyRegistry()
   await fillRoom(registry)
 
-  expect(registry.rooms.get(ROOM)?.participants.size).toBe(
-    MAX_ROOM_PARTICIPANTS,
-  )
+  expect(registry.rooms.get(ROOM)?.seats.size).toBe(MAX_ROOM_PARTICIPANTS)
 })
 
 test("the socket past the cap is refused and joins nothing", async () => {
@@ -715,9 +713,7 @@ test("the socket past the cap is refused and joins nothing", async () => {
   })
   expect(late.sent).toEqual([])
   expect(late.topics).toEqual([])
-  expect(registry.rooms.get(ROOM)?.participants.size).toBe(
-    MAX_ROOM_PARTICIPANTS,
-  )
+  expect(registry.rooms.get(ROOM)?.seats.size).toBe(MAX_ROOM_PARTICIPANTS)
 })
 
 test("the room the refused socket knocked on is not told about it", async () => {
@@ -1107,7 +1103,7 @@ test("a rejoin during the final write keeps the room alive", async () => {
   release()
   await leaving
 
-  expect(registry.rooms.get(ROOM)?.participants.size).toBe(1)
+  expect(registry.rooms.get(ROOM)?.seats.size).toBe(1)
   // The rejoiner is handed the live scene, not a re-read of the drawing.
   expect(elementsOf(framesOf(grace, "SCENE_INIT")[0])).toEqual([
     element("a", 1),
@@ -1275,7 +1271,7 @@ test("tightening to members closes the guests and leaves the members", async () 
     { code: LINK_DEAD_CLOSE_CODE, reason: "Link no longer active" },
   ])
   expect(ada.closes).toEqual([])
-  expect(registry.rooms.get(ROOM)?.participants.size).toBe(1)
+  expect(registry.rooms.get(ROOM)?.seats.size).toBe(1)
 })
 
 test("the members left behind are told the guests are gone", async () => {

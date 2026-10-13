@@ -59,7 +59,7 @@ test("avatar colors are the participant colors drawn on the canvas", async () =>
   await joinRoom(registry, "d1", fakePeer("p1"), guest("Quiet Otter"))
 
   const [badge] = liveDrawingsForOwner(registry, OWNER)
-  const participant = registry.rooms.get("d1")?.participants.get("p1")
+  const participant = registry.rooms.get("d1")?.seats.get("p1")?.participant
   expect(badge.participants[0].color).toEqual(participant?.color)
 })
 

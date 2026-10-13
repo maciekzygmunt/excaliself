@@ -210,7 +210,7 @@ test("loosening to anyone evicts nobody", async () => {
 
   expect(ada.closes).toEqual([])
   expect(grace.closes).toEqual([])
-  expect(registry.rooms.get(DRAWING)?.participants.size).toBe(2)
+  expect(registry.rooms.get(DRAWING)?.seats.size).toBe(2)
 })
 
 test("the ownership gate reads drawings, not shares", async () => {

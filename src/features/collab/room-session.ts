@@ -80,31 +80,23 @@ export type SceneSaver = (
  */
 export const ROOM_FLUSH_INTERVAL_MS = 15_000
 
+/** One connected socket and what the Room knows about it. */
+export type Seat = {
+  participant: Participant
+  peer: RoomPeer
+  /** Null for a guest. Kept off `participant`, which goes on the wire. */
+  userId: string | null
+  /** Last frame time, for the ghost sweep. */
+  lastSeenAt: number
+}
+
 export type Room = {
   /** The drawing this Room belongs to — its key in the registry. */
   id: string
-  participants: Map<string, Participant>
-  /**
-   * The live socket behind each participant. Follow mode is the first thing
-   * here that has to reach one named peer rather than the whole room, and
-   * the pub/sub topic can only do the latter.
-   */
-  peers: Map<string, RoomPeer>
-  /**
-   * Connection id → the authenticated userId behind it, null for a guest.
-   * Kept beside the roster rather than on the {@link Participant} because the
-   * roster goes on the wire and userIds must not (spec §1.5) — the live badge
-   * is the only thing that reads this, to drop the caller's own connections.
-   */
-  userIds: Map<string, string | null>
+  /** Keyed by connection id. */
+  seats: Map<string, Seat>
   /** Follower connection id → the connection id it is trailing (spec §1.3). */
   follows: Map<string, string>
-  /**
-   * When each connection was last heard from. A socket that dies without a
-   * FIN — a lid closing, a phone changing networks — leaves a peer the
-   * server still believes in, and nothing but silence says otherwise.
-   */
-  lastSeenAt: Map<string, number>
   /** Resolves when the stored scene has been read (or failed to read). */
   loaded: Promise<void>
   /**
@@ -247,11 +239,8 @@ function ensureRoom(registry: RoomRegistry, roomId: string): Room {
 
   const room: Room = {
     id: roomId,
-    participants: new Map(),
-    peers: new Map(),
-    userIds: new Map(),
+    seats: new Map(),
     follows: new Map(),
-    lastSeenAt: new Map(),
     loaded: Promise.resolve(),
     persistable: false,
     elements: [],
@@ -278,13 +267,10 @@ function ensureRoom(registry: RoomRegistry, roomId: string): Room {
       // clients keep their copy and reconnect into a fresh read.
       console.error(`[collab] could not load scene for room ${roomId}`, error)
       if (registry.rooms.get(roomId) === room) registry.rooms.delete(roomId)
-      const peers = [...room.peers.values()]
-      room.participants.clear()
-      room.peers.clear()
-      room.userIds.clear()
+      const seats = [...room.seats.values()]
+      room.seats.clear()
       room.follows.clear()
-      room.lastSeenAt.clear()
-      for (const peer of peers) peer.close(1011, "Scene unavailable")
+      for (const { peer } of seats) peer.close(1011, "Scene unavailable")
     },
   )
   return room
@@ -313,7 +299,7 @@ const hasUnwrittenWork = (room: Room) => room.dirty && room.persistable
  * flush had to be retried must not be dropped while it still owes one.
  */
 function reapIfIdle(registry: RoomRegistry, room: Room) {
-  if (room.participants.size > 0 || hasUnwrittenWork(room)) return
+  if (room.seats.size > 0 || hasUnwrittenWork(room)) return
   if (registry.rooms.get(room.id) !== room) return
   disarmFlush(room)
   registry.rooms.delete(room.id)
@@ -381,7 +367,7 @@ export async function flushAllRooms(registry: RoomRegistry): Promise<void> {
 }
 
 function rosterOf(room: Room): Participant[] {
-  return [...room.participants.values()]
+  return [...room.seats.values()].map((seat) => seat.participant)
 }
 
 const rosterMessage = (room: Room): ServerMessage => ({
@@ -428,31 +414,18 @@ export const PARTICIPANT_IDLE_TIMEOUT_MS = 90_000
  * write.
  */
 function forgetSilentParticipants(room: Room, now: number) {
-  for (const [connectionId, lastSeenAt] of room.lastSeenAt) {
-    if (now - lastSeenAt < PARTICIPANT_IDLE_TIMEOUT_MS) continue
+  for (const [connectionId, seat] of room.seats) {
+    if (now - seat.lastSeenAt < PARTICIPANT_IDLE_TIMEOUT_MS) continue
     forgetConnection(room, connectionId)
   }
 }
 
 /**
- * Drop one connection from every map the Room keys by connection id — the
- * single answer to "this socket is no longer in the room", however it got
- * there: it left, it went silent, or its link died under it.
- *
- * All five have to go together. A leftover in `userIds` keeps the live badge
- * counting a seat nobody is in (spec §1.5); a leftover in `follows` relays
- * viewports into a socket that is gone; a leftover in `lastSeenAt` is a ghost
- * the sweep will keep re-forgetting.
- *
- * The peer this one was trailing is told its audience shrank. The other
- * direction needs no message: Excalidraw drops `userToFollow` by itself once
- * the followed collaborator falls out of the roster.
+ * Drop one connection from the Room, however it went: left, went silent, or
+ * its link died. The peer it was trailing is told its audience shrank.
  */
 function forgetConnection(room: Room, connectionId: string) {
-  room.participants.delete(connectionId)
-  room.peers.delete(connectionId)
-  room.userIds.delete(connectionId)
-  room.lastSeenAt.delete(connectionId)
+  room.seats.delete(connectionId)
 
   const wasFollowing = room.follows.get(connectionId) ?? null
   room.follows.delete(connectionId)
@@ -512,8 +485,7 @@ export async function joinRoom(
   const existing = registry.rooms.get(roomId)
   if (existing) {
     forgetSilentParticipants(existing, registry.now())
-    if (existing.participants.size >= MAX_ROOM_PARTICIPANTS)
-      return { status: "full" }
+    if (existing.seats.size >= MAX_ROOM_PARTICIPANTS) return { status: "full" }
   }
 
   const room = ensureRoom(registry, roomId)
@@ -527,10 +499,12 @@ export async function joinRoom(
     color: pickParticipantColor(rosterOf(room).map((p) => p.color)),
     isGuest,
   }
-  room.participants.set(peer.id, participant)
-  room.peers.set(peer.id, peer)
-  room.userIds.set(peer.id, identity.userId)
-  room.lastSeenAt.set(peer.id, registry.now())
+  room.seats.set(peer.id, {
+    participant,
+    peer,
+    userId: identity.userId,
+    lastSeenAt: registry.now(),
+  })
 
   peer.subscribe(ROOM_TOPIC)
   // Presence goes out before the scene read so avatars never wait on the
@@ -544,7 +518,7 @@ export async function joinRoom(
   await room.loaded
   // A late joiner gets the authoritative scene, not whatever its own page
   // load happened to fetch (spec §5.2).
-  if (room.participants.has(peer.id)) {
+  if (room.seats.has(peer.id)) {
     peer.send({ type: "SCENE_INIT", payload: { elements: room.elements } })
   }
   return { status: "ok" }
@@ -582,7 +556,7 @@ function upstreamOf(room: Room, peerId: string): Set<string> {
  * silent.
  */
 function sendFollowedBy(room: Room, followedId: string) {
-  room.peers.get(followedId)?.send({
+  room.seats.get(followedId)?.peer.send({
     type: "FOLLOWED_BY",
     payload: { connectionIds: followersOf(room, followedId) },
   })
@@ -596,9 +570,7 @@ function setFollowTarget(
   // Following yourself or someone who isn't in the room means "nobody" —
   // the alternative is a client able to plant unreachable entries in the map.
   const followed =
-    target && target !== followerId && room.participants.has(target)
-      ? target
-      : null
+    target && target !== followerId && room.seats.has(target) ? target : null
   const previous = room.follows.get(followerId) ?? null
   if (previous === followed) return
 
@@ -695,14 +667,14 @@ export async function receiveFromPeer(
   // nobody is in, and the close hook will tidy it up on its own.
   if (!room) return "ok"
 
-  const participant = room.participants.get(peer.id)
-  if (!participant) return "evicted"
+  const seat = room.seats.get(peer.id)
+  if (!seat) return "evicted"
 
   // Any frame at all is proof of life, and `PING` most of all: it is the only
   // one a room where nobody is drawing will ever produce. Stamped before the
   // answer goes out, so the seat this heartbeat is defending is held for the
   // full window rather than the window minus a round trip.
-  room.lastSeenAt.set(peer.id, registry.now())
+  seat.lastSeenAt = registry.now()
 
   // Only ever answered for a peer that still has a seat. A `PONG` to an
   // evicted socket would tell its client the connection is healthy while the
@@ -715,12 +687,10 @@ export async function receiveFromPeer(
   if (message.type === "JOIN") {
     // Only guests name themselves. A member's name is whatever the session
     // says, so a compromised client can't pose as someone else in the room.
+    const { participant } = seat
     if (!participant.isGuest || participant.name === message.payload.name)
       return "ok"
-    room.participants.set(peer.id, {
-      ...participant,
-      name: message.payload.name,
-    })
+    seat.participant = { ...participant, name: message.payload.name }
     broadcastRoster(peer, room)
     return "ok"
   }
@@ -737,7 +707,7 @@ export async function receiveFromPeer(
       // trailing this peer still gets the viewport. A plain chain — C follows
       // A, A follows B — is not a loop and keeps working.
       if (upstream.has(followerId)) continue
-      room.peers.get(followerId)?.send({
+      room.seats.get(followerId)?.peer.send({
         type: "USER_VISIBLE_SCENE_BOUNDS",
         payload: { connectionId: peer.id, bounds: message.payload.bounds },
       })
@@ -752,7 +722,7 @@ export async function receiveFromPeer(
     // queue behind the same settled promise.
     await room.loaded
     // Swept as a ghost while the load was in flight, or simply gone.
-    if (!room.participants.has(peer.id)) return "evicted"
+    if (!room.seats.has(peer.id)) return "evicted"
     if (applySceneUpdate(room, peer, message.payload.elements))
       markDirty(registry, room)
     return "ok"
@@ -771,7 +741,7 @@ export async function leaveRoom(
   peer: RoomPeer,
 ) {
   const room = registry.rooms.get(roomId)
-  if (!room?.participants.has(peer.id)) return
+  if (!room?.seats.has(peer.id)) return
   forgetConnection(room, peer.id)
 
   // The last socket out writes the scene before the Room is torn down
@@ -780,7 +750,7 @@ export async function leaveRoom(
   // their tab" case. `reapIfIdle` rather than an unconditional delete: a
   // rejoin during the write keeps the Room, and a write that has to be
   // retried keeps it too.
-  if (room.participants.size === 0) {
+  if (room.seats.size === 0) {
     await flushRoom(registry, room)
     reapIfIdle(registry, room)
     return
@@ -852,17 +822,14 @@ export async function terminateRoom(
   // The peers are captured first because closing a socket is what fires the
   // route's `close` hook — `leaveRoom`, which must find nothing left to do
   // rather than taking itself for the last participant out and flushing again.
-  const peers = [...room.peers.values()]
-  room.participants.clear()
-  room.peers.clear()
-  room.userIds.clear()
+  const seats = [...room.seats.values()]
+  room.seats.clear()
   room.follows.clear()
-  room.lastSeenAt.clear()
 
   await flushRoom(registry, room)
   reapIfIdle(registry, room)
 
-  for (const peer of peers) closeAsDead(peer)
+  for (const { peer } of seats) closeAsDead(peer)
 }
 
 /**
@@ -871,7 +838,7 @@ export async function terminateRoom(
  * are, mid-stroke. Loosening evicts nobody — it only affects who may join
  * next — so callers reach this for `members` and nothing else.
  *
- * Membership is read from `userIds`, which is what the *upgrade* established,
+ * Membership is read from `seat.userId`, which is what the *upgrade* established,
  * never from the roster's `isGuest`: the roster is the copy that goes on the
  * wire, and a client is exactly the thing that must not get a say in this.
  */
@@ -892,16 +859,14 @@ export async function evictNonMembers(
   await room.loaded
 
   const evicted: RoomPeer[] = []
-  for (const connectionId of [...room.participants.keys()]) {
-    // A member's id is a non-empty string; a guest's is null.
-    if (room.userIds.get(connectionId)) continue
-    const peer = room.peers.get(connectionId)
+  for (const [connectionId, seat] of [...room.seats]) {
+    if (seat.userId !== null) continue
     forgetConnection(room, connectionId)
-    if (peer) evicted.push(peer)
+    evicted.push(seat.peer)
   }
   if (evicted.length === 0) return
 
-  if (room.participants.size === 0) {
+  if (room.seats.size === 0) {
     // The guests were the whole room: this is last-leave, and the scene has
     // to be written before the Room is let go.
     await flushRoom(registry, room)
@@ -910,7 +875,7 @@ export async function evictNonMembers(
     // Sent rather than published: the peers whose sockets could have fanned
     // this out are the ones being closed.
     const message = rosterMessage(room)
-    for (const peer of room.peers.values()) peer.send(message)
+    for (const { peer } of room.seats.values()) peer.send(message)
   }
 
   for (const peer of evicted) closeAsDead(peer)

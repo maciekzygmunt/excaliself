@@ -41,9 +41,9 @@ export function liveDrawingsForOwner(
   for (const [drawingId, room] of registry.rooms) {
     if (room.ownerId !== ownerId) continue
 
-    const others = [...room.participants.values()].filter(
-      (participant) => room.userIds.get(participant.connectionId) !== ownerId,
-    )
+    const others = [...room.seats.values()]
+      .filter((seat) => seat.userId !== ownerId)
+      .map((seat) => seat.participant)
     if (others.length === 0) continue
 
     live.push({
