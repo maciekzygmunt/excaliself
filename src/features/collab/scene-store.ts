@@ -55,8 +55,8 @@ function parseStoredObject(
 }
 
 /**
- * Unreadable JSON opens as an empty scene, with `readable: false` so the Room
- * never writes that emptiness back over the file.
+ * Unreadable JSON comes back empty with `readable: false`, so no Room opens
+ * on it and that emptiness never overwrites the file.
  */
 export function parseStoredScene(data: string | null | undefined): {
   elements: SceneElement[]

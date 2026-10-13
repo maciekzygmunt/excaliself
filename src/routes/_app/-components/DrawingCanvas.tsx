@@ -125,14 +125,24 @@ export function DrawingCanvas({ drawingId, readOnly = false }: Props) {
     })
   }, [queryClient, drawingId])
 
+  const shareToken = readOnly ? null : (share?.token ?? null)
+  // Keyed on the link, so a later link to a repaired scene starts clean.
+  const [unreadableToken, setUnreadableToken] = useState<string | null>(null)
+  const handleSceneUnreadable = useCallback(
+    () => setUnreadableToken(shareToken),
+    [shareToken],
+  )
+  const sceneUnreadable = shareToken !== null && unreadableToken === shareToken
+
   // A shared drawing has one writer, the room, so the owner's tabs join it too.
   const room = useRoom({
-    token: readOnly ? null : (share?.token ?? null),
+    token: shareToken,
     // Members use their session name.
     name: null,
     excalidrawAPI,
     onRoomFull: handleRoomFull,
     onLinkDead: handleLinkDead,
+    onSceneUnreadable: handleSceneUnreadable,
     storedFileIds,
   })
   // Autosave stays live until the share query answers; the server refuses the
@@ -144,6 +154,21 @@ export function DrawingCanvas({ drawingId, readOnly = false }: Props) {
     excalidrawAPI,
   )
 
+  // The room refused the damaged stored scene, so nothing here is saved.
+  useEffect(() => {
+    if (!sceneUnreadable) return
+    const toastId = `scene-unreadable:${drawingId}`
+    toast.error("This drawing can't be opened for live editing", {
+      id: toastId,
+      duration: Number.POSITIVE_INFINITY,
+      description:
+        "Its saved data is damaged, so your changes aren't being saved. Stop sharing to edit it on your own.",
+    })
+    return () => {
+      toast.dismiss(toastId)
+    }
+  }, [sceneUnreadable, drawingId])
+
   // A corrupt stored scene opens as an empty canvas; pause autosave until the
   // user acknowledges, so the next save doesn't silently overwrite the data.
   // Edits made while paused are recorded and saved once acknowledged.
@@ -154,6 +179,9 @@ export function DrawingCanvas({ drawingId, readOnly = false }: Props) {
     // Read-only view: nothing can save, so the "auto-save is paused" toast
     // and its "Edit anyway" escape hatch would only mislead.
     if (readOnly) return
+    // Shared: the room's refusal says it, and "Edit anyway" can't save there.
+    // Waiting for the share query keeps this one from flashing first.
+    if (share !== null) return
     if (!isDataCorrupt || corruptAcknowledged) return
     const toastId = `corrupt-scene:${drawingId}`
     toast.error("This drawing's saved data couldn't be read", {
@@ -169,7 +197,7 @@ export function DrawingCanvas({ drawingId, readOnly = false }: Props) {
     return () => {
       toast.dismiss(toastId)
     }
-  }, [isDataCorrupt, corruptAcknowledged, drawingId, readOnly])
+  }, [isDataCorrupt, corruptAcknowledged, drawingId, readOnly, share])
 
   const {
     saving,

@@ -16,6 +16,11 @@ export const SERVER_RESTART_CLOSE_CODE = 1012
 
 export const SERVER_RESTART_CLOSE_REASON = "Server restarting"
 
+/** The stored scene can't be parsed, so a Room could never save. Also final. */
+export const SCENE_UNREADABLE_CLOSE_CODE = 4022
+
+export const SCENE_UNREADABLE_CLOSE_REASON = "Stored scene unreadable"
+
 /** Excalidraw's `Collaborator["color"]` shape. */
 export type ParticipantColor = { background: string; stroke: string }
 

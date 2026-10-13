@@ -57,9 +57,8 @@ test("a blank or elementless drawing opens as an empty scene, and stays writable
   }
 })
 
-// The Room checks `readable` before it flushes: a drawing whose JSON cannot be
-// read opens as an empty canvas, and writing that emptiness back is how an
-// unreadable file becomes an empty one (spec §2.3).
+// No Room opens on an unreadable drawing: it would start empty, and writing
+// that emptiness back is how an unreadable file becomes an empty one (spec §2.3).
 test("a drawing whose JSON cannot be read opens empty and is marked unreadable", () => {
   for (const data of ["not json at all", stored(null), stored([1, 2])]) {
     expect(parseStoredScene(data)).toEqual({ elements: [], readable: false })

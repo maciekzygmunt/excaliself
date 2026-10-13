@@ -4,6 +4,8 @@ import type { SceneElement, ServerMessage } from "./protocol"
 import {
   LINK_DEAD_CLOSE_CODE,
   ROOM_TOPIC,
+  SCENE_UNREADABLE_CLOSE_CODE,
+  SCENE_UNREADABLE_CLOSE_REASON,
   SERVER_RESTART_CLOSE_CODE,
 } from "./protocol"
 import {
@@ -1244,21 +1246,30 @@ test("a rejoin during the final write keeps the room alive", async () => {
   ])
 })
 
-test("a drawing whose stored scene is unreadable is never written over", async () => {
-  vi.useFakeTimers()
-  try {
-    const registry = recordingRegistry([], undefined, { readable: false })
-    const ada = fakePeer("peer-ada")
-    await joinRoom(registry, ROOM, ada, member("Ada"))
+// It could never be written, so edits made in it would be lost on leave.
+test("a drawing whose stored scene is unreadable opens no Room to draw in", async () => {
+  const registry = recordingRegistry([], undefined, { readable: false })
+  const ada = fakePeer("peer-ada")
 
-    await receiveFromPeer(registry, ROOM, ada, sceneUpdate([element("a", 1)]))
-    await vi.advanceTimersByTimeAsync(ROOM_FLUSH_INTERVAL_MS * 2)
-    await leaveRoom(registry, ROOM, ada)
+  const joined = joinRoom(registry, ROOM, ada, member("Ada"))
+  const edited = receiveFromPeer(
+    registry,
+    ROOM,
+    ada,
+    sceneUpdate([element("a", 1)]),
+  )
+  await joined
 
-    expect(registry.writes).toEqual([])
-  } finally {
-    vi.useRealTimers()
-  }
+  expect(await edited).toBe("evicted")
+  expect(framesOf(ada, "SCENE_INIT")).toEqual([])
+  expect(ada.closes).toEqual([
+    {
+      code: SCENE_UNREADABLE_CLOSE_CODE,
+      reason: SCENE_UNREADABLE_CLOSE_REASON,
+    },
+  ])
+  expect(registry.rooms.has(ROOM)).toBe(false)
+  expect(registry.writes).toEqual([])
 })
 
 // Regression: dirtiness was decided by `getSceneVersion`, a sum of versions.

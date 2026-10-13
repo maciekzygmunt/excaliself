@@ -8,6 +8,8 @@ import {
   LINK_DEAD_CLOSE_REASON,
   parseClientMessage,
   ROOM_TOPIC,
+  SCENE_UNREADABLE_CLOSE_CODE,
+  SCENE_UNREADABLE_CLOSE_REASON,
   SERVER_RESTART_CLOSE_CODE,
   SERVER_RESTART_CLOSE_REASON,
 } from "./protocol"
@@ -58,8 +60,6 @@ export type Room = {
   /** Follower connection id → followed connection id. */
   follows: Map<string, string>
   loaded: Promise<void>
-  /** False when the stored scene was unreadable: writing would erase it. */
-  persistable: boolean
   elements: SceneElement[]
   /** Cached for the live badge. */
   ownerId: string | null
@@ -104,7 +104,6 @@ function ensureRoom(registry: RoomRegistry, roomId: string): Room {
     seats: new Map(),
     follows: new Map(),
     loaded: Promise.resolve(),
-    persistable: false,
     elements: [],
     ownerId: null,
     dirty: false,
@@ -112,21 +111,32 @@ function ensureRoom(registry: RoomRegistry, roomId: string): Room {
     flushing: Promise.resolve(),
   }
   registry.rooms.set(roomId, room)
+
+  // Drops the Room and hangs up on everyone seated while it loaded.
+  const abandon = (code: number, reason: string) => {
+    if (registry.rooms.get(roomId) === room) registry.rooms.delete(roomId)
+    const seats = [...room.seats.values()]
+    room.seats.clear()
+    room.follows.clear()
+    for (const { peer } of seats) peer.close(code, reason)
+  }
+
   room.loaded = registry.loadScene(roomId).then(
     (stored) => {
+      // Unreadable JSON would open empty and could never be written back, so
+      // every edit in it would be lost. No Room at all instead.
+      if (!stored.readable)
+        return abandon(
+          SCENE_UNREADABLE_CLOSE_CODE,
+          SCENE_UNREADABLE_CLOSE_REASON,
+        )
       room.elements = stored.elements
       room.ownerId = stored.ownerId
-      // Unreadable JSON leaves the Room open but never writing.
-      room.persistable = stored.readable
     },
     (error) => {
-      // Drop the Room and hang up, so clients reconnect into a fresh read.
+      // Clients reconnect into a fresh read.
       console.error(`[collab] could not load scene for room ${roomId}`, error)
-      if (registry.rooms.get(roomId) === room) registry.rooms.delete(roomId)
-      const seats = [...room.seats.values()]
-      room.seats.clear()
-      room.follows.clear()
-      for (const { peer } of seats) peer.close(1011, "Scene unavailable")
+      abandon(1011, "Scene unavailable")
     },
   )
   return room
@@ -138,19 +148,16 @@ function disarmFlush(room: Room) {
   room.flushTimer = null
 }
 
-// Without `persistable`, an unreadable Room stays dirty and is never reaped.
-const hasUnwrittenWork = (room: Room) => room.dirty && room.persistable
-
 /** Drops an empty, written Room. Also runs after writes: a leave can race one. */
 function reapIfIdle(registry: RoomRegistry, room: Room) {
-  if (room.seats.size > 0 || hasUnwrittenWork(room)) return
+  if (room.seats.size > 0 || room.dirty) return
   if (registry.rooms.get(room.id) !== room) return
   disarmFlush(room)
   registry.rooms.delete(room.id)
 }
 
 function armFlush(registry: RoomRegistry, room: Room) {
-  if (room.flushTimer !== null || !room.persistable) return
+  if (room.flushTimer !== null) return
   room.flushTimer = setTimeout(() => {
     room.flushTimer = null
     void flushRoom(registry, room)
@@ -168,7 +175,7 @@ function markDirty(registry: RoomRegistry, room: Room) {
  */
 function flushRoom(registry: RoomRegistry, room: Room): Promise<void> {
   disarmFlush(room)
-  if (!hasUnwrittenWork(room)) return room.flushing
+  if (!room.dirty) return room.flushing
 
   room.dirty = false
   room.flushing = room.flushing.then(() =>

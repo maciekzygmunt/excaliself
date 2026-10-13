@@ -36,19 +36,24 @@ vi.mock("@tanstack/react-router", () => ({
 vi.mock("@/features/shares/server", () => ({ resolveShareToken: vi.fn() }))
 
 // The real one drags Excalidraw into jsdom; this slice is about the states
-// around the canvas, not the canvas. The button stands in for the room
-// closing the socket at its participant cap.
+// around the canvas, not the canvas. The buttons stand in for the room
+// closing the socket at its participant cap, or on a damaged scene.
 vi.mock("./-components/SharedCanvas", () => ({
   default: ({
     token,
     onRoomFull,
+    onSceneUnreadable,
   }: {
     token: string
     onRoomFull: () => void
+    onSceneUnreadable: () => void
   }) => (
     <div data-testid="shared-canvas" data-token={token}>
       <button type="button" onClick={onRoomFull}>
         Refuse the join
+      </button>
+      <button type="button" onClick={onSceneUnreadable}>
+        Refuse the scene
       </button>
     </div>
   ),
@@ -248,6 +253,17 @@ test("a refused join sends the visitor to the room-full state", async () => {
     search: { full: true },
     replace: true,
   })
+})
+
+test("a damaged scene replaces the canvas with a page that says so", async () => {
+  await renderShare(OK)
+  fireEvent.click(
+    await screen.findByRole("button", { name: "Refuse the scene" }),
+  )
+  expect(
+    screen.getByRole("heading", { name: "This drawing can't be opened" }),
+  ).toBeDefined()
+  expect(screen.queryByTestId("shared-canvas")).toBeNull()
 })
 
 test("a throttled visit gets its own retryable state, not the dead link", async () => {

@@ -1,11 +1,12 @@
 import { createFileRoute, useNavigate, useRouter } from "@tanstack/react-router"
 import { createClientOnlyFn } from "@tanstack/react-start"
-import { lazy, Suspense } from "react"
+import { lazy, Suspense, useState } from "react"
 import { Mark } from "@/components/identity"
 import { resolveShareToken } from "@/features/shares/server"
 import { useApplyTheme } from "@/hooks/use-theme"
 import { useDocumentTitle } from "@/lib/document-title"
 import { DeadLink } from "./-components/DeadLink"
+import { DrawingDamaged } from "./-components/DrawingDamaged"
 import { DrawingFull } from "./-components/DrawingFull"
 import { SignInGate } from "./-components/SignInGate"
 import { TooManyAttempts } from "./-components/TooManyAttempts"
@@ -42,6 +43,8 @@ function SharePage() {
   const { full } = Route.useSearch()
   const router = useRouter()
   const navigate = useNavigate({ from: "/share/$token" })
+  // Not in the URL: a reload should try the room again.
+  const [sceneUnreadable, setSceneUnreadable] = useState(false)
   // The bootstrap script forces light on load; this covers SPA navigation.
   useApplyTheme("light")
   useDocumentTitle(
@@ -68,6 +71,8 @@ function SharePage() {
       <DrawingFull onRetry={() => navigate({ search: {}, replace: true })} />
     )
 
+  if (sceneUnreadable) return <DrawingDamaged />
+
   return (
     <Suspense fallback={<LoadingState />}>
       <SharedCanvas
@@ -77,6 +82,7 @@ function SharePage() {
         onRoomFull={() => navigate({ search: { full: true }, replace: true })}
         // The loader decides the page: dead link or sign-in gate.
         onLinkDead={() => router.invalidate()}
+        onSceneUnreadable={() => setSceneUnreadable(true)}
       />
     </Suspense>
   )

@@ -27,6 +27,7 @@ import {
   LINK_DEAD_CLOSE_CODE,
   parseServerMessage,
   ROOM_FULL_CLOSE_CODE,
+  SCENE_UNREADABLE_CLOSE_CODE,
 } from "./protocol"
 import { roomSocketUrl } from "./room-url"
 import {
@@ -63,11 +64,20 @@ export function useRoom(options: {
   onRoomFull: () => void
   /** The token no longer resolves; the socket stops and the page re-resolves it. */
   onLinkDead: () => void
+  /** The stored scene is damaged, so no room opens; the socket stops. */
+  onSceneUnreadable: () => void
   /** Image ids already stored before this visit. Must be referentially stable. */
   storedFileIds: readonly string[]
 }) {
-  const { token, name, excalidrawAPI, onRoomFull, onLinkDead, storedFileIds } =
-    options
+  const {
+    token,
+    name,
+    excalidrawAPI,
+    onRoomFull,
+    onLinkDead,
+    onSceneUnreadable,
+    storedFileIds,
+  } = options
 
   const [participants, setParticipants] = useState<Participant[]>([])
   const [selfConnectionId, setSelfConnectionId] = useState<string | null>(null)
@@ -90,6 +100,8 @@ export function useRoom(options: {
   onRoomFullRef.current = onRoomFull
   const onLinkDeadRef = useRef(onLinkDead)
   onLinkDeadRef.current = onLinkDead
+  const onSceneUnreadableRef = useRef(onSceneUnreadable)
+  onSceneUnreadableRef.current = onSceneUnreadable
 
   const pushCollaborators = useCallback(() => {
     apiRef.current?.updateScene({
@@ -313,6 +325,10 @@ export function useRoom(options: {
         }
         if (event.code === LINK_DEAD_CLOSE_CODE) {
           onLinkDeadRef.current()
+          return
+        }
+        if (event.code === SCENE_UNREADABLE_CLOSE_CODE) {
+          onSceneUnreadableRef.current()
           return
         }
 

@@ -11,7 +11,11 @@ import { afterEach, beforeEach, expect, test, vi } from "vitest"
 import { RECONNECT_MAX_DELAY_MS } from "./backoff"
 import { HEARTBEAT_INTERVAL_MS, HEARTBEAT_TIMEOUT_MS } from "./heartbeat"
 import type { SceneElement, ServerMessage } from "./protocol"
-import { LINK_DEAD_CLOSE_CODE, ROOM_FULL_CLOSE_CODE } from "./protocol"
+import {
+  LINK_DEAD_CLOSE_CODE,
+  ROOM_FULL_CLOSE_CODE,
+  SCENE_UNREADABLE_CLOSE_CODE,
+} from "./protocol"
 import { reconcileElements } from "./reconcile"
 import type { ConnectionStatus } from "./use-room"
 import { useRoom } from "./use-room"
@@ -192,6 +196,7 @@ function renderRoom(
   let status: ConnectionStatus = "connecting"
   const onRoomFull = vi.fn()
   const onLinkDead = vi.fn()
+  const onSceneUnreadable = vi.fn()
   function Harness({ token }: { token: string }) {
     const room = useRoom({
       token,
@@ -200,6 +205,7 @@ function renderRoom(
       excalidrawAPI: api as never,
       onRoomFull,
       onLinkDead,
+      onSceneUnreadable,
       storedFileIds,
     })
     onChange = room.onChange as never
@@ -217,6 +223,7 @@ function renderRoom(
     retoken: (next: string) => act(() => rerender(<Harness token={next} />)),
     onRoomFull,
     onLinkDead,
+    onSceneUnreadable,
     status: () => status,
     /** The socket the hook is on now — a reconnect makes a new one. */
     latest: () => sockets[sockets.length - 1],
@@ -430,6 +437,17 @@ test("a link that died is reported, not retried", () => {
   waitOutBackoff()
 
   expect(onLinkDead).toHaveBeenCalledTimes(1)
+  expect(sockets).toHaveLength(1)
+})
+
+test("a damaged stored scene is reported, not retried", () => {
+  const { socket, onSceneUnreadable } = renderRoom(fakeExcalidraw())
+  act(() => socket.receive(joined()))
+
+  act(() => socket.close(SCENE_UNREADABLE_CLOSE_CODE))
+  waitOutBackoff()
+
+  expect(onSceneUnreadable).toHaveBeenCalledTimes(1)
   expect(sockets).toHaveLength(1)
 })
 

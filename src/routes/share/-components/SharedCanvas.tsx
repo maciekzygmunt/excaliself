@@ -39,6 +39,7 @@ type Props = {
   token: string
   onRoomFull: () => void
   onLinkDead: () => void
+  onSceneUnreadable: () => void
 }
 
 export function SharedCanvas({
@@ -47,6 +48,7 @@ export function SharedCanvas({
   token,
   onRoomFull,
   onLinkDead,
+  onSceneUnreadable,
 }: Props) {
   const initialData = useMemo(
     () => buildInitialSceneData({ data: drawing.data, files }).initialData,
@@ -66,6 +68,7 @@ export function SharedCanvas({
     excalidrawAPI,
     onRoomFull,
     onLinkDead,
+    onSceneUnreadable,
     storedFileIds,
   })
   // A reset would wipe the drawing for everyone in the room.

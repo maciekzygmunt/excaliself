@@ -14,9 +14,9 @@ Live canvas sharing reuses excalidraw-room's message shapes (SCENE_INIT / SCENE_
 ## Implementation notes
 
 - **Link changes:** every stop, regenerate, audience change and trash writes the `shares` row first, then updates the Room. A socket is seated first and then checks its token again, so a link that dies during the handshake either fails that check or finds the seat to evict.
-- **Close codes:** a dead link or a full room is an accepted socket closed with 4010 or 4029. A refused handshake reaches the browser as an opaque 1006, which a client cannot tell from an outage, so it would retry forever. 4010 is the only close that stops reconnecting (and 4029 before the first join).
+- **Close codes:** a dead link, a full room or an unreadable scene is an accepted socket closed with 4010, 4029 or 4022. A refused handshake reaches the browser as an opaque 1006, which a client cannot tell from an outage, so it would retry forever. 4010 and 4022 stop reconnecting (and 4029 before the first join).
 - **Ending a Room:** seats are cleared before the final flush, which freezes the scene that write sees. Clearing them after would let an edit merge mid-write and land later as a retry over the owner's newer solo saves.
-- **Unreadable scenes:** a Room whose stored scene can't be parsed relays edits but never writes, so an empty canvas never replaces a recoverable file.
+- **Unreadable scenes:** no Room opens on a stored scene that can't be parsed. It would start empty and could never write, so edits made in it would be lost. Joins close with 4022; the owner stops sharing to recover it solo.
 - **Ghost seats:** silent connections are swept on join, not on a timer. A half-open socket holds one of the 25 seats, and enough of them would refuse a reconnecting tab that holds unsaved edits.
 - **One instance per process:** the websocket route and the server functions are separate bundles, so the Room registry and rate limiters live on `globalThis` (`processSingleton`).
 - **Client traffic:** cursors, viewports and scene deltas stay in refs and go straight to `updateScene`; only the roster is React state. Frames are split under the server's frame cap, because an oversized frame closes the socket and a resend would loop.
