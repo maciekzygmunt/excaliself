@@ -1,51 +1,24 @@
-import {
-  type ReactNode,
-  useCallback,
-  useLayoutEffect,
-  useRef,
-  useState,
-} from "react"
+import { type ReactNode, useLayoutEffect, useState } from "react"
 import { createPortal } from "react-dom"
 
-// Excalidraw mounts its UI slots asynchronously; we retry for ~4s
-// (240 frames at 60fps) before giving up so a portal target can be found
-// without flashing the absence of our controls.
-const TARGET_RESOLVE_RETRY_FRAMES = 240
-
+// Excalidraw mounts its UI slots late and re-creates them when it switches
+// between its mobile and desktop layouts (on window or canvas resize). We
+// watch the DOM and look the target up again while it is missing or detached.
 function useExcalidrawPortalTarget(findTarget: () => HTMLElement | null) {
   const [target, setTarget] = useState<HTMLElement | null>(null)
-  const rafRef = useRef<number | null>(null)
-  const targetRef = useRef<HTMLElement | null>(null)
-  const retryRef = useRef(0)
-
-  const resolveTarget = useCallback(() => {
-    if (rafRef.current !== null) cancelAnimationFrame(rafRef.current)
-    rafRef.current = requestAnimationFrame(() => {
-      const next = findTarget()
-      if (targetRef.current !== next) {
-        targetRef.current = next
-        setTarget(next)
-      }
-      if (!next && retryRef.current < TARGET_RESOLVE_RETRY_FRAMES) {
-        retryRef.current += 1
-        resolveTarget()
-      }
-    })
-  }, [findTarget])
 
   useLayoutEffect(() => {
-    retryRef.current = 0
-    resolveTarget()
-    const onResize = () => {
-      retryRef.current = 0
-      resolveTarget()
+    let current: HTMLElement | null = null
+    const resolve = () => {
+      if (current?.isConnected) return
+      current = findTarget()
+      setTarget(current)
     }
-    window.addEventListener("resize", onResize)
-    return () => {
-      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current)
-      window.removeEventListener("resize", onResize)
-    }
-  }, [resolveTarget])
+    resolve()
+    const observer = new MutationObserver(resolve)
+    observer.observe(document.body, { childList: true, subtree: true })
+    return () => observer.disconnect()
+  }, [findTarget])
 
   return target
 }
