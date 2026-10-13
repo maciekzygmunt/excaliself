@@ -268,14 +268,7 @@ export function DrawingCanvas({ drawingId, readOnly = false }: Props) {
             ? undefined
             : () => (
                 <>
-                  <PresenceAvatars
-                    className={PRESENCE_CLASS}
-                    participants={room.others}
-                    followedConnectionId={
-                      room.followedParticipant?.connectionId ?? null
-                    }
-                    onFollow={room.toggleFollow}
-                  />
+                  <PresenceAvatars room={room} className={PRESENCE_CLASS} />
                   <Button
                     onClick={() => setShareOpen(true)}
                     aria-label="Share"
@@ -302,14 +295,7 @@ export function DrawingCanvas({ drawingId, readOnly = false }: Props) {
             status={room.connectionStatus}
             className={PRESENCE_MENU_ROW_CLASS}
           />
-          <MenuParticipants
-            className={PRESENCE_MENU_ROW_CLASS}
-            participants={room.others}
-            followedConnectionId={
-              room.followedParticipant?.connectionId ?? null
-            }
-            onFollow={room.toggleFollow}
-          />
+          <MenuParticipants room={room} className={PRESENCE_MENU_ROW_CLASS} />
           <MainMenu.Item
             icon={<PanelLeftIcon className="h-4 w-4" />}
             onSelect={toggleSidebar}
@@ -367,10 +353,7 @@ export function DrawingCanvas({ drawingId, readOnly = false }: Props) {
           />
         </TopLeftPortal>
       </Excalidraw>
-      <FollowModeOverlay
-        participant={room.followedParticipant}
-        onStop={room.stopFollowing}
-      />
+      <FollowModeOverlay room={room} />
       {!readOnly && (
         <ShareDialog
           drawingId={drawingId}

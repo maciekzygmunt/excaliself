@@ -78,17 +78,7 @@ export function SharedCanvas({
   const [name, setName] = useState(getOrCreateGuestName)
 
   // `self` is how the room sees this tab — null until the join lands.
-  const {
-    self,
-    others,
-    connectionStatus,
-    onChange,
-    onPointerUpdate,
-    followedParticipant,
-    onScrollChange,
-    toggleFollow,
-    stopFollowing,
-  } = useRoom({
+  const room = useRoom({
     token,
     name,
     excalidrawAPI,
@@ -112,12 +102,12 @@ export function SharedCanvas({
   // working pill rather than a permanently frozen one. The cost is that a
   // member who renames in that window watches the pill snap back to their
   // session name when the roster lands.
-  const isGuest = self?.isGuest ?? true
+  const isGuest = room.self?.isGuest ?? true
   // A guest is shown the name it holds locally, never the roster's copy: the
   // server seats it under a pseudonym of its own until the JOIN carrying the
   // real name lands, and that stand-in must not flash through the pill. A
   // member's name is only ever the session's, which arrives with the roster.
-  const shownName = isGuest ? name : (self?.name ?? name)
+  const shownName = isGuest ? name : (room.self?.name ?? name)
 
   return (
     <div className="@container/canvas relative h-dvh w-full">
@@ -125,9 +115,9 @@ export function SharedCanvas({
         initialData={initialData}
         excalidrawAPI={setExcalidrawAPI}
         theme="light"
-        onChange={onChange}
-        onPointerUpdate={onPointerUpdate}
-        onScrollChange={onScrollChange}
+        onChange={room.onChange}
+        onPointerUpdate={room.onPointerUpdate}
+        onScrollChange={room.onScrollChange}
         // Excalidraw lays this row out after its toolbar without wrapping, so
         // in mobile layout it starts past the right edge whatever is in it.
         // Everything moves to the burger menu there rather than clipping.
@@ -137,18 +127,13 @@ export function SharedCanvas({
               {/* Where the avatars were: a disconnected tab has no roster to
                   show, so the two never compete for the row. */}
               <ReconnectingIndicator
-                status={connectionStatus}
+                status={room.connectionStatus}
                 className={PRESENCE_CLASS}
               />
-              <PresenceAvatars
-                className={PRESENCE_CLASS}
-                participants={others}
-                followedConnectionId={followedParticipant?.connectionId ?? null}
-                onFollow={toggleFollow}
-              />
+              <PresenceAvatars room={room} className={PRESENCE_CLASS} />
               <GuestNamePill
                 name={shownName}
-                color={self?.color ?? null}
+                color={room.self?.color ?? null}
                 editable={isGuest}
                 onNameChange={handleNameChange}
                 className={NAME_PILL_CLASS}
@@ -169,19 +154,14 @@ export function SharedCanvas({
             already turns off for this surface. */}
         <MainMenu>
           <MenuReconnecting
-            status={connectionStatus}
+            status={room.connectionStatus}
             className={PRESENCE_MENU_ROW_CLASS}
           />
-          <MenuParticipants
-            className={PRESENCE_MENU_ROW_CLASS}
-            participants={others}
-            followedConnectionId={followedParticipant?.connectionId ?? null}
-            onFollow={toggleFollow}
-          />
+          <MenuParticipants room={room} className={PRESENCE_MENU_ROW_CLASS} />
           <div className={NAME_MENU_ROW_CLASS}>
             <GuestNamePill
               name={shownName}
-              color={self?.color ?? null}
+              color={room.self?.color ?? null}
               editable={isGuest}
               onNameChange={handleNameChange}
               // In the menu it is a row, not an island: no card of its own,
@@ -209,10 +189,7 @@ export function SharedCanvas({
       </Excalidraw>
       {/* Outside the canvas, so the ring frames the whole surface — chrome
           portaled inside would sit under it. */}
-      <FollowModeOverlay
-        participant={followedParticipant}
-        onStop={stopFollowing}
-      />
+      <FollowModeOverlay room={room} />
     </div>
   )
 }

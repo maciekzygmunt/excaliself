@@ -10,24 +10,21 @@
  */
 
 import { initialsOf } from "@/features/collab/identity"
-import type { Participant } from "@/features/collab/protocol"
+import type { RoomPresence } from "@/features/collab/use-room"
 import { cn } from "@/lib/utils"
 
 /** Beyond this the stack turns into a "+N" tail rather than growing. */
 const MAX_AVATARS = 4
 
 export function PresenceAvatars({
-  participants,
-  followedConnectionId,
-  onFollow,
+  room,
   className,
 }: {
-  participants: readonly Participant[]
-  /** Whose avatar should read as "you are following this one". */
-  followedConnectionId: string | null
-  onFollow: (participant: Participant) => void
+  room: RoomPresence
   className?: string
 }) {
+  const participants = room.others
+  const followedConnectionId = room.followedParticipant?.connectionId
   if (participants.length === 0) return null
 
   const shown = participants.slice(0, MAX_AVATARS)
@@ -51,7 +48,7 @@ export function PresenceAvatars({
                 ? `Stop following ${participant.name}`
                 : `Follow ${participant.name}`
             }
-            onClick={() => onFollow(participant)}
+            onClick={() => room.toggleFollow(participant)}
             className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-full text-[0.625rem] font-semibold text-white ring-2 ring-(--island-bg-color) transition-transform hover:scale-110"
             style={{
               backgroundColor: participant.color.background,

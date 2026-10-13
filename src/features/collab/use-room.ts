@@ -75,6 +75,12 @@ type PointerMove = Omit<PointerUpdate, "selectedElementIds">
  */
 export type ConnectionStatus = "connecting" | "connected" | "reconnecting"
 
+/** What the presence chrome reads from a room. */
+export type RoomPresence = Pick<
+  ReturnType<typeof useRoom>,
+  "others" | "followedParticipant" | "toggleFollow" | "stopFollowing"
+>
+
 export function useRoom(options: {
   /** The share token from the URL; null keeps the socket closed. */
   token: string | null

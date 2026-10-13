@@ -5,19 +5,17 @@
  */
 
 import { MainMenu } from "@excalidraw/excalidraw"
-import type { Participant } from "@/features/collab/protocol"
+import type { RoomPresence } from "@/features/collab/use-room"
 
 export function MenuParticipants({
-  participants,
-  followedConnectionId,
-  onFollow,
+  room,
   className,
 }: {
-  participants: readonly Participant[]
-  followedConnectionId: string | null
-  onFollow: (participant: Participant) => void
+  room: RoomPresence
   className?: string
 }) {
+  const participants = room.others
+  const followedConnectionId = room.followedParticipant?.connectionId
   if (participants.length === 0) return null
 
   return (
@@ -30,7 +28,7 @@ export function MenuParticipants({
           return (
             <MainMenu.Item
               key={participant.connectionId}
-              onSelect={() => onFollow(participant)}
+              onSelect={() => room.toggleFollow(participant)}
               icon={
                 <span
                   aria-hidden="true"

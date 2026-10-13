@@ -12,16 +12,10 @@
  * guest canvas and the owner's canvas.
  */
 
-import type { Participant } from "@/features/collab/protocol"
+import type { RoomPresence } from "@/features/collab/use-room"
 
-export function FollowModeOverlay({
-  participant,
-  onStop,
-}: {
-  /** The person being followed; null renders nothing. */
-  participant: Participant | null
-  onStop: () => void
-}) {
+export function FollowModeOverlay({ room }: { room: RoomPresence }) {
+  const participant = room.followedParticipant
   if (!participant) return null
 
   return (
@@ -33,7 +27,7 @@ export function FollowModeOverlay({
     >
       <button
         type="button"
-        onClick={onStop}
+        onClick={room.stopFollowing}
         className="pointer-events-auto mb-4 cursor-pointer rounded-full px-3 py-1.5 text-xs font-medium text-white shadow-sm transition-opacity hover:opacity-90"
         style={{ backgroundColor: participant.color.background }}
       >

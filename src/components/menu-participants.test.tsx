@@ -2,6 +2,7 @@ import { cleanup, render, screen } from "@testing-library/react"
 import type { ReactNode } from "react"
 import { afterEach, expect, test, vi } from "vitest"
 import type { Participant } from "@/features/collab/protocol"
+import type { RoomPresence } from "@/features/collab/use-room"
 import { MenuParticipants } from "./menu-participants"
 
 /**
@@ -44,13 +45,20 @@ const participant = (name: string, i: number): Participant => ({
   isGuest: true,
 })
 
+const roomWith = (
+  others: Participant[],
+  followedParticipant: Participant | null,
+  toggleFollow: (participant: Participant) => void,
+): RoomPresence => ({
+  others,
+  followedParticipant,
+  toggleFollow,
+  stopFollowing: () => {},
+})
+
 test("a room with nobody else in it adds nothing to the menu", () => {
   const { container } = render(
-    <MenuParticipants
-      participants={[]}
-      followedConnectionId={null}
-      onFollow={() => {}}
-    />,
+    <MenuParticipants room={roomWith([], null, () => {})} />,
   )
   expect(container.firstChild).toBeNull()
 })
@@ -60,9 +68,7 @@ test("each person is a row that starts following them", () => {
   const wren = participant("Wren", 1)
   render(
     <MenuParticipants
-      participants={[wren, participant("Ada Lovelace", 2)]}
-      followedConnectionId={null}
-      onFollow={onFollow}
+      room={roomWith([wren, participant("Ada Lovelace", 2)], null, onFollow)}
     />,
   )
 
@@ -74,13 +80,7 @@ test("each person is a row that starts following them", () => {
 test("the row you are following offers to stop instead", () => {
   const onFollow = vi.fn()
   const wren = participant("Wren", 1)
-  render(
-    <MenuParticipants
-      participants={[wren]}
-      followedConnectionId={wren.connectionId}
-      onFollow={onFollow}
-    />,
-  )
+  render(<MenuParticipants room={roomWith([wren], wren, onFollow)} />)
 
   expect(screen.getByText("1 other person here")).toBeTruthy()
   screen.getByRole("button", { name: "Stop following Wren" }).click()

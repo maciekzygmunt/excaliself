@@ -19,9 +19,15 @@ const renderAvatars = (props: {
 }) =>
   render(
     <PresenceAvatars
-      participants={props.participants}
-      followedConnectionId={props.followedConnectionId ?? null}
-      onFollow={props.onFollow ?? (() => {})}
+      room={{
+        others: [...props.participants],
+        followedParticipant:
+          props.participants.find(
+            (p) => p.connectionId === props.followedConnectionId,
+          ) ?? null,
+        toggleFollow: props.onFollow ?? (() => {}),
+        stopFollowing: () => {},
+      }}
     />,
   )
 
