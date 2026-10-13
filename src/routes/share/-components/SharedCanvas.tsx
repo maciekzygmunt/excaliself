@@ -22,6 +22,7 @@ import {
   type PersistedFile,
 } from "@/features/drawings/scene"
 import { useBlockClearCanvasShortcut } from "@/hooks/use-block-clear-canvas-shortcut"
+import { usePreloadTextFont } from "@/hooks/use-preload-text-font"
 import { GuestAttribution } from "./GuestAttribution"
 import { GuestNamePill } from "./GuestNamePill"
 import { GuestTitle } from "./GuestTitle"
@@ -65,6 +66,7 @@ export function SharedCanvas({
   const storedFileIds = useMemo(() => files.map((file) => file.fileId), [files])
   const [excalidrawAPI, setExcalidrawAPI] =
     useState<ExcalidrawImperativeAPI | null>(null)
+  usePreloadTextFont(excalidrawAPI)
 
   // Members send it too; the server uses their session name instead.
   const [name, setName] = useState(getOrCreateGuestName)
