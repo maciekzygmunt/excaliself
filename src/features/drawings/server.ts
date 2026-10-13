@@ -6,8 +6,7 @@ import { and, desc, eq, isNotNull, isNull } from "drizzle-orm"
 import { z } from "zod"
 import { db } from "@/db"
 import { drawingFiles, drawings, folders } from "@/db/schema"
-import { rooms } from "@/features/collab/room-registry"
-import { terminateRoom } from "@/features/collab/room-session"
+import { endRooms } from "@/features/collab/room-registry"
 import { assertFolderTarget } from "@/features/folders/ownership"
 import { findNearestLiveAncestorId } from "@/features/folders/subtree"
 import { authMiddleware } from "@/middleware/auth"
@@ -182,7 +181,7 @@ export const trashDrawing = createServerFn({ method: "POST" })
     // survives, which is what makes restore revive the existing link; the
     // evicted guests re-validate, hit the `deletedAt` check, and land on the
     // same generic dead-link page a stopped link gets.
-    await terminateRoom(rooms, id)
+    await endRooms([id])
   })
 
 /**

@@ -6,8 +6,7 @@ import { and, asc, eq, inArray, isNull } from "drizzle-orm"
 import { z } from "zod"
 import { db } from "@/db"
 import { drawings, folders } from "@/db/schema"
-import { rooms } from "@/features/collab/room-registry"
-import { terminateRoom } from "@/features/collab/room-session"
+import { endRooms } from "@/features/collab/room-registry"
 import { authMiddleware } from "@/middleware/auth"
 import { assertFolderTarget } from "./ownership"
 import { collectFolderSubtreeIds, findNearestLiveAncestorId } from "./subtree"
@@ -143,7 +142,7 @@ export const trashFolder = createServerFn({ method: "POST" })
     // A drawing swept along by its folder is trashed like any other, and its
     // live session ends the same way (spec §5.1): final flush, every socket
     // closed, link dead until the folder is restored.
-    for (const drawing of swept) await terminateRoom(rooms, drawing.id)
+    await endRooms(swept.map((drawing) => drawing.id))
   })
 
 /**

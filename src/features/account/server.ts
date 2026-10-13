@@ -13,8 +13,7 @@ import {
   sharedDrawingIds,
 } from "@/features/admin/delete-user"
 import { isLastAdmin } from "@/features/admin/roles"
-import { rooms } from "@/features/collab/room-registry"
-import { terminateRoom } from "@/features/collab/room-session"
+import { endRooms } from "@/features/collab/room-registry"
 import { auth } from "@/lib/auth"
 import { authMiddleware } from "@/middleware/auth"
 import { compareSessions } from "./sessions"
@@ -200,7 +199,7 @@ export const deleteMyAccount = createServerFn({ method: "POST" })
     const shared = await sharedDrawingIds(db, userId)
     await hardDeleteUser(db, userId)
     // Hang up on live rooms; their flush finds no row and writes nothing.
-    for (const id of shared) await terminateRoom(rooms, id)
+    await endRooms(shared)
     // The session rows died with the user, but the browser still holds the
     // session cookie, whose cookie cache would keep reporting the account
     // for up to five minutes. Sign out to clear it — best-effort, because a

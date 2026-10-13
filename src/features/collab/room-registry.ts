@@ -11,6 +11,7 @@ import {
   createRoomRegistry,
   flushAllRooms,
   type RoomRegistry,
+  terminateRoom,
 } from "./room-session"
 import { loadRoomScene, saveRoomScene } from "./scene-store"
 import { registerShutdownFlush } from "./shutdown"
@@ -47,3 +48,8 @@ const host = globalThis as Host
 host[REGISTRY] ??= createHostRegistry()
 
 export const rooms: RoomRegistry = host[REGISTRY]
+
+/** Ends these drawings' live Rooms in parallel: each one flushes, then hangs up. */
+export async function endRooms(drawingIds: string[]): Promise<void> {
+  await Promise.all(drawingIds.map((id) => terminateRoom(rooms, id)))
+}
