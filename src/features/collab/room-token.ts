@@ -1,19 +1,20 @@
 /**
- * Token → room, for every guest-reachable surface that isn't the share page:
- * the websocket upgrade and the room-scoped image endpoints (spec §2.4, §4.1).
- *
- * Both surfaces owe the visitor the same three checks — the token resolves,
- * the audience admits them, the drawing isn't trashed — and "the same way the
- * websocket does" is only true if it is literally the same call. The decision
- * itself stays in `resolveRoomJoin`, which is pure; this is the pair of
- * lookups it needs.
+ * Token → room, for the websocket and the room-scoped image endpoints. Both
+ * run the same checks as the share page (spec §4.1), through this one call.
  */
 
 import type { NodePgDatabase } from "drizzle-orm/node-postgres"
 import type * as schema from "@/db/schema"
+import { resolveShareAccess } from "@/features/shares/access"
 import { resolveShareForRoom } from "@/features/shares/store"
 import { auth } from "@/lib/auth"
-import { type RoomJoin, resolveRoomJoin } from "./join"
+import { memberDisplayName } from "./identity"
+import type { ParticipantIdentity } from "./room-session"
+
+export type RoomJoin =
+  | { status: "ok"; roomId: string; identity: ParticipantIdentity }
+  /** Every refusal reason, so nothing tells whether the drawing exists. */
+  | { status: "refused" }
 
 export async function resolveRoomForToken(
   db: NodePgDatabase<typeof schema>,
@@ -24,5 +25,17 @@ export async function resolveRoomForToken(
     token ? resolveShareForRoom(db, token) : null,
     auth.api.getSession({ headers }),
   ])
-  return resolveRoomJoin({ share, user: session?.user ?? null })
+  const user = session?.user ?? null
+  const access = resolveShareAccess({ share, hasSession: user !== null })
+  if (access !== "ok" || !share) return { status: "refused" }
+
+  return {
+    status: "ok",
+    // One Room per drawing, not per token: a regenerated link meets the same room.
+    roomId: share.drawing.id,
+    identity: {
+      userId: user?.id ?? null,
+      displayName: user ? memberDisplayName(user) : null,
+    },
+  }
 }

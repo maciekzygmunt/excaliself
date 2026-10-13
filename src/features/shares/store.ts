@@ -189,7 +189,6 @@ export async function resolveShareVisit(
 
   const access = resolveShareAccess({
     share: resolved,
-    drawing: resolved?.drawing ?? null,
     hasSession: resolved?.audience === "members" ? await hasSession() : false,
   })
 

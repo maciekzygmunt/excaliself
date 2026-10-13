@@ -24,15 +24,12 @@ export type ShareAccess =
   | "dead"
 
 export function resolveShareAccess(input: {
-  /** The share row the token resolved to, or null for an unknown token. */
-  share: { audience: ShareAudience } | null
-  /** The shared drawing, when the token resolved. */
-  drawing: { deletedAt: Date | null } | null
+  /** The share row with its drawing, or null for an unknown token. */
+  share: { audience: ShareAudience; drawing: { deletedAt: Date | null } } | null
   hasSession: boolean
 }): ShareAccess {
-  const { share, drawing, hasSession } = input
-  if (!share || !drawing) return "dead"
-  if (drawing.deletedAt !== null) return "dead"
+  const { share, hasSession } = input
+  if (!share || share.drawing.deletedAt !== null) return "dead"
   if (!admitsGuests(share.audience) && !hasSession) return "signin"
   return "ok"
 }
