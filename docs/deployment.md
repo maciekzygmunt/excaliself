@@ -114,7 +114,8 @@ docker compose start excaliself
 
 Restore into the same or a newer version of the app: it migrates the data on
 start. An older version cannot read a newer dump, because there are no down
-migrations.
+migrations. Take a dump before each upgrade: restoring it is the safe way
+back to the older version.
 
 On Coolify, run the same commands against the `db` container from the
 server's shell, with `docker exec` and the container name from `docker ps`.

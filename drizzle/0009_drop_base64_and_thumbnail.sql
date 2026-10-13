@@ -9,6 +9,9 @@
 --   UPDATE drawing_files SET "dataUrl" = 'data:' || "mimeType" || ';base64,'
 --     || translate(encode("bytes", 'base64'), E'\n', '');
 --   ALTER TABLE drawing_files ALTER COLUMN "dataUrl" SET NOT NULL;
+--   ALTER TABLE drawing_files ALTER COLUMN "bytes" DROP NOT NULL;
+-- The UPDATE rebuilds every dataUrl from bytes; the last line lets the older
+-- image, which never writes bytes, save images.
 DELETE FROM "drawing_files" WHERE "bytes" IS NULL;--> statement-breakpoint
 ALTER TABLE "drawing_files" ALTER COLUMN "bytes" SET NOT NULL;--> statement-breakpoint
 ALTER TABLE "drawing_files" DROP COLUMN "dataUrl";--> statement-breakpoint
