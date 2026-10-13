@@ -12,24 +12,23 @@ export const getInstanceStats = createServerFn({ method: "GET" })
   .handler(async () => {
     const [userCount] = await db.select({ value: count() }).from(users)
     // Drawing count matches what users see (trash excluded); storage is the
-    // physical bytes held, trash included — scene JSON, thumbnails, and the
-    // embedded-image data URLs in drawing_files.
+    // physical bytes held, trash included — scene JSON and the embedded
+    // images in drawing_files.
     const [drawingCount] = await db
       .select({ value: count() })
       .from(drawings)
       .where(isNull(drawings.deletedAt))
     const [sceneBytes] = await db
       .select({
-        value:
-          sql`coalesce(sum(octet_length(${drawings.data}) + coalesce(octet_length(${drawings.thumbnail}), 0)), 0)`.mapWith(
-            Number,
-          ),
+        value: sql`coalesce(sum(octet_length(${drawings.data})), 0)`.mapWith(
+          Number,
+        ),
       })
       .from(drawings)
     const [fileBytes] = await db
       .select({
         value:
-          sql`coalesce(sum(octet_length(${drawingFiles.dataUrl})), 0)`.mapWith(
+          sql`coalesce(sum(octet_length(${drawingFiles.bytes})), 0)`.mapWith(
             Number,
           ),
       })

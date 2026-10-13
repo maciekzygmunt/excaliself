@@ -5,6 +5,7 @@ import { and, eq, isNull } from "drizzle-orm"
 import type { NodePgDatabase } from "drizzle-orm/node-postgres"
 import type * as schema from "@/db/schema"
 import { drawingFiles, drawings, shares } from "@/db/schema"
+import { bytesToDataUrl } from "@/features/drawings/file-bytes"
 import { resolveShareAccess, type ShareAudience } from "./access"
 
 type Db = NodePgDatabase<typeof schema>
@@ -173,7 +174,7 @@ export async function resolveShareVisit(
     .select({
       fileId: drawingFiles.fileId,
       mimeType: drawingFiles.mimeType,
-      dataUrl: drawingFiles.dataUrl,
+      bytes: drawingFiles.bytes,
     })
     .from(drawingFiles)
     .where(eq(drawingFiles.drawingId, resolved.drawing.id))
@@ -186,6 +187,9 @@ export async function resolveShareVisit(
       name: resolved.drawing.name,
       data: resolved.drawing.data,
     },
-    files,
+    files: files.map(({ bytes, ...file }) => ({
+      ...file,
+      dataUrl: bytesToDataUrl(file.mimeType, bytes),
+    })),
   }
 }

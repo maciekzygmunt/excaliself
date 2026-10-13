@@ -21,11 +21,13 @@ import { ReconnectingIndicator } from "@/components/reconnecting-indicator"
 import { Button } from "@/components/ui/button"
 import { useSidebar } from "@/components/ui/sidebar"
 import { useRoom } from "@/features/collab/use-room"
+import { markImageStatus } from "@/features/collab/use-room-files"
 import { useRenameDrawing } from "@/features/drawings/mutations"
 import { drawingQueryOptions } from "@/features/drawings/queries"
 import {
   buildScenePayload,
   getScenePayloadSignature,
+  selectOversizedImages,
   useDrawingScene,
   useSaveScenePayload,
 } from "@/features/drawings/scene"
@@ -74,6 +76,7 @@ export function DrawingCanvas({ drawingId, readOnly = false }: Props) {
     () => (drawing?.files ?? []).map((file) => file.fileId),
     [drawing?.files],
   )
+  const storedFileIdSet = useMemo(() => new Set(storedFileIds), [storedFileIds])
   const renameMutation = useRenameDrawing()
   const [excalidrawAPI, setExcalidrawAPI] =
     useState<ExcalidrawImperativeAPI | null>(null)
@@ -175,11 +178,24 @@ export function DrawingCanvas({ drawingId, readOnly = false }: Props) {
       appState: AppState,
       files: BinaryFiles,
     ) => {
+      // A room flags these itself, from the upload's answer.
+      if (!isShared && excalidrawAPI) {
+        for (const fileId of selectOversizedImages(
+          elements,
+          files,
+          storedFileIdSet,
+        )) {
+          markImageStatus(excalidrawAPI, fileId, "error")
+          toast.error("This image is too large to save", {
+            description: "Images up to 2 MB are saved with the drawing.",
+          })
+        }
+      }
       handleChange({ elements, appState, files })
       // No-op until the room is joined.
       roomChange(elements, appState, files)
     },
-    [handleChange, roomChange],
+    [handleChange, roomChange, isShared, excalidrawAPI, storedFileIdSet],
   )
 
   const handleNameSubmit = (newName: string) => {

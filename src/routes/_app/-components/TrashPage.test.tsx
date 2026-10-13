@@ -90,6 +90,7 @@ vi.mock("@/features/trash/server", () => ({
 }))
 
 vi.mock("@/features/drawings/server", () => ({
+  getDrawingScene: vi.fn(async () => "{}"),
   getDrawings: vi.fn(),
   getDrawingWithFiles: vi.fn(),
   restoreDrawing: vi.fn(),
@@ -122,8 +123,7 @@ function makeTrashedDrawing(
 ): TrashedDrawing {
   return {
     name: `Drawing ${overrides.id}`,
-    data: "{}",
-    thumbnail: null,
+    searchText: "",
     folderId: null,
     ownerId: "user-1",
     starred: false,
@@ -238,10 +238,9 @@ test("restoring a drawing removes its card optimistically and calls the server",
   renderTrashPage()
 
   fireEvent.click(screen.getByRole("button", { name: "Restore Old sketch" }))
-  await flush()
 
   // Gone before the server ever answers
-  expect(screen.queryByText("Old sketch")).toBeNull()
+  await waitFor(() => expect(screen.queryByText("Old sketch")).toBeNull())
   expect(restoreDrawing).toHaveBeenCalledWith({ data: "d1" }, expect.anything())
 })
 
@@ -250,9 +249,8 @@ test("restoring a folder calls the folder restore with the unit root", async () 
   renderTrashPage()
 
   fireEvent.click(screen.getByRole("button", { name: "Restore Archive" }))
-  await flush()
 
-  expect(screen.queryByText("Archive")).toBeNull()
+  await waitFor(() => expect(screen.queryByText("Archive")).toBeNull())
   expect(restoreFolder).toHaveBeenCalledWith({ data: "f1" }, expect.anything())
 })
 

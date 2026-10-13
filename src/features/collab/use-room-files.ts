@@ -27,7 +27,7 @@ const FETCH_RETRY_MS = 2_000
 const MAX_UPLOAD_ATTEMPTS = 3
 
 /** Version bump syncs the flip to peers; NEVER keeps it out of local undo. */
-function markImageStatus(
+export function markImageStatus(
   api: ExcalidrawImperativeAPI,
   fileId: string,
   status: Exclude<ImageStatus, "pending">,

@@ -18,6 +18,11 @@ vi.mock("@/features/collab/server", () => ({
   getLiveDrawings: vi.fn(async () => []),
 }))
 
+// Each card fetches its own scene for the preview.
+vi.mock("@/features/drawings/server", () => ({
+  getDrawingScene: vi.fn(async () => "{}"),
+}))
+
 /**
  * Every card runs the live poll's `useQuery`, so it needs a client — and
  * `rerender` has to keep the same one, or the second render loses it.
@@ -91,8 +96,7 @@ afterEach(() => {
 function makeDrawing(overrides: Partial<Drawing> & { id: string }): Drawing {
   return {
     name: `Drawing ${overrides.id}`,
-    data: "{}",
-    thumbnail: null,
+    searchText: "",
     folderId: null,
     ownerId: "user-1",
     starred: false,

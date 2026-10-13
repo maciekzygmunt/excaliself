@@ -65,6 +65,7 @@ vi.mock("@/components/drawing-gallery/preview", () => ({
 // The query modules import the server functions, which import the db — stub
 // the server-function edge (the caches are seeded, so they are never called).
 vi.mock("@/features/drawings/server", () => ({
+  getDrawingScene: vi.fn(async () => "{}"),
   getDrawings: vi.fn(),
   getDrawingWithFiles: vi.fn(),
   // The gallery's Move to trash wiring (useTrashDrawing) binds these
@@ -90,8 +91,7 @@ afterEach(() => {
 function makeDrawing(overrides: Partial<Drawing> & { id: string }): Drawing {
   return {
     name: `Drawing ${overrides.id}`,
-    data: "{}",
-    thumbnail: null,
+    searchText: "",
     folderId: null,
     ownerId: "user-1",
     starred: false,

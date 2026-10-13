@@ -57,6 +57,20 @@
       "when": 1784971477246,
       "tag": "0007_shares",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1791903727463,
+      "tag": "0008_storage_columns",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1791903732797,
+      "tag": "0009_drop_base64_and_thumbnail",
+      "breakpoints": true
     }
   ]
 }

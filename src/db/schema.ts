@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm"
 import {
   boolean,
+  customType,
   foreignKey,
   pgTable,
   text,
@@ -155,7 +156,9 @@ export const drawings = pgTable("drawings", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
   data: text("data").notNull().default("{}"),
-  thumbnail: text("thumbnail"),
+  // The scene's text, derived on every write so lists can search without
+  // shipping scenes.
+  searchText: text("searchText").notNull().default(""),
   folderId: text("folderId").references(() => folders.id, {
     onDelete: "cascade",
   }),
@@ -197,6 +200,9 @@ export const shares = pgTable(
   }),
 )
 
+// node-postgres reads and writes bytea as a Buffer.
+const bytea = customType<{ data: Buffer }>({ dataType: () => "bytea" })
+
 export const drawingFiles = pgTable("drawing_files", {
   id: text("id").primaryKey(),
   drawingId: text("drawingId")
@@ -204,7 +210,7 @@ export const drawingFiles = pgTable("drawing_files", {
     .references(() => drawings.id, { onDelete: "cascade" }),
   fileId: text("fileId").notNull(),
   mimeType: text("mimeType").notNull(),
-  dataUrl: text("dataUrl").notNull(),
+  bytes: bytea("bytes").notNull(),
   createdAt: timestamp("createdAt")
     .notNull()
     .$defaultFn(() => new Date()),

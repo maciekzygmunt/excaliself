@@ -91,8 +91,7 @@ afterEach(cleanup)
 function makeDrawing(overrides: Partial<Drawing> & { id: string }): Drawing {
   return {
     name: `Drawing ${overrides.id}`,
-    data: "{}",
-    thumbnail: null,
+    searchText: "",
     folderId: null,
     ownerId: "user-1",
     starred: false,

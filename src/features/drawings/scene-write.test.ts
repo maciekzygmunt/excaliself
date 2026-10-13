@@ -74,22 +74,23 @@ function fakeDb(options: {
 
 const file = (fileId: string) => ({
   fileId,
-  mimeType: "image/png",
-  dataUrl: `data:image/png;base64,${fileId}`,
+  dataUrl: "data:image/png;base64,QUJDRA==",
 })
 
-test("a solo save writes the scene and bumps updatedAt", async () => {
+test("a solo save writes the scene, its search text, and bumps updatedAt", async () => {
   const { db, calls } = fakeDb({ target: { id: "d1", shareId: null } })
+  const scene = JSON.stringify({ elements: [{ type: "text", text: "Login" }] })
 
   const result = await writeDrawingScene(db, "user-1", {
     id: "d1",
-    data: SCENE,
+    data: scene,
     files: [],
   })
 
-  expect(result).toEqual({ status: "saved" })
+  expect(result).toEqual({ status: "saved", missingFileIds: [] })
   const update = calls.find((call) => call.kind === "update")
-  expect(update?.set.data).toBe(SCENE)
+  expect(update?.set.data).toBe(scene)
+  expect(update?.set.searchText).toBe("Login")
   expect(update?.set.updatedAt).toBeInstanceOf(Date)
 })
 
@@ -153,7 +154,28 @@ test("files reconcile: new ones are inserted, unused ones dropped", async () => 
   expect(removed?.table).toBe(drawingFiles)
   expect(toParams(removed?.where as SQL)).toEqual(["d1", "drop", "erased"])
   const inserted = calls.find((call) => call.kind === "insert")
-  expect(inserted?.values).toEqual([expect.objectContaining({ fileId: "add" })])
+  expect(inserted?.values).toEqual([
+    expect.objectContaining({
+      fileId: "add",
+      mimeType: "image/png",
+      bytes: Buffer.from("ABCD"),
+    }),
+  ])
+})
+
+// The client sends only images it believes unstored, so it has to hear about
+// one the server lost, and one that failed the upload checks is not stored.
+test("a used image with no stored bytes is reported missing", async () => {
+  const { db, calls } = fakeDb({ target: { id: "d1", shareId: null } })
+
+  const result = await writeDrawingScene(db, "user-1", {
+    id: "d1",
+    data: JSON.stringify({ elements: [image("lost"), image("bad")] }),
+    files: [{ fileId: "bad", dataUrl: "data:text/html;base64,QUJDRA==" }],
+  })
+
+  expect(result).toEqual({ status: "saved", missingFileIds: ["lost", "bad"] })
+  expect(calls.some((call) => call.kind === "insert")).toBe(false)
 })
 
 // Regression: a tab that had not fetched a guest's upload yet sent no bytes

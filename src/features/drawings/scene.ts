@@ -7,8 +7,10 @@ import type {
 } from "@excalidraw/excalidraw/types"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { useCallback, useMemo } from "react"
+import { parseFileUpload } from "@/features/collab/room-files"
 import { drawingShareQueryOptions } from "@/features/shares/queries"
 import { drawingQueryOptions, drawingsQueryOptions } from "./queries"
+import { extractSceneText } from "./search"
 import { saveDrawingScene } from "./server"
 
 export type SceneData = {
@@ -39,7 +41,12 @@ function toPersistedFiles(
   // live image element so removals on the canvas actually drop the row.
   const referenced = new Set<string>()
   for (const element of elements) {
-    if (element.type === "image" && !element.isDeleted && element.fileId) {
+    if (
+      element.type === "image" &&
+      !element.isDeleted &&
+      element.status !== "error" &&
+      element.fileId
+    ) {
       referenced.add(element.fileId)
     }
   }
@@ -50,6 +57,28 @@ function toPersistedFiles(
       mimeType: file.mimeType || "image/png",
       dataUrl: file.dataURL || "",
     }))
+}
+
+/**
+ * Unstored images over the upload cap. The server would refuse them, so the
+ * canvas flags them `error` as a room does. Stored ones load `pending` too,
+ * hence `stored`.
+ */
+export function selectOversizedImages(
+  elements: readonly ExcalidrawElement[],
+  files: BinaryFiles,
+  stored: ReadonlySet<string>,
+): string[] {
+  return elements.flatMap((element) => {
+    if (element.type !== "image" || element.isDeleted) return []
+    const { fileId, status } = element
+    if (!fileId || status === "error" || stored.has(fileId)) return []
+    const dataUrl = files[fileId]?.dataURL
+    if (!dataUrl) return []
+    return parseFileUpload(fileId, { dataUrl }).status === "too-large"
+      ? [fileId]
+      : []
+  })
 }
 
 export function buildScenePayload(scene: SceneData): ScenePayload {
@@ -143,12 +172,32 @@ export function useSaveScenePayload(id: string) {
   const queryClient = useQueryClient()
   return useCallback(
     async (payload: ScenePayload) => {
-      const result = await saveDrawingScene({
-        data: { id, data: payload.data, files: payload.files },
-      })
+      const send = (files: PersistedFile[]) =>
+        saveDrawingScene({
+          data: {
+            id,
+            data: payload.data,
+            files: files.map(({ fileId, dataUrl }) => ({ fileId, dataUrl })),
+          },
+        })
+      // Image bytes go up once: skip what the last committed save stored.
+      const stored = new Set(
+        queryClient
+          .getQueryData(drawingQueryOptions(id).queryKey)
+          ?.files.map((file) => file.fileId),
+      )
+      let result = await send(
+        payload.files.filter((file) => !stored.has(file.fileId)),
+      )
+      // The server lost some (another tab removed them): send those too.
+      if (result.status === "saved" && result.missingFileIds.length > 0) {
+        const missing = new Set(result.missingFileIds)
+        const resend = payload.files.filter((file) => missing.has(file.fileId))
+        if (resend.length > 0) result = await send(resend)
+      }
       // Shared elsewhere: refetching the share flips this canvas to collab,
       // and joining the room reconciles the local scene.
-      if (result?.status === "shared") {
+      if (result.status === "shared") {
         await queryClient.invalidateQueries({
           queryKey: drawingShareQueryOptions(id).queryKey,
         })
@@ -167,22 +216,18 @@ export function useSaveScenePayload(id: string) {
           files: payload.files.map((file) => {
             const existing = prev.files.find((f) => f.fileId === file.fileId)
             if (existing) return existing
-            // Cache-only placeholder row; the client never reads `id`.
-            return {
-              id: file.fileId,
-              drawingId: id,
-              fileId: file.fileId,
-              mimeType: file.mimeType,
-              dataUrl: file.dataUrl,
-              createdAt: updatedAt,
-            }
+            return { ...file, createdAt: updatedAt }
           }),
         }
       })
       queryClient.setQueryData(drawingsQueryOptions().queryKey, (drawings) =>
         drawings?.map((drawing) =>
           drawing.id === id
-            ? { ...drawing, data: payload.data, updatedAt }
+            ? {
+                ...drawing,
+                searchText: extractSceneText(payload.data),
+                updatedAt,
+              }
             : drawing,
         ),
       )

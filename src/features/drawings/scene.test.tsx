@@ -8,7 +8,7 @@ import { act, render } from "@testing-library/react"
 import type { ReactNode } from "react"
 import { expect, test, vi } from "vitest"
 import { drawingQueryOptions } from "./queries"
-import { useSaveScenePayload } from "./scene"
+import { type ScenePayload, useSaveScenePayload } from "./scene"
 import { saveDrawingScene } from "./server"
 
 // `@excalidraw/excalidraw` can't be loaded outside the browser build; the
@@ -23,7 +23,7 @@ vi.mock("./server", () => ({ saveDrawingScene: vi.fn() }))
 // Reached through the share query options; its module body opens the live db.
 vi.mock("@/features/shares/server", () => ({ getDrawingShare: vi.fn() }))
 
-const PAYLOAD = { data: '{"elements":[]}', files: [] }
+const PAYLOAD: ScenePayload = { data: '{"elements":[]}', files: [] }
 
 const DRAWING = {
   id: "d1",
@@ -33,12 +33,12 @@ const DRAWING = {
   files: [],
 }
 
-function renderSaver() {
+function renderSaver(drawing: object = DRAWING) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   })
   // Only the fields this path reads; the row has a dozen more.
-  queryClient.setQueryData(drawingQueryOptions("d1").queryKey, DRAWING as never)
+  queryClient.setQueryData(drawingQueryOptions("d1").queryKey, drawing as never)
   const saveRef = {
     current: null as ((payload: typeof PAYLOAD) => Promise<unknown>) | null,
   }
@@ -54,7 +54,10 @@ function renderSaver() {
 }
 
 test("a committed save is mirrored into the drawing cache", async () => {
-  vi.mocked(saveDrawingScene).mockResolvedValue({ status: "saved" })
+  vi.mocked(saveDrawingScene).mockResolvedValue({
+    status: "saved",
+    missingFileIds: [],
+  })
   const { queryClient, saveRef } = renderSaver()
 
   await act(async () => {
@@ -83,4 +86,45 @@ test("a refused save leaves the cache alone and refetches the share", async () =
   expect(
     queryClient.getQueryData(drawingQueryOptions("d1").queryKey)?.data,
   ).toBe(DRAWING.data)
+})
+
+const file = (fileId: string) => ({
+  fileId,
+  mimeType: "image/png",
+  dataUrl: `data:image/png;base64,${fileId}`,
+})
+
+const sentFileIds = (call: number) =>
+  vi
+    .mocked(saveDrawingScene)
+    .mock.calls[call][0].data.files.map((sent) => sent.fileId)
+
+test("image bytes go up once: stored images are not sent again", async () => {
+  vi.mocked(saveDrawingScene).mockReset().mockResolvedValue({
+    status: "saved",
+    missingFileIds: [],
+  })
+  const { saveRef } = renderSaver({ ...DRAWING, files: [file("old")] })
+
+  await act(async () => {
+    await saveRef.current?.({ ...PAYLOAD, files: [file("old"), file("new")] })
+  })
+
+  expect(sentFileIds(0)).toEqual(["new"])
+})
+
+// Another tab removed the image and saved, so this tab's cache is stale.
+test("images the server reports missing are sent again", async () => {
+  vi.mocked(saveDrawingScene)
+    .mockReset()
+    .mockResolvedValueOnce({ status: "saved", missingFileIds: ["old"] })
+    .mockResolvedValueOnce({ status: "saved", missingFileIds: [] })
+  const { saveRef } = renderSaver({ ...DRAWING, files: [file("old")] })
+
+  await act(async () => {
+    await saveRef.current?.({ ...PAYLOAD, files: [file("old")] })
+  })
+
+  expect(sentFileIds(0)).toEqual([])
+  expect(sentFileIds(1)).toEqual(["old"])
 })

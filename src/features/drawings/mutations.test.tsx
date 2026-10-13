@@ -37,8 +37,7 @@ function makeDrawing(id: string, updatedAt: Date): Drawing {
   return {
     id,
     name: `Drawing ${id}`,
-    data: "{}",
-    thumbnail: null,
+    searchText: "",
     folderId: null,
     ownerId: "user-1",
     starred: false,

@@ -5,6 +5,7 @@ import { and, eq } from "drizzle-orm"
 import type { NodePgDatabase } from "drizzle-orm/node-postgres"
 import type * as schema from "@/db/schema"
 import { drawingFiles } from "@/db/schema"
+import { bytesToDataUrl, dataUrlToBytes } from "@/features/drawings/file-bytes"
 import type { RoomFile, RoomFilePayload } from "./room-files"
 
 type Db = NodePgDatabase<typeof schema>
@@ -35,7 +36,7 @@ export async function saveRoomFile(
     drawingId,
     fileId: file.fileId,
     mimeType: file.mimeType,
-    dataUrl: file.dataUrl,
+    bytes: dataUrlToBytes(file.dataUrl),
     createdAt: now,
   })
 }
@@ -50,7 +51,7 @@ export async function loadRoomFile(
     .select({
       fileId: drawingFiles.fileId,
       mimeType: drawingFiles.mimeType,
-      dataUrl: drawingFiles.dataUrl,
+      bytes: drawingFiles.bytes,
       createdAt: drawingFiles.createdAt,
     })
     .from(drawingFiles)
@@ -66,7 +67,7 @@ export async function loadRoomFile(
   return {
     fileId: row.fileId,
     mimeType: row.mimeType,
-    dataUrl: row.dataUrl,
+    dataUrl: bytesToDataUrl(row.mimeType, row.bytes),
     created: Number.isFinite(created) ? created : 0,
   }
 }

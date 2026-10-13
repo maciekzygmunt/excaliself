@@ -1,3 +1,4 @@
+import { useQuery } from "@tanstack/react-query"
 import { Link } from "@tanstack/react-router"
 import { createClientOnlyFn } from "@tanstack/react-start"
 import {
@@ -16,7 +17,10 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useLiveDrawing } from "@/features/collab/queries"
-import type { Drawing } from "@/features/drawings/queries"
+import {
+  type Drawing,
+  drawingSceneQueryOptions,
+} from "@/features/drawings/queries"
 import type { Folder } from "@/features/folders/queries"
 import { useDelayedVisible } from "@/hooks/use-delayed-visible"
 import { formatAgo } from "@/lib/relative-time"
@@ -183,7 +187,7 @@ function DrawingCard({
       {/* `relative` paints this above the stretched link; pointer-events-none
           lets clicks reach it. */}
       <div className="pointer-events-none relative aspect-[4/3] overflow-hidden border-b border-hairline">
-        <Preview name={drawing.name} data={drawing.data} />
+        <Preview drawing={drawing} />
         <LiveAvatarStack
           live={live}
           className="absolute bottom-2 left-2 animate-in fade-in-0 zoom-in-95 duration-200"
@@ -253,14 +257,51 @@ function CardActions({ name, onTrash }: { name: string; onTrash: () => void }) {
   )
 }
 
-export function Preview({ name, data }: { name: string; data: string }) {
+/** True once `ref` comes near the viewport, and from then on. */
+function useSeen(ref: React.RefObject<HTMLElement | null>) {
+  const [seen, setSeen] = useState(false)
+  useEffect(() => {
+    const element = ref.current
+    if (seen || !element) return
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) setSeen(true)
+      },
+      { rootMargin: "200px" },
+    )
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [ref, seen])
+  return seen
+}
+
+/** A card's scene, rendered. The list has no scenes; each card fetches its own once seen. */
+export function Preview({
+  drawing,
+}: {
+  drawing: Pick<Drawing, "id" | "name" | "updatedAt">
+}) {
+  const name = drawing.name
+  const frameRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
+  const seen = useSeen(frameRef)
+  const scene = useQuery({
+    ...drawingSceneQueryOptions(drawing.id, drawing.updatedAt),
+    enabled: seen,
+  })
   const [state, setState] = useState<"pending" | "ready" | "empty">("pending")
 
+  const data = scene.data
+  const failed = scene.isError
   useEffect(() => {
+    if (failed) {
+      setState("empty")
+      return
+    }
+    if (data === undefined) return
     let cancelled = false
     loadPreview()
-      .then(({ renderPreviewSvg }) => renderPreviewSvg(data))
+      .then(({ renderPreviewSvg }) => renderPreviewSvg(data ?? ""))
       .then((svg) => {
         if (cancelled) return
         if (!svg || !containerRef.current) {
@@ -279,13 +320,13 @@ export function Preview({ name, data }: { name: string; data: string }) {
     return () => {
       cancelled = true
     }
-  }, [data])
+  }, [data, failed])
 
   return (
     // pointer-events-none: this div is positioned and DOM-later than the
     // card's stretched link, so it would otherwise paint above the link and
     // swallow clicks on the whole preview area.
-    <div className="pointer-events-none relative h-full w-full">
+    <div ref={frameRef} className="pointer-events-none relative h-full w-full">
       <div
         ref={containerRef}
         role="img"

@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm"
 import type { NodePgDatabase } from "drizzle-orm/node-postgres"
 import type * as schema from "@/db/schema"
 import { drawings } from "@/db/schema"
+import { sceneText } from "@/features/drawings/search"
 import type { SceneElement } from "./protocol"
 
 type Db = NodePgDatabase<typeof schema>
@@ -104,6 +105,7 @@ export async function saveRoomScene(
     .update(drawings)
     .set({
       data: mergeSceneElements(drawing.data, elements),
+      searchText: sceneText(elements),
       updatedAt: new Date(),
     })
     .where(eq(drawings.id, drawingId))

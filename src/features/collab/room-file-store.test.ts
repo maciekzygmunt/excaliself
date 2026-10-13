@@ -15,6 +15,12 @@ const FILE = {
   mimeType: "image/png",
   dataUrl: "data:image/png;base64,QUJDRA==",
 }
+/** FILE as drawing_files holds it: raw bytes, not base64. */
+const ROW = {
+  fileId: "file-1",
+  mimeType: "image/png",
+  bytes: Buffer.from("ABCD"),
+}
 
 function fakeDb(rows: unknown[] = []) {
   const calls: Call[] = []
@@ -37,7 +43,7 @@ function fakeDb(rows: unknown[] = []) {
   return { db: db as never, calls }
 }
 
-test("writes the row, stamped with the id the uploader named", async () => {
+test("writes the decoded bytes, stamped with the id the uploader named", async () => {
   const { db, calls } = fakeDb()
 
   await saveRoomFile(db, "drawing-1", FILE, new Date("2026-07-25T10:00:00Z"))
@@ -47,7 +53,7 @@ test("writes the row, stamped with the id the uploader named", async () => {
     drawingId: "drawing-1",
     fileId: "file-1",
     mimeType: "image/png",
-    dataUrl: FILE.dataUrl,
+    bytes: ROW.bytes,
     createdAt: new Date("2026-07-25T10:00:00Z"),
   })
 })
@@ -74,7 +80,7 @@ test("the existence check is scoped to the drawing and the file", async () => {
 
 test("a read is scoped to the room, so one token can't read another's images", async () => {
   const { db, calls } = fakeDb([
-    { ...FILE, createdAt: new Date("2026-07-25T10:00:00Z") },
+    { ...ROW, createdAt: new Date("2026-07-25T10:00:00Z") },
   ])
 
   const file = await loadRoomFile(db, "drawing-1", "file-1")

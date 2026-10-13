@@ -282,8 +282,12 @@ test("members link without a session serves the sign-in arm with the name only",
 })
 
 test("members link with a session opens with the drawing and its files", async () => {
-  const file = { fileId: "f1", mimeType: "image/png", dataUrl: "data:," }
-  const { db } = fakeDb({ shareRows: [RESOLVED], fileRows: [file] })
+  const row = {
+    fileId: "f1",
+    mimeType: "image/png",
+    bytes: Buffer.from("ABCD"),
+  }
+  const { db } = fakeDb({ shareRows: [RESOLVED], fileRows: [row] })
 
   await expect(
     resolveShareVisit(db, "live-token", async () => true),
@@ -291,7 +295,13 @@ test("members link with a session opens with the drawing and its files", async (
     status: "ok",
     audience: "members",
     drawing: { id: "d1", name: "Wireframe", data: "{}" },
-    files: [file],
+    files: [
+      {
+        fileId: "f1",
+        mimeType: "image/png",
+        dataUrl: "data:image/png;base64,QUJDRA==",
+      },
+    ],
   })
 })
 

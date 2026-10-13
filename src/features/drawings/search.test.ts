@@ -49,20 +49,18 @@ describe("extractSceneText", () => {
 
 describe("findInScene", () => {
   test("matches case-insensitively and returns the surrounding words", () => {
-    const drawing = { data: scene({ type: "text", text: "Login flow" }) }
+    const drawing = { searchText: "Login flow" }
     expect(findInScene(drawing, "  LOGIN ")).toBe("Login flow")
     expect(findInScene(drawing, "signup")).toBeNull()
   })
 
   test("a deep match leads in from a word start, marked with an ellipsis", () => {
     const text = "one two three four five six seven eight nine ten eleven"
-    const drawing = { data: scene({ type: "text", text }) }
+    const drawing = { searchText: text }
     expect(findInScene(drawing, "eleven")).toBe("…eight nine ten eleven")
   })
 
   test("an empty query never matches", () => {
-    expect(findInScene({ data: scene({ type: "text", text: "x" }) }, " ")).toBe(
-      null,
-    )
+    expect(findInScene({ searchText: "x" }, " ")).toBeNull()
   })
 })

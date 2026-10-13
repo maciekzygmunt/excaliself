@@ -5,8 +5,7 @@ import { compareDrawings, filterDrawings } from "./browse"
 function makeDrawing(overrides: Partial<Drawing> & { id: string }): Drawing {
   return {
     name: `Drawing ${overrides.id}`,
-    data: "{}",
-    thumbnail: null,
+    searchText: "",
     folderId: null,
     ownerId: "user-1",
     starred: false,
@@ -46,9 +45,7 @@ describe("filterDrawings", () => {
     const flow = makeDrawing({
       id: "d4",
       name: "Untitled",
-      data: JSON.stringify({
-        elements: [{ type: "text", text: "Login flow" }],
-      }),
+      searchText: "Login flow",
     })
     expect(
       filterDrawings([...all, flow], { query: "login", scope: "all" }),
@@ -118,10 +115,9 @@ describe("compareDrawings", () => {
   })
 
   test("while searching, title matches lead scene-text matches in sort order", () => {
-    const scene = JSON.stringify({ elements: [{ type: "text", text: "map" }] })
     const newerByText = makeDrawing({
       id: "a",
-      data: scene,
+      searchText: "map",
       updatedAt: new Date(4000),
     })
     const olderByTitle = makeDrawing({
@@ -136,7 +132,7 @@ describe("compareDrawings", () => {
     })
     const olderByText = makeDrawing({
       id: "d",
-      data: scene,
+      searchText: "map",
       updatedAt: new Date(2000),
     })
     expect(

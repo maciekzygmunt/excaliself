@@ -10,23 +10,33 @@ import { endRooms } from "@/features/collab/room-registry"
 import { assertFolderTarget } from "@/features/folders/ownership"
 import { findNearestLiveAncestorId } from "@/features/folders/subtree"
 import { authMiddleware } from "@/middleware/auth"
+import { bytesToDataUrl } from "./file-bytes"
+import { drawingListColumns } from "./list-columns"
 import { writeDrawingScene } from "./scene-write"
-
-const persistedFileSchema = z.object({
-  fileId: z.string(),
-  mimeType: z.string(),
-  dataUrl: z.string(),
-})
 
 export const getDrawings = createServerFn({ method: "GET" })
   .middleware([authMiddleware])
   .handler(async ({ context }) => {
     const userId = context.session.user.id
     return db
-      .select()
+      .select(drawingListColumns)
       .from(drawings)
       .where(and(eq(drawings.ownerId, userId), isNull(drawings.deletedAt)))
       .orderBy(desc(drawings.updatedAt))
+  })
+
+/** One drawing's stored scene, for its card preview. Trashed ones too. */
+export const getDrawingScene = createServerFn({ method: "GET" })
+  .middleware([authMiddleware])
+  .validator((id: string) => id)
+  .handler(async ({ data: id, context }) => {
+    const [drawing] = await db
+      .select({ data: drawings.data })
+      .from(drawings)
+      .where(
+        and(eq(drawings.id, id), eq(drawings.ownerId, context.session.user.id)),
+      )
+    return drawing?.data ?? null
   })
 
 export const getDrawingWithFiles = createServerFn({ method: "GET" })
@@ -44,11 +54,22 @@ export const getDrawingWithFiles = createServerFn({ method: "GET" })
     if (!drawing) return null
 
     const files = await db
-      .select()
+      .select({
+        fileId: drawingFiles.fileId,
+        mimeType: drawingFiles.mimeType,
+        bytes: drawingFiles.bytes,
+        createdAt: drawingFiles.createdAt,
+      })
       .from(drawingFiles)
       .where(eq(drawingFiles.drawingId, id))
 
-    return { ...drawing, files }
+    return {
+      ...drawing,
+      files: files.map(({ bytes, ...file }) => ({
+        ...file,
+        dataUrl: bytesToDataUrl(file.mimeType, bytes),
+      })),
+    }
   })
 
 export const createDrawing = createServerFn({ method: "POST" })
@@ -143,7 +164,7 @@ export const saveDrawingScene = createServerFn({ method: "POST" })
     z.object({
       id: z.string(),
       data: z.string(),
-      files: z.array(persistedFileSchema),
+      files: z.array(z.object({ fileId: z.string(), dataUrl: z.string() })),
     }),
   )
   .handler(async ({ data: { id, data: sceneData, files }, context }) =>
