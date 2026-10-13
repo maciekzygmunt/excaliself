@@ -1,13 +1,5 @@
-/**
- * Who a participant appears to be in a Room (canvas sharing spec §4.4).
- *
- * Guest identity is fully ephemeral: no account, no cookie, no server-side
- * record. The client generates a pseudonym once, keeps it in localStorage,
- * and sends it on join; the server keeps a deterministic pseudonym of its own
- * for the window before that arrives (and for a guest that never sends one).
- * Members never get a pseudonym — their name comes from the session, which
- * the client cannot talk the server out of.
- */
+// Guests pick a pseudonym client-side (no server record); members get their
+// session name, which the client can't override.
 
 import type { ParticipantColor } from "./protocol"
 
@@ -78,11 +70,7 @@ export function guestNameForConnection(connectionId: string): string {
   return guestNameFromSeed(hashSeed(connectionId))
 }
 
-/**
- * A member's display name. `users.name` is nullable and better-auth lets it
- * be blank, so fall back to the email's local part rather than showing an
- * empty avatar — the room is people the member shared with, not the public.
- */
+/** Falls back to the email's local part, since `users.name` can be blank. */
 export function memberDisplayName(user: {
   name?: string | null
   email?: string | null
@@ -93,11 +81,7 @@ export function memberDisplayName(user: {
   return local || "Member"
 }
 
-/**
- * The one or two letters an avatar wears, wherever a participant is drawn as
- * a circle — the room's presence stack and the owner's live badge both.
- * Middle names are dropped rather than crowding the circle.
- */
+/** First and last initials for an avatar. */
 export function initialsOf(name: string): string {
   const words = name.trim().split(/\s+/).filter(Boolean)
   if (words.length === 0) return "?"
@@ -109,11 +93,7 @@ export function initialsOf(name: string): string {
     .slice(0, 2)
 }
 
-/**
- * Excalidraw's own collaborator palette (Open Color 6/9 pairs): `background`
- * fills the cursor and the avatar, `stroke` outlines both. Kept server-side
- * because the live badge reads the same colors out of room presence.
- */
+/** Excalidraw's collaborator palette. Server-side, as the live badge reads it too. */
 export const PARTICIPANT_COLORS: readonly ParticipantColor[] = [
   { background: "#fa5252", stroke: "#c92a2a" },
   { background: "#e64980", stroke: "#a61e4d" },
@@ -125,11 +105,7 @@ export const PARTICIPANT_COLORS: readonly ParticipantColor[] = [
   { background: "#f76707", stroke: "#d9480f" },
 ]
 
-/**
- * The lowest-numbered color nobody in the room is wearing, so a small room
- * never has two identical cursors. Past the palette's length it wraps —
- * duplicates are unavoidable, and the participant cap is 25.
- */
+/** First unused color; wraps once the palette runs out. */
 export function pickParticipantColor(
   taken: readonly ParticipantColor[],
 ): ParticipantColor {

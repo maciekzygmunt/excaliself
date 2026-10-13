@@ -1,26 +1,10 @@
-/**
- * "Someone else is in this drawing right now", on the owner's two browsing
- * surfaces (canvas sharing spec §1.5).
- *
- * The gallery card gets the avatar stack — the same initials and the same
- * participant colors the cursors will be wearing when the owner clicks in, so
- * the badge and the room look like the same people. The sidebar row, which
- * has a line of text and no room for faces, gets the count alone.
- *
- * Both are ornament, not controls: clicking a live card just opens the
- * drawing, which joins the session. So neither is focusable, and both let
- * clicks fall through to the row's own link.
- */
+// "Someone is in this drawing" badges. Ornament only: clicks fall through to
+// the row's link.
 
 import { initialsOf } from "@/features/collab/identity"
 import type { LiveDrawing } from "@/features/collab/live"
 import { cn } from "@/lib/utils"
 
-/**
- * One sentence for both surfaces, so the sidebar chip and the gallery card
- * don't describe the same room two different ways. Past one person the names
- * are dropped — four of them read aloud is noise, and the count is the fact.
- */
 function liveLabel(live: LiveDrawing): string {
   const [first] = live.participants
   if (live.count > 1) return `${live.count} people are in this drawing`
@@ -29,7 +13,7 @@ function liveLabel(live: LiveDrawing): string {
     : "1 person is in this drawing"
 }
 
-/** The gallery card's corner stack: overlapping faces, then a "+N" tail. */
+/** Gallery card corner stack: overlapping faces, then a "+N" tail. */
 export function LiveAvatarStack({
   live,
   className,
@@ -46,18 +30,13 @@ export function LiveAvatarStack({
       role="img"
       aria-label={liveLabel(live)}
       className={cn(
-        // The card's stretched link is a DOM sibling underneath: staying out
-        // of the pointer's way is what keeps the whole preview clickable.
         "pointer-events-none flex items-center -space-x-1.5",
         className,
       )}
     >
       {live.participants.map((participant, i) => (
-        // No `title`: the stack takes no pointer events, so a native tooltip
-        // could never open. The names live in the label above instead.
         <span
-          // Two guests can land on the same pseudonym and the payload carries
-          // no connection ids, so position is the only stable key here.
+          // Names can repeat and there are no ids, so index is the key.
           key={i}
           className="flex h-5 w-5 items-center justify-center rounded-full text-[9px] font-semibold text-white ring-2 ring-card"
           style={{ backgroundColor: participant.color.background }}
@@ -74,7 +53,7 @@ export function LiveAvatarStack({
   )
 }
 
-/** The sidebar row's count, in the palette's one green. */
+/** Sidebar row count. */
 export function LiveCountChip({
   live,
   className,

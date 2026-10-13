@@ -1,23 +1,10 @@
-/**
- * The cursor channel's rate limit (spec §2.2): MOUSE_LOCATION is throttled to
- * ~33 ms client-side and is droppable — an update that arrives inside the
- * window is discarded rather than queued, because the next one supersedes it
- * anyway. Leading-edge only, so the first move of a gesture goes out at once.
- */
+// Cursor updates inside the window are dropped: the next one supersedes them.
 
 export const CURSOR_INTERVAL_MS = 33
 
 /**
- * The follow-mode viewport channel. Same budget as cursors, but with a
- * trailing flush: the last frame of a pan is the one that decides where a
- * follower's canvas comes to rest, so dropping it would leave them parked
- * slightly off from the person they are following.
- *
- * That last frame is also the one with nothing behind it to supersede it, so
- * a `run` that reports failure (a congested socket, say) doesn't end the
- * flush — the value stays pending and is retried a window later. Whoever
- * owns the channel is expected to `cancel()` when it closes for good;
- * otherwise a permanently failing `run` retries forever.
+ * Throttle with a trailing flush, so a follower lands on a pan's last frame.
+ * A failed `run` retries until `cancel()`.
  */
 export function createTrailingThrottle<T>(
   intervalMs: number,
@@ -54,7 +41,6 @@ export function createTrailingThrottle<T>(
   }
 
   return {
-    /** Run now if the window is open, otherwise at the end of it. */
     push(value: T) {
       const wait = intervalMs - (Date.now() - lastRunAt)
       if (wait <= 0) {

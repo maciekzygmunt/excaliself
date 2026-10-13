@@ -1,11 +1,4 @@
-/**
- * Room presence, in the shape Excalidraw renders it: `updateScene({
- * collaborators })` draws every entry's cursor and label (spec §2.2).
- *
- * Pure, and rebuilt from the roster rather than patched in place, so a
- * participant who left can't leave a stale cursor behind — their pointer is
- * simply not reachable from the new roster.
- */
+// Rebuilt from the roster, not patched, so a leaver's cursor can't linger.
 
 import type { Collaborator, SocketId } from "@excalidraw/excalidraw/types"
 import type { Participant, PointerUpdate } from "./protocol"

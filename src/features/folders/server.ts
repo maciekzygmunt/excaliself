@@ -139,9 +139,7 @@ export const trashFolder = createServerFn({ method: "POST" })
         .returning({ id: drawings.id })
     })
 
-    // A drawing swept along by its folder is trashed like any other, and its
-    // live session ends the same way (spec §5.1): final flush, every socket
-    // closed, link dead until the folder is restored.
+    // Swept drawings end their live rooms too, like a direct trash.
     await endRooms(swept.map((drawing) => drawing.id))
   })
 

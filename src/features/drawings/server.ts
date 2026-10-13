@@ -175,12 +175,8 @@ export const trashDrawing = createServerFn({ method: "POST" })
       .returning({ id: drawings.id })
     if (trashed.length === 0) throw new Error("Drawing not found")
 
-    // Trashing mid-session reuses the stop-sharing termination path verbatim
-    // (spec §5.1): the Room writes what the session produced — so restoring
-    // brings all of it back — and every socket is closed. The `shares` row
-    // survives, which is what makes restore revive the existing link; the
-    // evicted guests re-validate, hit the `deletedAt` check, and land on the
-    // same generic dead-link page a stopped link gets.
+    // Flush and close the live room. The share row survives, so restore
+    // revives the link.
     await endRooms([id])
   })
 

@@ -38,31 +38,17 @@ import { TopLeftControls } from "./TopLeftControls"
 
 import "@excalidraw/excalidraw/index.css"
 
-/** The green "sharing is on" dot shown beside the Share label. */
 const SharingDot = () => (
   <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />
 )
 
-// The Share entry point adapts to the canvas area's width (the @container/
-// canvas wrapper below), not the viewport — the app sidebar can eat 240px,
-// and Excalidraw's own mobile flip keys off its container too. Both
-// surfaces share the 64rem seam, so exactly one of them is ever visible:
-//   ≥72rem  labeled island button
-//   64–72rem  icon-only island button
-//   <64rem  no island button; Share lives in the burger menu instead
-// The seams carry real margin: the top row must hold the burger island,
-// the toggle+title island (title capped at max-w-45), Excalidraw's full
-// ~550px toolbar, our button, and the Library button — worst case ~1000px
-// icon-only and ~1060px labeled before anything may clip.
+// Breakpoints key off the canvas container, not the viewport (the sidebar eats
+// 240px). ≥72rem labeled, 64–72rem icon-only, <64rem Share moves to the menu.
 const SHARE_BUTTON_CLASS =
   "gap-1.5 @max-5xl/canvas:hidden @max-6xl/canvas:px-2.5"
 const SHARE_LABEL_CLASS = "@max-6xl/canvas:hidden"
-// The ! is load-order armor: Excalidraw's lazy-loaded stylesheet declares
-// .dropdown-menu-item { display: flex } after our sheet, which would win
-// the tie against a plain `hidden`.
+// `!` beats Excalidraw's later-loaded `.dropdown-menu-item { display: flex }`.
 const SHARE_MENU_ITEM_CLASS = "@5xl/canvas:hidden!"
-// Avatars need the labeled Share and the Library to fit beside them; below
-// that they move to the menu. Measured with a long title and five others.
 const PRESENCE_CLASS = "@max-[76rem]/canvas:hidden"
 const PRESENCE_MENU_ROW_CLASS = "@min-[76rem]/canvas:hidden!"
 
@@ -83,8 +69,7 @@ export function DrawingCanvas({ drawingId, readOnly = false }: Props) {
 
   const { drawing, initialData, isDataCorrupt } = useDrawingScene(drawingId)
   const saveScenePayload = useSaveScenePayload(drawingId)
-  // Referentially stable, as `useRoom` requires: the detail query's `files`
-  // only changes identity when the drawing's images actually do.
+  // `useRoom` needs a stable reference.
   const storedFileIds = useMemo(
     () => (drawing?.files ?? []).map((file) => file.fileId),
     [drawing?.files],
@@ -93,23 +78,14 @@ export function DrawingCanvas({ drawingId, readOnly = false }: Props) {
   const [excalidrawAPI, setExcalidrawAPI] =
     useState<ExcalidrawImperativeAPI | null>(null)
 
-  // Share state drives the button's green "sharing is on" dot. Trashed
-  // drawings hide the share surface entirely — their link is dead while in
-  // the trash and comes back on restore (spec §4.3).
   const [shareOpen, setShareOpen] = useState(false)
   const { data: share } = useQuery({
     ...drawingShareQueryOptions(drawingId),
     enabled: !readOnly,
   })
 
-  // The cap is 25, so this is a corner the owner should almost never see —
-  // but while it lasts they are genuinely offline: the room refused them, and
-  // the server refuses classic writes for a shared drawing.
-  //
-  // Only ever a *first* join refused by the cap; a rejoin the cap turns away
-  // is retried instead, because that tab is holding a scene (spec §5.3). So
-  // the message still says reload: nothing is coming back on its own here,
-  // and saying otherwise is how the work gets lost.
+  // Only a first join hits this (rejoins retry), so nothing recovers on its
+  // own: the tab is offline until reload.
   const handleRoomFull = useCallback(() => {
     toast.error("This drawing has too many people in it right now", {
       id: `room-full:${drawingId}`,
@@ -119,22 +95,8 @@ export function DrawingCanvas({ drawingId, readOnly = false }: Props) {
     })
   }, [drawingId])
 
-  /**
-   * The link died under this tab — the owner stopped or regenerated it in
-   * another tab, or the drawing was trashed. Re-reading the share row answers
-   * the first two: with no row, `token` goes null, the socket effect tears
-   * down, and classic autosave picks up from this tab's in-memory scene,
-   * which is the stop-sharing reverse of spec §5.5. A regenerated link comes
-   * back with a new token and the socket redials on it.
-   *
-   * Trash is the third, and the share row alone cannot see it: trashing keeps
-   * the row (that is what makes restore revive the same link, spec §4.3), so
-   * the token comes back unchanged and nothing about this tab would move.
-   * Re-reading the drawing is what flips it to the read-only trashed view of
-   * spec §5.1 — without it the canvas stays editable and every stroke after
-   * this goes nowhere, since the socket is gone and the server refuses
-   * classic writes for a trashed drawing.
-   */
+  // Link stopped, regenerated, or drawing trashed. Trash keeps the share row,
+  // so only re-reading the drawing flips this tab to read-only.
   const queryClient = useQueryClient()
   const handleLinkDead = useCallback(() => {
     void queryClient.invalidateQueries({
@@ -145,27 +107,18 @@ export function DrawingCanvas({ drawingId, readOnly = false }: Props) {
     })
   }, [queryClient, drawingId])
 
-  /**
-   * Shared ⇒ always collab mode (spec §1.1, §5.5). The owner's own tabs join
-   * the socket like any visitor, which is what makes "the room is the only
-   * writer" true: with a solo writer still running, two tabs of the owner's
-   * would fight the room over the same drawing.
-   */
+  // A shared drawing has one writer, the room, so the owner's tabs join it too.
   const room = useRoom({
     token: readOnly ? null : (share?.token ?? null),
-    // A member's name is the session's; this tab has none to offer.
+    // Members use their session name.
     name: null,
     excalidrawAPI,
     onRoomFull: handleRoomFull,
     onLinkDead: handleLinkDead,
-    // The drawing's images as this tab loaded them: already in the database,
-    // so the room is owed nothing for them (spec §2.4).
     storedFileIds,
   })
-  // `undefined` is "the share query hasn't answered yet", and autosave stays
-  // live through that window: the server refuses the write if the drawing
-  // turns out to be shared, and that refusal is what flips this tab into
-  // collab mode (see `useSaveScenePayload`).
+  // Autosave stays live until the share query answers; the server refuses the
+  // write if the drawing is shared.
   const isShared = share != null && !readOnly
 
   // A corrupt stored scene opens as an empty canvas; pause autosave until the
@@ -208,11 +161,7 @@ export function DrawingCanvas({ drawingId, readOnly = false }: Props) {
     skipInitialChange: true,
     // `readOnly` also unwires onChange below; pausing here is belt and
     // braces so no code path can flush a save for a trashed drawing.
-    //
-    // While the drawing is shared, classic autosave is suspended and the room
-    // persists instead (spec §5.5). Changes keep being *recorded* though —
-    // `handleChange` still runs — so when sharing stops the hook picks up
-    // exactly where the session left off and saves the collaborative result.
+    // While shared the room saves; changes are still recorded for when it stops.
     paused: autoSavePaused || readOnly || isShared,
     onError: () => {
       toast.error("Failed to save drawing", { id: "drawing-save-error" })
@@ -227,10 +176,7 @@ export function DrawingCanvas({ drawingId, readOnly = false }: Props) {
       files: BinaryFiles,
     ) => {
       handleChange({ elements, appState, files })
-      // A no-op until the socket is up and SCENE_INIT has landed, so it costs
-      // an unshared drawing one call per change and nothing else. `files` is
-      // what the image upload rides on (spec §2.4), so it has to come through
-      // here too rather than being dropped as it was before #124.
+      // No-op until the room is joined.
       roomChange(elements, appState, files)
     },
     [handleChange, roomChange],
@@ -258,9 +204,6 @@ export function DrawingCanvas({ drawingId, readOnly = false }: Props) {
         theme={canvasTheme}
         viewModeEnabled={readOnly || undefined}
         onChange={readOnly ? undefined : handleSceneChange}
-        // The owner is a participant like anyone else: their cursor goes out
-        // and their viewport is relayed to whoever is following them. Both are
-        // inert while the socket is closed.
         onPointerUpdate={readOnly ? undefined : room.onPointerUpdate}
         onScrollChange={readOnly ? undefined : room.onScrollChange}
         renderTopRightUI={
@@ -332,8 +275,6 @@ export function DrawingCanvas({ drawingId, readOnly = false }: Props) {
         {/* No autosave in read-only mode, so no save status to report. */}
         {!readOnly && (
           <FooterRightPortal>
-            {/* Shared drawings save through the room, so its status is the
-                save status. */}
             <ReconnectingIndicator
               status={room.connectionStatus}
               className="order-first mr-2 h-auto self-stretch"

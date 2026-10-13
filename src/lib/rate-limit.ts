@@ -1,41 +1,22 @@
-/**
- * The one rate limiter shape this app uses (canvas sharing spec §4.5): a
- * fixed window per key, counted in memory. Deliberately not a token bucket
- * and not backed by anything — the app is single-replica by design (spec
- * §2.3), and the limits exist to blunt scripted abuse of the guest surfaces,
- * not to meter anything.
- *
- * `now` is a parameter rather than a `Date.now()` call so the whole window
- * behavior is drivable from tests without fake timers.
- */
+// Fixed-window, in-memory limiter: the app is single-replica, and it only
+// blunts scripted abuse.
 
 type Window = { startedAt: number; count: number }
 
 export type RateLimiter = {
-  /** Counts one hit for `key` and says whether it fits in the budget. */
   allow(key: string, now: number): boolean
-  /** How many keys are being tracked — the number the sweep exists to bound. */
   trackedKeys(): number
 }
 
 export function createRateLimiter(options: {
   limit: number
   windowMs: number
-  /**
-   * Hard ceiling on tracked keys. Keys arrive from strangers, so the map
-   * sheds expired windows once it grows past this — and if a flood of
-   * distinct keys leaves nothing expired to shed, it evicts the
-   * longest-standing ones anyway. Bounded memory beats perfect accounting:
-   * an evicted key gets a fresh budget, which is the price of not letting
-   * the limiter itself become the way to exhaust the process.
-   */
+  /** Keys come from strangers: past this, the oldest are evicted. */
   maxTrackedKeys?: number
 }): RateLimiter {
   const { limit, windowMs, maxTrackedKeys = 10_000 } = options
-  /** Insertion-ordered, so the front of the map is the oldest window. */
   const windows = new Map<string, Window>()
-  // Eviction goes past the ceiling rather than to it, so the scan is paid
-  // once per batch of new keys instead of once per request.
+  // Evict below the ceiling so the scan runs once per batch, not per request.
   const evictTo = Math.max(1, Math.floor(maxTrackedKeys * 0.9))
 
   const expired = (window: Window, now: number) =>

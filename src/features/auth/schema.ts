@@ -32,10 +32,7 @@ export const registerFormSchema = registerFieldsSchema
   })
   .superRefine(confirmPasswordMatches)
 
-/**
- * Sign-in form, shared by /login and the share sign-in gate. No minimum on
- * the password: an existing account's password is whatever it already is.
- */
+/** Sign-in form. No password minimum: existing passwords are as they are. */
 export const signInFormSchema = z.object({
   email: z.email(),
   password: z.string(),

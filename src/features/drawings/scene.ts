@@ -146,11 +146,8 @@ export function useSaveScenePayload(id: string) {
       const result = await saveDrawingScene({
         data: { id, data: payload.data, files: payload.files },
       })
-      // The drawing was shared — from another tab, or from this one before
-      // its share query caught up — so the room owns its data now and the
-      // server refused this write (spec §5.5). Not an error: refetch the
-      // share, which is what flips this canvas into collab mode. Nothing is
-      // lost, because joining the room reconciles the local scene into it.
+      // Shared elsewhere: refetching the share flips this canvas to collab,
+      // and joining the room reconciles the local scene.
       if (result?.status === "shared") {
         await queryClient.invalidateQueries({
           queryKey: drawingShareQueryOptions(id).queryKey,

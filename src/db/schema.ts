@@ -174,14 +174,7 @@ export const drawings = pgTable("drawings", {
     .$defaultFn(() => new Date()),
 })
 
-// Share links (canvas sharing spec §3). "Shared" is derived — a drawing is
-// shared iff a row exists here; there is no flag on drawings. The unique
-// index on drawingId is what enforces "one live link per drawing".
-//
-// The migration adding this table also dropped the never-used
-// drawings.isPublic. Migrations run on boot with no down-migrations, so
-// rolling back to a pre-sharing image needs this one-line restore first:
-//   ALTER TABLE drawings ADD COLUMN "isPublic" boolean NOT NULL DEFAULT false;
+// A drawing is shared iff it has a row here; at most one link per drawing.
 export const shares = pgTable(
   "shares",
   {

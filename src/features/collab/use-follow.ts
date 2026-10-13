@@ -1,21 +1,6 @@
 /**
- * Follow mode's client half (spec §1.3): click someone's avatar and your
- * canvas rides along with theirs until you pan, zoom, or click the chip.
- *
- * The mechanics are Excalidraw's own — `appState.userToFollow` is the single
- * source of truth, and the package already handles the awkward parts:
- * dragging the canvas drops the follow, and so does the followed person
- * leaving the room. This hook only listens for the resulting FOLLOW/UNFOLLOW
- * and keeps the room in the loop.
- *
- * That listening goes through `excalidrawAPI.onUserFollow`, not the
- * `onUserFollow` prop: the prop is declared in 0.18's types but nothing in
- * the package ever calls it, so only the imperative subscription fires.
- *
- * Viewports travel peer-to-peer rather than by broadcast: the server tells a
- * peer who is trailing it (`FOLLOWED_BY`), and only then does it relay its
- * visible bounds — a room where nobody follows anybody carries no viewport
- * traffic at all.
+ * Follow mode. `appState.userToFollow` is the source of truth; a leader relays
+ * its viewport only while the server says someone follows it (`FOLLOWED_BY`).
  */
 
 import { getVisibleSceneBounds, zoomToFitBounds } from "@excalidraw/excalidraw"
@@ -36,7 +21,6 @@ type FollowMessage = Extract<
 export function useFollow(options: {
   excalidrawAPI: ExcalidrawImperativeAPI | null
   send: (message: ClientMessage) => boolean
-  /** True while the socket's outbound buffer is too full for another frame. */
   isBackedUp: () => boolean
 }) {
   const { excalidrawAPI, send, isBackedUp } = options
@@ -48,33 +32,23 @@ export function useFollow(options: {
   const apiRef = useRef(excalidrawAPI)
   apiRef.current = excalidrawAPI
   const followedRef = useRef<string | null>(null)
-  /** Who is trailing us, straight off the wire — never rendered here. */
   const followersRef = useRef<ReadonlySet<string>>(new Set())
 
-  // The throttle outlives any one render, so it reaches the socket through
-  // refs rather than closing over the `send` it happened to be built with.
+  // The throttle outlives renders, so it reads `send` through refs.
   const sendRef = useRef(send)
   sendRef.current = send
   const isBackedUpRef = useRef(isBackedUp)
   isBackedUpRef.current = isBackedUp
   const relayViewport = useRef(
     createTrailingThrottle<ClientMessage>(CURSOR_INTERVAL_MS, (message) => {
-      // Checked here rather than on the way in, so the trailing frame is the
-      // one that gets the chance to go out once the buffer has drained.
-      // Reporting the refusal rather than swallowing it is what keeps that
-      // frame alive: a pan that *ends* while the socket is congested has no
-      // later scroll to supersede it, and followers would sit at stale bounds
-      // until the leader happened to move again.
+      // Returning false keeps the trailing frame, so a pan that ends while
+      // congested still reaches followers once the buffer drains.
       if (isBackedUpRef.current()) return false
       return sendRef.current(message)
     }),
   )
 
-  /**
-   * Hand our viewport to whoever is trailing us. Mutual follows are pruned
-   * server-side, per recipient — suppressing the whole relay here would
-   * strand any third peer following us as well.
-   */
+  // Mutual follows are pruned server-side, per recipient, not here.
   const publishViewport = useCallback(() => {
     const api = apiRef.current
     if (!api || followersRef.current.size === 0) return
@@ -91,9 +65,7 @@ export function useFollow(options: {
     }
   }, [])
 
-  // Bounds move with the window as well as with the canvas, and Excalidraw's
-  // `onScrollChange` only fires for the latter — without this a leader who
-  // resizes leaves their followers parked on stale bounds until the next pan.
+  // `onScrollChange` doesn't fire on window resize.
   useEffect(() => {
     window.addEventListener("resize", publishViewport)
     return () => {
@@ -101,11 +73,7 @@ export function useFollow(options: {
     }
   }, [publishViewport])
 
-  /**
-   * The one place follow state changes. Excalidraw fires this both for our
-   * own avatar clicks and for the interruptions it handles natively, so the
-   * server hears about every stop, however it came about.
-   */
+  // The only place follow state changes; fires for clicks and native stops alike.
   const onUserFollow = useCallback((payload: OnUserFollowedPayload) => {
     const next =
       payload.action === "FOLLOW" ? payload.userToFollow.socketId : null
@@ -124,12 +92,12 @@ export function useFollow(options: {
     })
   }, [])
 
+  // The `onUserFollow` prop is never called in 0.18; only the API subscription fires.
   useEffect(
     () => excalidrawAPI?.onUserFollow(onUserFollow),
     [excalidrawAPI, onUserFollow],
   )
 
-  /** Clicking the avatar of the person you are already following stops. */
   const toggleFollow = useCallback((participant: Participant) => {
     const api = apiRef.current
     if (!api) return
@@ -150,7 +118,6 @@ export function useFollow(options: {
     apiRef.current?.updateScene({ appState: { userToFollow: null } })
   }, [])
 
-  /** The two follow-mode frames; `use-room` routes the rest. */
   const handleServerMessage = useCallback(
     (message: FollowMessage) => {
       const api = apiRef.current
@@ -162,8 +129,7 @@ export function useFollow(options: {
             followedBy: new Set(message.payload.connectionIds as SocketId[]),
           },
         })
-        // A new follower is waiting on a viewport that may not come for a
-        // while, so send one now instead of leaving them on their own canvas.
+        // A new follower needs a viewport now, not at the next pan.
         publishViewport()
         return
       }
@@ -183,7 +149,6 @@ export function useFollow(options: {
     [publishViewport],
   )
 
-  /** A dropped socket ends every arrangement it was carrying. */
   const reset = useCallback(() => {
     followersRef.current = new Set()
     relayViewport.current.cancel()
@@ -196,7 +161,6 @@ export function useFollow(options: {
 
   return {
     followedConnectionId,
-    /** Wire straight to Excalidraw's `onScrollChange` prop. */
     onScrollChange: publishViewport,
     toggleFollow,
     stopFollowing,

@@ -2,15 +2,10 @@ import { AuthPage } from "@/components/auth-page"
 import { Button } from "@/components/ui/button"
 
 type Props = {
-  /** Re-runs the loader; the limit clears on its own within the minute. */
   onRetry: () => void
 }
 
-/**
- * The share page's answer to a tripped validation limit (spec §4.5), served
- * with a 429. Like the room-full state and unlike the dead link, it is worth
- * retrying — and it says nothing about the token, which was never looked up.
- */
+/** Rate-limited; says nothing about the token, which was never looked up. */
 export function TooManyAttempts({ onRetry }: Props) {
   return (
     <AuthPage

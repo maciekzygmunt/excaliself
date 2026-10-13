@@ -1,6 +1,4 @@
-// Persistence for the room-scoped image endpoint (canvas sharing spec §2.4).
-// Kept out of the route — which imports the live db — so the rules below are
-// drivable by tests with a fake db, mirroring scene-store.ts.
+// Persistence for the room image endpoint, kept out of the route so tests can use a fake db.
 
 import { randomUUID } from "node:crypto"
 import { and, eq } from "drizzle-orm"
@@ -12,24 +10,8 @@ import type { RoomFile, RoomFilePayload } from "./room-files"
 type Db = NodePgDatabase<typeof schema>
 
 /**
- * Writes the row the moment the blob lands — before the uploader's element is
- * allowed to flip to `status: "saved"`, so a peer reacting to that flip always
- * finds bytes waiting (spec §2.4).
- *
- * `fileId` is upstream's hash of the file the user picked, so an id the
- * drawing already holds came from the same picture and the existing row
- * stands. Note it is *not* a hash of what gets stored, and cannot be checked
- * against it: upstream generates the id from the original file and only then
- * downscales it, so the stored data URL is the resized image. Nothing here
- * can verify that a participant uploaded the bytes their id names — but a
- * participant already holds an edit link, and someone who can replace an
- * image outright gains nothing by doing it under someone else's id.
- *
- * Two peers pasting the same picture at the same instant can race the check
- * and leave a duplicate row; both read back identically, and the solo save
- * path's delete-by-fileId removes them together. A unique index would be the
- * tighter fix, and the price is a migration for a collision that changes
- * nothing.
+ * First write per fileId wins. The id hashes the pre-downscale file, so bytes
+ * can't be verified against it. A concurrent duplicate row is harmless.
  */
 export async function saveRoomFile(
   db: Db,
@@ -58,10 +40,7 @@ export async function saveRoomFile(
   })
 }
 
-/**
- * One blob, scoped to the room asking for it: a token for drawing A can never
- * read drawing B's images, whatever fileId it names.
- */
+/** Scoped by drawing, so a token can't read another drawing's images. */
 export async function loadRoomFile(
   db: Db,
   drawingId: string,

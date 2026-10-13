@@ -123,8 +123,7 @@ export function setCanvasThemePreference(preference: CanvasThemePreference) {
 }
 
 // Logged-out pages are always light regardless of the stored choice; these
-// exact paths plus every /share/<token> page are the only routes that can
-// render logged-out.
+// paths and /share/<token> are the only routes that render logged-out.
 const LOGGED_OUT_PATHS = ["/login", "/setup", "/invite", "/reset-password"]
 const LOGGED_OUT_PREFIX = "/share/"
 

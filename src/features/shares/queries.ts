@@ -7,9 +7,7 @@ export type DrawingShare = Awaited<ReturnType<typeof getDrawingShare>> | null
 export const drawingShareQueryOptions = (drawingId: string) =>
   queryOptions({
     queryKey: ["shares", drawingId] as const,
-    // The explicit annotation restores null in the type: the server fn's
-    // client-side signature strips it, and the cache needs "unshared" to be
-    // a storable value (undefined means "not fetched yet").
+    // Restores the null the client type strips; undefined means unfetched.
     queryFn: async (): Promise<DrawingShare> =>
       (await getDrawingShare({ data: drawingId })) ?? null,
   })

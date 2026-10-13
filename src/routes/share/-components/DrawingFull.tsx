@@ -2,17 +2,10 @@ import { AuthPage } from "@/components/auth-page"
 import { Button } from "@/components/ui/button"
 
 type Props = {
-  /** Re-attempts the visit; the state is transient by nature. */
   onRetry: () => void
 }
 
-/**
- * The room hit its participant cap (spec §4.5) — a live link the visitor
- * simply can't get into right now. Distinct from the dead link on purpose:
- * this one is worth retrying, and the retry re-dials the room. Reached when
- * the server closes the socket with the room-full code, which the share route
- * records as ?full.
- */
+/** The room hit its participant cap; unlike a dead link, worth retrying. */
 export function DrawingFull({ onRetry }: Props) {
   return (
     <AuthPage

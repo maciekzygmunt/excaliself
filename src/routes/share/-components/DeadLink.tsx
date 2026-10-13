@@ -2,12 +2,7 @@ import { Link } from "@tanstack/react-router"
 import { AuthPage } from "@/components/auth-page"
 import { Button } from "@/components/ui/button"
 
-/**
- * The one page every dead token gets (spec §1.4) — never-existed, stopped,
- * regenerated-away, and trashed are deliberately indistinguishable, so
- * nothing leaks about whether a drawing exists. No drawing name, and no
- * sign-in gate: no session could revive this link.
- */
+/** One page for every dead token, so nothing leaks about whether it existed. */
 export function DeadLink() {
   return (
     <AuthPage

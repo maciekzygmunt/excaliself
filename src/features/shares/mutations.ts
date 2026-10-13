@@ -9,17 +9,7 @@ import {
   stopSharing,
 } from "./server"
 
-// Every mutation writes the server's returned row (or null) straight into
-// the share query cache — no invalidation round-trip, so the dialog flips
-// state the moment the server answers.
-
-/**
- * `beforeCreate` is the handoff of spec §5.5: the owner's last solo save has
- * to be in the database *before* the `shares` row exists, because from that
- * moment the server refuses classic writes and the Room loads the drawing as
- * stored. Awaiting it inside the mutationFn means `isPending` — and so every
- * disabled control in the dialog — covers the flush too.
- */
+/** `beforeCreate` flushes the last solo save; once shared, it is refused. */
 export function useCreateShare(
   drawingId: string,
   options: { beforeCreate?: () => Promise<void> } = {},
@@ -41,13 +31,7 @@ export function useCreateShare(
   })
 }
 
-/**
- * The server function does not answer until the Room has written what the
- * session produced and closed every socket in it (spec §4.2), so by the time
- * this cache write lands the Room has stopped writing: the share query
- * empties, the socket effect tears down, and the paused autosave hook picks
- * up on the merged scene the tab is already holding (spec §5.5).
- */
+/** Resolves after the room has flushed and closed; then autosave resumes. */
 export function useStopSharing(drawingId: string) {
   const queryClient = useQueryClient()
   return useMutation({
@@ -88,8 +72,6 @@ export function useSetShareAudience(drawingId: string) {
   return useMutation({
     mutationFn: (audience: ShareAudience) =>
       setShareAudience({ data: { drawingId, audience } }),
-    // Optimistic: radio cards must feel instant, and the server can only
-    // disagree by erroring — then the previous audience rolls back.
     onMutate: async (audience) => {
       await queryClient.cancelQueries({ queryKey })
       const previous = queryClient.getQueryData(queryKey)

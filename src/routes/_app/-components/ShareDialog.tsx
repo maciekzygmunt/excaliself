@@ -1,9 +1,3 @@
-// The owner's share dialog (canvas sharing spec §1.2) — the winning
-// sectioned centered modal from the UX prototype (variant B, branch
-// prototype/canvas-sharing-ux). Unshared: audience pickable before the link
-// exists + full-width create. Shared: link row with copy feedback, audience
-// radio cards, Stop / Regenerate footer.
-
 import { useQuery } from "@tanstack/react-query"
 import { Check, Copy, Link2, RefreshCw } from "lucide-react"
 import { useEffect, useState } from "react"
@@ -36,11 +30,7 @@ const AUDIENCE_COPY: Record<ShareAudience, { label: string; hint: string }> = {
   },
 }
 
-/**
- * execCommand fallback for the async clipboard API, which is unavailable on
- * insecure origins — a real deployment mode for a self-hosted app served
- * over plain HTTP on a LAN.
- */
+/** Clipboard fallback for insecure origins (self-hosted over plain HTTP). */
 function legacyCopy(text: string): boolean {
   const textarea = document.createElement("textarea")
   textarea.value = text
@@ -66,8 +56,6 @@ function useCopy(url: string) {
   }, [copied])
   return {
     copied,
-    // "Copied" only after a copy actually landed — a false confirmation
-    // here means the owner walks away having shared nothing.
     copy: async () => {
       let ok = false
       if (navigator.clipboard) {
@@ -167,11 +155,7 @@ type Props = {
   drawingId: string
   open: boolean
   onOpenChange: (open: boolean) => void
-  /**
-   * Commit the canvas's pending autosave and resolve once it has landed.
-   * Awaited before the link is minted (spec §5.5) — after that the server
-   * refuses classic writes, so anything still debounced would be lost.
-   */
+  /** Flushes autosave; once shared, the server refuses classic writes. */
   onBeforeCreate?: () => Promise<void>
 }
 
@@ -189,26 +173,21 @@ export function ShareDialog({
   const regenerateMutation = useRegenerateShare(drawingId)
   const audienceMutation = useSetShareAudience(drawingId)
 
-  // One flag gates every control: the mutations write the same cache entry,
-  // and letting them race (Stop while Regenerate is in flight) can leave the
-  // dialog showing a link or audience the database no longer has.
+  // One flag for all controls: the mutations race on the same cache entry.
   const busy =
     createMutation.isPending ||
     stopMutation.isPending ||
     regenerateMutation.isPending ||
     audienceMutation.isPending
 
-  // The audience is pickable before the link exists; this local choice seeds
-  // the create call. Reset each time the dialog opens so a stale pick from a
-  // previous visit doesn't leak into a fresh one.
+  // Seeds the create call; reset on each open.
   const [draftAudience, setDraftAudience] = useState<ShareAudience>("members")
   const handleOpenChange = (next: boolean) => {
     if (next) setDraftAudience("members")
     onOpenChange(next)
   }
 
-  // undefined = share state still loading; keep the dialog closed-looking
-  // rather than flashing the unshared layout at an already-shared drawing.
+  // Still loading: don't flash the unshared layout.
   if (share === undefined) return null
 
   const shared = share !== null
@@ -217,9 +196,8 @@ export function ShareDialog({
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="gap-0 p-0 sm:max-w-md">
-        {/* min-w-0 on every section: DialogContent is a grid, and grid
-            items' default min-width:auto would let the long token URL push
-            the layout wider than the panel instead of truncating. */}
+        {/* min-w-0 on every section: DialogContent is a grid, so the long
+            URL would otherwise widen the panel instead of truncating. */}
         <div className="min-w-0 px-5 pt-5 pb-1">
           <DialogTitle>Share drawing</DialogTitle>
           <DialogDescription className="mt-1">

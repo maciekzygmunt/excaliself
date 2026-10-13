@@ -1,11 +1,3 @@
-/**
- * Portals into Excalidraw's own UI slots, so app chrome sits in the canvas's
- * islands and footer rows instead of floating over them at hand-tuned
- * offsets. Shared by the member canvas and the guest share page — both put
- * a title in the top-left island and a small status/attribution line in the
- * bottom-right footer row.
- */
-
 import {
   type ReactNode,
   useCallback,
@@ -71,11 +63,7 @@ function findTopLeft(): HTMLElement | null {
   return fallback instanceof HTMLElement ? fallback : null
 }
 
-/**
- * Renders alongside the burger inside Excalidraw's top-left island, so the
- * drawing title shares the island's height, padding, and background rather
- * than sitting in a second box beside it.
- */
+/** Renders beside the burger, inside Excalidraw's top-left island. */
 export function TopLeftPortal({ children }: { children: ReactNode }) {
   const target = useExcalidrawPortalTarget(findTopLeft)
   return target ? createPortal(children, target) : null

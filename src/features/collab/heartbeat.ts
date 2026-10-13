@@ -1,36 +1,16 @@
-/**
- * The app-level heartbeat of canvas sharing spec §5.3 and rollout note 2: a
- * `PING` every ~25 s so a reverse proxy's 60 s idle timeout never kills a
- * room where nobody happens to be drawing. Two people staring at a diagram
- * are a live session, and the socket has no way to say so on its own.
- *
- * It is app-level because a browser cannot send websocket ping frames from
- * JavaScript — only the server end can — and because the client is the end
- * that has to act when the answer stops coming.
- *
- * The `PONG` is not decoration. A TCP connection that dies without a FIN —
- * a laptop lid closing, a phone changing networks, a proxy dropping the
- * conntrack entry — leaves a socket that is `OPEN` forever and delivers
- * nothing. Waiting for a missing answer is the only way a client notices,
- * and noticing is what hands it to the reconnect loop.
- */
+// App-level PING, since browsers can't send ws pings. Keeps idle rooms past a
+// proxy's 60 s timeout; a missing PONG finds sockets that died without a FIN.
 
-/** Comfortably inside the 60 s idle timeout, and cheap: one tiny frame. */
 export const HEARTBEAT_INTERVAL_MS = 25_000
 
-/**
- * How long a `PING` may go unanswered before the socket counts as dead.
- * Generous next to a round trip, because the alternative — dropping a live
- * connection over one slow answer — costs a `SCENE_INIT` resync.
- */
+/** Generous: a false "dead" costs a full resync. */
 export const HEARTBEAT_TIMEOUT_MS = 10_000
 
 export type Heartbeat = ReturnType<typeof createHeartbeat>
 
 export function createHeartbeat(options: {
-  /** Puts a `PING` on the wire. */
   ping: () => void
-  /** A ping went unanswered: the socket is dead even if it says otherwise. */
+  /** A ping went unanswered: the socket is dead even if it says `OPEN`. */
   onSilent: () => void
   intervalMs?: number
   timeoutMs?: number
@@ -55,13 +35,9 @@ export function createHeartbeat(options: {
     start() {
       if (beat !== null) return
       beat = setInterval(() => {
-        // One outstanding ping at a time: a second timer started while the
-        // first is still running would shorten the window it was given.
+        // One outstanding ping at a time.
         if (waiting !== null) return
-        // Armed before the send, not after: `ping` reaches the socket, and a
-        // socket that answers synchronously — a test double, a same-process
-        // loopback — would otherwise have its `acknowledge` land on a timer
-        // that does not exist yet, and be forgotten.
+        // Armed before the send, so a synchronous reply finds the timer.
         waiting = setTimeout(() => {
           waiting = null
           onSilent()
@@ -70,7 +46,6 @@ export function createHeartbeat(options: {
       }, intervalMs)
     },
 
-    /** A `PONG` came back — the socket is answering. */
     acknowledge() {
       stopWaiting()
     },

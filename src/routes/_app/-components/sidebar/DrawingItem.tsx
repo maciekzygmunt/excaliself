@@ -63,9 +63,7 @@ export function DrawingItem({ drawing }: DrawingItemProps) {
       ) : (
         <>
           <span className="truncate transition-colors">{drawing.name}</span>
-          {/* mr-4 clears the row's overflow trigger, which is absolutely
-              positioned over the right edge and always visible on touch —
-              so the chip never ends up underneath it. */}
+          {/* mr-4 clears the overflow trigger (always visible on touch). */}
           <LiveCountChip
             live={live}
             className="mr-4 ml-auto animate-in fade-in-0 duration-200"

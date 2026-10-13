@@ -1,7 +1,4 @@
-/**
- * Token → room, for the websocket and the room-scoped image endpoints. Both
- * run the same checks as the share page (spec §4.1), through this one call.
- */
+// Token → room, with the same access checks as the share page.
 
 import type { NodePgDatabase } from "drizzle-orm/node-postgres"
 import type * as schema from "@/db/schema"
@@ -31,7 +28,7 @@ export async function resolveRoomForToken(
 
   return {
     status: "ok",
-    // One Room per drawing, not per token: a regenerated link meets the same room.
+    // One Room per drawing, so a regenerated link meets the same room.
     roomId: share.drawing.id,
     identity: {
       userId: user?.id ?? null,

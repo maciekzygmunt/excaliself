@@ -1,8 +1,4 @@
-/**
- * The room's other participants as burger-menu rows, for the canvas widths
- * where the avatars don't fit the top row. The host hides it above that
- * width with `className`. Each row is a way into follow mode.
- */
+/** Menu-row variant for widths where the avatars don't fit the top row. */
 
 import { MainMenu } from "@excalidraw/excalidraw"
 import type { RoomPresence } from "@/features/collab/use-room"

@@ -1,10 +1,3 @@
-/**
- * The drawing's name in Excalidraw's top-left island, portaled in beside the
- * burger so it lands on the same row, at the same weight, as the title on a
- * member's canvas (spec §1.3). Plain text, not a field: a guest may rename
- * itself but never the drawing.
- */
-
 type Props = { name: string }
 
 export function GuestTitle({ name }: Props) {
@@ -17,7 +10,6 @@ export function GuestTitle({ name }: Props) {
       >
         {label}
       </span>
-      {/* Says what this page is without competing with the drawing's name. */}
       <span className="shrink-0 text-xs text-(--color-gray-60)">Shared</span>
     </div>
   )

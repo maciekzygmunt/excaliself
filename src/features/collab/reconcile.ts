@@ -1,29 +1,9 @@
-/**
- * Excalidraw's element merge rule, ported for the server (canvas sharing
- * spec §2.3).
- *
- * `@excalidraw/excalidraw` exports `reconcileElements`, but only from a build
- * that reads `import.meta.env` and `window`, so a Room can't import it. This
- * is the same rule, kept deliberately literal against upstream
- * `data/reconcile.ts` so an upstream change reads as a diff. The client keeps
- * using the package's copy; the two agreeing is what makes concurrent edits
- * converge to the same winner on every side (spec §5.2).
- *
- * Left out of the port: upstream's fractional-index validation and repair.
- * Every client re-syncs indices when `updateScene` applies what it receives,
- * and the Room needs nothing from an index but a stable order.
- */
+// Server port of Excalidraw's `reconcileElements` (upstream's build needs
+// `window`). Keep it literal to upstream so clients and Room pick the same winner.
 
 import type { SceneElement } from "./protocol"
 
-/**
- * The slice of Excalidraw's appState the rule consults — an element the user
- * has their hands on right now is never yanked out from under them.
- *
- * A Room passes `{}`: nothing is being edited on the server, so only the
- * version rules apply there. It stays a parameter so the port can be tested
- * against the same cases as the client's copy.
- */
+/** Elements being edited locally always win. A Room passes `{}`. */
 export type EditingState = {
   editingTextElement?: { id: string } | null
   resizingElement?: { id: string } | null
@@ -50,12 +30,7 @@ function shouldDiscardRemoteElement(
   )
 }
 
-/**
- * Upstream's comparator, quirks included: a pair where either side has no
- * index sorts as "already in place" rather than being moved. Ties on the
- * index itself break by id, so peers holding the same elements agree on the
- * order without talking to each other.
- */
+/** Upstream's comparator, quirks included. */
 function orderByFractionalIndex(elements: SceneElement[]): SceneElement[] {
   return elements.sort((a, b) => {
     if (a.index != null && b.index != null) {
@@ -67,11 +42,7 @@ function orderByFractionalIndex(elements: SceneElement[]): SceneElement[] {
   })
 }
 
-/**
- * Merge `remoteElements` into `localElements`, per-element last-writer-wins.
- * Neither input is mutated; the returned array is a new one, ordered by
- * fractional index.
- */
+/** Per-element last-writer-wins merge into a new array. */
 export function reconcileElements(
   localElements: readonly SceneElement[],
   remoteElements: readonly SceneElement[],
@@ -102,10 +73,7 @@ export function reconcileElements(
   return orderByFractionalIndex(reconciledElements)
 }
 
-/**
- * Upstream's cheap scene fingerprint: monotonic, because an element's version
- * only ever goes up. Used to decide whether anything is worth broadcasting.
- */
+/** Upstream's scene fingerprint; monotonic, since versions only go up. */
 export function getSceneVersion(elements: readonly SceneElement[]): number {
   return elements.reduce((total, element) => total + element.version, 0)
 }

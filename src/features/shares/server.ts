@@ -40,8 +40,8 @@ export const createShare = createServerFn({ method: "POST" })
     createShareLink(db, context.session.user.id, data.drawingId, data.audience),
   )
 
-// Each mutation below writes the row first, then updates the live Room. In
-// that order, a socket that joins between the two steps cannot keep its seat.
+// Write the row before touching the room, so a socket joining in between
+// can't keep its seat.
 
 export const stopSharing = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
@@ -79,25 +79,14 @@ export const setShareAudience = createServerFn({ method: "POST" })
     return share
   })
 
-/**
- * What the /share/$token loader gets back. `throttled` is the limiter's
- * answer and never comes out of resolveShareVisit — it is decided before the
- * database is touched at all.
- */
 export type ShareVisit = ShareResolution | { status: "throttled" }
 
-/**
- * Public (pre-auth) resolution of a share token, called by the /share/$token
- * loader on every visit. All decisions live in resolveShareVisit; this
- * wrapper only supplies the live db, the cookie-derived session check, and
- * the per-IP validation limit of spec §4.5.
- */
+/** Public (pre-auth) share token lookup for the /share/$token loader. */
 export const resolveShareToken = createServerFn({ method: "GET" })
   .validator(z.string())
   .handler(async ({ data: token }): Promise<ShareVisit> => {
     const headers = getRequestHeaders()
-    // Counted before the token lookup, so a flood costs the database nothing.
-    // The real 429 goes on the wire; the loader data drives the page.
+    // Counted before the lookup, so a flood costs the database nothing.
     if (!allowTokenValidation({ headers, socketIp: getRequestIP() })) {
       setResponseStatus(429)
       return { status: "throttled" }

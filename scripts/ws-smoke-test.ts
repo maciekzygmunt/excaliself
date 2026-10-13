@@ -1,12 +1,6 @@
 /**
- * Websocket smoke test for the collab room (canvas sharing spec §6, rollout
- * note 4). Drives two real sockets against a running instance and checks the
- * whole transport: upgrade auth, presence on join and leave, and cursor
- * relay.
- *
- * Run it after any change to the nitro/TanStack Start versions, in BOTH
- * `pnpm dev` and the built container — the pinned nitro beta is the reason
- * this script exists. See docs/collab-websocket-smoke-test.md.
+ * Collab websocket smoke test against a running instance. Run after any
+ * nitro/TanStack Start bump, in dev and the container. See docs/collab-websocket-smoke-test.md.
  *
  *   pnpm smoke:ws                       # mints a token from DATABASE_URL
  *   pnpm smoke:ws --token <share-token> # uses a link from the Share dialog
@@ -55,11 +49,7 @@ type Frame = { type: string; payload: Record<string, unknown> }
 class Peer {
   readonly frames: Frame[] = []
   private socket: WebSocket
-  /**
-   * Subscribed at construction, not when someone asks: the server can close a
-   * socket the instant it opens (the participant cap does exactly that), and a
-   * listener added after `connect()` resolves would miss it.
-   */
+  // Subscribed at construction: the cap closes a socket the instant it opens.
   private readonly closeCode: Promise<number>
 
   private constructor(socket: WebSocket) {
@@ -101,7 +91,6 @@ class Peer {
     this.socket.close()
   }
 
-  /** The code the server closed with, for the closes that mean something. */
   closedWith(timeoutMs = 5000): Promise<number> {
     return Promise.race([
       this.closeCode,
@@ -114,12 +103,11 @@ class Peer {
     ])
   }
 
-  /** Where the frame log stands now, to pass as `since` on a later expect. */
+  /** Pass as `since` on a later expect. */
   mark() {
     return this.frames.length
   }
 
-  /** Waits for the next frame of `type` that satisfies `matches`. */
   async expect(
     type: string,
     matches: (frame: Frame) => boolean = () => true,
@@ -143,12 +131,7 @@ class Peer {
 const participantsOf = (frame: Frame) =>
   (frame.payload.participants ?? []) as { connectionId: string; name: string }[]
 
-/**
- * Waits for a peer's *latest* roster to settle at `size`. `expect` scans from
- * the first frame, which can't tell "the room grew to 24 on the way up" from
- * "the room came back down to 24" — and the difference is what says the
- * server has finished processing a departure.
- */
+/** Checks the *latest* roster; `expect` would match the size on the way up too. */
 async function roomSettlesAt(peer: Peer, size: number, timeoutMs = 5000) {
   const deadline = Date.now() + timeoutMs
   while (Date.now() < deadline) {
@@ -171,7 +154,6 @@ type WireElement = {
 const elementsOf = (frame: Frame) =>
   (frame.payload.elements ?? []) as WireElement[]
 
-/** A shape no other run could have drawn, so checks can't read each other's. */
 const scribble = (version: number, versionNonce = 1): WireElement => ({
   id: `smoke-${randomBytes(6).toString("hex")}`,
   version,
@@ -189,16 +171,10 @@ const findElement = (frame: Frame, id: string) =>
 
 // --- the checks --------------------------------------------------------
 
-/**
- * Thrown by a check that cannot run in this environment (no DATABASE_URL for
- * the persistence check, say). Reported, but not counted as a failure.
- */
+/** A check this environment can't run; reported, not failed. */
 class Skipped extends Error {}
 
-/**
- * Reads a shared drawing straight out of Postgres — the only way to see what
- * a Room actually flushed, since nothing on the wire reports it.
- */
+/** Reads the flushed drawing from Postgres; nothing on the wire reports it. */
 async function storedScene(
   token: string,
 ): Promise<{ elements: WireElement[]; appState: unknown }> {
@@ -230,10 +206,7 @@ const checks: {
   run: (token: string, url: string) => Promise<void>
 }[] = [
   {
-    // Spec §5.3. The upgrade completes and the close code carries the answer:
-    // a refused handshake would reach the browser as an opaque 1006, which a
-    // client reconnecting through an outage cannot tell from a server that is
-    // merely down — and would retry against forever.
+    // A refused handshake reads as an opaque 1006, which the client would retry forever.
     name: "a bogus token is closed with the dead-link code, not left to retry",
     run: async (_token, url) => {
       const dead = randomBytes(32).toString("hex")
@@ -248,8 +221,7 @@ const checks: {
     },
   },
   {
-    // Spec §5.3, rollout note 2 — the thing that keeps a quiet session alive
-    // past a proxy's 60 s idle timeout.
+    // Keeps a quiet session alive past a proxy's 60 s idle timeout.
     name: "a heartbeat is answered",
     run: async (token, url) => {
       const peer = await Peer.connect(socketUrl(url, token))
@@ -260,14 +232,11 @@ const checks: {
     },
   },
   {
-    // Spec §5.4. No error channel: the close is all the client gets, and the
-    // reconnect's SCENE_INIT is what puts the session back together.
     name: "a frame past the cap closes the socket with 1009",
     run: async (token, url) => {
       const peer = await Peer.connect(socketUrl(url, token))
       await peer.expect("ROOM_JOINED")
-      // Comfortably over 4 MB, and shaped like something the parser would
-      // otherwise accept — so what refuses it is the cap and nothing else.
+      // Otherwise valid, so only the cap can refuse it.
       const oversized = { ...scribble(1), text: "x".repeat(MAX_FRAME_BYTES) }
       peer.send({ type: "SCENE_UPDATE", payload: { elements: [oversized] } })
       const code = await peer.closedWith()
@@ -398,9 +367,7 @@ const checks: {
     },
   },
   {
-    // Spec §4.5. The upgrade still succeeds — the cap is enforced on the
-    // open, because only a close code reaches the page as something it can
-    // turn into the "this drawing is full" state.
+    // Enforced after the upgrade: only a close code reaches the page.
     name: "the socket past the participant cap is closed, and its slot reopens",
     run: async (token, url) => {
       const seated = await Promise.all(
@@ -420,9 +387,7 @@ const checks: {
         if (refused.frames.length > 0)
           throw new Error("a refused socket was told about the room")
 
-        // The departure and the replacement's handshake travel on different
-        // connections, so wait until a peer that stayed can see the slot is
-        // free — otherwise the replacement can race the leave and be refused.
+        // Wait for the leave to land, or the replacement can race it.
         seated.pop()?.close()
         await roomSettlesAt(seated[0], MAX_ROOM_PARTICIPANTS - 1)
 
@@ -482,8 +447,7 @@ const checks: {
         type: "SCENE_UPDATE",
         payload: { elements: [{ ...winner, version: 2 }] },
       })
-      // The room answers its own sender — the correction that lets a peer
-      // whose edit lost converge instead of sitting on a version nobody has.
+      // The losing sender gets the winner back so it converges.
       const correction = await b.expect(
         "SCENE_UPDATE",
         (f) => findElement(f, winner.id) !== undefined,
@@ -497,9 +461,6 @@ const checks: {
     },
   },
   {
-    // Spec §2.3: the last socket out writes the scene before the Room is torn
-    // down — the "guest edits survive the owner closing their tab" case, and
-    // the one thing no in-process test can prove.
     name: "the last peer out flushes the scene to the database, elements only",
     run: async (token, url) => {
       const before = await storedScene(token)
@@ -511,7 +472,6 @@ const checks: {
 
       const drawn = scribble(1)
       a.send({ type: "SCENE_UPDATE", payload: { elements: [drawn] } })
-      // The room has ruled on it once the other peer hears about it.
       await b.expect("SCENE_UPDATE", (f) => Boolean(findElement(f, drawn.id)))
 
       a.close()

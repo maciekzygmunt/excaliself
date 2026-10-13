@@ -163,8 +163,7 @@ function DrawingCard({
   folder?: Folder
   onTrash: () => void
 }) {
-  // Read per card rather than per grid: one shared poll loop either way
-  // (spec §1.5), and a poll that found one new visitor re-renders one card.
+  // Per card so a poll result re-renders only the changed card.
   const live = useLiveDrawing(drawing.id)
 
   return (
@@ -181,11 +180,8 @@ function DrawingCard({
         aria-label={drawing.name}
         className="absolute inset-0 rounded-card"
       />
-      {/* `relative` anchors the avatar stack to the preview's corner — and
-          makes this div positioned, so it now paints above the stretched
-          link that is its DOM-earlier sibling. `pointer-events-none` is what
-          keeps clicks on the preview (the card's largest target) reaching
-          that link instead of dying here; nothing inside is interactive. */}
+      {/* `relative` paints this above the stretched link; pointer-events-none
+          lets clicks reach it. */}
       <div className="pointer-events-none relative aspect-[4/3] overflow-hidden border-b border-hairline">
         <Preview name={drawing.name} data={drawing.data} />
         <LiveAvatarStack

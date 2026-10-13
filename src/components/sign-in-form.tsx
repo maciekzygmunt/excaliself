@@ -8,23 +8,12 @@ import { signInFormSchema } from "@/features/auth/schema"
 import { authClient } from "@/lib/auth-client"
 
 type Props = {
-  /**
-   * Runs once the credentials are accepted and the session cookie is set.
-   * Where that lands the member is the page's call: /login navigates, the
-   * share sign-in gate revalidates in place. Awaited, so a handler that
-   * takes a moment (revalidation) keeps the button in its pending state
-   * instead of going idle over a page that is about to be replaced.
-   */
+  /** Awaited, so the button stays pending while the page revalidates. */
   onSignedIn: () => void | Promise<void>
-  /** Microcopy under the submit button — each page explains its own context. */
   children?: ReactNode
 }
 
-/**
- * The instance's only credential form: email + password, nothing else (no
- * remember-me, no SSO, no self-serve reset). Shared by /login and the share
- * sign-in gate so the two can never drift apart.
- */
+/** Shared by /login and the share sign-in gate. */
 export function SignInForm({ onSignedIn, children }: Props) {
   const form = useForm({
     defaultValues: { email: "", password: "" },
