@@ -2,9 +2,8 @@
  * The room websocket (canvas sharing spec §2.1). One in-process nitro handler
  * on the app's own port — no new ports, no new env vars.
  *
- * This file is deliberately thin: it adapts a crossws peer to the
- * {@link RoomPeer} interface and does the two lookups the upgrade decision
- * needs. Everything else lives in `@/features/collab`, where it is unit
+ * This file is deliberately thin: it does the lookups the upgrade decision
+ * needs and hands the crossws peer to the Room. Everything else lives in `@/features/collab`, where it is unit
  * tested without a server.
  */
 
@@ -20,10 +19,7 @@ import {
   ROOM_FULL_CLOSE_CODE,
 } from "@/features/collab/protocol"
 import { rooms } from "@/features/collab/room-registry"
-import type {
-  ParticipantIdentity,
-  RoomPeer,
-} from "@/features/collab/room-session"
+import type { ParticipantIdentity } from "@/features/collab/room-session"
 import {
   joinRoom,
   leaveRoom,
@@ -42,59 +38,20 @@ import { socketIpOf } from "@/lib/client-ip"
 const namespaceFor = (roomId: string) => `room:${roomId}`
 
 /**
- * Where a refused socket lands for the moment it stays open. Its own
- * namespace, shared with no room: nothing is published into it, and its
- * peers never subscribe to a topic before being closed.
+ * The path is `/ws/rooms/<token>`. Nitro's route params don't reach the
+ * websocket hooks, and tokens are hex, so there is nothing to decode.
  */
-const REFUSED_NAMESPACE = "room:refused"
+const tokenOf = (request: Request) =>
+  new URL(request.url).pathname.split("/").pop() || ""
 
-/** crossws peers already carry a random per-socket id — the connection id. */
-function toRoomPeer(peer: {
-  id: string
-  send: (data: unknown) => unknown
-  publish: (topic: string, data: unknown) => unknown
-  subscribe: (topic: string) => unknown
-  close: (code?: number, reason?: string) => unknown
-}): RoomPeer {
-  return {
-    id: peer.id,
-    send: (data) => {
-      peer.send(data)
-    },
-    publish: (topic, data) => {
-      peer.publish(topic, data)
-    },
-    subscribe: (topic) => {
-      peer.subscribe(topic)
-    },
-    // What the Room reaches for when a link dies under a live socket
-    // (spec §4.2): the adapter stored at join time is the only handle it has
-    // on a connection, and a server function is where that decision is made.
-    close: (code, reason) => {
-      peer.close(code, reason)
-    },
-  }
-}
-
-/**
- * The room the upgrade seated this socket in, or null for a socket that
- * belongs in none — refused, or missing the context entirely. Both of those
- * are answered once, in `open`, by closing; every hook after that has a room
- * or has nothing to do.
- */
+/** The room the upgrade seated this socket in, or null if it was refused. */
 function roomContextOf(peer: { context: Record<string, unknown> }) {
-  const context = peer.context as Partial<{
+  const { roomId, identity } = peer.context as Partial<{
     roomId: string
     identity: ParticipantIdentity
-    refused: true
   }>
-  return context.roomId && context.identity
-    ? { roomId: context.roomId, identity: context.identity }
-    : null
+  return roomId && identity ? { roomId, identity } : null
 }
-
-const wasRefused = (peer: { context: Record<string, unknown> }) =>
-  peer.context.refused === true
 
 export default defineWebSocketHandler({
   async upgrade(request) {
@@ -109,25 +66,23 @@ export default defineWebSocketHandler({
     )
       throw new Response("Too Many Requests", { status: 429 })
 
-    // The path is `/ws/rooms/<token>`; nitro's route params aren't exposed to
-    // the upgrade hook, so read the token off the URL directly.
-    // Tokens are hex, so there is nothing to decode.
-    const token = new URL(request.url).pathname.split("/").pop() || ""
-
     // Runs on every (re)connect, so stop, regenerate, an audience tighten,
     // and trash all take effect on the next join (spec §4.1). The room-scoped
     // image endpoints call the same function, so the token, audience and
     // deletedAt decision is literally shared — the per-IP budget above is not,
     // and `$fileId.ts` says why.
-    const join = await resolveRoomForToken(db, token, request.headers)
+    const join = await resolveRoomForToken(
+      db,
+      tokenOf(request),
+      request.headers,
+    )
     // One generic refusal for every reason, like the dead-link page: nothing
     // here reveals whether the drawing exists. The socket is accepted anyway
     // and closed in `open` with a code the client can read — a rejected
     // handshake would arrive as an opaque 1006, which a client reconnecting
     // through an outage (spec §5.3) cannot tell from a server that is down,
     // and would retry against forever.
-    if (join.status !== "ok")
-      return { namespace: REFUSED_NAMESPACE, context: { refused: true } }
+    if (join.status !== "ok") return
 
     return {
       namespace: namespaceFor(join.roomId),
@@ -145,20 +100,20 @@ export default defineWebSocketHandler({
   async open(peer) {
     // The dead-link answer of spec §5.3, and the one close the reconnect loop
     // treats as final: retrying a link that is gone would spin forever.
-    if (wasRefused(peer))
-      return peer.close(LINK_DEAD_CLOSE_CODE, LINK_DEAD_CLOSE_REASON)
-
     const context = roomContextOf(peer)
-    if (!context) return peer.close(1011, "Room unavailable")
+    if (!context)
+      return peer.close(LINK_DEAD_CLOSE_CODE, LINK_DEAD_CLOSE_REASON)
 
     // Seat first, then check the link again. A link that died during the
     // handshake either fails this check or finds the seat to evict.
-    const roomPeer = toRoomPeer(peer)
-    const joining = joinRoom(rooms, context.roomId, roomPeer, context.identity)
-    const token = new URL(peer.request.url).pathname.split("/").pop() || ""
-    const recheck = await resolveRoomForToken(db, token, peer.request.headers)
+    const joining = joinRoom(rooms, context.roomId, peer, context.identity)
+    const recheck = await resolveRoomForToken(
+      db,
+      tokenOf(peer.request),
+      peer.request.headers,
+    )
     if (recheck.status !== "ok" || recheck.roomId !== context.roomId) {
-      await leaveRoom(rooms, context.roomId, roomPeer)
+      await leaveRoom(rooms, context.roomId, peer)
       return peer.close(LINK_DEAD_CLOSE_CODE, LINK_DEAD_CLOSE_REASON)
     }
     // The cap is checked here, not at the upgrade: a refused handshake
@@ -185,7 +140,7 @@ export default defineWebSocketHandler({
     const outcome = await receiveFromPeer(
       rooms,
       context.roomId,
-      toRoomPeer(peer),
+      peer,
       message.text(),
     )
     // The Room forgot this connection while its socket stayed open — a seat
@@ -200,6 +155,6 @@ export default defineWebSocketHandler({
   async close(peer) {
     const context = roomContextOf(peer)
     if (!context) return
-    await leaveRoom(rooms, context.roomId, toRoomPeer(peer))
+    await leaveRoom(rooms, context.roomId, peer)
   },
 })
