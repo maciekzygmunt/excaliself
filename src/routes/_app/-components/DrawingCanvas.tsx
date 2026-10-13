@@ -55,8 +55,8 @@ const SHARE_BUTTON_CLASS =
 const SHARE_LABEL_CLASS = "@max-6xl/canvas:hidden"
 // `!` beats Excalidraw's later-loaded `.dropdown-menu-item { display: flex }`.
 const SHARE_MENU_ITEM_CLASS = "@5xl/canvas:hidden!"
-const PRESENCE_CLASS = "@max-[76rem]/canvas:hidden"
-const PRESENCE_MENU_ROW_CLASS = "@min-[76rem]/canvas:hidden!"
+const PRESENCE_CLASS = "@max-[77rem]/canvas:hidden"
+const PRESENCE_MENU_ROW_CLASS = "@min-[77rem]/canvas:hidden!"
 
 type Props = {
   drawingId: string

@@ -31,7 +31,7 @@ export function TopLeftControls({
       </button>
       {readOnly ? (
         <span
-          className="hidden max-w-45 truncate text-[0.95rem] font-semibold text-(--text-primary-color) @min-[66rem]/canvas:block"
+          className="hidden max-w-45 truncate text-[0.95rem] font-semibold text-(--text-primary-color) @min-[67rem]/canvas:block"
           title={initialName}
         >
           {initialName || "Untitled Drawing"}
@@ -55,7 +55,7 @@ function RenameField({
   const [value, setValue] = useState(initialName)
 
   return (
-    <div className="relative max-w-45 min-w-0 overflow-hidden hidden @min-[66rem]/canvas:block">
+    <div className="relative max-w-45 min-w-0 overflow-hidden hidden @min-[67rem]/canvas:block">
       <div
         className="relative h-(--lg-button-size) border-b border-transparent bg-transparent font-semibold after:block after:w-full after:min-w-16 after:whitespace-pre after:invisible after:content-[attr(data-value)] focus-within:border-(--color-primary)"
         data-value={value || "Untitled Drawing"}

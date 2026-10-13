@@ -298,6 +298,19 @@ code {
   display: none;
 }
 
+/* Excalidraw's top row is a grid that overflows to the right once its items
+   outgrow the canvas, pushing the Library button off screen. On narrow
+   canvases (sidebar open, or a small window) the Library button goes
+   icon-only and the gaps shrink, like Share does. */
+@container canvas (width < 52rem) {
+  .excalidraw div.App-menu_top {
+    column-gap: 0.75rem;
+  }
+  .excalidraw .default-sidebar-trigger div.sidebar-trigger__label {
+    display: none;
+  }
+}
+
 /* A barely-there scrollbar for scrollable chrome surfaces (palette list):
    thin trackless thumb on the border token, so it follows the theme. */
 @utility scrollbar-subtle {
