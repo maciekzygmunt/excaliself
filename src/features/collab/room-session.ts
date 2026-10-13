@@ -205,7 +205,7 @@ function broadcastRoster(peer: RoomPeer, room: Room) {
   peer.publish(ROOM_TOPIC, message)
 }
 
-/** Stops a script holding sockets open, not real sessions. */
+/** Stops a script holding sockets open, not real sessions. The last seat is the owner's. */
 export const MAX_ROOM_PARTICIPANTS = 25
 
 /** About 3.5 missed heartbeats. */
@@ -244,7 +244,11 @@ export async function joinRoom(
   const existing = registry.rooms.get(roomId)
   if (existing) {
     forgetSilentParticipants(existing, registry.now())
-    if (existing.seats.size >= MAX_ROOM_PARTICIPANTS) return { status: "full" }
+    // Everyone else stops one short, so guests can't lock the owner out.
+    const isOwner =
+      identity.userId !== null && identity.userId === existing.ownerId
+    const cap = isOwner ? MAX_ROOM_PARTICIPANTS : MAX_ROOM_PARTICIPANTS - 1
+    if (existing.seats.size >= cap) return { status: "full" }
   }
 
   const room = ensureRoom(registry, roomId)

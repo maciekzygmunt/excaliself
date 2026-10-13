@@ -675,20 +675,58 @@ test("a peer that left mid-load is not sent a scene", async () => {
   expect(framesOf(grace, "SCENE_INIT")).toHaveLength(1)
 })
 
-/** Seats the cap's worth of sockets, so the next join is the one refused. */
+/** Seats guests up to their cap, so the next guest is the one refused. */
 async function fillRoom(registry: RoomRegistry) {
-  const peers = Array.from({ length: MAX_ROOM_PARTICIPANTS }, (_, i) =>
+  const peers = Array.from({ length: MAX_ROOM_PARTICIPANTS - 1 }, (_, i) =>
     fakePeer(`peer-${i}`),
   )
   await Promise.all(peers.map((peer) => joinRoom(registry, ROOM, peer, guest)))
   return peers
 }
 
-test("a room fills up to the cap", async () => {
+/** A registry over an empty drawing owned by `member("Owen")`. */
+const ownedRegistry = () =>
+  emptyRegistry(async () => ({
+    elements: [],
+    ownerId: member("Owen").userId,
+    readable: true,
+  }))
+
+test("guests fill every seat but the owner's", async () => {
   const registry = emptyRegistry()
   await fillRoom(registry)
 
+  expect(registry.rooms.get(ROOM)?.seats.size).toBe(MAX_ROOM_PARTICIPANTS - 1)
+})
+
+test("the owner gets into a room guests have filled", async () => {
+  const registry = ownedRegistry()
+  await fillRoom(registry)
+  await joinRoom(registry, ROOM, fakePeer("peer-late"), guest)
+
+  expect(
+    await joinRoom(registry, ROOM, fakePeer("peer-owner"), member("Owen")),
+  ).toEqual({ status: "ok" })
+})
+
+test("the owner's tabs still stop at the cap", async () => {
+  const registry = ownedRegistry()
+  await fillRoom(registry)
+  await joinRoom(registry, ROOM, fakePeer("peer-owner-1"), member("Owen"))
+
+  expect(
+    await joinRoom(registry, ROOM, fakePeer("peer-owner-2"), member("Owen")),
+  ).toEqual({ status: "full" })
   expect(registry.rooms.get(ROOM)?.seats.size).toBe(MAX_ROOM_PARTICIPANTS)
+})
+
+test("a member who is not the owner stops with the guests", async () => {
+  const registry = ownedRegistry()
+  await fillRoom(registry)
+
+  expect(
+    await joinRoom(registry, ROOM, fakePeer("peer-ada"), member("Ada")),
+  ).toEqual({ status: "full" })
 })
 
 test("the socket past the cap is refused and joins nothing", async () => {
@@ -701,7 +739,7 @@ test("the socket past the cap is refused and joins nothing", async () => {
   })
   expect(late.sent).toEqual([])
   expect(late.topics).toEqual([])
-  expect(registry.rooms.get(ROOM)?.seats.size).toBe(MAX_ROOM_PARTICIPANTS)
+  expect(registry.rooms.get(ROOM)?.seats.size).toBe(MAX_ROOM_PARTICIPANTS - 1)
 })
 
 test("the room the refused socket knocked on is not told about it", async () => {
