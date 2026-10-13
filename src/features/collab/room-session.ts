@@ -24,7 +24,7 @@ import {
   parseClientMessage,
   ROOM_TOPIC,
 } from "./protocol"
-import { getSceneVersion, reconcileElements } from "./reconcile"
+import { reconcileElements } from "./reconcile"
 import type { StoredScene } from "./scene-store"
 
 /** The slice of a crossws `Peer` the room logic uses. */
@@ -97,7 +97,6 @@ export type Room = {
   persistable: boolean
   /** The authoritative scene, in fractional-index order. */
   elements: SceneElement[]
-  sceneVersion: number
   /** Cached at load time for the live badge (spec §1.5). */
   ownerId: string | null
   /** Set when a merge changed the scene, cleared once it has been written. */
@@ -153,7 +152,6 @@ function ensureRoom(registry: RoomRegistry, roomId: string): Room {
     loaded: Promise.resolve(),
     persistable: false,
     elements: [],
-    sceneVersion: 0,
     ownerId: null,
     dirty: false,
     flushTimer: null,
@@ -163,7 +161,6 @@ function ensureRoom(registry: RoomRegistry, roomId: string): Room {
   room.loaded = registry.loadScene(roomId).then(
     (stored) => {
       room.elements = stored.elements
-      room.sceneVersion = getSceneVersion(stored.elements)
       room.ownerId = stored.ownerId
       // Unreadable stored JSON leaves the Room open but mute: the drawing rendered as an empty canvas here, and
       // writing that emptiness back is how a recoverable file becomes an
@@ -471,7 +468,7 @@ function setFollowTarget(
  * scene exactly as it was, and re-writing it would be a database round trip
  * for nothing.
  *
- * That question is answered by identity, not by `sceneVersion`: reconciliation
+ * That question is answered by identity, not by the scene version: reconciliation
  * keeps the winning object by reference, so an element the Room replaced is a
  * different object than the one it held. A version sum cannot see the
  * versionNonce tie-break — a remote element with the same `version` and a
@@ -487,7 +484,6 @@ function applySceneUpdate(
   const previous = room.elements
   const previousById = new Map(previous.map((el) => [el.id, el]))
   room.elements = reconcileElements(previous, incoming, {})
-  room.sceneVersion = getSceneVersion(room.elements)
   const changed =
     room.elements.length !== previous.length ||
     room.elements.some((el) => previousById.get(el.id) !== el)
@@ -552,63 +548,58 @@ export async function receiveFromPeer(
   // full window rather than the window minus a round trip.
   seat.lastSeenAt = registry.now()
 
-  // Only ever answered for a peer that still has a seat. A `PONG` to an
-  // evicted socket would tell its client the connection is healthy while the
-  // Room ignores every scene and cursor frame it sends.
-  if (message.type === "PING") {
-    peer.send({ type: "PONG", payload: {} })
-    return "ok"
-  }
-
-  if (message.type === "JOIN") {
-    // Only guests name themselves. A member's name is whatever the session
-    // says, so a compromised client can't pose as someone else in the room.
-    const { participant } = seat
-    if (!participant.isGuest || participant.name === message.payload.name)
+  switch (message.type) {
+    case "PING":
+      // Only a seated peer gets a PONG, so an evicted client never looks healthy.
+      peer.send({ type: "PONG", payload: {} })
       return "ok"
-    seat.participant = { ...participant, name: message.payload.name }
-    broadcastRoster(peer, room)
-    return "ok"
-  }
 
-  if (message.type === "USER_FOLLOW") {
-    setFollowTarget(room, peer.id, message.payload.followedConnectionId)
-    return "ok"
-  }
-
-  if (message.type === "USER_VISIBLE_SCENE_BOUNDS") {
-    const upstream = upstreamOf(room, peer.id)
-    for (const followerId of followersOf(room, peer.id)) {
-      // Only the edges that would close a loop are dropped; anyone else
-      // trailing this peer still gets the viewport. A plain chain — C follows
-      // A, A follows B — is not a loop and keeps working.
-      if (upstream.has(followerId)) continue
-      room.seats.get(followerId)?.peer.send({
-        type: "USER_VISIBLE_SCENE_BOUNDS",
-        payload: { connectionId: peer.id, bounds: message.payload.bounds },
-      })
+    case "JOIN": {
+      // Only guests name themselves; a member's name comes from the session.
+      const { participant } = seat
+      if (!participant.isGuest || participant.name === message.payload.name)
+        return "ok"
+      seat.participant = { ...participant, name: message.payload.name }
+      broadcastRoster(peer, room)
+      return "ok"
     }
-    return "ok"
-  }
 
-  if (message.type === "SCENE_UPDATE") {
-    // A client can start drawing before its SCENE_INIT lands. Merging into an
-    // empty scene here would drop everything the drawing already had, so the
-    // delta waits for the load — deltas keep their order because they all
-    // queue behind the same settled promise.
-    await room.loaded
-    // Swept as a ghost while the load was in flight, or simply gone.
-    if (!room.seats.has(peer.id)) return "evicted"
-    if (applySceneUpdate(room, peer, message.payload.elements))
-      markDirty(registry, room)
-    return "ok"
-  }
+    case "USER_FOLLOW":
+      setFollowTarget(room, peer.id, message.payload.followedConnectionId)
+      return "ok"
 
-  peer.publish(ROOM_TOPIC, {
-    type: "MOUSE_LOCATION",
-    payload: { ...message.payload, connectionId: peer.id },
-  })
-  return "ok"
+    case "USER_VISIBLE_SCENE_BOUNDS": {
+      const upstream = upstreamOf(room, peer.id)
+      for (const followerId of followersOf(room, peer.id)) {
+        // Skip only the edges that would close a loop.
+        if (upstream.has(followerId)) continue
+        room.seats.get(followerId)?.peer.send({
+          type: "USER_VISIBLE_SCENE_BOUNDS",
+          payload: { connectionId: peer.id, bounds: message.payload.bounds },
+        })
+      }
+      return "ok"
+    }
+
+    case "SCENE_UPDATE":
+      // Wait for the stored scene, or the merge would drop it. Deltas keep
+      // their order: they all queue behind the same promise.
+      await room.loaded
+      if (!room.seats.has(peer.id)) return "evicted"
+      if (applySceneUpdate(room, peer, message.payload.elements))
+        markDirty(registry, room)
+      return "ok"
+
+    case "MOUSE_LOCATION":
+      peer.publish(ROOM_TOPIC, {
+        type: "MOUSE_LOCATION",
+        payload: { ...message.payload, connectionId: peer.id },
+      })
+      return "ok"
+
+    default:
+      return message satisfies never
+  }
 }
 
 export async function leaveRoom(

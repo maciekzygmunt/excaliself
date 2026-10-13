@@ -354,53 +354,55 @@ export function useRoom(options: {
         const message = parseServerMessage(event.data)
         if (!message) return
 
-        if (message.type === "PONG") {
-          ownBeat.acknowledge()
-          return
-        }
-        if (message.type === "ROOM_JOINED") {
-          // Not on `open`: a handshake the server accepts and then abandons
-          // would otherwise read as a healthy connection and reset the wait
-          // that keeps a crash-looping server from being hammered.
-          backoff.reset()
-          everJoined = true
-          setConnectionStatus("connected")
-          selfConnectionIdRef.current = message.payload.connectionId
-          setSelfConnectionId(message.payload.connectionId)
-          setRoster(message.payload.participants)
-          return
-        }
-        if (message.type === "PARTICIPANTS") {
-          setRoster(message.payload.participants)
-          return
-        }
-        if (
-          message.type === "FOLLOWED_BY" ||
-          message.type === "USER_VISIBLE_SCENE_BOUNDS"
-        ) {
-          followRef.current.handleServerMessage(message)
-          return
-        }
-        if (message.type === "SCENE_INIT") {
-          const merged = applyRemoteScene(message.payload.elements)
-          if (!merged) return
-          sceneInitializedRef.current = true
-          // Anything this tab was holding that the room's scene didn't have —
-          // an edit the owner saved between this page's fetch and the room's
-          // load, a stroke drawn while the socket was still opening, or
-          // everything drawn during an outage — goes up now, so the room
-          // converges on the union of the two rather than dropping one side.
-          if (sendScene(broadcasterRef.current.catchUp(merged))) queueFullSync()
-          return
-        }
-        if (message.type === "SCENE_UPDATE") {
-          applyRemoteScene(message.payload.elements)
-          return
-        }
+        switch (message.type) {
+          case "PONG":
+            ownBeat.acknowledge()
+            return
 
-        const { connectionId, ...pointer } = message.payload
-        pointersRef.current.set(connectionId, pointer)
-        pushCollaborators()
+          case "ROOM_JOINED":
+            // Not on `open`: a server that accepts and then drops the socket
+            // must not reset the backoff.
+            backoff.reset()
+            everJoined = true
+            setConnectionStatus("connected")
+            selfConnectionIdRef.current = message.payload.connectionId
+            setSelfConnectionId(message.payload.connectionId)
+            setRoster(message.payload.participants)
+            return
+
+          case "PARTICIPANTS":
+            setRoster(message.payload.participants)
+            return
+
+          case "FOLLOWED_BY":
+          case "USER_VISIBLE_SCENE_BOUNDS":
+            followRef.current.handleServerMessage(message)
+            return
+
+          case "SCENE_INIT": {
+            const merged = applyRemoteScene(message.payload.elements)
+            if (!merged) return
+            sceneInitializedRef.current = true
+            // Send up what this tab has and the room lacks, so both sides merge.
+            if (sendScene(broadcasterRef.current.catchUp(merged)))
+              queueFullSync()
+            return
+          }
+
+          case "SCENE_UPDATE":
+            applyRemoteScene(message.payload.elements)
+            return
+
+          case "MOUSE_LOCATION": {
+            const { connectionId, ...pointer } = message.payload
+            pointersRef.current.set(connectionId, pointer)
+            pushCollaborators()
+            return
+          }
+
+          default:
+            return message satisfies never
+        }
       })
 
       socket.addEventListener("close", (event: CloseEvent) => {

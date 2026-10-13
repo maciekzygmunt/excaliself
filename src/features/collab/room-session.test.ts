@@ -500,7 +500,6 @@ test("a joiner is handed the stored scene", async () => {
   await joinRoom(registry, ROOM, ada, member("Ada"))
 
   expect(elementsOf(framesOf(ada, "SCENE_INIT")[0])).toEqual(stored)
-  expect(registry.rooms.get(ROOM)?.sceneVersion).toBe(3)
   // Cached for the live badge, which the badge slice will read.
   expect(registry.rooms.get(ROOM)?.ownerId).toBe("owner-1")
 })
