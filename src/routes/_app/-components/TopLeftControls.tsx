@@ -1,6 +1,9 @@
 import { PanelLeftIcon } from "lucide-react"
 import { useState } from "react"
 
+// The title hides on narrow canvases (sidebar open, or a small window), where
+// it would push Excalidraw's Library button off screen.
+
 type Props = {
   initialName: string
   /** Trashed drawings (spec §5.11): the name is shown but not editable. */
@@ -28,7 +31,7 @@ export function TopLeftControls({
       </button>
       {readOnly ? (
         <span
-          className="hidden max-w-45 truncate text-[0.95rem] font-semibold text-(--text-primary-color) lg:block"
+          className="hidden max-w-45 truncate text-[0.95rem] font-semibold text-(--text-primary-color) @min-[66rem]/canvas:block"
           title={initialName}
         >
           {initialName || "Untitled Drawing"}
@@ -52,7 +55,7 @@ function RenameField({
   const [value, setValue] = useState(initialName)
 
   return (
-    <div className="relative max-w-45 min-w-0 overflow-hidden hidden lg:block">
+    <div className="relative max-w-45 min-w-0 overflow-hidden hidden @min-[66rem]/canvas:block">
       <div
         className="relative h-(--lg-button-size) border-b border-transparent bg-transparent font-semibold after:block after:w-full after:min-w-16 after:whitespace-pre after:invisible after:content-[attr(data-value)] focus-within:border-(--color-primary)"
         data-value={value || "Untitled Drawing"}

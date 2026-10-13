@@ -1,6 +1,6 @@
 /**
  * Who else is in the room, as a stack of initialed avatars in Excalidraw's
- * top-right island (spec §1.3), to the left of the visitor's own name pill.
+ * top-right row (spec §1.3), on the guest and the owner canvas.
  *
  * Only other people are shown — you already know you're here — so a lone
  * visitor gets no chrome at all.
@@ -11,6 +11,7 @@
 
 import { initialsOf } from "@/features/collab/identity"
 import type { Participant } from "@/features/collab/protocol"
+import { cn } from "@/lib/utils"
 
 /** Beyond this the stack turns into a "+N" tail rather than growing. */
 const MAX_AVATARS = 4
@@ -19,11 +20,13 @@ export function PresenceAvatars({
   participants,
   followedConnectionId,
   onFollow,
+  className,
 }: {
   participants: readonly Participant[]
   /** Whose avatar should read as "you are following this one". */
   followedConnectionId: string | null
   onFollow: (participant: Participant) => void
+  className?: string
 }) {
   if (participants.length === 0) return null
 
@@ -32,7 +35,7 @@ export function PresenceAvatars({
 
   return (
     <div
-      className="flex items-center -space-x-1.5"
+      className={cn("flex items-center -space-x-1.5", className)}
       aria-label={`${participants.length} other ${participants.length === 1 ? "person" : "people"} here`}
     >
       {shown.map((participant) => {

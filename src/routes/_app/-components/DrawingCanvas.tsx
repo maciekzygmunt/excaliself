@@ -13,6 +13,11 @@ import {
   FooterRightPortal,
   TopLeftPortal,
 } from "@/components/excalidraw-portal"
+import { FollowModeOverlay } from "@/components/follow-mode-overlay"
+import { MenuParticipants } from "@/components/menu-participants"
+import { MenuReconnecting } from "@/components/menu-reconnecting"
+import { PresenceAvatars } from "@/components/presence-avatars"
+import { ReconnectingIndicator } from "@/components/reconnecting-indicator"
 import { Button } from "@/components/ui/button"
 import { useSidebar } from "@/components/ui/sidebar"
 import { useRoom } from "@/features/collab/use-room"
@@ -56,6 +61,10 @@ const SHARE_LABEL_CLASS = "@max-6xl/canvas:hidden"
 // .dropdown-menu-item { display: flex } after our sheet, which would win
 // the tie against a plain `hidden`.
 const SHARE_MENU_ITEM_CLASS = "@5xl/canvas:hidden!"
+// Avatars need the labeled Share and the Library to fit beside them; below
+// that they move to the menu. Measured with a long title and five others.
+const PRESENCE_CLASS = "@max-[76rem]/canvas:hidden"
+const PRESENCE_MENU_ROW_CLASS = "@min-[76rem]/canvas:hidden!"
 
 type Props = {
   drawingId: string
@@ -238,7 +247,7 @@ export function DrawingCanvas({ drawingId, readOnly = false }: Props) {
   if (!drawing || !initialData) return null
 
   return (
-    <div className="@container/canvas size-full">
+    <div className="@container/canvas relative size-full">
       <Excalidraw
         initialData={initialData}
         excalidrawAPI={setExcalidrawAPI}
@@ -258,16 +267,26 @@ export function DrawingCanvas({ drawingId, readOnly = false }: Props) {
           readOnly
             ? undefined
             : () => (
-                <Button
-                  onClick={() => setShareOpen(true)}
-                  aria-label="Share"
-                  title="Share"
-                  className={SHARE_BUTTON_CLASS}
-                >
-                  <Share2Icon className="h-3.5 w-3.5" />
-                  <span className={SHARE_LABEL_CLASS}>Share</span>
-                  {share && <SharingDot />}
-                </Button>
+                <>
+                  <PresenceAvatars
+                    className={PRESENCE_CLASS}
+                    participants={room.others}
+                    followedConnectionId={
+                      room.followedParticipant?.connectionId ?? null
+                    }
+                    onFollow={room.toggleFollow}
+                  />
+                  <Button
+                    onClick={() => setShareOpen(true)}
+                    aria-label="Share"
+                    title="Share"
+                    className={SHARE_BUTTON_CLASS}
+                  >
+                    <Share2Icon className="h-3.5 w-3.5" />
+                    <span className={SHARE_LABEL_CLASS}>Share</span>
+                    {share && <SharingDot />}
+                  </Button>
+                </>
               )
         }
         UIOptions={{
@@ -279,6 +298,18 @@ export function DrawingCanvas({ drawingId, readOnly = false }: Props) {
         }}
       >
         <MainMenu>
+          <MenuReconnecting
+            status={room.connectionStatus}
+            className={PRESENCE_MENU_ROW_CLASS}
+          />
+          <MenuParticipants
+            className={PRESENCE_MENU_ROW_CLASS}
+            participants={room.others}
+            followedConnectionId={
+              room.followedParticipant?.connectionId ?? null
+            }
+            onFollow={room.toggleFollow}
+          />
           <MainMenu.Item
             icon={<PanelLeftIcon className="h-4 w-4" />}
             onSelect={toggleSidebar}
@@ -315,6 +346,12 @@ export function DrawingCanvas({ drawingId, readOnly = false }: Props) {
         {/* No autosave in read-only mode, so no save status to report. */}
         {!readOnly && (
           <FooterRightPortal>
+            {/* Shared drawings save through the room, so its status is the
+                save status. */}
+            <ReconnectingIndicator
+              status={room.connectionStatus}
+              className="order-first mr-2 h-auto self-stretch"
+            />
             <SaveStatusPill saving={saving} saved={saved} />
           </FooterRightPortal>
         )}
@@ -330,6 +367,10 @@ export function DrawingCanvas({ drawingId, readOnly = false }: Props) {
           />
         </TopLeftPortal>
       </Excalidraw>
+      <FollowModeOverlay
+        participant={room.followedParticipant}
+        onStop={room.stopFollowing}
+      />
       {!readOnly && (
         <ShareDialog
           drawingId={drawingId}

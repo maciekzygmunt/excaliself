@@ -2,17 +2,14 @@ import { cleanup, render, screen } from "@testing-library/react"
 import type { ReactNode } from "react"
 import { afterEach, expect, test, vi } from "vitest"
 import type { Participant } from "@/features/collab/protocol"
-import { MenuParticipants } from "./MenuParticipants"
+import { MenuParticipants } from "./menu-participants"
 
 /**
  * The canvas package can't be imported under vitest, and its menu primitives
  * are chrome we don't own. These stand-ins keep the two things this component
  * decides: whether it renders at all, and what each row says and does.
  */
-const device = { editor: { isMobile: true } }
-
 vi.mock("@excalidraw/excalidraw", () => ({
-  useDevice: () => device,
   MainMenu: {
     Group: ({ title, children }: { title: string; children: ReactNode }) => (
       <div>
@@ -38,28 +35,13 @@ vi.mock("@excalidraw/excalidraw", () => ({
   },
 }))
 
-afterEach(() => {
-  device.editor.isMobile = true
-  cleanup()
-})
+afterEach(cleanup)
 
 const participant = (name: string, i: number): Participant => ({
   connectionId: `peer-${i}`,
   name,
   color: { background: "#fa5252", stroke: "#c92a2a" },
   isGuest: true,
-})
-
-test("on a wide canvas the avatars carry the room, so this renders nothing", () => {
-  device.editor.isMobile = false
-  const { container } = render(
-    <MenuParticipants
-      participants={[participant("Wren", 1)]}
-      followedConnectionId={null}
-      onFollow={() => {}}
-    />,
-  )
-  expect(container.firstChild).toBeNull()
 })
 
 test("a room with nobody else in it adds nothing to the menu", () => {

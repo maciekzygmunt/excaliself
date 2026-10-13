@@ -284,6 +284,13 @@ code {
   display: none;
 }
 
+/* Same for Excalidraw's collaborator list, in the top row and the mobile
+   menu: our avatars and menu rows replace it. */
+.excalidraw div.UserList__wrapper,
+.excalidraw fieldset.UserList-Wrapper {
+  display: none;
+}
+
 /* A barely-there scrollbar for scrollable chrome surfaces (palette list):
    thin trackless thumb on the border token, so it follows the theme. */
 @utility scrollbar-subtle {

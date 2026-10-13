@@ -1,33 +1,27 @@
 /**
- * The room's other participants as burger-menu rows, for the widths where
- * they can't be avatars (spec §1.3).
- *
- * Excalidraw's top strip lays our row out after its toolbar without wrapping,
- * so once it collapses to mobile layout the avatars start past the right edge
- * — no count of them fits, not even one. There they move in here instead,
- * where a row is still the way into follow mode.
- *
- * Above that layout the avatars are in the island where they belong, and this
- * renders nothing: two ways to reach the same people would just be noise.
+ * The room's other participants as burger-menu rows, for the canvas widths
+ * where the avatars don't fit the top row. The host hides it above that
+ * width with `className`. Each row is a way into follow mode.
  */
 
-import { MainMenu, useDevice } from "@excalidraw/excalidraw"
+import { MainMenu } from "@excalidraw/excalidraw"
 import type { Participant } from "@/features/collab/protocol"
 
 export function MenuParticipants({
   participants,
   followedConnectionId,
   onFollow,
+  className,
 }: {
   participants: readonly Participant[]
   followedConnectionId: string | null
   onFollow: (participant: Participant) => void
+  className?: string
 }) {
-  const device = useDevice()
-  if (!device.editor.isMobile || participants.length === 0) return null
+  if (participants.length === 0) return null
 
   return (
-    <>
+    <div className={className}>
       <MainMenu.Group
         title={`${participants.length} other ${participants.length === 1 ? "person" : "people"} here`}
       >
@@ -53,6 +47,6 @@ export function MenuParticipants({
         })}
       </MainMenu.Group>
       <MainMenu.Separator />
-    </>
+    </div>
   )
 }

@@ -7,13 +7,9 @@
  * the reconnect is automatic and indefinite, and a Retry would only offer
  * the visitor a way to do worse than waiting.
  *
- * It sits in Excalidraw's top-right island row, in the space the presence
- * avatars have just vacated — a disconnected tab has no roster to show, so
- * the two never compete for the row.
- *
- * Lives here rather than under the share route because any surface that
- * joins a Room needs it. Today that is the guest canvas; the member canvas
- * joins a Room with the autosave handoff (#120).
+ * On the guest canvas it takes the avatars' place in the top row (a
+ * disconnected tab has no roster); on the owner's canvas it sits in the
+ * footer beside the save status.
  */
 
 import type { ConnectionStatus } from "@/features/collab/use-room"

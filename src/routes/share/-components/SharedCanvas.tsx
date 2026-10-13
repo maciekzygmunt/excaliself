@@ -1,8 +1,7 @@
 // The canvas a share-link visitor lands on. It joins the drawing's room on
 // open, so everyone here sees each other's cursors, presence and edits
-// (canvas sharing #118, #119). Flushing those edits back to the database is
-// the next slice. Always light, per the logged-out pages convention
-// (spec §1.3).
+// (canvas sharing #118, #119). Always light, per the logged-out pages
+// convention (spec §1.3).
 //
 // The chrome is all in-canvas (spec §1.3, prototype variant A): no app shell,
 // no sidebar, no gallery. The drawing's title portals into Excalidraw's own
@@ -17,6 +16,9 @@ import {
   TopLeftPortal,
 } from "@/components/excalidraw-portal"
 import { FollowModeOverlay } from "@/components/follow-mode-overlay"
+import { MenuParticipants } from "@/components/menu-participants"
+import { MenuReconnecting } from "@/components/menu-reconnecting"
+import { PresenceAvatars } from "@/components/presence-avatars"
 import { ReconnectingIndicator } from "@/components/reconnecting-indicator"
 import {
   getOrCreateGuestName,
@@ -30,33 +32,17 @@ import {
 import { GuestAttribution } from "./GuestAttribution"
 import { GuestNamePill } from "./GuestNamePill"
 import { GuestTitle } from "./GuestTitle"
-import { MenuParticipants } from "./MenuParticipants"
-import { MenuReconnecting } from "./MenuReconnecting"
-import { PresenceAvatars } from "./PresenceAvatars"
 
 import "@excalidraw/excalidraw/index.css"
 
-// The top-right row holds the presence avatars and the visitor's name pill,
-// and it has to share the strip with Excalidraw's own toolbar. The pill is
-// the wider and the less urgent of the two — it is set once and forgotten,
-// while the avatars are both who-is-here and follow mode's entry point — so
-// below the seam the pill leaves the row for the burger menu, the same trade
-// the member canvas makes with its Share button.
-//
-// The seam is the canvas area, not the viewport — this surface has no
-// sidebar, but Excalidraw's toolbar is a fixed-width island the row is laid
-// out after, so what matters is how much is left beside it.
-//
-// 50rem rather than a round breakpoint because the pill is not a fixed width:
-// its field grows with the name to `max-w-40` (10rem), so the seam has to
-// clear the longest name the field will accept, not the pseudonym a visitor
-// happens to arrive with. Measured with a short name it would look like 43rem
-// is enough, and then a visitor types their full name and it clips.
-const NAME_PILL_CLASS = "@max-[50rem]/canvas:hidden"
-// The ! is load-order armor, as on the member canvas: Excalidraw's
-// lazy-loaded sheet declares .dropdown-menu-item { display: flex } after ours
-// and would win the tie against a plain `hidden`.
-const NAME_MENU_ROW_CLASS = "@min-[50rem]/canvas:hidden!"
+// Excalidraw's top row doesn't shrink, so items that don't fit move to the
+// burger menu. Seams are canvas widths, measured with the worst case: a long
+// title, a long name, and five others in the room. The `!` beats Excalidraw's
+// later-loaded `.dropdown-menu-item { display: flex }`.
+const NAME_PILL_CLASS = "@max-[86rem]/canvas:hidden"
+const NAME_MENU_ROW_CLASS = "@min-[86rem]/canvas:hidden!"
+const PRESENCE_CLASS = "@max-[72rem]/canvas:hidden"
+const PRESENCE_MENU_ROW_CLASS = "@min-[72rem]/canvas:hidden!"
 
 type Props = {
   drawing: { id: string; name: string; data: string }
@@ -150,8 +136,12 @@ export function SharedCanvas({
             <>
               {/* Where the avatars were: a disconnected tab has no roster to
                   show, so the two never compete for the row. */}
-              <ReconnectingIndicator status={connectionStatus} />
+              <ReconnectingIndicator
+                status={connectionStatus}
+                className={PRESENCE_CLASS}
+              />
               <PresenceAvatars
+                className={PRESENCE_CLASS}
                 participants={others}
                 followedConnectionId={followedParticipant?.connectionId ?? null}
                 onFollow={toggleFollow}
@@ -178,8 +168,12 @@ export function SharedCanvas({
             below are that default, restated — minus the entries `UIOptions`
             already turns off for this surface. */}
         <MainMenu>
-          <MenuReconnecting status={connectionStatus} />
+          <MenuReconnecting
+            status={connectionStatus}
+            className={PRESENCE_MENU_ROW_CLASS}
+          />
           <MenuParticipants
+            className={PRESENCE_MENU_ROW_CLASS}
             participants={others}
             followedConnectionId={followedParticipant?.connectionId ?? null}
             onFollow={toggleFollow}

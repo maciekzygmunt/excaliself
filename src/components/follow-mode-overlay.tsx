@@ -8,10 +8,8 @@
  * `styles.css` so this one stands in its place, in the participant's color
  * and with copy that says what clicking does.
  *
- * It lives here rather than under the share route because that CSS is
- * app-wide: any surface that joins a Room must mount this, or follow mode
- * would run there with no chrome at all. Today that is the guest surface
- * alone; the member canvas joins a Room with the autosave handoff (#120).
+ * That CSS is app-wide, so every surface that joins a Room mounts this: the
+ * guest canvas and the owner's canvas.
  */
 
 import type { Participant } from "@/features/collab/protocol"

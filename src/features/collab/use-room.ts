@@ -452,6 +452,8 @@ export function useRoom(options: {
       socketRef.current = null
       participantsRef.current = []
       forgetConnection()
+      // A stopped share must not leave "Reconnecting…" up.
+      setConnectionStatus("connecting")
     }
   }, [
     token,
