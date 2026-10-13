@@ -1,6 +1,5 @@
 import { expect, test } from "vitest"
 import {
-  base64ByteLength,
   MAX_IMAGE_BYTES,
   MAX_UPLOAD_BODY_BYTES,
   parseFilePayload,
@@ -42,9 +41,12 @@ test("refuses an image over the per-image cap", () => {
 })
 
 test("the body ceiling leaves room for the largest legal image", () => {
-  expect(imageOf(MAX_IMAGE_BYTES).length).toBeLessThanOrEqual(
-    MAX_UPLOAD_BODY_BYTES,
-  )
+  const percentEncoded = `data:image/svg+xml,${"%20".repeat(MAX_IMAGE_BYTES)}`
+  for (const dataUrl of [imageOf(MAX_IMAGE_BYTES), percentEncoded]) {
+    expect(JSON.stringify({ dataUrl }).length).toBeLessThanOrEqual(
+      MAX_UPLOAD_BODY_BYTES,
+    )
+  }
 })
 
 test.each([
@@ -52,8 +54,9 @@ test.each([
   ["a missing dataUrl", {}],
   ["a non-string dataUrl", { dataUrl: 42 }],
   ["something that isn't a data URL", { dataUrl: "https://evil.test/x.png" }],
-  ["a non-base64 data URL", { dataUrl: "data:image/svg+xml,<svg/>" }],
   ["an empty payload", { dataUrl: "data:image/png;base64," }],
+  ["an empty URL-encoded payload", { dataUrl: "data:image/svg+xml," }],
+  ["base64 with stray characters", { dataUrl: "data:image/png;base64,QU*D" }],
   [
     "a truncated base64 payload",
     { dataUrl: "data:image/png;base64,QUJD" + "Q" },
@@ -86,11 +89,30 @@ test("an oversize body that is also malformed reads as a 400, not a 413", () => 
   ).toBe("invalid")
 })
 
-test("base64ByteLength matches what the payload decodes to", () => {
-  for (const bytes of [1, 2, 3, 4, 5, 1000]) {
-    const base64 = Buffer.alloc(bytes).toString("base64")
-    expect(base64ByteLength(base64)).toBe(bytes)
-  }
+test.each([
+  ["URL-encoded", `data:image/svg+xml,${encodeURIComponent("<svg/>")}`],
+  ["raw utf8", "data:image/svg+xml;utf8,<svg/>"],
+  [
+    "unpadded base64 with a mixed-case header",
+    "data:Image/SVG+xml;BASE64,PHN2Zy8+",
+  ],
+])("accepts a %s SVG an imported file can carry", (_label, dataUrl) => {
+  expect(parseFileUpload("abc123", { dataUrl })).toEqual({
+    status: "ok",
+    file: { fileId: "abc123", mimeType: "image/svg+xml", dataUrl },
+  })
+})
+
+test("measures a URL-encoded image by its decoded bytes", () => {
+  // Every byte is a 3-char escape, so the URL is 3x the cap.
+  const svgOf = (bytes: number) => `data:image/svg+xml,${"%20".repeat(bytes)}`
+
+  expect(
+    parseFileUpload("abc123", { dataUrl: svgOf(MAX_IMAGE_BYTES) }).status,
+  ).toBe("ok")
+  expect(
+    parseFileUpload("abc123", { dataUrl: svgOf(MAX_IMAGE_BYTES + 1) }).status,
+  ).toBe("too-large")
 })
 
 test("parses a GET payload and defaults a missing timestamp", () => {

@@ -5,7 +5,10 @@
  */
 
 import { beforeEach, expect, test, vi } from "vitest"
-import { MAX_IMAGE_BYTES } from "@/features/collab/room-files"
+import {
+  MAX_IMAGE_BYTES,
+  MAX_UPLOAD_BODY_BYTES,
+} from "@/features/collab/room-files"
 import { IMAGE_UPLOADS_PER_MINUTE } from "@/features/collab/upload-rate-limit"
 import { getRoomFile, postRoomFile } from "./$fileId"
 
@@ -221,7 +224,7 @@ test("an undeclared body is capped while it is read, not after", async () => {
   expect(response.status).toBe(413)
   expect(saveRoomFile).not.toHaveBeenCalled()
   // It hung up rather than draining an endless sender.
-  expect(pushed * 1024 * 1024).toBeLessThan(4 * MAX_IMAGE_BYTES)
+  expect(pushed * 1024 * 1024).toBeLessThan(2 * MAX_UPLOAD_BODY_BYTES)
 })
 
 test("an unparseable body is a 400", async () => {
