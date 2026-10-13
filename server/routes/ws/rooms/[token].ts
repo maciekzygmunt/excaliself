@@ -97,8 +97,8 @@ export default defineWebSocketHandler({
     const context = roomContextOf(peer)
     if (!context) return
 
-    // Raw frame, so it isn't decoded too. srvx/nitro hide ws `maxPayload`,
-    // so the bytes are already buffered by now.
+    // Raw frame, so it isn't decoded too. The build sets ws `maxPayload` to
+    // the same cap (vite.config.ts), so ws refuses first; this is the fallback.
     if (exceedsFrameCap(message.rawData))
       return peer.close(FRAME_TOO_LARGE_CLOSE_CODE, "Frame too large")
 

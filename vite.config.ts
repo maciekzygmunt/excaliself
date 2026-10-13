@@ -4,7 +4,41 @@ import { devtools } from "@tanstack/devtools-vite"
 import { tanstackStart } from "@tanstack/react-start/plugin/vite"
 import viteReact from "@vitejs/plugin-react"
 import { nitro } from "nitro/vite"
+import type { Plugin } from "vite"
 import { defineConfig } from "vite"
+import { MAX_FRAME_BYTES } from "./src/features/collab/frame-cap.ts"
+
+/**
+ * Nitro builds its crossws node adapter with no ws options, so ws would buffer
+ * frames up to its 100 MiB default before the room handler sees them. Wrap the
+ * adapter so ws refuses oversized frames from the header and closes with 1009.
+ */
+function wsFrameCap(): Plugin {
+  const wrapperId = "\0ws-frame-cap"
+  let adapterId = ""
+  return {
+    name: "ws-frame-cap",
+    resolveId: {
+      // Before Vite's resolver, which would claim the import first.
+      order: "pre",
+      async handler(source, importer) {
+        if (source !== "crossws/adapters/node") return
+        const adapter = await this.resolve(source, importer, { skipSelf: true })
+        if (!adapter) throw new Error("ws-frame-cap: crossws adapter not found")
+        adapterId = adapter.id
+        return wrapperId
+      },
+    },
+    load(id) {
+      if (id !== wrapperId) return
+      return `import nodeAdapter from ${JSON.stringify(adapterId)}
+export default (options) => nodeAdapter({
+  ...options,
+  serverOptions: { ...options?.serverOptions, maxPayload: ${MAX_FRAME_BYTES} },
+})`
+    },
+  }
+}
 
 const config = defineConfig({
   resolve: {
@@ -24,6 +58,7 @@ const config = defineConfig({
       serverDir: "server",
       features: { websocket: true },
       rolldownConfig: {
+        plugins: [wsFrameCap()],
         checks: {
           // The server bundle inlines client libraries; their "use client"
           // directives mean nothing there and Rolldown warns on each one.
