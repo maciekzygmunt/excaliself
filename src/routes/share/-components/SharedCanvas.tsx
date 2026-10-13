@@ -19,6 +19,7 @@ import {
   buildInitialSceneData,
   type PersistedFile,
 } from "@/features/drawings/scene"
+import { useBlockClearCanvasShortcut } from "@/hooks/use-block-clear-canvas-shortcut"
 import { GuestAttribution } from "./GuestAttribution"
 import { GuestNamePill } from "./GuestNamePill"
 import { GuestTitle } from "./GuestTitle"
@@ -67,6 +68,8 @@ export function SharedCanvas({
     onLinkDead,
     storedFileIds,
   })
+  // A reset would wipe the drawing for everyone in the room.
+  useBlockClearCanvasShortcut()
 
   const handleNameChange = useCallback((next: string) => {
     const remembered = rememberGuestName(next)
@@ -112,6 +115,7 @@ export function SharedCanvas({
             loadScene: false,
             saveToActiveFile: false,
             toggleTheme: false,
+            clearCanvas: false,
           },
         }}
       >
@@ -136,7 +140,6 @@ export function SharedCanvas({
           <MainMenu.DefaultItems.SaveAsImage />
           <MainMenu.DefaultItems.SearchMenu />
           <MainMenu.DefaultItems.Help />
-          <MainMenu.DefaultItems.ClearCanvas />
           <MainMenu.Separator />
           <MainMenu.Group title="Excalidraw links">
             <MainMenu.DefaultItems.Socials />
