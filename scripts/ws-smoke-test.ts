@@ -154,6 +154,7 @@ type WireElement = {
 const elementsOf = (frame: Frame) =>
   (frame.payload.elements ?? []) as WireElement[]
 
+// Deleted, so a run against a real drawing leaves no visible box at (0,0).
 const scribble = (version: number, versionNonce = 1): WireElement => ({
   id: `smoke-${randomBytes(6).toString("hex")}`,
   version,
@@ -164,6 +165,7 @@ const scribble = (version: number, versionNonce = 1): WireElement => ({
   y: 0,
   width: 10,
   height: 10,
+  isDeleted: true,
 })
 
 const findElement = (frame: Frame, id: string) =>
