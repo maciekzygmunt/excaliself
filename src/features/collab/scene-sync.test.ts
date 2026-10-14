@@ -85,6 +85,17 @@ test("the catch-up after SCENE_INIT carries only what the room did not send", ()
   expect(idsOf(broadcaster.catchUp(reconciled))).toEqual(["mine-only"])
 })
 
+test("a local copy that wins a version tie still goes out in the catch-up", () => {
+  const broadcaster = createSceneBroadcaster(() => NOW)
+  // Both sides edited from version 2 while apart; the lower nonce wins.
+  const fromRoom = [element("a", 3, { versionNonce: 9 })]
+  const reconciled = [element("a", 3, { versionNonce: 4 })]
+
+  broadcaster.received(fromRoom, reconciled)
+
+  expect(idsOf(broadcaster.catchUp(reconciled))).toEqual(["a"])
+})
+
 test("a full sync does not re-open the gate on a scene already broadcast", () => {
   const broadcaster = createSceneBroadcaster(() => NOW)
   const scene = [element("a", 4)]
