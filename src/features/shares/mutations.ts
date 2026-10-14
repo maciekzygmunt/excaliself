@@ -31,8 +31,14 @@ export function useCreateShare(
   })
 }
 
-/** Resolves after the room has flushed and closed; then autosave resumes. */
-export function useStopSharing(drawingId: string) {
+/**
+ * Resolves after the room has flushed and closed; then a Private drawing's
+ * autosave resumes. A Team drawing's Room keeps its members.
+ */
+export function useStopSharing(
+  drawingId: string,
+  { isTeam }: { isTeam: boolean },
+) {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: () => stopSharing({ data: drawingId }),
@@ -42,7 +48,9 @@ export function useStopSharing(drawingId: string) {
         null,
       )
       toast("Sharing stopped", {
-        description: "The link is dead and the drawing is private again.",
+        description: isTeam
+          ? "The link is dead. Guests can no longer open it."
+          : "The link is dead and the drawing is private again.",
       })
     },
     onError: () => toast.error("Failed to stop sharing"),
