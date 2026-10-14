@@ -13,20 +13,32 @@ import {
   FolderEmpty,
   NoMatches,
   QuietLine,
+  TeamEmpty,
 } from "@/components/drawing-gallery/GalleryEmpty"
 import { IllustratedEmptyState } from "@/components/illustrated-empty-state"
 import { useTrashDrawing } from "@/features/drawings/mutations"
 import { drawingsQueryOptions } from "@/features/drawings/queries"
 import type { Folder } from "@/features/folders/queries"
 import { foldersQueryOptions } from "@/features/folders/queries"
+import { inBrowsedSpace, useBrowsedSpace } from "@/features/spaces/browse"
 import { useDocumentTitle } from "@/lib/document-title"
 import { useCreateDialog } from "./CreateDialog"
+import { SpaceSwitch } from "./SpaceSwitch"
 
-// The browse surface: every drawing the user owns, in Home's card language,
-// under the toolbar (on-page search, folder chips, sort — spec §5.2).
+// The browse surface: every drawing of the browsed space, in Home's card
+// language, under the toolbar (on-page search, folder chips, sort — spec §5.2).
 export function AllDrawings({ isAdmin }: { isAdmin: boolean }) {
-  const { data: drawings = [], isPending } = useQuery(drawingsQueryOptions())
-  const { data: folders = [] } = useQuery(foldersQueryOptions())
+  const space = useBrowsedSpace()
+  const { data: allDrawings = [], isPending } = useQuery(drawingsQueryOptions())
+  const { data: allFolders = [] } = useQuery(foldersQueryOptions())
+  const drawings = useMemo(
+    () => inBrowsedSpace(allDrawings, space),
+    [allDrawings, space],
+  )
+  const folders = useMemo(
+    () => inBrowsedSpace(allFolders, space),
+    [allFolders, space],
+  )
   const { openCreateDrawingDialog } = useCreateDialog()
   const trashDrawing = useTrashDrawing()
   useDocumentTitle("All drawings", { chrome: true })
@@ -55,10 +67,11 @@ export function AllDrawings({ isAdmin }: { isAdmin: boolean }) {
   return (
     <div className="h-full overflow-y-auto">
       <div className="mx-auto flex min-h-full w-full max-w-4xl flex-col px-6 py-8">
-        <div className="flex items-center pb-5">
+        <div className="flex items-center gap-3 pb-5">
           <h1 className="text-sm font-semibold tracking-[-0.01em] text-foreground">
             All drawings
           </h1>
+          {space && <SpaceSwitch to="/drawings" space={space} />}
         </div>
 
         {hasAnyDrawings && (
@@ -92,6 +105,8 @@ export function AllDrawings({ isAdmin }: { isAdmin: boolean }) {
                   openCreateDrawingDialog({ id: folder.id, name: folder.name })
                 }
               />
+            ) : space === "team" ? (
+              <TeamEmpty onCreate={openCreateDrawingDialog} />
             ) : (
               <IllustratedEmptyState
                 isAdmin={isAdmin}

@@ -18,7 +18,10 @@ vi.mock("@/features/collab/server", () => ({
 vi.mock("@tanstack/react-router", () => ({
   useParams: () => ({}),
   useNavigate: () => vi.fn(),
+  useSearch: () => ({}),
 }))
+
+vi.mock("@/features/account/server", () => ({ getCurrentUser: vi.fn() }))
 
 vi.mock("@/features/folders/server", () => ({
   getFolders: vi.fn(),

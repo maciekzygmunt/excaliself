@@ -39,3 +39,19 @@ export function FolderEmpty({
     </div>
   )
 }
+
+/** Tier-2 state of an empty Team space, with its create action. */
+export function TeamEmpty({ onCreate }: { onCreate: () => void }) {
+  return (
+    <div className="flex flex-col items-center py-16">
+      <p className="text-sm text-muted-foreground">No drawings in Team yet</p>
+      <button
+        type="button"
+        onClick={() => onCreate()}
+        className="mt-3 text-[13px] font-medium text-iris transition-colors duration-150 hover:text-iris-strong"
+      >
+        New drawing in Team
+      </button>
+    </div>
+  )
+}

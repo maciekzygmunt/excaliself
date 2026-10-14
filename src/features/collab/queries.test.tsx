@@ -1,8 +1,9 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { act, cleanup, render, screen, waitFor } from "@testing-library/react"
 import { afterEach, beforeEach, expect, test, vi } from "vitest"
+import { POLL_INTERVAL_MS } from "@/lib/polling"
 import type { LiveDrawing } from "./live"
-import { LIVE_POLL_INTERVAL_MS, useLiveDrawing } from "./queries"
+import { useLiveDrawing } from "./queries"
 import { getLiveDrawings } from "./server"
 
 vi.mock("./server", () => ({ getLiveDrawings: vi.fn() }))
@@ -76,7 +77,7 @@ test("the badge refreshes on the poll interval", async () => {
 
   vi.mocked(getLiveDrawings).mockResolvedValue([badge("d1", 1)])
   await act(async () => {
-    await vi.advanceTimersByTimeAsync(LIVE_POLL_INTERVAL_MS)
+    await vi.advanceTimersByTimeAsync(POLL_INTERVAL_MS)
   })
 
   await waitFor(() => {

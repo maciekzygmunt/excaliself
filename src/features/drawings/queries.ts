@@ -1,12 +1,15 @@
 import { queryOptions } from "@tanstack/react-query"
+import { polled } from "@/lib/polling"
 import { getDrawingScene, getDrawings, getDrawingWithFiles } from "./server"
 
 export type Drawing = Awaited<ReturnType<typeof getDrawings>>[number]
 
+/** Polled: teammates' Team drawings show up without a reload. */
 export const drawingsQueryOptions = () =>
   queryOptions({
     queryKey: ["drawings"] as const,
     queryFn: () => getDrawings(),
+    ...polled,
   })
 
 export const drawingQueryOptions = (id: string) =>
