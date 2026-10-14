@@ -35,7 +35,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-import { userDisplayName } from "@/features/account/display-name"
+import { userDisplayName, userInitials } from "@/features/account/display-name"
 import {
   type CurrentUser,
   currentUserQueryOptions,
@@ -133,8 +133,7 @@ export function MembersSection() {
           >
             <div className="flex min-w-0 items-center gap-3">
               <InitialsAvatar
-                name={member.name}
-                email={member.email}
+                initials={userInitials(member)}
                 className="h-7 w-7"
               />
               <div className="min-w-0">

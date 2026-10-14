@@ -24,15 +24,13 @@ test("falls back to the email's first letter when no name is set", () => {
 })
 
 test("renders the initials, hidden from assistive tech", () => {
-  render(<InitialsAvatar name="John Doe" email="j@example.com" />)
+  render(<InitialsAvatar initials="JD" />)
   const avatar = screen.getByText("JD")
   expect(avatar.getAttribute("aria-hidden")).toBe("true")
 })
 
 test("merges a size override onto the base classes", () => {
-  render(
-    <InitialsAvatar name={null} email="m@example.com" className="h-7 w-7" />,
-  )
+  render(<InitialsAvatar initials="M" className="h-7 w-7" />)
   const avatar = screen.getByText("M")
   expect(avatar.classList).toContain("h-7")
   expect(avatar.classList).toContain("rounded-full")

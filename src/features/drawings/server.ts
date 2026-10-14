@@ -5,8 +5,8 @@ import { createServerFn } from "@tanstack/react-start"
 import { and, desc, eq, isNull } from "drizzle-orm"
 import { z } from "zod"
 import { db } from "@/db"
-import { drawingFiles, drawings, spaces, stars } from "@/db/schema"
-import { userDisplayName } from "@/features/account/display-name"
+import { drawingFiles, drawings, spaces, stars, users } from "@/db/schema"
+import { userDisplayName, userInitials } from "@/features/account/display-name"
 import { endTrashedRooms } from "@/features/collab/room-registry"
 import { assertFolderTarget } from "@/features/folders/ownership"
 import { accessibleTo } from "@/features/spaces/access"
@@ -20,12 +20,25 @@ export const getDrawings = createServerFn({ method: "GET" })
   .middleware([authMiddleware])
   .handler(async ({ context }) => {
     const userId = context.session.user.id
-    return db
-      .select(drawingListColumns)
+    const rows = await db
+      .select({
+        ...drawingListColumns,
+        creatorUser: { name: users.name, email: users.email },
+      })
       .from(drawings)
       .leftJoin(stars, starOf(userId))
+      .leftJoin(users, eq(users.id, drawings.createdBy))
       .where(and(accessibleTo(drawings, userId), isNull(drawings.deletedAt)))
       .orderBy(desc(drawings.updatedAt))
+    // Team cards show who made each drawing. Null once the creator is
+    // deleted; emails stay on the server.
+    return rows.map(({ creatorUser, ...drawing }) => ({
+      ...drawing,
+      creator: creatorUser && {
+        name: userDisplayName(creatorUser),
+        initials: userInitials(creatorUser),
+      },
+    }))
   })
 
 /** One drawing's stored scene, for its card preview. Trashed ones too. */

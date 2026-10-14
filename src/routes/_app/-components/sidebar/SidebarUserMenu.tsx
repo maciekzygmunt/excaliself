@@ -8,7 +8,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { userDisplayName } from "@/features/account/display-name"
+import { userDisplayName, userInitials } from "@/features/account/display-name"
 import { authClient } from "@/lib/auth-client"
 
 export type SidebarUser = {
@@ -31,11 +31,7 @@ export function SidebarUserMenu({ user }: { user: SidebarUser }) {
           />
         }
       >
-        <InitialsAvatar
-          name={user.name}
-          email={user.email}
-          className="h-5.5 w-5.5"
-        />
+        <InitialsAvatar initials={userInitials(user)} className="h-5.5 w-5.5" />
         <span className="truncate text-[12px] opacity-60">{displayName}</span>
       </DropdownMenuTrigger>
       <DropdownMenuContent

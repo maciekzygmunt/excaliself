@@ -6,8 +6,10 @@ import {
   MoreHorizontal,
   Pencil,
   Trash2,
+  UserRound,
 } from "lucide-react"
 import { useEffect, useMemo, useRef, useState } from "react"
+import { InitialsAvatar } from "@/components/initials-avatar"
 import { LiveAvatarStack } from "@/components/live-badge"
 import {
   DropdownMenu,
@@ -16,6 +18,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Skeleton } from "@/components/ui/skeleton"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 import { useLiveDrawing } from "@/features/collab/queries"
 import {
   type Drawing,
@@ -194,6 +201,9 @@ function DrawingCard({
         />
       </div>
       <div className="flex items-center gap-2 px-3 py-2.5">
+        {drawing.space === "team" && (
+          <CreatorAvatar creator={drawing.creator} />
+        )}
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
           <span className="truncate text-[13px] font-medium text-foreground">
             {drawing.name}
@@ -223,6 +233,41 @@ function DrawingCard({
         <CardActions name={drawing.name} onTrash={onTrash} />
       </div>
     </div>
+  )
+}
+
+/**
+ * Who made a Team drawing, as a byline face in the footer. The Live stack
+ * ("who is here now") sits on the preview instead, in cursor colors, so the
+ * two never meet. A deleted creator reads "Former member".
+ */
+function CreatorAvatar({ creator }: { creator: Drawing["creator"] }) {
+  const name = creator?.name ?? "Former member"
+  return (
+    <Tooltip>
+      {/* z-10 lifts it above the stretched link so hover reaches it */}
+      <TooltipTrigger
+        render={
+          <span
+            role="img"
+            aria-label={`Created by ${name}`}
+            className="relative z-10 shrink-0 rounded-full"
+          />
+        }
+      >
+        {creator ? (
+          <InitialsAvatar initials={creator.initials} />
+        ) : (
+          <span
+            aria-hidden
+            className="flex h-6 w-6 items-center justify-center rounded-full border border-dashed border-muted-foreground/40 text-muted-foreground/70"
+          >
+            <UserRound className="h-3.5 w-3.5" />
+          </span>
+        )}
+      </TooltipTrigger>
+      <TooltipContent>{name}</TooltipContent>
+    </Tooltip>
   )
 }
 

@@ -100,6 +100,7 @@ function makeDrawing(overrides: Partial<Drawing> & { id: string }): Drawing {
     folderId: null,
     space: "private",
     createdBy: "user-1",
+    creator: { name: "Ada", initials: "A" },
     deletedBy: null,
     starred: false,
     deletedAt: null,
@@ -249,6 +250,56 @@ test("without a folders prop, attribution stays off even for filed drawings", ()
 
   expect(screen.getByText("Filed")).toBeTruthy()
   expect(screen.queryByText("Projects")).toBeNull()
+})
+
+// Spec stories 34, 36, 37: Team cards name their creator; Private ones don't.
+test("a Team card shows its creator's initials, with their name on hover", async () => {
+  render(
+    <DrawingGallery
+      {...defaultProps}
+      drawings={[
+        makeDrawing({
+          id: "d1",
+          space: "team",
+          creator: { name: "Ada Lovelace", initials: "AL" },
+        }),
+      ]}
+    />,
+  )
+
+  const avatar = screen.getByRole("img", { name: "Created by Ada Lovelace" })
+  expect(avatar.textContent).toBe("AL")
+
+  fireEvent.mouseEnter(avatar)
+  expect(await screen.findByText("Ada Lovelace")).toBeTruthy()
+})
+
+test("a Team card whose creator was deleted shows Former member", async () => {
+  render(
+    <DrawingGallery
+      {...defaultProps}
+      drawings={[
+        makeDrawing({
+          id: "d1",
+          space: "team",
+          createdBy: null,
+          creator: null,
+        }),
+      ]}
+    />,
+  )
+
+  const avatar = screen.getByRole("img", { name: "Created by Former member" })
+  fireEvent.mouseEnter(avatar)
+  expect(await screen.findByText("Former member")).toBeTruthy()
+})
+
+test("a Private card shows no creator", () => {
+  render(
+    <DrawingGallery {...defaultProps} drawings={[makeDrawing({ id: "d1" })]} />,
+  )
+
+  expect(screen.queryByRole("img", { name: /^Created by/ })).toBeNull()
 })
 
 test("the empty slot renders only when loaded and empty", () => {
