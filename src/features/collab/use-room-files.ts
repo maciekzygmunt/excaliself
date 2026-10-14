@@ -28,12 +28,15 @@ const FETCH_RETRY_MS = 2_000
 // Counts only unanswered attempts; a refusal is final at once.
 const MAX_UPLOAD_ATTEMPTS = 3
 
-/** Solo saves and room uploads both refuse images past the drawing's cap. */
+/**
+ * Solo saves and room uploads both refuse images past the drawing's cap. A
+ * Room keeps removed images for undo (see `saveRoomScene`), so they still count.
+ */
 export function toastImageCapFull() {
   toast.error("This drawing can't hold more images", {
     // One toast for a batch of refusals.
     id: "image-cap-full",
-    description: `A drawing saves up to ${MAX_DRAWING_IMAGE_BYTES / 1024 / 1024} MB of images. Remove some to add more.`,
+    description: `A drawing saves up to ${MAX_DRAWING_IMAGE_BYTES / 1024 / 1024} MB of images. Remove some to add more. While shared, removed images can take up to a day to free their space.`,
   })
 }
 
