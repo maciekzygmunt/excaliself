@@ -43,24 +43,36 @@ const IMAGE_MIME_TYPES = new Set([
 const FILE_ID = /^[A-Za-z0-9_-]{1,128}$/
 
 const utf8 = new TextEncoder()
+// Maps every byte to one char, and only ASCII bytes to ASCII chars.
+const latin1 = new TextDecoder("latin1")
 
-/** `%XX` escapes as bytes, everything else as UTF-8. */
+/** An ASCII hex digit's value, else -1. */
+function hexValue(char: number | undefined): number {
+  if (char === undefined) return -1
+  if (char >= 0x30 && char <= 0x39) return char - 0x30
+  const lower = char | 0x20
+  return lower >= 0x61 && lower <= 0x66 ? lower - 0x57 : -1
+}
+
+/**
+ * `%XX` escapes as bytes, everything else as UTF-8. One pass into one buffer:
+ * an upload can be millions of escapes.
+ */
 function percentDecode(text: string): Uint8Array {
-  // The capture group puts each escape's hex digits at the odd indexes.
-  const parts = text
-    .split(/%([0-9A-Fa-f]{2})/)
-    .map((part, i) =>
-      i % 2 ? Uint8Array.of(Number.parseInt(part, 16)) : utf8.encode(part),
-    )
-  const bytes = new Uint8Array(
-    parts.reduce((sum, part) => sum + part.length, 0),
-  )
-  let offset = 0
-  for (const part of parts) {
-    bytes.set(part, offset)
-    offset += part.length
+  const input = utf8.encode(text)
+  const bytes = new Uint8Array(input.length)
+  let length = 0
+  for (let i = 0; i < input.length; i++) {
+    const high = input[i] === 0x25 ? hexValue(input[i + 1]) : -1
+    const low = high < 0 ? -1 : hexValue(input[i + 2])
+    if (low < 0) {
+      bytes[length++] = input[i]
+      continue
+    }
+    bytes[length++] = high * 16 + low
+    i += 2
   }
-  return bytes
+  return bytes.subarray(0, length)
 }
 
 /** `base64` is unpadded and free of whitespace. */
@@ -84,10 +96,8 @@ export function readDataUrl(dataUrl: string): DataUrlBody | null {
     return { mimeType, bytes: percentDecode(payload) }
 
   // Escaped non-ASCII chars fail the alphabet check, as they should.
-  const base64 = payload
-    .replace(/%([0-9A-Fa-f]{2})/g, (_, hex: string) =>
-      String.fromCharCode(Number.parseInt(hex, 16)),
-    )
+  const base64 = latin1
+    .decode(percentDecode(payload))
     .replace(/[\t\n\f\r ]/g, "")
     .replace(/={1,2}$/, "")
   if (!/^[A-Za-z0-9+/]*$/.test(base64) || base64.length % 4 === 1) return null
