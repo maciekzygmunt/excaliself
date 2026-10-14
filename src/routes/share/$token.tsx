@@ -3,6 +3,7 @@ import { createClientOnlyFn } from "@tanstack/react-start"
 import { lazy, Suspense, useState } from "react"
 import { Mark } from "@/components/identity"
 import { resolveShareToken } from "@/features/shares/server"
+import { isOpenAsTeam } from "@/features/spaces/server"
 import { useApplyTheme } from "@/hooks/use-theme"
 import { useDocumentTitle } from "@/lib/document-title"
 import { DeadLink } from "./-components/DeadLink"
@@ -73,6 +74,15 @@ function SharePage() {
 
   if (sceneUnreadable) return <DrawingDamaged />
 
+  // A members link dies when its drawing moves to Team; the member can then
+  // open it by id. Anything else goes back to the loader: dead or sign-in.
+  const handleLinkDead = async () => {
+    const { audience, drawing } = resolution
+    if (audience === "members" && (await isOpenAsTeam({ data: drawing.id })))
+      return navigate({ to: "/draw/$id", params: { id: drawing.id } })
+    return router.invalidate()
+  }
+
   return (
     <Suspense fallback={<LoadingState />}>
       <SharedCanvas
@@ -80,8 +90,9 @@ function SharePage() {
         files={resolution.files}
         token={token}
         onRoomFull={() => navigate({ search: { full: true }, replace: true })}
-        // The loader decides the page: dead link or sign-in gate.
-        onLinkDead={() => router.invalidate()}
+        onLinkDead={() =>
+          void handleLinkDead().catch(() => router.invalidate())
+        }
         onSceneUnreadable={() => setSceneUnreadable(true)}
       />
     </Suspense>
