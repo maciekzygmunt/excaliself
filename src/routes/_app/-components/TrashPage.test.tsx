@@ -125,7 +125,9 @@ function makeTrashedDrawing(
     name: `Drawing ${overrides.id}`,
     searchText: "",
     folderId: null,
-    ownerId: "user-1",
+    space: "private",
+    createdBy: "user-1",
+    deletedBy: null,
     starred: false,
     deletedAt: daysAgo(5),
     trashRootId: overrides.id,
@@ -140,7 +142,9 @@ function makeTrashedFolder(
 ): TrashedFolder {
   return {
     name: `Folder ${overrides.id}`,
-    ownerId: "user-1",
+    space: "private",
+    createdBy: "user-1",
+    deletedBy: null,
     parentId: null,
     deletedAt: daysAgo(2),
     trashRootId: overrides.id,

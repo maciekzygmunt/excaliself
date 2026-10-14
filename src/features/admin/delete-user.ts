@@ -7,13 +7,14 @@ import { count, eq, or } from "drizzle-orm"
 import type { NodePgDatabase } from "drizzle-orm/node-postgres"
 import type * as schema from "@/db/schema"
 import { drawings, folders, shares, users, verifications } from "@/db/schema"
+import { inPrivateSpaceOf } from "@/features/spaces/access"
 
 type Db = NodePgDatabase<typeof schema>
 
 /**
- * Counts everything the delete cascade would destroy — trashed rows
- * included — so both tier-3 confirms (admin delete and the Account danger
- * zone) can state real numbers in their danger copy.
+ * Counts everything the delete destroys — the user's Private rows, trashed
+ * ones included — so both tier-3 confirms (admin delete and the Account
+ * danger zone) can state real numbers in their danger copy.
  */
 export async function countOwnedContent(
   db: Db,
@@ -23,22 +24,22 @@ export async function countOwnedContent(
     db
       .select({ count: count() })
       .from(drawings)
-      .where(eq(drawings.ownerId, userId)),
+      .where(inPrivateSpaceOf(drawings, userId)),
     db
       .select({ count: count() })
       .from(folders)
-      .where(eq(folders.ownerId, userId)),
+      .where(inPrivateSpaceOf(folders, userId)),
   ])
   return { drawings: drawingCount.count, folders: folderCount.count }
 }
 
-/** The user's shared drawings, whose live rooms must close on delete. */
+/** The user's shared Private drawings, whose live rooms must close on delete. */
 export async function sharedDrawingIds(db: Db, userId: string) {
   const rows = await db
     .select({ id: drawings.id })
     .from(drawings)
     .innerJoin(shares, eq(shares.drawingId, drawings.id))
-    .where(eq(drawings.ownerId, userId))
+    .where(inPrivateSpaceOf(drawings, userId))
   return rows.map((row) => row.id)
 }
 
@@ -60,8 +61,10 @@ export async function deleteUserAccount(
 }
 
 /**
- * Hard-deletes a user account and, via the schema's FK cascades, everything
- * they own: sessions, accounts, folders, drawings, and drawing_files.
+ * Hard-deletes a user account: their Private drawings and folders (with
+ * drawing_files) explicitly, then the user row, whose FK cascades take
+ * sessions, accounts and stars. Team rows they created stay, with createdBy
+ * set to null.
  *
  * One invariant is enforced here rather than trusted to the UI: the last
  * remaining admin can never be deleted (the instance would be locked out of
@@ -95,6 +98,11 @@ export async function hardDeleteUser(db: Db, userId: string): Promise<void> {
         throw new Error("Can't delete the last admin")
       }
     }
+
+    // Before the user row: once createdBy is set to null, a Private row
+    // would break the "private needs a creator" check.
+    await tx.delete(drawings).where(inPrivateSpaceOf(drawings, userId))
+    await tx.delete(folders).where(inPrivateSpaceOf(folders, userId))
 
     const deleted = await tx
       .delete(users)

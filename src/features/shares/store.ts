@@ -6,6 +6,7 @@ import type { NodePgDatabase } from "drizzle-orm/node-postgres"
 import type * as schema from "@/db/schema"
 import { drawingFiles, drawings, shares } from "@/db/schema"
 import { bytesToDataUrl } from "@/features/drawings/file-bytes"
+import { accessibleTo } from "@/features/spaces/access"
 import { resolveShareAccess, type ShareAudience } from "./access"
 
 type Db = NodePgDatabase<typeof schema>
@@ -15,8 +16,9 @@ export function mintShareToken() {
   return randomBytes(32).toString("hex")
 }
 
-// Throws the same "not found" as a missing id, so non-owners can't probe.
-async function requireOwnedLiveDrawing(
+// Throws the same "not found" as a missing id, so private drawings can't be
+// probed.
+async function requireAccessibleLiveDrawing(
   db: Db,
   userId: string,
   drawingId: string,
@@ -27,7 +29,7 @@ async function requireOwnedLiveDrawing(
     .where(
       and(
         eq(drawings.id, drawingId),
-        eq(drawings.ownerId, userId),
+        accessibleTo(drawings, userId),
         isNull(drawings.deletedAt),
       ),
     )
@@ -40,13 +42,13 @@ const shareColumns = {
   createdAt: shares.createdAt,
 }
 
-/** The owner's live link for a drawing, or null when unshared. */
+/** The live link for a drawing the caller can access, or null when unshared. */
 export async function getShareLink(db: Db, userId: string, drawingId: string) {
   const [share] = await db
     .select(shareColumns)
     .from(shares)
     .innerJoin(drawings, eq(shares.drawingId, drawings.id))
-    .where(and(eq(shares.drawingId, drawingId), eq(drawings.ownerId, userId)))
+    .where(and(eq(shares.drawingId, drawingId), accessibleTo(drawings, userId)))
   return share ?? null
 }
 
@@ -56,7 +58,7 @@ export async function createShareLink(
   drawingId: string,
   audience: ShareAudience,
 ) {
-  await requireOwnedLiveDrawing(db, userId, drawingId)
+  await requireAccessibleLiveDrawing(db, userId, drawingId)
   const [created] = await db
     .insert(shares)
     .values({
@@ -77,7 +79,7 @@ export async function stopSharingDrawing(
   userId: string,
   drawingId: string,
 ) {
-  await requireOwnedLiveDrawing(db, userId, drawingId)
+  await requireAccessibleLiveDrawing(db, userId, drawingId)
   await db.delete(shares).where(eq(shares.drawingId, drawingId))
 }
 
@@ -86,7 +88,7 @@ export async function regenerateShareLink(
   userId: string,
   drawingId: string,
 ) {
-  await requireOwnedLiveDrawing(db, userId, drawingId)
+  await requireAccessibleLiveDrawing(db, userId, drawingId)
   const updated = await db
     .update(shares)
     .set({ token: mintShareToken() })
@@ -102,7 +104,7 @@ export async function setShareLinkAudience(
   drawingId: string,
   audience: ShareAudience,
 ) {
-  await requireOwnedLiveDrawing(db, userId, drawingId)
+  await requireAccessibleLiveDrawing(db, userId, drawingId)
   const updated = await db
     .update(shares)
     .set({ audience })

@@ -210,7 +210,9 @@ test("confirm stays disabled while the folder unit's counts are loading", async 
       {
         id: "f1",
         name: "Archive",
-        ownerId: "user-1",
+        space: "private",
+        createdBy: "user-1",
+        deletedBy: null,
         parentId: null,
         deletedAt: daysAgo(5),
         trashRootId: "f1",
@@ -317,7 +319,9 @@ test("a drawing trashed with its folder deletes the whole unit, with count-aware
       {
         id: "f1",
         name: "Archive",
-        ownerId: "user-1",
+        space: "private",
+        createdBy: "user-1",
+        deletedBy: null,
         parentId: null,
         deletedAt: daysAgo(5),
         trashRootId: "f1",

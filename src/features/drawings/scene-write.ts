@@ -11,6 +11,7 @@ import {
   parseFileUpload,
   type RoomFileUpload,
 } from "@/features/collab/room-files"
+import { accessibleTo } from "@/features/spaces/access"
 import { dataUrlToBytes } from "./file-bytes"
 import { parseSceneElements, sceneText } from "./search"
 
@@ -31,8 +32,8 @@ export type SceneWriteResult =
   | { status: "shared" }
 
 /**
- * Persist a solo edit. Unowned and missing ids both throw "Drawing not found",
- * so ownership can't be probed. Shared drawings are refused.
+ * Persist a solo edit. Inaccessible and missing ids both throw "Drawing not
+ * found", so private drawings can't be probed. Shared drawings are refused.
  *
  * `files` carries only images the client has not stored yet. Ones that fail
  * the room upload's checks are skipped, not fatal: the client flags oversized
@@ -54,7 +55,7 @@ export async function writeDrawingScene(
     const now = new Date()
 
     // One query for both gates, so the share check never answers for a drawing
-    // the caller doesn't own.
+    // the caller can't access.
     const [target] = await tx
       .select({ id: drawings.id, shareId: shares.id })
       .from(drawings)
@@ -62,7 +63,7 @@ export async function writeDrawingScene(
       .where(
         and(
           eq(drawings.id, id),
-          eq(drawings.ownerId, userId),
+          accessibleTo(drawings, userId),
           isNull(drawings.deletedAt),
         ),
       )

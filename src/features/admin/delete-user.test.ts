@@ -1,7 +1,9 @@
 import type { SQL } from "drizzle-orm"
-import { PgDialect } from "drizzle-orm/pg-core"
+import { getTableConfig, PgDialect } from "drizzle-orm/pg-core"
 import { expect, test } from "vitest"
-import { users, verifications } from "@/db/schema"
+import { drawings, folders, users, verifications } from "@/db/schema"
+import { inPrivateSpaceOf } from "@/features/spaces/access"
+import { expectCondition } from "@/features/spaces/expect-condition"
 import { deleteUserAccount, hardDeleteUser } from "./delete-user"
 
 type Call =
@@ -81,6 +83,8 @@ test("deletes a regular user and sweeps their verification rows", async () => {
 
   expect(calls.map(shape)).toEqual([
     { kind: "select" },
+    { kind: "delete", table: drawings },
+    { kind: "delete", table: folders },
     { kind: "delete", table: users },
     { kind: "delete", table: verifications },
   ])
@@ -98,6 +102,33 @@ test("deletes a regular user and sweeps their verification rows", async () => {
   expect(toSql((verificationsDelete as { where: SQL }).where).params).toEqual([
     "bea@example.com",
   ])
+})
+
+test("deletes the member's Private drawings and folders; their Team rows lose only the creator", async () => {
+  const { db, calls } = fakeDb({
+    rows: [
+      { id: "admin-1", role: "admin" },
+      { id: "user-bea", role: "user" },
+    ],
+    email: "bea@example.com",
+  })
+
+  await deleteUserAccount(db, "admin-1", "user-bea")
+
+  for (const table of [drawings, folders]) {
+    const del = calls.find(
+      (call) => call.kind === "delete" && call.table === table,
+    )
+    expectCondition(
+      (del as { where: SQL }).where,
+      inPrivateSpaceOf(table, "user-bea"),
+    )
+    // Team rows are left to the FK, which keeps them with createdBy = null.
+    const creator = getTableConfig(table).foreignKeys.find(
+      (fk) => fk.reference().columns[0].name === "createdBy",
+    )
+    expect(creator?.onDelete).toBe("set null")
+  }
 })
 
 test("the role read locks the target row even for non-admin targets", async () => {
@@ -134,6 +165,8 @@ test("deleting an admin is allowed while another admin remains, behind a row loc
 
   expect(calls.map(shape)).toEqual([
     { kind: "select" },
+    { kind: "delete", table: drawings },
+    { kind: "delete", table: folders },
     { kind: "delete", table: users },
     { kind: "delete", table: verifications },
   ])
@@ -198,6 +231,8 @@ test("hardDeleteUser lets an admin delete themselves while another admin remains
 
   expect(calls.map(shape)).toEqual([
     { kind: "select" },
+    { kind: "delete", table: drawings },
+    { kind: "delete", table: folders },
     { kind: "delete", table: users },
     { kind: "delete", table: verifications },
   ])

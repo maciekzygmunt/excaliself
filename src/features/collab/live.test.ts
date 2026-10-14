@@ -1,5 +1,5 @@
 import { expect, test } from "vitest"
-import { liveDrawingsForOwner, MAX_LIVE_AVATARS } from "./live"
+import { liveDrawingsFor, MAX_LIVE_AVATARS } from "./live"
 import type { ServerMessage } from "./protocol"
 import {
   createRoomRegistry,
@@ -22,7 +22,7 @@ const fakePeer = (id: string): RoomPeer => ({
 /** Every drawing in these tests belongs to OWNER unless a test says otherwise. */
 const ownedByOwner: SceneLoader = async () => ({
   elements: [],
-  ownerId: OWNER,
+  access: { space: "private", createdBy: OWNER },
   readable: true,
 })
 
@@ -43,7 +43,7 @@ test("a room with someone else in it becomes one badge", async () => {
   const registry = registryOf()
   await joinRoom(registry, "d1", fakePeer("p1"), guest("Quiet Otter"))
 
-  expect(liveDrawingsForOwner(registry, OWNER)).toEqual([
+  expect(liveDrawingsFor(registry, OWNER)).toEqual([
     {
       drawingId: "d1",
       count: 1,
@@ -56,7 +56,7 @@ test("avatar colors are the participant colors drawn on the canvas", async () =>
   const registry = registryOf()
   await joinRoom(registry, "d1", fakePeer("p1"), guest("Quiet Otter"))
 
-  const [badge] = liveDrawingsForOwner(registry, OWNER)
+  const [badge] = liveDrawingsFor(registry, OWNER)
   const participant = registry.rooms.get("d1")?.seats.get("p1")?.participant
   expect(badge.participants[0].color).toEqual(participant?.color)
 })
@@ -65,26 +65,41 @@ test("the payload carries no userIds", async () => {
   const registry = registryOf()
   await joinRoom(registry, "d1", fakePeer("p1"), member("u:ada", "Ada"))
 
-  const [badge] = liveDrawingsForOwner(registry, OWNER)
+  const [badge] = liveDrawingsFor(registry, OWNER)
   expect(Object.keys(badge.participants[0]).sort()).toEqual(["color", "name"])
 })
 
 test("drawings someone else owns are not the caller's business", async () => {
   const registry = registryOf(async () => ({
     elements: [],
-    ownerId: "someone-else",
+    access: { space: "private", createdBy: "someone-else" },
     readable: true,
   }))
   await joinRoom(registry, "d1", fakePeer("p1"), guest("Quiet Otter"))
 
-  expect(liveDrawingsForOwner(registry, OWNER)).toEqual([])
+  expect(liveDrawingsFor(registry, OWNER)).toEqual([])
+})
+
+test("a Team room shows for every member, minus their own tabs", async () => {
+  const registry = registryOf(async () => ({
+    elements: [],
+    access: { space: "team", createdBy: "someone-else" },
+    readable: true,
+  }))
+  await joinRoom(registry, "d1", fakePeer("p1"), member(OWNER, "Owner"))
+  await joinRoom(registry, "d1", fakePeer("p2"), member("u:ada", "Ada"))
+
+  expect(liveDrawingsFor(registry, OWNER)).toEqual([
+    { drawingId: "d1", count: 1, participants: [expect.anything()] },
+  ])
+  expect(liveDrawingsFor(registry, "u:ada")[0].count).toBe(1)
 })
 
 test("a room alone with its owner shows no badge", async () => {
   const registry = registryOf()
   await joinRoom(registry, "d1", fakePeer("p1"), member(OWNER, "Owner"))
 
-  expect(liveDrawingsForOwner(registry, OWNER)).toEqual([])
+  expect(liveDrawingsFor(registry, OWNER)).toEqual([])
 })
 
 test("the owner's other tabs don't count either, but everyone else does", async () => {
@@ -93,7 +108,7 @@ test("the owner's other tabs don't count either, but everyone else does", async 
   await joinRoom(registry, "d1", fakePeer("p2"), member(OWNER, "Owner"))
   await joinRoom(registry, "d1", fakePeer("p3"), guest("Quiet Otter"))
 
-  expect(liveDrawingsForOwner(registry, OWNER)).toEqual([
+  expect(liveDrawingsFor(registry, OWNER)).toEqual([
     {
       drawingId: "d1",
       count: 1,
@@ -107,7 +122,7 @@ test("guests always count — they have no userId to match the caller's", async 
   await joinRoom(registry, "d1", fakePeer("p1"), guest("Quiet Otter"))
   await joinRoom(registry, "d1", fakePeer("p2"), guest("Brisk Auk"))
 
-  expect(liveDrawingsForOwner(registry, OWNER)[0].count).toBe(2)
+  expect(liveDrawingsFor(registry, OWNER)[0].count).toBe(2)
 })
 
 test("the stack caps at four avatars while the count stays true", async () => {
@@ -116,7 +131,7 @@ test("the stack caps at four avatars while the count stays true", async () => {
   for (let i = 0; i < joined; i++)
     await joinRoom(registry, "d1", fakePeer(`p${i}`), guest(`Guest ${i}`))
 
-  const [badge] = liveDrawingsForOwner(registry, OWNER)
+  const [badge] = liveDrawingsFor(registry, OWNER)
   expect(badge.count).toBe(joined)
   expect(badge.participants).toHaveLength(MAX_LIVE_AVATARS)
   expect(badge.participants.map((p) => p.name)).toEqual([
@@ -132,9 +147,10 @@ test("every live room the caller owns gets its own entry", async () => {
   await joinRoom(registry, "d1", fakePeer("p1"), guest("Quiet Otter"))
   await joinRoom(registry, "d2", fakePeer("p2"), guest("Brisk Auk"))
 
-  expect(liveDrawingsForOwner(registry, OWNER).map((b) => b.drawingId)).toEqual(
-    ["d1", "d2"],
-  )
+  expect(liveDrawingsFor(registry, OWNER).map((b) => b.drawingId)).toEqual([
+    "d1",
+    "d2",
+  ])
 })
 
 test("the last visitor leaving takes the badge with them", async () => {
@@ -146,7 +162,7 @@ test("the last visitor leaving takes the badge with them", async () => {
 
   leaveRoom(registry, "d1", visitor)
 
-  expect(liveDrawingsForOwner(registry, OWNER)).toEqual([])
+  expect(liveDrawingsFor(registry, OWNER)).toEqual([])
 })
 
 test("a room whose drawing never loaded belongs to nobody", async () => {
@@ -155,5 +171,5 @@ test("a room whose drawing never loaded belongs to nobody", async () => {
   })
   await joinRoom(registry, "d1", fakePeer("p1"), guest("Quiet Otter"))
 
-  expect(liveDrawingsForOwner(registry, OWNER)).toEqual([])
+  expect(liveDrawingsFor(registry, OWNER)).toEqual([])
 })

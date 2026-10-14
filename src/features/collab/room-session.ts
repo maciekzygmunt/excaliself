@@ -1,6 +1,7 @@
 // The Room: who is in a shared drawing and its authoritative scene. Deltas
 // merge here first; peers hear the Room's ruling, not the sender's claim.
 
+import { type AccessRow, canAccess } from "@/features/spaces/access"
 import { guestNameForConnection, pickParticipantColor } from "./identity"
 import type { Participant, SceneElement, ServerMessage } from "./protocol"
 import {
@@ -61,8 +62,8 @@ export type Room = {
   follows: Map<string, string>
   loaded: Promise<void>
   elements: SceneElement[]
-  /** Cached for the live badge. */
-  ownerId: string | null
+  /** Cached for the live badge and the reserved seat; null until loaded. */
+  access: AccessRow | null
   dirty: boolean
   flushTimer: ReturnType<typeof setTimeout> | null
   /** The write in flight; overlapping flushes chain onto it. */
@@ -105,7 +106,7 @@ function ensureRoom(registry: RoomRegistry, roomId: string): Room {
     follows: new Map(),
     loaded: Promise.resolve(),
     elements: [],
-    ownerId: null,
+    access: null,
     dirty: false,
     flushTimer: null,
     flushing: Promise.resolve(),
@@ -131,7 +132,7 @@ function ensureRoom(registry: RoomRegistry, roomId: string): Room {
           SCENE_UNREADABLE_CLOSE_REASON,
         )
       room.elements = stored.elements
-      room.ownerId = stored.ownerId
+      room.access = stored.access
     },
     (error) => {
       // Clients reconnect into a fresh read.
@@ -311,10 +312,13 @@ export async function joinRoom(
     // joiner's own roster publish tells the others.
     const silent = forgetSilentParticipants(existing, registry.now())
     for (const peer of silent) closeToRejoin(peer)
-    // Everyone else stops one short, so guests can't lock the owner out.
-    const isOwner =
-      identity.userId !== null && identity.userId === existing.ownerId
-    const cap = isOwner ? MAX_ROOM_PARTICIPANTS : MAX_ROOM_PARTICIPANTS - 1
+    // Everyone else stops one short, so guests can't lock out a member who
+    // can access the drawing (for a Private one, its creator).
+    const hasAccess =
+      identity.userId !== null &&
+      existing.access !== null &&
+      canAccess(existing.access, identity.userId)
+    const cap = hasAccess ? MAX_ROOM_PARTICIPANTS : MAX_ROOM_PARTICIPANTS - 1
     if (existing.seats.size >= cap) {
       // No joiner publish follows, so tell the others here.
       if (silent.length > 0) await settleAfterForget(registry, existing)

@@ -63,7 +63,9 @@ function makeFolder(
   return {
     id,
     name,
-    ownerId: "user-1",
+    space: "private",
+    createdBy: "user-1",
+    deletedBy: null,
     parentId,
     deletedAt: null,
     trashRootId: null,

@@ -54,7 +54,9 @@ function makeDrawing(overrides: Partial<Drawing> & { id: string }): Drawing {
     name: `Drawing ${overrides.id}`,
     searchText: "",
     folderId: null,
-    ownerId: "user-1",
+    space: "private",
+    createdBy: "user-1",
+    deletedBy: null,
     starred: false,
     deletedAt: null,
     trashRootId: null,
@@ -67,7 +69,9 @@ function makeDrawing(overrides: Partial<Drawing> & { id: string }): Drawing {
 function makeFolder(overrides: Partial<Folder> & { id: string }): Folder {
   return {
     name: `Folder ${overrides.id}`,
-    ownerId: "user-1",
+    space: "private",
+    createdBy: "user-1",
+    deletedBy: null,
     parentId: null,
     deletedAt: null,
     trashRootId: null,

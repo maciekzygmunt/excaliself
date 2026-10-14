@@ -105,8 +105,12 @@ test("folder target creates a root folder on Enter and does not navigate", async
   vi.mocked(createFolder).mockResolvedValue({
     id: "33333333-3333-3333-3333-333333333333",
     name: "Projects",
-    ownerId: "user-1",
+    space: "private",
+    createdBy: "user-1",
+    deletedBy: null,
     parentId: null,
+    deletedAt: null,
+    trashRootId: null,
     createdAt: new Date(0),
     updatedAt: new Date(0),
   })
