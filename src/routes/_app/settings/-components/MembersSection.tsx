@@ -237,10 +237,15 @@ function MemberRowActions({ user }: { user: AdminUser }) {
 
   const deleteMutation = useMutation({
     mutationFn: () => deleteUser({ data: user.id }),
-    onSuccess: () =>
+    onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: usersQueryOptions().queryKey,
-      }),
+      })
+      // The member count drives teamEnabled.
+      queryClient.invalidateQueries({
+        queryKey: currentUserQueryOptions().queryKey,
+      })
+    },
     onError: () => toast.error(`Couldn't delete ${displayName}`),
   })
 

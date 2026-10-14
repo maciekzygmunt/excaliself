@@ -1,4 +1,5 @@
 import { queryOptions } from "@tanstack/react-query"
+import { polled } from "@/lib/polling"
 import {
   getCurrentUser,
   getDeleteAccountState,
@@ -11,10 +12,12 @@ export type ActiveSession = Awaited<
   ReturnType<typeof listActiveSessions>
 >[number]
 
+/** Polled, so teamEnabled turns on once a second member joins. */
 export const currentUserQueryOptions = () =>
   queryOptions({
     queryKey: ["account", "currentUser"] as const,
     queryFn: () => getCurrentUser(),
+    ...polled,
   })
 
 export const sessionsQueryOptions = () =>

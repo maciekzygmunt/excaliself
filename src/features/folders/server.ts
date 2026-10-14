@@ -5,7 +5,7 @@ import { createServerFn } from "@tanstack/react-start"
 import { and, asc, eq, inArray, isNull } from "drizzle-orm"
 import { z } from "zod"
 import { db } from "@/db"
-import { drawings, folders } from "@/db/schema"
+import { drawings, folders, spaces } from "@/db/schema"
 import { endRooms } from "@/features/collab/room-registry"
 import { accessibleTo } from "@/features/spaces/access"
 import { authMiddleware } from "@/middleware/auth"
@@ -29,6 +29,8 @@ export const createFolder = createServerFn({ method: "POST" })
     z.object({
       name: z.string().min(1),
       parentId: z.string().nullable().optional(),
+      // Ignored inside a parent folder: the folder takes the parent's space.
+      space: z.enum(spaces).default("private"),
     }),
   )
   .handler(async ({ data, context }) => {
@@ -36,13 +38,16 @@ export const createFolder = createServerFn({ method: "POST" })
     const id = randomUUID()
     const now = new Date()
     const parentId = data.parentId ?? null
-    if (parentId) await assertFolderTarget(db, userId, parentId)
+    const space = parentId
+      ? await assertFolderTarget(db, userId, parentId)
+      : data.space
 
     const [folder] = await db
       .insert(folders)
       .values({
         id,
         name: data.name,
+        space,
         createdBy: userId,
         parentId,
         createdAt: now,
@@ -67,12 +72,14 @@ export const updateFolder = createServerFn({ method: "POST" })
     const updateFields: { name?: string; parentId?: string | null } = {}
     if (data.name !== undefined) updateFields.name = data.name
     if (data.parentId !== undefined) updateFields.parentId = data.parentId
-    if (data.parentId)
-      await assertFolderTarget(db, userId, data.parentId, data.id)
+    const targetSpace = data.parentId
+      ? await assertFolderTarget(db, userId, data.parentId, data.id)
+      : undefined
 
     // Access is enforced in the statement itself; zero rows means "not
     // found" so others can't tell a private folder exists. Trashed folders
-    // are treated the same — no edits while in the trash.
+    // are treated the same — no edits while in the trash — and so is a move
+    // into a folder of the other space.
     const updated = await db
       .update(folders)
       .set({ ...updateFields, updatedAt: new Date() })
@@ -81,6 +88,7 @@ export const updateFolder = createServerFn({ method: "POST" })
           eq(folders.id, data.id),
           accessibleTo(folders, userId),
           isNull(folders.deletedAt),
+          targetSpace && eq(folders.space, targetSpace),
         ),
       )
       .returning({ id: folders.id })

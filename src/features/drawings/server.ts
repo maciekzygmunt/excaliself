@@ -5,7 +5,7 @@ import { createServerFn } from "@tanstack/react-start"
 import { and, desc, eq, isNotNull, isNull } from "drizzle-orm"
 import { z } from "zod"
 import { db } from "@/db"
-import { drawingFiles, drawings, folders, stars } from "@/db/schema"
+import { drawingFiles, drawings, folders, spaces, stars } from "@/db/schema"
 import { endRooms } from "@/features/collab/room-registry"
 import { assertFolderTarget } from "@/features/folders/ownership"
 import { findNearestLiveAncestorId } from "@/features/folders/subtree"
@@ -83,11 +83,15 @@ export const createDrawing = createServerFn({ method: "POST" })
     z.object({
       name: z.string().min(1).optional(),
       folderId: z.string().nullable().optional(),
+      // Ignored inside a folder: the drawing takes the folder's space.
+      space: z.enum(spaces).default("private"),
     }),
   )
   .handler(async ({ data, context }) => {
     const userId = context.session.user.id
-    if (data.folderId) await assertFolderTarget(db, userId, data.folderId)
+    const space = data.folderId
+      ? await assertFolderTarget(db, userId, data.folderId)
+      : data.space
     const id = randomUUID()
     const now = new Date()
 
@@ -96,6 +100,7 @@ export const createDrawing = createServerFn({ method: "POST" })
       name: data.name ?? "Untitled",
       data: JSON.stringify({ elements: [], appState: {} }),
       folderId: data.folderId ?? null,
+      space,
       createdBy: userId,
       createdAt: now,
       updatedAt: now,
@@ -117,12 +122,13 @@ export const updateDrawing = createServerFn({ method: "POST" })
   )
   .handler(async ({ data: { id, updateData }, context }) => {
     const userId = context.session.user.id
-    if (updateData.folderId) {
-      await assertFolderTarget(db, userId, updateData.folderId)
-    }
+    const targetSpace = updateData.folderId
+      ? await assertFolderTarget(db, userId, updateData.folderId)
+      : undefined
     // Access is enforced in the statement itself; zero rows means "not
     // found" so others can't tell a private drawing exists. Trashed drawings
-    // are treated the same — no edits while in the trash.
+    // are treated the same — no edits while in the trash — and so is a move
+    // into a folder of the other space.
     const updated = await db
       .update(drawings)
       .set({ ...updateData, updatedAt: new Date() })
@@ -131,6 +137,7 @@ export const updateDrawing = createServerFn({ method: "POST" })
           eq(drawings.id, id),
           accessibleTo(drawings, userId),
           isNull(drawings.deletedAt),
+          targetSpace && eq(drawings.space, targetSpace),
         ),
       )
       .returning({ id: drawings.id })

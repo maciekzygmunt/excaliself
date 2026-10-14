@@ -1,0 +1,12 @@
+// Freshness for data teammates change. There is no push channel, so these
+// queries poll and refetch when the tab regains focus. TanStack pauses the
+// poll in hidden tabs.
+export const POLL_INTERVAL_MS = 25_000
+
+/** Query options for a polled query, spread into queryOptions(). */
+export const polled = {
+  refetchInterval: POLL_INTERVAL_MS,
+  refetchOnWindowFocus: true,
+  // Otherwise every navigation refetches on mount.
+  staleTime: POLL_INTERVAL_MS,
+} as const

@@ -1,5 +1,5 @@
 import { useNavigate } from "@tanstack/react-router"
-import { Folder, Plus } from "lucide-react"
+import { Folder, Lock, Plus, Users } from "lucide-react"
 import {
   createContext,
   type ReactNode,
@@ -14,6 +14,7 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { Kbd } from "@/components/ui/kbd"
 import { useCreateDrawing } from "@/features/drawings/mutations"
 import { useCreateFolder } from "@/features/folders/mutations"
+import { useBrowsedSpace } from "@/features/spaces/browse"
 
 export type FolderScope = { id: string; name: string }
 
@@ -35,6 +36,10 @@ export function CreateDialog({
   const navigate = useNavigate()
   const createDrawingMutation = useCreateDrawing()
   const createFolderMutation = useCreateFolder()
+  // Creates in the space being browsed; inside a folder, the server gives
+  // the new item the folder's space instead.
+  const browsedSpace = useBrowsedSpace()
+  const space = browsedSpace ?? "private"
   const [name, setName] = useState("")
   // Synchronous guard against a double Enter racing ahead of isPending's
   // re-render (same pattern the inline folder row used).
@@ -56,13 +61,13 @@ export function CreateDialog({
     try {
       if (target.kind === "drawing") {
         const id = await createDrawingMutation.mutateAsync({
-          data: { name: trimmed, folderId: target.folder?.id ?? null },
+          data: { name: trimmed, folderId: target.folder?.id ?? null, space },
         })
         onOpenChange(false)
         navigate({ to: "/draw/$id", params: { id } })
       } else {
         await createFolderMutation.mutateAsync({
-          data: { name: trimmed, parentId: null },
+          data: { name: trimmed, parentId: null, space },
         })
         onOpenChange(false)
       }
@@ -114,6 +119,15 @@ export function CreateDialog({
             <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <Folder className="h-3 w-3 shrink-0 fill-iris/70 text-iris" />
               in {folder.name}
+            </span>
+          ) : browsedSpace ? (
+            <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              {browsedSpace === "team" ? (
+                <Users className="h-3 w-3 shrink-0 text-iris" />
+              ) : (
+                <Lock className="h-3 w-3 shrink-0 text-iris" />
+              )}
+              in {browsedSpace === "team" ? "Team" : "Private"}
             </span>
           ) : (
             <span className="text-xs text-muted-foreground/60">

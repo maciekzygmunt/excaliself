@@ -14,26 +14,31 @@ import {
 } from "@/features/admin/delete-user"
 import { isLastAdmin } from "@/features/admin/roles"
 import { endRooms } from "@/features/collab/room-registry"
+import { isTeamEnabled } from "@/features/spaces/team-enabled"
 import { auth } from "@/lib/auth"
 import { authMiddleware } from "@/middleware/auth"
 import { compareSessions } from "./sessions"
 
 // Read the row fresh rather than trusting the session's cookie cache — a
 // just-saved profile edit must never be masked by a stale cookie snapshot.
+// Also carries teamEnabled, the instance-wide gate on every Team UI element.
 export const getCurrentUser = createServerFn({ method: "GET" })
   .middleware([authMiddleware])
   .handler(async ({ context }) => {
-    const [user] = await db
-      .select({
-        id: users.id,
-        email: users.email,
-        name: users.name,
-        role: users.role,
-      })
-      .from(users)
-      .where(eq(users.id, context.session.user.id))
+    const [[user], teamEnabled] = await Promise.all([
+      db
+        .select({
+          id: users.id,
+          email: users.email,
+          name: users.name,
+          role: users.role,
+        })
+        .from(users)
+        .where(eq(users.id, context.session.user.id)),
+      isTeamEnabled(db),
+    ])
     if (!user) throw new Error("User not found")
-    return user
+    return { ...user, teamEnabled }
   })
 
 export type ChangeEmailResult =

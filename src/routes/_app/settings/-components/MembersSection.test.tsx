@@ -99,6 +99,7 @@ const viewer = {
   email: "ada@example.com",
   name: "",
   role: "admin" as const,
+  teamEnabled: false,
 }
 
 const clipboardWriteText = vi.fn()
