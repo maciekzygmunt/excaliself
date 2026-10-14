@@ -48,6 +48,11 @@ vi.mock("@/features/folders/server", () => ({
 
 // The palette provider (needed for the banner's context section) pulls in
 // the create dialog and the auth client — stub those edges.
+// The palette reads teamEnabled off the current user.
+vi.mock("@/features/account/server", () => ({
+  getCurrentUser: vi.fn(async () => ({ teamEnabled: false })),
+}))
+
 vi.mock("./CreateDialog", () => ({
   useCreateDialog: () => ({
     openCreateDrawingDialog: vi.fn(),

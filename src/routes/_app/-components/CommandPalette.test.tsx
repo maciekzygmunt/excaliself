@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { FolderInput, Pencil, Star, Trash2 } from "lucide-react"
 import { afterEach, beforeEach, expect, test, vi } from "vitest"
+import { currentUserQueryOptions } from "@/features/account/queries"
 import type { Drawing } from "@/features/drawings/queries"
 import { drawingsQueryOptions } from "@/features/drawings/queries"
 import type { Folder } from "@/features/folders/queries"
@@ -28,6 +29,9 @@ vi.mock("@/features/drawings/server", () => ({
 vi.mock("@/features/folders/server", () => ({
   getFolders: vi.fn(),
 }))
+
+// The current user only matters here for teamEnabled.
+vi.mock("@/features/account/server", () => ({ getCurrentUser: vi.fn() }))
 
 const openCreateDrawingDialog = vi.fn()
 const openCreateFolderDialog = vi.fn()
@@ -85,9 +89,11 @@ function makeFolder(overrides: Partial<Folder> & { id: string }): Folder {
 function makeClient({
   drawings = [],
   folders = [],
+  teamEnabled = false,
 }: {
   drawings?: Drawing[]
   folders?: Folder[]
+  teamEnabled?: boolean
 } = {}) {
   // Seeded data is the fixture — keep react-query from refetching it through
   // the stubbed server functions.
@@ -96,22 +102,33 @@ function makeClient({
   })
   client.setQueryData(drawingsQueryOptions().queryKey, drawings)
   client.setQueryData(foldersQueryOptions().queryKey, folders)
+  client.setQueryData(currentUserQueryOptions().queryKey, {
+    id: "user-1",
+    email: "ada@example.com",
+    name: "Ada",
+    role: "user",
+    teamEnabled,
+  })
   return client
 }
 
 function renderPalette({
   drawings = [],
   folders = [],
+  teamEnabled = false,
   contextSection = null,
   provider = false,
 }: {
   drawings?: Drawing[]
   folders?: Folder[]
+  teamEnabled?: boolean
   contextSection?: PaletteContextSection | null
   provider?: boolean
 } = {}) {
   render(
-    <QueryClientProvider client={makeClient({ drawings, folders })}>
+    <QueryClientProvider
+      client={makeClient({ drawings, folders, teamEnabled })}
+    >
       {provider ? (
         <CommandPaletteProvider>
           <div />
@@ -131,6 +148,7 @@ function renderOpenPalette(
   fixtures: {
     drawings?: Drawing[]
     folders?: Folder[]
+    teamEnabled?: boolean
     contextSection?: PaletteContextSection | null
   } = {},
 ) {
@@ -385,6 +403,29 @@ test("scene-text matches follow title matches and show the matching words", () =
   })
   fireEvent.change(input, { target: { value: "roadmap" } })
   expect(optionLabels()).toEqual(["Roadmap", "ArchitectureRoadmap review"])
+})
+
+test("with Team on, each drawing result says which space it lives in", () => {
+  const input = renderOpenPalette({
+    drawings: [
+      makeDrawing({ id: "d1", name: "Roadmap", space: "team" }),
+      makeDrawing({ id: "d2", name: "Road trip" }),
+    ],
+    teamEnabled: true,
+  })
+  fireEvent.change(input, { target: { value: "road" } })
+  expect(optionLabels()).toEqual(["RoadmapTeam", "Road tripPrivate"])
+})
+
+test("while Team is hidden, drawing results carry no space label", () => {
+  const input = renderOpenPalette({
+    drawings: [
+      makeDrawing({ id: "d1", name: "Roadmap", space: "team" }),
+      makeDrawing({ id: "d2", name: "Road trip" }),
+    ],
+  })
+  fireEvent.change(input, { target: { value: "road" } })
+  expect(optionLabels()).toEqual(["Roadmap", "Road trip"])
 })
 
 test("selecting a drawing opens it and closes the palette", () => {

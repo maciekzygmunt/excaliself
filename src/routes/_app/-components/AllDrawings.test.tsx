@@ -6,6 +6,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react"
 import { afterEach, beforeEach, expect, test, vi } from "vitest"
 import { renderPreviewSvg } from "@/components/drawing-gallery/preview"
@@ -514,4 +515,48 @@ test("with Team on, the grid and folder chips scope to the browsed space", () =>
   expect(
     screen.getByRole("link", { name: "Private" }).getAttribute("href"),
   ).toBe("/drawings")
+})
+
+// The card around a drawing's stretched link
+const card = (name: string) =>
+  screen.getByRole("link", { name }).parentElement as HTMLElement
+
+test("with Team on, search covers both spaces and labels each match; clearing it returns to the space", () => {
+  renderAllDrawings({
+    drawings: [
+      makeDrawing({ id: "ours", name: "Roadmap", space: "team" }),
+      makeDrawing({ id: "mine", name: "Road trip", folderId: "f1" }),
+      makeDrawing({ id: "retro", name: "Retro", space: "team" }),
+    ],
+    folders: [makeFolder("f1", "Sketches")],
+    teamEnabled: true,
+    space: "team",
+  })
+  const search = screen.getByRole("searchbox", { name: /search/i })
+
+  fireEvent.change(search, { target: { value: "road" } })
+  expect(cardHrefs()).toEqual(["/draw/ours", "/draw/mine"])
+  expect(within(card("Roadmap")).getByText("Team")).toBeTruthy()
+  expect(within(card("Road trip")).getByText("Private")).toBeTruthy()
+  // The private match keeps its folder attribution
+  expect(
+    within(card("Road trip")).getByRole("link", { name: "Sketches" }),
+  ).toBeTruthy()
+
+  fireEvent.change(search, { target: { value: "" } })
+  expect(cardHrefs()).toEqual(["/draw/ours", "/draw/retro"])
+  expect(within(card("Roadmap")).queryByText("Team")).toBeNull()
+})
+
+test("while Team is hidden, search results carry no space label", () => {
+  renderAllDrawings({
+    drawings: [makeDrawing({ id: "mine", name: "Road trip" })],
+    teamEnabled: false,
+  })
+
+  fireEvent.change(screen.getByRole("searchbox", { name: /search/i }), {
+    target: { value: "road" },
+  })
+  expect(cardHrefs()).toEqual(["/draw/mine"])
+  expect(within(card("Road trip")).queryByText("Private")).toBeNull()
 })

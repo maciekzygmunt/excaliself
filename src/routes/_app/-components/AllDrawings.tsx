@@ -27,6 +27,7 @@ import { SpaceSwitch } from "./SpaceSwitch"
 
 // The browse surface: every drawing of the browsed space, in Home's card
 // language, under the toolbar (on-page search, folder chips, sort — spec §5.2).
+// Search reaches past the space into both.
 export function AllDrawings({ isAdmin }: { isAdmin: boolean }) {
   const space = useBrowsedSpace()
   const { data: allDrawings = [], isPending } = useQuery(drawingsQueryOptions())
@@ -55,9 +56,16 @@ export function AllDrawings({ isAdmin }: { isAdmin: boolean }) {
       ? "all"
       : scope
 
+  // A query searches both spaces, whatever the page's space (story 9); the
+  // chips still narrow it. Clearing it returns to the space's grid.
+  const searchesBothSpaces = space !== null && query.trim() !== ""
   const filtered = useMemo(
-    () => filterDrawings(drawings, { query, scope: liveScope }),
-    [drawings, query, liveScope],
+    () =>
+      filterDrawings(searchesBothSpaces ? allDrawings : drawings, {
+        query,
+        scope: liveScope,
+      }),
+    [searchesBothSpaces, allDrawings, drawings, query, liveScope],
   )
 
   // Tier-1 is reserved for a truly empty account; a grid emptied by the
@@ -88,11 +96,13 @@ export function AllDrawings({ isAdmin }: { isAdmin: boolean }) {
 
         <DrawingGallery
           drawings={filtered}
-          // Attribution only in the All view — a scoped grid repeats one folder
-          folders={liveScope === "all" ? folders : undefined}
+          // Attribution only in the All view — a scoped grid repeats one
+          // folder. Every space's folders, for matches from the other one.
+          folders={liveScope === "all" ? allFolders : undefined}
           isPending={isPending}
           sort={sort}
           query={query}
+          spaceLabels={searchesBothSpaces}
           loadingLabel="Loading drawings"
           onTrash={trashDrawing}
           empty={

@@ -11,6 +11,7 @@ import {
 import { useEffect, useMemo, useRef, useState } from "react"
 import { InitialsAvatar } from "@/components/initials-avatar"
 import { LiveAvatarStack } from "@/components/live-badge"
+import { SpaceLabel } from "@/components/space-label"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -65,6 +66,7 @@ export function DrawingGallery({
   limit,
   sort = DEFAULT_SORT,
   query,
+  spaceLabels = false,
   loadingLabel,
   onTrash,
   empty,
@@ -82,6 +84,8 @@ export function DrawingGallery({
   sort?: SortOrder
   /** The browse search, so title matches sort ahead of scene-text matches. */
   query?: string
+  /** Cards say which space they live in: search results that span both. */
+  spaceLabels?: boolean
   /** Accessible name for the loading grid. */
   loadingLabel: string
   /** Card overflow action "Move to trash" (spec §5.11): tier-1 destructive,
@@ -127,6 +131,7 @@ export function DrawingGallery({
           folder={
             drawing.folderId ? foldersById.get(drawing.folderId) : undefined
           }
+          spaceLabel={spaceLabels}
           onTrash={() => onTrash(drawing)}
         />
       ))}
@@ -168,10 +173,12 @@ export function LoadingGrid({
 function DrawingCard({
   drawing,
   folder,
+  spaceLabel,
   onTrash,
 }: {
   drawing: Drawing
   folder?: Folder
+  spaceLabel: boolean
   onTrash: () => void
 }) {
   // Per card so a poll result re-renders only the changed card.
@@ -199,6 +206,13 @@ function DrawingCard({
           live={live}
           className="absolute bottom-2 left-2 animate-in fade-in-0 zoom-in-95 duration-200"
         />
+        {/* On the preview, not the footer: the footer has no room left */}
+        {spaceLabel && (
+          <SpaceLabel
+            space={drawing.space}
+            className="absolute top-2 right-2 h-5 rounded-[5px] bg-keycap-from px-1.5 text-[11px] font-medium text-muted-foreground shadow-keycap"
+          />
+        )}
       </div>
       <div className="flex items-center gap-2 px-3 py-2.5">
         {drawing.space === "team" && (
