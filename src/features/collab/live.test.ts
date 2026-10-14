@@ -93,6 +93,17 @@ test("a Team room shows for every member, minus their own tabs", async () => {
     { drawingId: "d1", count: 1, participants: [expect.anything()] },
   ])
   expect(liveDrawingsFor(registry, "u:ada")[0].count).toBe(1)
+  // A member with no tab in it sees everyone.
+  expect(liveDrawingsFor(registry, "u:bob")[0].count).toBe(2)
+})
+
+test("a private room stays its creator's, even with other members in it", async () => {
+  const registry = registryOf()
+  await joinRoom(registry, "d1", fakePeer("p1"), member("u:ada", "Ada"))
+
+  expect(liveDrawingsFor(registry, "u:bob")).toEqual([])
+  expect(liveDrawingsFor(registry, "u:ada")).toEqual([])
+  expect(liveDrawingsFor(registry, OWNER)[0].count).toBe(1)
 })
 
 test("a room alone with its owner shows no badge", async () => {

@@ -549,6 +549,22 @@ export function terminateRoom(
   return endRoom(registry, roomId, closeAsDead)
 }
 
+/**
+ * A Share link stopped or regenerated. A Private drawing's Room ends with it;
+ * a Team drawing's Room needs no link, so only its guests go.
+ */
+export async function endLinkRoom(
+  registry: RoomRegistry,
+  roomId: string,
+): Promise<void> {
+  const room = registry.rooms.get(roomId)
+  if (!room) return
+  // `access` is read once the scene has loaded.
+  await room.loaded
+  if (room.access?.space === "team") return evictNonMembers(registry, roomId)
+  return terminateRoom(registry, roomId)
+}
+
 /** Freeze, write, then hang up each peer with `hangUp`. */
 async function endRoom(
   registry: RoomRegistry,

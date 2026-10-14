@@ -85,11 +85,12 @@ test("a committed save is mirrored into the drawing cache", async () => {
   ).toBe('{"elements":["new"]}')
 })
 
-// A tab that was still saving solo when the drawing got shared — from another
-// tab, or from this one before its share query caught up. The write is
-// refused rather than failing, and refetching the share is what flips this
-// canvas into collab mode, where the local scene is reconciled in.
-test("a refused save leaves the cache alone and refetches the share", async () => {
+// A tab that was still saving solo when the drawing got shared or moved to
+// Team — from another tab, or from this one before its queries caught up. The
+// write is refused rather than failing, and refetching the share and the
+// drawing is what flips this canvas into a Room, where the local scene is
+// reconciled in.
+test("a refused save leaves the cache alone and refetches the share and drawing", async () => {
   vi.mocked(saveDrawingScene).mockResolvedValue({ status: "shared" })
   const { queryClient, saveRef } = renderSaver()
   const invalidate = vi.spyOn(queryClient, "invalidateQueries")
@@ -99,6 +100,10 @@ test("a refused save leaves the cache alone and refetches the share", async () =
   })
 
   expect(invalidate).toHaveBeenCalledWith({ queryKey: ["shares", "d1"] })
+  expect(invalidate).toHaveBeenCalledWith({
+    queryKey: ["drawings", "d1"],
+    exact: true,
+  })
   expect(
     queryClient.getQueryData(drawingQueryOptions("d1").queryKey)?.data,
   ).toBe(DRAWING.data)

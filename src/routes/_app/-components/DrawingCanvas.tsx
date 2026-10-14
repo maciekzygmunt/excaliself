@@ -20,6 +20,10 @@ import { PresenceAvatars } from "@/components/presence-avatars"
 import { ReconnectingIndicator } from "@/components/reconnecting-indicator"
 import { Button } from "@/components/ui/button"
 import { useSidebar } from "@/components/ui/sidebar"
+import {
+  roomPathForDrawing,
+  roomPathForToken,
+} from "@/features/collab/room-url"
 import { useRoom } from "@/features/collab/use-room"
 import {
   markImageStatus,
@@ -127,18 +131,26 @@ export function DrawingCanvas({ drawingId, readOnly = false }: Props) {
     })
   }, [queryClient, drawingId])
 
-  const shareToken = readOnly ? null : (share?.token ?? null)
-  // Keyed on the link, so a later link to a repaired scene starts clean.
-  const [unreadableToken, setUnreadableToken] = useState<string | null>(null)
+  // A Team drawing is always a Room, joined by id; a Private one only while
+  // its Share link exists. Either way the Room is the only writer.
+  const isTeam = drawing?.space === "team"
+  const roomPath = readOnly
+    ? null
+    : isTeam
+      ? roomPathForDrawing(drawingId)
+      : share
+        ? roomPathForToken(share.token)
+        : null
+  // Keyed on the room, so a later link to a repaired scene starts clean.
+  const [unreadableRoom, setUnreadableRoom] = useState<string | null>(null)
   const handleSceneUnreadable = useCallback(
-    () => setUnreadableToken(shareToken),
-    [shareToken],
+    () => setUnreadableRoom(roomPath),
+    [roomPath],
   )
-  const sceneUnreadable = shareToken !== null && unreadableToken === shareToken
+  const sceneUnreadable = roomPath !== null && unreadableRoom === roomPath
 
-  // A shared drawing has one writer, the room, so the owner's tabs join it too.
   const room = useRoom({
-    token: shareToken,
+    room: roomPath,
     // Members use their session name.
     name: null,
     excalidrawAPI,
@@ -148,11 +160,11 @@ export function DrawingCanvas({ drawingId, readOnly = false }: Props) {
     storedFileIds,
   })
   // Autosave stays live until the share query answers; the server refuses the
-  // write if the drawing is shared.
-  const isShared = share != null && !readOnly
+  // write if the drawing is shared or in Team.
+  const isLive = !readOnly && (isTeam || share != null)
   const reloadingScene = useReloadSceneAfterRoom(
     drawingId,
-    isShared,
+    isLive,
     excalidrawAPI,
   )
 
@@ -163,13 +175,14 @@ export function DrawingCanvas({ drawingId, readOnly = false }: Props) {
     toast.error("This drawing can't be opened for live editing", {
       id: toastId,
       duration: Number.POSITIVE_INFINITY,
-      description:
-        "Its saved data is damaged, so your changes aren't being saved. Stop sharing to edit it on your own.",
+      description: isTeam
+        ? "Its saved data is damaged, so your changes aren't being saved."
+        : "Its saved data is damaged, so your changes aren't being saved. Stop sharing to edit it on your own.",
     })
     return () => {
       toast.dismiss(toastId)
     }
-  }, [sceneUnreadable, drawingId])
+  }, [sceneUnreadable, drawingId, isTeam])
 
   // A corrupt stored scene opens as an empty canvas; pause autosave until the
   // user acknowledges, so the next save doesn't silently overwrite the data.
@@ -181,9 +194,9 @@ export function DrawingCanvas({ drawingId, readOnly = false }: Props) {
     // Read-only view: nothing can save, so the "auto-save is paused" toast
     // and its "Edit anyway" escape hatch would only mislead.
     if (readOnly) return
-    // Shared: the room's refusal says it, and "Edit anyway" can't save there.
+    // Live: the room's refusal says it, and "Edit anyway" can't save there.
     // Waiting for the share query keeps this one from flashing first.
-    if (share !== null) return
+    if (isTeam || share !== null) return
     if (!isDataCorrupt || corruptAcknowledged) return
     const toastId = `corrupt-scene:${drawingId}`
     toast.error("This drawing's saved data couldn't be read", {
@@ -199,7 +212,7 @@ export function DrawingCanvas({ drawingId, readOnly = false }: Props) {
     return () => {
       toast.dismiss(toastId)
     }
-  }, [isDataCorrupt, corruptAcknowledged, drawingId, readOnly, share])
+  }, [isDataCorrupt, corruptAcknowledged, drawingId, readOnly, isTeam, share])
 
   const {
     saving,
@@ -214,9 +227,9 @@ export function DrawingCanvas({ drawingId, readOnly = false }: Props) {
     skipInitialChange: true,
     // `readOnly` also unwires onChange below; pausing here is belt and
     // braces so no code path can flush a save for a trashed drawing.
-    // While shared the room saves; changes are still recorded for when it
+    // While live the room saves; changes are still recorded for when it
     // stops. After it stops, the stored scene replaces them first.
-    paused: autoSavePaused || readOnly || isShared || reloadingScene,
+    paused: autoSavePaused || readOnly || isLive || reloadingScene,
     onError: () => {
       toast.error("Failed to save drawing", { id: "drawing-save-error" })
     },
@@ -230,7 +243,7 @@ export function DrawingCanvas({ drawingId, readOnly = false }: Props) {
       files: BinaryFiles,
     ) => {
       // A room flags these itself, from the upload's answer.
-      if (!isShared && excalidrawAPI) {
+      if (!isLive && excalidrawAPI) {
         for (const fileId of selectOversizedImages(
           elements,
           files,
@@ -246,7 +259,7 @@ export function DrawingCanvas({ drawingId, readOnly = false }: Props) {
       // No-op until the room is joined.
       roomChange(elements, appState, files)
     },
-    [handleChange, roomChange, isShared, excalidrawAPI, storedFileIdSet],
+    [handleChange, roomChange, isLive, excalidrawAPI, storedFileIdSet],
   )
 
   const handleNameSubmit = (newName: string) => {

@@ -29,7 +29,7 @@ import {
   ROOM_FULL_CLOSE_CODE,
   SCENE_UNREADABLE_CLOSE_CODE,
 } from "./protocol"
-import { roomSocketUrl } from "./room-url"
+import { type RoomPath, roomSocketUrl } from "./room-url"
 import {
   createSceneBroadcaster,
   SYNC_FULL_SCENE_INTERVAL_MS,
@@ -55,14 +55,14 @@ export type RoomPresence = Pick<
 >
 
 export function useRoom(options: {
-  /** The share token from the URL; null keeps the socket closed. */
-  token: string | null
+  /** The Room's address; null keeps the socket closed. */
+  room: RoomPath | null
   /** Guest display name; null for members, whose name the server takes from the session. */
   name: string | null
   excalidrawAPI: ExcalidrawImperativeAPI | null
   /** The room turned this tab away at its participant cap. */
   onRoomFull: () => void
-  /** The token no longer resolves; the socket stops and the page re-resolves it. */
+  /** The room refused this tab (link dead, drawing trashed); the socket stops and the page re-resolves. */
   onLinkDead: () => void
   /** The stored scene is damaged, so no room opens; the socket stops. */
   onSceneUnreadable: () => void
@@ -70,7 +70,7 @@ export function useRoom(options: {
   storedFileIds: readonly string[]
 }) {
   const {
-    token,
+    room,
     name,
     excalidrawAPI,
     onRoomFull,
@@ -91,7 +91,7 @@ export function useRoom(options: {
   const pointersRef = useRef(new Map<string, PointerUpdate>())
   const participantsRef = useRef<Participant[]>([])
   const selfConnectionIdRef = useRef<string | null>(null)
-  // Refs keep the socket effect keyed on the token only; a rename must not reconnect.
+  // Refs keep the socket effect keyed on the room only; a rename must not reconnect.
   const apiRef = useRef(excalidrawAPI)
   apiRef.current = excalidrawAPI
   const nameRef = useRef(name)
@@ -140,7 +140,7 @@ export function useRoom(options: {
 
   // Image bytes ride HTTP, not the socket.
   const { uploadPending, fetchMissing } = useRoomFiles({
-    token,
+    room,
     excalidrawAPI,
     storedFileIds,
   })
@@ -171,7 +171,7 @@ export function useRoom(options: {
     }, SYNC_FULL_SCENE_INTERVAL_MS)
   }, [sendScene])
 
-  // Upload runs before the SCENE_INIT gate: it needs only the token. Deltas
+  // Upload runs before the SCENE_INIT gate: it needs only the room. Deltas
   // wait for SCENE_INIT, or the catch-up would skip edits made while dialing.
   const onChange = useCallback(
     (
@@ -230,7 +230,7 @@ export function useRoom(options: {
   const canvasReady = excalidrawAPI !== null
 
   useEffect(() => {
-    if (!token || !canvasReady) return
+    if (!room || !canvasReady) return
 
     // Shared across dials so the wait grows over a whole outage.
     const backoff = createReconnectBackoff()
@@ -240,7 +240,7 @@ export function useRoom(options: {
     let everJoined = false
 
     const connect = () => {
-      const socket = new WebSocket(roomSocketUrl(token, window.location))
+      const socket = new WebSocket(roomSocketUrl(room, window.location))
       socketRef.current = socket
       beat = createHeartbeat({
         ping: () => send({ type: "PING", payload: {} }),
@@ -353,7 +353,7 @@ export function useRoom(options: {
       setConnectionStatus("connecting")
     }
   }, [
-    token,
+    room,
     canvasReady,
     send,
     sendScene,

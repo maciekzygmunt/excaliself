@@ -8,8 +8,8 @@ import {
 } from "@tanstack/react-start/server"
 import { z } from "zod"
 import { db } from "@/db"
-import { endRooms, rooms } from "@/features/collab/room-registry"
-import { evictNonMembers } from "@/features/collab/room-session"
+import { rooms } from "@/features/collab/room-registry"
+import { endLinkRoom, evictNonMembers } from "@/features/collab/room-session"
 import { auth } from "@/lib/auth"
 import { authMiddleware } from "@/middleware/auth"
 import { admitsGuests } from "./access"
@@ -51,7 +51,7 @@ export const stopSharing = createServerFn({ method: "POST" })
   .validator(z.string())
   .handler(async ({ data: drawingId, context }) => {
     await stopSharingDrawing(db, context.session.user.id, drawingId)
-    await endRooms([drawingId])
+    await endLinkRoom(rooms, drawingId)
   })
 
 export const regenerateShare = createServerFn({ method: "POST" })
@@ -63,7 +63,7 @@ export const regenerateShare = createServerFn({ method: "POST" })
       context.session.user.id,
       drawingId,
     )
-    await endRooms([drawingId])
+    await endLinkRoom(rooms, drawingId)
     return share
   })
 

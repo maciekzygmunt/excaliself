@@ -17,6 +17,7 @@ import {
   SCENE_UNREADABLE_CLOSE_CODE,
 } from "./protocol"
 import { reconcileElements } from "./reconcile"
+import { roomPathForToken } from "./room-url"
 import type { ConnectionStatus } from "./use-room"
 import { useRoom } from "./use-room"
 
@@ -199,7 +200,7 @@ function renderRoom(
   const onSceneUnreadable = vi.fn()
   function Harness({ token }: { token: string }) {
     const room = useRoom({
-      token,
+      room: roomPathForToken(token),
       name: "Ada",
       // The hook only ever reaches for the handful of methods above.
       excalidrawAPI: api as never,

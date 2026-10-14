@@ -11,6 +11,7 @@ import {
 import {
   closeAllRooms,
   createRoomRegistry,
+  endLinkRoom,
   evictNonMembers,
   joinRoom,
   leaveRoom,
@@ -1421,6 +1422,44 @@ test("a termination whose final write fails keeps the room until it lands", asyn
     errors.mockRestore()
     vi.useRealTimers()
   }
+})
+
+const LINK_DEAD = {
+  code: LINK_DEAD_CLOSE_CODE,
+  reason: "Link no longer active",
+}
+
+test("a stopped link ends a Private drawing's room for everyone in it", async () => {
+  const registry = recordingRegistry()
+  const ada = fakePeer("peer-ada")
+  const grace = fakePeer("peer-grace")
+  await joinRoom(registry, ROOM, ada, member("Ada"))
+  await joinRoom(registry, ROOM, grace, guest)
+
+  await endLinkRoom(registry, ROOM)
+
+  expect(ada.closes).toEqual([LINK_DEAD])
+  expect(grace.closes).toEqual([LINK_DEAD])
+  expect(registry.rooms.has(ROOM)).toBe(false)
+})
+
+// Members reach a Team drawing by id, so its Room never hangs on a link.
+test("a stopped link sends only the guests out of a Team drawing's room", async () => {
+  const registry = emptyRegistry(async () => ({
+    elements: [],
+    access: { space: "team", createdBy: "owner-1" },
+    readable: true,
+  }))
+  const ada = fakePeer("peer-ada")
+  const grace = fakePeer("peer-grace")
+  await joinRoom(registry, ROOM, ada, member("Ada"))
+  await joinRoom(registry, ROOM, grace, guest)
+
+  await endLinkRoom(registry, ROOM)
+
+  expect(ada.closes).toEqual([])
+  expect(grace.closes).toEqual([LINK_DEAD])
+  expect(registry.rooms.get(ROOM)?.seats.size).toBe(1)
 })
 
 test("tightening to members closes the guests and leaves the members", async () => {
