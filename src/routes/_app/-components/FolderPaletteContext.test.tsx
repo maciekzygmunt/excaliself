@@ -69,11 +69,9 @@ function makeDrawing(overrides: Partial<Drawing> = {}): Drawing {
   return {
     id: "d1",
     name: "Retro board",
-    data: "{}",
-    thumbnail: null,
+    searchText: "",
     folderId: null,
     ownerId: "user-1",
-    isPublic: false,
     starred: false,
     deletedAt: null,
     trashRootId: null,

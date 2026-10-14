@@ -11,7 +11,7 @@ import { afterEach, beforeEach, expect, test, vi } from "vitest"
 import { renderPreviewSvg } from "@/components/drawing-gallery/preview"
 import type { Drawing } from "@/features/drawings/queries"
 import { drawingsQueryOptions } from "@/features/drawings/queries"
-import { getDrawings } from "@/features/drawings/server"
+import { getDrawingScene, getDrawings } from "@/features/drawings/server"
 import type { Folder } from "@/features/folders/queries"
 import { foldersQueryOptions } from "@/features/folders/queries"
 import { Home } from "./Home"
@@ -19,6 +19,12 @@ import { Home } from "./Home"
 const { openCreateDrawingDialog, openCreateFolderDialog } = vi.hoisted(() => ({
   openCreateDrawingDialog: vi.fn(),
   openCreateFolderDialog: vi.fn(),
+}))
+
+// Cards and rows poll for live sessions (spec §1.5); these tests are not
+// about the badge, so the poll answers "nobody".
+vi.mock("@/features/collab/server", () => ({
+  getLiveDrawings: vi.fn(async () => []),
 }))
 
 vi.mock("../CreateDialog", () => ({
@@ -57,6 +63,7 @@ vi.mock("@/components/drawing-gallery/preview", () => ({
 // The query modules import the server functions, which import the db — stub
 // the server-function edge (the caches are seeded, so they are never called).
 vi.mock("@/features/drawings/server", () => ({
+  getDrawingScene: vi.fn(async () => "{}"),
   getDrawings: vi.fn(),
   getDrawingWithFiles: vi.fn(),
   // The gallery's Move to trash wiring (useTrashDrawing) binds these
@@ -82,11 +89,9 @@ afterEach(() => {
 function makeDrawing(overrides: Partial<Drawing> & { id: string }): Drawing {
   return {
     name: `Drawing ${overrides.id}`,
-    data: "{}",
-    thumbnail: null,
+    searchText: "",
     folderId: null,
     ownerId: "user-1",
-    isPublic: false,
     starred: false,
     deletedAt: null,
     trashRootId: null,
@@ -227,7 +232,12 @@ test("cards link to their drawing's canvas", () => {
 
 test("the preview renderer is invoked with each drawing's scene", async () => {
   const scene = JSON.stringify({ elements: [{ type: "rectangle" }] })
-  renderHome({ drawings: [makeDrawing({ id: "d1", data: scene })] })
+  vi.mocked(getDrawingScene).mockResolvedValue(scene)
+  renderHome({ drawings: [makeDrawing({ id: "d1" })] })
+
+  await waitFor(() =>
+    expect(getDrawingScene).toHaveBeenCalledWith({ data: "d1" }),
+  )
 
   // The renderer module is dynamically imported, so the call lands a tick
   // after mount
@@ -237,7 +247,7 @@ test("the preview renderer is invoked with each drawing's scene", async () => {
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg")
   vi.mocked(renderPreviewSvg).mockResolvedValue(svg)
   cleanup()
-  renderHome({ drawings: [makeDrawing({ id: "d1", data: scene })] })
+  renderHome({ drawings: [makeDrawing({ id: "d1" })] })
   await screen.findByLabelText(/preview of/i)
 })
 
@@ -273,9 +283,7 @@ test("a preview fades in when its render resolves, without flashing the placehol
 test("a drawing whose scene cannot be rendered gets a placeholder card", async () => {
   vi.mocked(renderPreviewSvg).mockResolvedValue(null)
   renderHome({
-    drawings: [
-      makeDrawing({ id: "d1", name: "Corrupt one", data: "not json" }),
-    ],
+    drawings: [makeDrawing({ id: "d1", name: "Corrupt one" })],
   })
 
   expect(await screen.findByLabelText(/no preview/i)).toBeTruthy()

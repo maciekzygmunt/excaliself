@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm"
 import {
   boolean,
+  customType,
   foreignKey,
   pgTable,
   text,
@@ -12,7 +13,8 @@ export const users = pgTable("users", {
   id: text("id").primaryKey(),
   email: text("email").notNull().unique(),
   emailVerified: boolean("emailVerified").default(false),
-  name: text("name"),
+  // "" when unset. better-auth's cookie cache rejects a null name.
+  name: text("name").notNull(),
   image: text("image"),
   role: text("role", { enum: ["admin", "user"] })
     .notNull()
@@ -155,14 +157,15 @@ export const drawings = pgTable("drawings", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
   data: text("data").notNull().default("{}"),
-  thumbnail: text("thumbnail"),
+  // The scene's text, derived on every write so lists can search without
+  // shipping scenes.
+  searchText: text("searchText").notNull().default(""),
   folderId: text("folderId").references(() => folders.id, {
     onDelete: "cascade",
   }),
   ownerId: text("ownerId")
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
-  isPublic: boolean("isPublic").notNull().default(false),
   starred: boolean("starred").notNull().default(false),
   // Soft delete — see folders.deletedAt/trashRootId for the model.
   deletedAt: timestamp("deletedAt"),
@@ -175,6 +178,32 @@ export const drawings = pgTable("drawings", {
     .$defaultFn(() => new Date()),
 })
 
+// A drawing is shared iff it has a row here; at most one link per drawing.
+export const shares = pgTable(
+  "shares",
+  {
+    id: text("id").primaryKey(),
+    token: text("token").notNull().unique(),
+    drawingId: text("drawingId")
+      .notNull()
+      .references(() => drawings.id, { onDelete: "cascade" }),
+    audience: text("audience", { enum: ["members", "anyone"] })
+      .notNull()
+      .default("members"),
+    createdAt: timestamp("createdAt")
+      .notNull()
+      .$defaultFn(() => new Date()),
+  },
+  (table) => ({
+    oneLinkPerDrawing: uniqueIndex("shares_one_link_per_drawing").on(
+      table.drawingId,
+    ),
+  }),
+)
+
+// node-postgres reads and writes bytea as a Buffer.
+const bytea = customType<{ data: Buffer }>({ dataType: () => "bytea" })
+
 export const drawingFiles = pgTable("drawing_files", {
   id: text("id").primaryKey(),
   drawingId: text("drawingId")
@@ -182,7 +211,7 @@ export const drawingFiles = pgTable("drawing_files", {
     .references(() => drawings.id, { onDelete: "cascade" }),
   fileId: text("fileId").notNull(),
   mimeType: text("mimeType").notNull(),
-  dataUrl: text("dataUrl").notNull(),
+  bytes: bytea("bytes").notNull(),
   createdAt: timestamp("createdAt")
     .notNull()
     .$defaultFn(() => new Date()),

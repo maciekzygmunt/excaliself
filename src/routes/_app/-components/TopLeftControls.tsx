@@ -1,25 +1,8 @@
 import { PanelLeftIcon } from "lucide-react"
-import { type ReactNode, useState } from "react"
-import { createPortal } from "react-dom"
-import { useExcalidrawPortalTarget } from "./excalidraw-portal"
+import { useState } from "react"
 
-const PRIMARY_TARGET_SELECTOR =
-  ".excalidraw .App-menu_top__left > div:first-child"
-const FALLBACK_TRIGGER_SELECTOR = ".excalidraw .main-menu-trigger"
-
-function findPortalTarget(): HTMLElement | null {
-  const primary = document.querySelector(PRIMARY_TARGET_SELECTOR)
-  if (primary instanceof HTMLElement) return primary
-
-  const trigger = document.querySelector(FALLBACK_TRIGGER_SELECTOR)
-  const fallback = trigger?.closest("div")
-  return fallback instanceof HTMLElement ? fallback : null
-}
-
-export function TopLeftPortal({ children }: { children: ReactNode }) {
-  const target = useExcalidrawPortalTarget(findPortalTarget)
-  return target ? createPortal(children, target) : null
-}
+// The title hides on narrow canvases (sidebar open, or a small window), where
+// it would push Excalidraw's Library button off screen.
 
 type Props = {
   initialName: string
@@ -48,7 +31,7 @@ export function TopLeftControls({
       </button>
       {readOnly ? (
         <span
-          className="hidden max-w-45 truncate text-[0.95rem] font-semibold text-(--text-primary-color) lg:block"
+          className="hidden max-w-45 truncate text-[0.95rem] font-semibold text-(--text-primary-color) @min-[67rem]/canvas:block"
           title={initialName}
         >
           {initialName || "Untitled Drawing"}
@@ -72,7 +55,7 @@ function RenameField({
   const [value, setValue] = useState(initialName)
 
   return (
-    <div className="relative max-w-45 min-w-0 overflow-hidden hidden lg:block">
+    <div className="relative max-w-45 min-w-0 overflow-hidden hidden @min-[67rem]/canvas:block">
       <div
         className="relative h-(--lg-button-size) border-b border-transparent bg-transparent font-semibold after:block after:w-full after:min-w-16 after:whitespace-pre after:invisible after:content-[attr(data-value)] focus-within:border-(--color-primary)"
         data-value={value || "Untitled Drawing"}

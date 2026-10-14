@@ -32,6 +32,12 @@ export const registerFormSchema = registerFieldsSchema
   })
   .superRefine(confirmPasswordMatches)
 
+/** Sign-in form. No password minimum: existing passwords are as they are. */
+export const signInFormSchema = z.object({
+  email: z.email(),
+  password: z.string(),
+})
+
 /** Set-new-password form for the password-reset page. */
 export const newPasswordFormSchema = z
   .object({

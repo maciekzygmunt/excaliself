@@ -20,6 +20,7 @@ import { Route as AppDrawingsRouteImport } from './routes/_app/drawings'
 import { Route as AppSettingsRouteRouteImport } from './routes/_app/settings/route'
 import { Route as AppTrashRouteImport } from './routes/_app/trash'
 import { Route as ApiHealthRouteImport } from './routes/api/health'
+import { Route as ShareTokenRouteImport } from './routes/share/$token'
 import { Route as AppDrawIndexRouteImport } from './routes/_app/draw/index'
 import { Route as AppDrawIdRouteImport } from './routes/_app/draw/$id'
 import { Route as AppFolderIdRouteImport } from './routes/_app/folder.$id'
@@ -28,6 +29,7 @@ import { Route as AppSettingsInstanceRouteImport } from './routes/_app/settings/
 import { Route as AppSettingsInvitesRouteImport } from './routes/_app/settings/invites'
 import { Route as AppSettingsMembersRouteImport } from './routes/_app/settings/members'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
+import { Route as ApiRoomsTokenFilesFileIdRouteImport } from './routes/api/rooms/$token/files/$fileId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -83,6 +85,11 @@ const ApiHealthRoute = ApiHealthRouteImport.update({
   path: '/api/health',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ShareTokenRoute = ShareTokenRouteImport.update({
+  id: '/share/$token',
+  path: '/share/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AppDrawIndexRoute = AppDrawIndexRouteImport.update({
   id: '/draw/',
   path: '/draw/',
@@ -123,6 +130,12 @@ const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   path: '/api/auth/$',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiRoomsTokenFilesFileIdRoute =
+  ApiRoomsTokenFilesFileIdRouteImport.update({
+    id: '/api/rooms/$token/files/$fileId',
+    path: '/api/rooms/$token/files/$fileId',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -135,6 +148,7 @@ export interface FileRoutesByFullPath {
   '/drawings': typeof AppDrawingsRoute
   '/trash': typeof AppTrashRoute
   '/api/health': typeof ApiHealthRoute
+  '/share/$token': typeof ShareTokenRoute
   '/draw/$id': typeof AppDrawIdRoute
   '/folder/$id': typeof AppFolderIdRoute
   '/settings/instance': typeof AppSettingsInstanceRoute
@@ -143,6 +157,7 @@ export interface FileRoutesByFullPath {
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/draw/': typeof AppDrawIndexRoute
   '/settings/': typeof AppSettingsIndexRoute
+  '/api/rooms/$token/files/$fileId': typeof ApiRoomsTokenFilesFileIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -154,6 +169,7 @@ export interface FileRoutesByTo {
   '/drawings': typeof AppDrawingsRoute
   '/trash': typeof AppTrashRoute
   '/api/health': typeof ApiHealthRoute
+  '/share/$token': typeof ShareTokenRoute
   '/draw/$id': typeof AppDrawIdRoute
   '/folder/$id': typeof AppFolderIdRoute
   '/settings/instance': typeof AppSettingsInstanceRoute
@@ -162,6 +178,7 @@ export interface FileRoutesByTo {
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/draw': typeof AppDrawIndexRoute
   '/settings': typeof AppSettingsIndexRoute
+  '/api/rooms/$token/files/$fileId': typeof ApiRoomsTokenFilesFileIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -176,6 +193,7 @@ export interface FileRoutesById {
   '/_app/drawings': typeof AppDrawingsRoute
   '/_app/trash': typeof AppTrashRoute
   '/api/health': typeof ApiHealthRoute
+  '/share/$token': typeof ShareTokenRoute
   '/_app/draw/$id': typeof AppDrawIdRoute
   '/_app/folder/$id': typeof AppFolderIdRoute
   '/_app/settings/instance': typeof AppSettingsInstanceRoute
@@ -184,6 +202,7 @@ export interface FileRoutesById {
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/_app/draw/': typeof AppDrawIndexRoute
   '/_app/settings/': typeof AppSettingsIndexRoute
+  '/api/rooms/$token/files/$fileId': typeof ApiRoomsTokenFilesFileIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -198,6 +217,7 @@ export interface FileRouteTypes {
     | '/drawings'
     | '/trash'
     | '/api/health'
+    | '/share/$token'
     | '/draw/$id'
     | '/folder/$id'
     | '/settings/instance'
@@ -206,6 +226,7 @@ export interface FileRouteTypes {
     | '/api/auth/$'
     | '/draw/'
     | '/settings/'
+    | '/api/rooms/$token/files/$fileId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -217,6 +238,7 @@ export interface FileRouteTypes {
     | '/drawings'
     | '/trash'
     | '/api/health'
+    | '/share/$token'
     | '/draw/$id'
     | '/folder/$id'
     | '/settings/instance'
@@ -225,6 +247,7 @@ export interface FileRouteTypes {
     | '/api/auth/$'
     | '/draw'
     | '/settings'
+    | '/api/rooms/$token/files/$fileId'
   id:
     | '__root__'
     | '/'
@@ -238,6 +261,7 @@ export interface FileRouteTypes {
     | '/_app/drawings'
     | '/_app/trash'
     | '/api/health'
+    | '/share/$token'
     | '/_app/draw/$id'
     | '/_app/folder/$id'
     | '/_app/settings/instance'
@@ -246,6 +270,7 @@ export interface FileRouteTypes {
     | '/api/auth/$'
     | '/_app/draw/'
     | '/_app/settings/'
+    | '/api/rooms/$token/files/$fileId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -257,7 +282,9 @@ export interface RootRouteChildren {
   ResetPasswordRoute: typeof ResetPasswordRoute
   SetupRoute: typeof SetupRoute
   ApiHealthRoute: typeof ApiHealthRoute
+  ShareTokenRoute: typeof ShareTokenRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
+  ApiRoomsTokenFilesFileIdRoute: typeof ApiRoomsTokenFilesFileIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -339,6 +366,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiHealthRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/share/$token': {
+      id: '/share/$token'
+      path: '/share/$token'
+      fullPath: '/share/$token'
+      preLoaderRoute: typeof ShareTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_app/draw/': {
       id: '/_app/draw/'
       path: '/draw'
@@ -395,6 +429,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAuthSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/rooms/$token/files/$fileId': {
+      id: '/api/rooms/$token/files/$fileId'
+      path: '/api/rooms/$token/files/$fileId'
+      fullPath: '/api/rooms/$token/files/$fileId'
+      preLoaderRoute: typeof ApiRoomsTokenFilesFileIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -446,7 +487,9 @@ const rootRouteChildren: RootRouteChildren = {
   ResetPasswordRoute: ResetPasswordRoute,
   SetupRoute: SetupRoute,
   ApiHealthRoute: ApiHealthRoute,
+  ShareTokenRoute: ShareTokenRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
+  ApiRoomsTokenFilesFileIdRoute: ApiRoomsTokenFilesFileIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

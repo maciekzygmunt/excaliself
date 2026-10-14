@@ -7,9 +7,14 @@ import z from "zod"
 import { db } from "@/db"
 import { sessions, users } from "@/db/schema"
 import { setupFieldsSchema } from "@/features/auth/schema"
+import { endRooms } from "@/features/collab/room-registry"
 import { auth } from "@/lib/auth"
 import { adminMiddleware } from "@/middleware/admin"
-import { countOwnedContent, deleteUserAccount } from "./delete-user"
+import {
+  countOwnedContent,
+  deleteUserAccount,
+  sharedDrawingIds,
+} from "./delete-user"
 import { isLastAdmin } from "./roles"
 
 export const getUserCount = createServerFn({ method: "GET" }).handler(
@@ -31,10 +36,9 @@ export const setupAdmin = createServerFn({ method: "POST" })
       body: {
         email: data.email,
         password: data.password,
-        // better-auth requires a name in the sign-up body; it's nulled just
-        // below — display names are only ever set in Settings, and the
-        // email-prefix fallback covers everyone else (spec §5.12).
-        name: data.email.split("@")[0],
+        // Display names are only ever set in Settings; "" means unset and
+        // the email-prefix fallback covers it (spec §5.12).
+        name: "",
       },
     })
 
@@ -44,7 +48,7 @@ export const setupAdmin = createServerFn({ method: "POST" })
 
     await db
       .update(users)
-      .set({ role: "admin", name: null })
+      .set({ role: "admin" })
       .where(eq(users.id, result.user.id))
 
     // The sign-up session was minted before the promotion, so its cookie
@@ -115,7 +119,10 @@ export const deleteUser = createServerFn({ method: "POST" })
   .middleware([adminMiddleware])
   .validator(z.string())
   .handler(async ({ data: userId, context }) => {
+    const shared = await sharedDrawingIds(db, userId)
     await deleteUserAccount(db, context.session.user.id, userId)
+    // Hang up on live rooms; their flush finds no row and writes nothing.
+    await endRooms(shared)
   })
 
 // Feeds the tier-3 confirm's count-aware copy ("…and permanently delete

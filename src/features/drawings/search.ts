@@ -1,48 +1,49 @@
 import type { Drawing } from "./queries"
 
-type StoredElement = {
-  type: string
-  isDeleted?: boolean
-  text?: string
-  originalText?: string
-}
-
 /**
- * The words in a stored scene: every live text element, which includes labels
- * bound to shapes and arrows. Whitespace is collapsed so wrapped lines read as
- * one line. Empty for an empty, unparseable or malformed scene.
+ * The words in a scene: every live text element, which includes labels bound
+ * to shapes and arrows. Whitespace is collapsed so wrapped lines read as one
+ * line. Stored as `drawings.searchText` on every write; migration 0008
+ * mirrors this in SQL for the backfill.
  */
-export function extractSceneText(data: string): string {
-  // The server stores any string, so a bad scene must not throw mid-render
-  try {
-    const elements =
-      (JSON.parse(data) as { elements?: StoredElement[] } | null)?.elements ??
-      []
-    return (
-      elements
-        .filter((element) => element.type === "text" && !element.isDeleted)
-        // originalText is the unwrapped source; text has container wrapping
-        .map((element) => element.originalText ?? element.text ?? "")
-        .join(" ")
-        .replace(/\s+/g, " ")
-        .trim()
-    )
-  } catch {
-    return ""
-  }
+export function sceneText(
+  elements: readonly Record<string, unknown>[],
+): string {
+  return (
+    elements
+      .filter((element) => element.type === "text" && !element.isDeleted)
+      // originalText is the unwrapped source; text has container wrapping
+      .map((element) => {
+        const text = element.originalText ?? element.text
+        return typeof text === "string" ? text : ""
+      })
+      .join(" ")
+      .replace(/\s+/g, " ")
+      .trim()
+  )
 }
 
-// Keyed by the cached row: React Query keeps unchanged rows referentially
-// stable, so a scene is parsed once per save, not once per keystroke.
-const sceneTextCache = new WeakMap<Pick<Drawing, "data">, string>()
-
-function sceneText(drawing: Pick<Drawing, "data">): string {
-  let text = sceneTextCache.get(drawing)
-  if (text === undefined) {
-    text = extractSceneText(drawing.data)
-    sceneTextCache.set(drawing, text)
+/** A stored scene's elements, or null when its JSON can't be read. */
+export function parseSceneElements(
+  data: string,
+): Record<string, unknown>[] | null {
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(data)
+  } catch {
+    return null
   }
-  return text
+  const elements = (parsed as { elements?: unknown } | null)?.elements
+  if (!Array.isArray(elements)) return []
+  return elements.filter(
+    (element): element is Record<string, unknown> =>
+      typeof element === "object" && element !== null,
+  )
+}
+
+/** {@link sceneText} of a stored scene; empty when it can't be read. */
+export function extractSceneText(data: string): string {
+  return sceneText(parseSceneElements(data) ?? [])
 }
 
 // Short lead keeps the match in view next to a long title in the palette
@@ -55,12 +56,12 @@ const SNIPPET_LENGTH = 80
  * truncate the tail in CSS.
  */
 export function findInScene(
-  drawing: Pick<Drawing, "data">,
+  drawing: Pick<Drawing, "searchText">,
   query: string,
 ): string | null {
   const needle = query.trim().toLowerCase()
   if (needle === "") return null
-  const text = sceneText(drawing)
+  const text = drawing.searchText
   const at = text.toLowerCase().indexOf(needle)
   if (at === -1) return null
   // Lead in from a word start; no space before the lead means start at 0

@@ -5,12 +5,15 @@ import { useDebounceCallback } from "./use-debounce-callback"
 const DEBOUNCE_MS = 300
 const SAVED_INDICATOR_MS = 2000
 
+/** "skipped": the server stored nothing, so the payload stays unsaved. */
+export type SaveOutcome = "saved" | "skipped"
+
 type Options<TData, TPayload> = {
   /** Build the exact payload that gets persisted. Runs once per save attempt. */
   toPayload: (data: TData) => TPayload
   /** Fingerprint of a payload, used to skip redundant saves. */
   getSignature: (payload: TPayload) => string
-  onSave: (payload: TPayload) => Promise<unknown>
+  onSave: (payload: TPayload) => Promise<SaveOutcome>
   /**
    * Saves sharing this scope id run one at a time (react-query mutation
    * scope), so a slow older save can never land after a newer one.
@@ -51,22 +54,26 @@ export function useAutoSave<TData, TPayload>({
   const pendingSigRef = useRef<string | null>(null)
   const latestDataRef = useRef<TData | null>(null)
   const performSaveRef = useRef<(data: TData) => void>(() => {})
+  const inFlightRef = useRef<Promise<unknown> | null>(null)
 
   // All bookkeeping lives in mutation-level callbacks: unlike per-mutate
   // callbacks, they run even after unmount, so the post-settle re-check and
   // error reporting survive the unmount flush.
-  const { mutate, isPending } = useMutation({
+  const { mutateAsync, isPending } = useMutation({
     mutationFn: (vars: SaveVars<TPayload>) =>
       handlersRef.current.onSave(vars.payload),
     scope: scopeId ? { id: scopeId } : undefined,
-    onSuccess: (_data, { sig }) => {
-      lastSavedSigRef.current = sig
-      setSaved(true)
+    onSuccess: (result, { sig }) => {
+      // A skip must not record its signature, or dedup would never retry it.
+      if (result === "saved") {
+        lastSavedSigRef.current = sig
+        setSaved(true)
+      }
       // The user may have kept editing — or undone back to the previously
       // saved state — while this save was in flight. If the latest state no
       // longer matches what was committed, save it now.
       const latest = latestDataRef.current
-      if (latest != null) performSaveRef.current(latest)
+      if (latest != null && !pausedRef.current) performSaveRef.current(latest)
     },
     onError: (err) => handlersRef.current.onError?.(err),
     onSettled: (_data, _err, { sig }) => {
@@ -82,14 +89,32 @@ export function useAutoSave<TData, TPayload>({
         return
       }
       pendingSigRef.current = sig
-      mutate({ payload, sig })
+      // `flush` awaits the rejection; the catch only silences unawaited saves.
+      const settled = mutateAsync({ payload, sig })
+      settled.catch(() => {})
+      inFlightRef.current = settled
     },
-    [mutate],
+    [mutateAsync],
   )
   performSaveRef.current = performSave
 
   const { run: runDebouncedSave, flush: flushDebouncedSave } =
     useDebounceCallback(performSave, DEBOUNCE_MS)
+
+  /** Saves all pending changes. Rejects on failure, so a share handoff stops. */
+  const flush = useCallback(async () => {
+    flushDebouncedSave()
+    const latest = latestDataRef.current
+    if (latest != null && initializedRef.current && !pausedRef.current) {
+      performSave(latest)
+    }
+    // A save can chain another from onSuccess, so wait until none is new.
+    let awaited: Promise<unknown> | null = null
+    while (inFlightRef.current && inFlightRef.current !== awaited) {
+      awaited = inFlightRef.current
+      await awaited
+    }
+  }, [flushDebouncedSave, performSave])
 
   const handleChange = useCallback(
     (data: TData) => {
@@ -133,5 +158,6 @@ export function useAutoSave<TData, TPayload>({
     saving: isPending,
     saved,
     handleChange,
+    flush,
   }
 }

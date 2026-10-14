@@ -33,7 +33,7 @@ vi.mock("sonner", () => ({
 const user: CurrentUser = {
   id: "user-1",
   email: "maciek@example.com",
-  name: null,
+  name: "",
   role: "user",
 }
 
@@ -110,7 +110,7 @@ test("an unchanged value does not hit the server", async () => {
   expect(updateProfile).not.toHaveBeenCalled()
 })
 
-test("clearing the name saves the email-prefix fallback (null in cache)", async () => {
+test("clearing the name saves an empty name for the email-prefix fallback", async () => {
   renderSection({ name: "John" })
   const input = screen.getByLabelText("Display name")
   fireEvent.change(input, { target: { value: "" } })
@@ -121,7 +121,7 @@ test("clearing the name saves the email-prefix fallback (null in cache)", async 
       expect.anything(),
     ),
   )
-  expect(cachedName()).toBeNull()
+  expect(cachedName()).toBe("")
 })
 
 test("rapid successive saves run in serial so the last edit wins", async () => {

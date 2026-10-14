@@ -6,6 +6,7 @@ import { and, asc, eq, inArray, isNull } from "drizzle-orm"
 import { z } from "zod"
 import { db } from "@/db"
 import { drawings, folders } from "@/db/schema"
+import { endRooms } from "@/features/collab/room-registry"
 import { authMiddleware } from "@/middleware/auth"
 import { assertFolderTarget } from "./ownership"
 import { collectFolderSubtreeIds, findNearestLiveAncestorId } from "./subtree"
@@ -104,7 +105,7 @@ export const trashFolder = createServerFn({ method: "POST" })
     const userId = context.session.user.id
     const now = new Date()
 
-    await db.transaction(async (tx) => {
+    const swept = await db.transaction(async (tx) => {
       const liveFolders = await tx
         .select({ id: folders.id, parentId: folders.parentId })
         .from(folders)
@@ -125,7 +126,7 @@ export const trashFolder = createServerFn({ method: "POST" })
           ),
         )
       // Leaves updatedAt alone (see trashDrawing) so restore is in place.
-      await tx
+      return tx
         .update(drawings)
         .set({ deletedAt: now, trashRootId: id })
         .where(
@@ -135,7 +136,11 @@ export const trashFolder = createServerFn({ method: "POST" })
             isNull(drawings.deletedAt),
           ),
         )
+        .returning({ id: drawings.id })
     })
+
+    // Swept drawings end their live rooms too, like a direct trash.
+    await endRooms(swept.map((drawing) => drawing.id))
   })
 
 /**

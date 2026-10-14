@@ -31,7 +31,7 @@ vi.mock("sonner", () => ({ toast: toastMock }))
 const viewer: CurrentUser = {
   id: "user-ada",
   email: "ada@example.com",
-  name: null,
+  name: "",
   role: "user",
 }
 

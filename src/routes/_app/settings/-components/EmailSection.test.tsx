@@ -31,7 +31,7 @@ vi.mock("sonner", () => ({
 const user: CurrentUser = {
   id: "user-1",
   email: "maciek@example.com",
-  name: null,
+  name: "",
   role: "user",
 }
 

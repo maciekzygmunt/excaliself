@@ -131,7 +131,7 @@ function TrashedDrawingCard({
         className="absolute inset-0 rounded-card"
       />
       <div className="aspect-[4/3] overflow-hidden border-b border-hairline">
-        <Preview name={drawing.name} data={drawing.data} />
+        <Preview drawing={drawing} />
       </div>
       <CardFooter
         name={drawing.name}

@@ -7,8 +7,13 @@ import { and, eq, ne } from "drizzle-orm"
 import z from "zod"
 import { db } from "@/db"
 import { sessions, users } from "@/db/schema"
-import { countOwnedContent, hardDeleteUser } from "@/features/admin/delete-user"
+import {
+  countOwnedContent,
+  hardDeleteUser,
+  sharedDrawingIds,
+} from "@/features/admin/delete-user"
 import { isLastAdmin } from "@/features/admin/roles"
+import { endRooms } from "@/features/collab/room-registry"
 import { auth } from "@/lib/auth"
 import { authMiddleware } from "@/middleware/auth"
 import { compareSessions } from "./sessions"
@@ -98,15 +103,15 @@ function isUniqueViolation(error: unknown): boolean {
   )
 }
 
-// Display name is optional (spec §5.12): an empty submission clears it back
-// to null so the email-prefix fallback takes over everywhere.
+// Display name is optional (spec §5.12): an empty submission clears it to ""
+// so the email-prefix fallback takes over everywhere.
 export const updateProfile = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
   .validator(z.object({ name: z.string().trim().max(120) }))
   .handler(async ({ data, context }) => {
     await db
       .update(users)
-      .set({ name: data.name === "" ? null : data.name, updatedAt: new Date() })
+      .set({ name: data.name, updatedAt: new Date() })
       .where(eq(users.id, context.session.user.id))
   })
 
@@ -190,7 +195,11 @@ export const getMyContentCounts = createServerFn({ method: "GET" })
 export const deleteMyAccount = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
   .handler(async ({ context }) => {
-    await hardDeleteUser(db, context.session.user.id)
+    const userId = context.session.user.id
+    const shared = await sharedDrawingIds(db, userId)
+    await hardDeleteUser(db, userId)
+    // Hang up on live rooms; their flush finds no row and writes nothing.
+    await endRooms(shared)
     // The session rows died with the user, but the browser still holds the
     // session cookie, whose cookie cache would keep reporting the account
     // for up to five minutes. Sign out to clear it — best-effort, because a

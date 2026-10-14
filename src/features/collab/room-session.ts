@@ -1,0 +1,596 @@
+// The Room: who is in a shared drawing and its authoritative scene. Deltas
+// merge here first; peers hear the Room's ruling, not the sender's claim.
+
+import { guestNameForConnection, pickParticipantColor } from "./identity"
+import type { Participant, SceneElement, ServerMessage } from "./protocol"
+import {
+  LINK_DEAD_CLOSE_CODE,
+  LINK_DEAD_CLOSE_REASON,
+  parseClientMessage,
+  ROOM_TOPIC,
+  SCENE_UNREADABLE_CLOSE_CODE,
+  SCENE_UNREADABLE_CLOSE_REASON,
+  SERVER_RESTART_CLOSE_CODE,
+  SERVER_RESTART_CLOSE_REASON,
+} from "./protocol"
+import { reconcileElements } from "./reconcile"
+import type { StoredScene } from "./scene-store"
+
+/** The slice of a crossws `Peer` the room logic uses. */
+export interface RoomPeer {
+  /** Random per socket. */
+  readonly id: string
+  send(data: ServerMessage): void
+  /** Never echoes to the sender. */
+  publish(topic: string, data: ServerMessage): void
+  subscribe(topic: string): void
+  close(code: number, reason: string): void
+}
+
+/** From the upgrade. `userId` is null for guests. */
+export type ParticipantIdentity = {
+  userId: string | null
+  displayName: string | null
+}
+
+export type SceneLoader = (roomId: string) => Promise<StoredScene>
+
+export type SceneSaver = (
+  roomId: string,
+  elements: SceneElement[],
+) => Promise<void>
+
+/** Trailing write delay; a crash loses at most this much from the db. */
+export const ROOM_FLUSH_INTERVAL_MS = 15_000
+
+export type Seat = {
+  participant: Participant
+  peer: RoomPeer
+  /** Kept off `participant`, which goes on the wire. */
+  userId: string | null
+  /** Last frame time, for the ghost sweep. */
+  lastSeenAt: number
+}
+
+export type Room = {
+  /** The drawing id. */
+  id: string
+  /** Keyed by connection id. */
+  seats: Map<string, Seat>
+  /** Follower connection id → followed connection id. */
+  follows: Map<string, string>
+  loaded: Promise<void>
+  elements: SceneElement[]
+  /** Cached for the live badge. */
+  ownerId: string | null
+  dirty: boolean
+  flushTimer: ReturnType<typeof setTimeout> | null
+  /** The write in flight; overlapping flushes chain onto it. */
+  flushing: Promise<void>
+}
+
+/** One Room per drawing, in-memory per process. */
+export type RoomRegistry = {
+  rooms: Map<string, Room>
+  loadScene: SceneLoader
+  saveScene: SceneSaver
+  /** Injected for the ghost sweep. */
+  now: () => number
+  /** Set on shutdown: joins are refused from then on. */
+  closing: boolean
+}
+
+export function createRoomRegistry(
+  loadScene: SceneLoader,
+  saveScene: SceneSaver,
+  now: () => number = () => Date.now(),
+): RoomRegistry {
+  return {
+    rooms: new Map(),
+    loadScene,
+    saveScene,
+    now,
+    closing: false,
+  }
+}
+
+/** Lazy. Concurrent joins share one load promise rather than racing. */
+function ensureRoom(registry: RoomRegistry, roomId: string): Room {
+  const existing = registry.rooms.get(roomId)
+  if (existing) return existing
+
+  const room: Room = {
+    id: roomId,
+    seats: new Map(),
+    follows: new Map(),
+    loaded: Promise.resolve(),
+    elements: [],
+    ownerId: null,
+    dirty: false,
+    flushTimer: null,
+    flushing: Promise.resolve(),
+  }
+  registry.rooms.set(roomId, room)
+
+  // Drops the Room and hangs up on everyone seated while it loaded.
+  const abandon = (code: number, reason: string) => {
+    if (registry.rooms.get(roomId) === room) registry.rooms.delete(roomId)
+    const seats = [...room.seats.values()]
+    room.seats.clear()
+    room.follows.clear()
+    for (const { peer } of seats) peer.close(code, reason)
+  }
+
+  room.loaded = registry.loadScene(roomId).then(
+    (stored) => {
+      // Unreadable JSON would open empty and could never be written back, so
+      // every edit in it would be lost. No Room at all instead.
+      if (!stored.readable)
+        return abandon(
+          SCENE_UNREADABLE_CLOSE_CODE,
+          SCENE_UNREADABLE_CLOSE_REASON,
+        )
+      room.elements = stored.elements
+      room.ownerId = stored.ownerId
+    },
+    (error) => {
+      // Clients reconnect into a fresh read.
+      console.error(`[collab] could not load scene for room ${roomId}`, error)
+      abandon(1011, "Scene unavailable")
+    },
+  )
+  return room
+}
+
+function disarmFlush(room: Room) {
+  if (room.flushTimer === null) return
+  clearTimeout(room.flushTimer)
+  room.flushTimer = null
+}
+
+/** Drops an empty, written Room. Also runs after writes: a leave can race one. */
+function reapIfIdle(registry: RoomRegistry, room: Room) {
+  if (room.seats.size > 0 || room.dirty) return
+  if (registry.rooms.get(room.id) !== room) return
+  disarmFlush(room)
+  registry.rooms.delete(room.id)
+}
+
+function armFlush(registry: RoomRegistry, room: Room) {
+  if (room.flushTimer !== null) return
+  room.flushTimer = setTimeout(() => {
+    room.flushTimer = null
+    void flushRoom(registry, room)
+  }, ROOM_FLUSH_INTERVAL_MS)
+}
+
+function markDirty(registry: RoomRegistry, room: Room) {
+  room.dirty = true
+  armFlush(registry, room)
+}
+
+/**
+ * Writes now if dirty; resolves once landed. Chained on `flushing`, so two
+ * read-modify-writes never race and the older one can't land last.
+ */
+function flushRoom(registry: RoomRegistry, room: Room): Promise<void> {
+  disarmFlush(room)
+  if (!room.dirty) return room.flushing
+
+  room.dirty = false
+  room.flushing = room.flushing.then(() =>
+    // Read inside the chain, so merges during an earlier write ride along.
+    registry.saveScene(room.id, room.elements).then(
+      () => {
+        reapIfIdle(registry, room)
+      },
+      (error) => {
+        // Still in memory: retry on the throttle. An empty Room stays until it lands.
+        console.error(`[collab] could not flush room ${room.id}`, error)
+        room.dirty = true
+        armFlush(registry, room)
+      },
+    ),
+  )
+  return room.flushing
+}
+
+/**
+ * Shutdown: refuse joins, then end every Room. Edits after the final write
+ * are refused, so they stay on the client and are re-sent after the restart.
+ */
+export async function closeAllRooms(registry: RoomRegistry): Promise<void> {
+  registry.closing = true
+  await Promise.all(
+    [...registry.rooms.keys()].map((roomId) =>
+      endRoom(registry, roomId, (peer) =>
+        peer.close(SERVER_RESTART_CLOSE_CODE, SERVER_RESTART_CLOSE_REASON),
+      ),
+    ),
+  )
+}
+
+function rosterOf(room: Room): Participant[] {
+  return [...room.seats.values()].map((seat) => seat.participant)
+}
+
+const rosterMessage = (room: Room): ServerMessage => ({
+  type: "PARTICIPANTS",
+  payload: { participants: rosterOf(room) },
+})
+
+function broadcastRoster(peer: RoomPeer, room: Room) {
+  const message = rosterMessage(room)
+  peer.send(message)
+  peer.publish(ROOM_TOPIC, message)
+}
+
+/** Stops a script holding sockets open, not real sessions. The last seat is the owner's. */
+export const MAX_ROOM_PARTICIPANTS = 25
+
+/** About 3.5 missed heartbeats. */
+export const PARTICIPANT_IDLE_TIMEOUT_MS = 90_000
+
+/** How often `sweepSilentParticipants` runs. */
+export const PARTICIPANT_SWEEP_INTERVAL_MS = 30_000
+
+/** Drops seats silent past the timeout; returns their peers to close. */
+function forgetSilentParticipants(room: Room, now: number): RoomPeer[] {
+  const silent: RoomPeer[] = []
+  for (const [connectionId, seat] of room.seats) {
+    if (now - seat.lastSeenAt < PARTICIPANT_IDLE_TIMEOUT_MS) continue
+    forgetConnection(room, connectionId)
+    silent.push(seat.peer)
+  }
+  return silent
+}
+
+/** Matches the ws route's eviction close, so a live client rejoins. */
+const closeToRejoin = (peer: RoomPeer) => peer.close(1000, "Rejoin")
+
+/**
+ * Ghost seats (a socket that died without a close) would hold a seat, the
+ * roster and the live badge. Runs on a timer, so nobody has to join first.
+ */
+export async function sweepSilentParticipants(
+  registry: RoomRegistry,
+): Promise<void> {
+  const now = registry.now()
+  await Promise.all(
+    [...registry.rooms.values()].map(async (room) => {
+      const silent = forgetSilentParticipants(room, now)
+      if (silent.length === 0) return
+      await settleAfterForget(registry, room)
+      for (const peer of silent) closeToRejoin(peer)
+    }),
+  )
+}
+
+/**
+ * After seats were dropped without their own close: last-leave if empty,
+ * else the new roster. Sent, not published: the dropped peers can't fan out.
+ */
+async function settleAfterForget(registry: RoomRegistry, room: Room) {
+  if (room.seats.size === 0) {
+    await flushRoom(registry, room)
+    reapIfIdle(registry, room)
+    return
+  }
+  const message = rosterMessage(room)
+  for (const { peer } of room.seats.values()) peer.send(message)
+}
+
+function forgetConnection(room: Room, connectionId: string) {
+  room.seats.delete(connectionId)
+
+  const wasFollowing = room.follows.get(connectionId) ?? null
+  room.follows.delete(connectionId)
+  for (const follower of followersOf(room, connectionId))
+    room.follows.delete(follower)
+  if (wasFollowing) sendFollowedBy(room, wasFollowing)
+}
+
+export type RoomJoinResult =
+  | { status: "ok" }
+  | { status: "full" }
+  | { status: "closing" }
+
+export async function joinRoom(
+  registry: RoomRegistry,
+  roomId: string,
+  peer: RoomPeer,
+  identity: ParticipantIdentity,
+): Promise<RoomJoinResult> {
+  // A Room made now would never get its final write.
+  if (registry.closing) return { status: "closing" }
+
+  // Before `ensureRoom`, so a refused join creates no Room and no read.
+  const existing = registry.rooms.get(roomId)
+  if (existing) {
+    // Also swept on join, so a full Room never waits on the timer. The
+    // joiner's own roster publish tells the others.
+    const silent = forgetSilentParticipants(existing, registry.now())
+    for (const peer of silent) closeToRejoin(peer)
+    // Everyone else stops one short, so guests can't lock the owner out.
+    const isOwner =
+      identity.userId !== null && identity.userId === existing.ownerId
+    const cap = isOwner ? MAX_ROOM_PARTICIPANTS : MAX_ROOM_PARTICIPANTS - 1
+    if (existing.seats.size >= cap) {
+      // No joiner publish follows, so tell the others here.
+      if (silent.length > 0) await settleAfterForget(registry, existing)
+      return { status: "full" }
+    }
+  }
+
+  const room = ensureRoom(registry, roomId)
+
+  const isGuest = identity.userId === null
+  const participant: Participant = {
+    connectionId: peer.id,
+    // A guest wears a pseudonym until its JOIN arrives.
+    name: identity.displayName?.trim() || guestNameForConnection(peer.id),
+    color: pickParticipantColor(rosterOf(room).map((p) => p.color)),
+    isGuest,
+  }
+  room.seats.set(peer.id, {
+    participant,
+    peer,
+    userId: identity.userId,
+    lastSeenAt: registry.now(),
+  })
+
+  peer.subscribe(ROOM_TOPIC)
+  // Presence before the scene read, so avatars never wait on the db.
+  peer.send({
+    type: "ROOM_JOINED",
+    payload: { connectionId: peer.id, participants: rosterOf(room) },
+  })
+  peer.publish(ROOM_TOPIC, rosterMessage(room))
+
+  await room.loaded
+  if (room.seats.has(peer.id)) {
+    peer.send({ type: "SCENE_INIT", payload: { elements: room.elements } })
+  }
+  return { status: "ok" }
+}
+
+const followersOf = (room: Room, followedId: string) =>
+  [...room.follows.entries()]
+    .filter(([, followed]) => followed === followedId)
+    .map(([follower]) => follower)
+
+/** Everyone up this peer's follow chain, so a ring A→B→C→A never loops bounds. */
+function upstreamOf(room: Room, peerId: string): Set<string> {
+  const upstream = new Set<string>()
+  let cursor = room.follows.get(peerId)
+  while (cursor && !upstream.has(cursor)) {
+    upstream.add(cursor)
+    cursor = room.follows.get(cursor)
+  }
+  return upstream
+}
+
+/** A peer relays its viewport only while this list is non-empty. */
+function sendFollowedBy(room: Room, followedId: string) {
+  room.seats.get(followedId)?.peer.send({
+    type: "FOLLOWED_BY",
+    payload: { connectionIds: followersOf(room, followedId) },
+  })
+}
+
+function setFollowTarget(
+  room: Room,
+  followerId: string,
+  target: string | null,
+) {
+  // Self or absent targets mean "nobody", so clients can't plant bad entries.
+  const followed =
+    target && target !== followerId && room.seats.has(target) ? target : null
+  const previous = room.follows.get(followerId) ?? null
+  if (previous === followed) return
+
+  if (followed) room.follows.set(followerId, followed)
+  else room.follows.delete(followerId)
+
+  if (previous) sendFollowedBy(room, previous)
+  if (followed) sendFollowedBy(room, followed)
+}
+
+/**
+ * Merges a delta; others get the winners, the sender only its corrections.
+ * Returns whether the scene changed, by identity: a version sum misses
+ * nonce tie-breaks.
+ */
+function applySceneUpdate(
+  room: Room,
+  peer: RoomPeer,
+  incoming: SceneElement[],
+): boolean {
+  const previous = room.elements
+  const previousById = new Map(previous.map((el) => [el.id, el]))
+  room.elements = reconcileElements(previous, incoming, {})
+  const changed =
+    room.elements.length !== previous.length ||
+    room.elements.some((el) => previousById.get(el.id) !== el)
+
+  // Winners are kept by reference, so `winner !== element` means it lost.
+  const authoritative = new Map(room.elements.map((el) => [el.id, el]))
+  const winners: SceneElement[] = []
+  const corrections: SceneElement[] = []
+  const seen = new Set<string>()
+  for (const element of incoming) {
+    if (seen.has(element.id)) continue
+    seen.add(element.id)
+    const winner = authoritative.get(element.id) ?? element
+    winners.push(winner)
+    if (winner !== element) corrections.push(winner)
+  }
+
+  if (winners.length)
+    peer.publish(ROOM_TOPIC, {
+      type: "SCENE_UPDATE",
+      payload: { elements: winners },
+    })
+  if (corrections.length)
+    peer.send({ type: "SCENE_UPDATE", payload: { elements: corrections } })
+
+  return changed
+}
+
+/** `evicted`: the seat is gone, so the transport must close to make it rejoin. */
+export type FrameOutcome = "ok" | "evicted"
+
+export async function receiveFromPeer(
+  registry: RoomRegistry,
+  roomId: string,
+  peer: RoomPeer,
+  raw: string,
+): Promise<FrameOutcome> {
+  const message = parseClientMessage(raw)
+  if (!message) return "ok"
+
+  const room = registry.rooms.get(roomId)
+  // Not an eviction: the close hook tidies this up.
+  if (!room) return "ok"
+
+  const seat = room.seats.get(peer.id)
+  if (!seat) return "evicted"
+
+  // Any frame is proof of life.
+  seat.lastSeenAt = registry.now()
+
+  switch (message.type) {
+    case "PING":
+      // Only seated peers get a PONG, so an evicted client never looks healthy.
+      peer.send({ type: "PONG", payload: {} })
+      return "ok"
+
+    case "JOIN": {
+      // Only guests name themselves.
+      const { participant } = seat
+      if (!participant.isGuest || participant.name === message.payload.name)
+        return "ok"
+      seat.participant = { ...participant, name: message.payload.name }
+      broadcastRoster(peer, room)
+      return "ok"
+    }
+
+    case "USER_FOLLOW":
+      setFollowTarget(room, peer.id, message.payload.followedConnectionId)
+      return "ok"
+
+    case "USER_VISIBLE_SCENE_BOUNDS": {
+      const upstream = upstreamOf(room, peer.id)
+      for (const followerId of followersOf(room, peer.id)) {
+        if (upstream.has(followerId)) continue
+        room.seats.get(followerId)?.peer.send({
+          type: "USER_VISIBLE_SCENE_BOUNDS",
+          payload: { connectionId: peer.id, bounds: message.payload.bounds },
+        })
+      }
+      return "ok"
+    }
+
+    case "SCENE_UPDATE":
+      // Wait for the stored scene, or the merge would drop it.
+      await room.loaded
+      if (!room.seats.has(peer.id)) return "evicted"
+      if (applySceneUpdate(room, peer, message.payload.elements))
+        markDirty(registry, room)
+      return "ok"
+
+    case "MOUSE_LOCATION":
+      peer.publish(ROOM_TOPIC, {
+        type: "MOUSE_LOCATION",
+        payload: { ...message.payload, connectionId: peer.id },
+      })
+      return "ok"
+
+    default:
+      return message satisfies never
+  }
+}
+
+export async function leaveRoom(
+  registry: RoomRegistry,
+  roomId: string,
+  peer: RoomPeer,
+) {
+  const room = registry.rooms.get(roomId)
+  if (!room?.seats.has(peer.id)) return
+  forgetConnection(room, peer.id)
+
+  // Last one out writes first. `reapIfIdle` keeps the Room on a rejoin or retry.
+  if (room.seats.size === 0) {
+    await flushRoom(registry, room)
+    reapIfIdle(registry, room)
+    return
+  }
+  peer.publish(ROOM_TOPIC, rosterMessage(room))
+}
+
+// --- link lifecycle ---
+
+const closeAsDead = (peer: RoomPeer) =>
+  peer.close(LINK_DEAD_CLOSE_CODE, LINK_DEAD_CLOSE_REASON)
+
+/**
+ * Stop, regenerate and trash all end here: freeze, write, then hang up. The
+ * awaited write lets the owner resume autosave once the mutation resolves.
+ */
+export function terminateRoom(
+  registry: RoomRegistry,
+  roomId: string,
+): Promise<void> {
+  return endRoom(registry, roomId, closeAsDead)
+}
+
+/** Freeze, write, then hang up each peer with `hangUp`. */
+async function endRoom(
+  registry: RoomRegistry,
+  roomId: string,
+  hangUp: (peer: RoomPeer) => void,
+): Promise<void> {
+  const room = registry.rooms.get(roomId)
+  if (!room) return
+
+  // Queue behind edits still waiting on the load, so the flush carries them.
+  await room.loaded
+
+  // Clear seats before the flush: that freezes the scene the write sees.
+  // Peers are captured first, so their close hooks find nothing to flush.
+  const seats = [...room.seats.values()]
+  room.seats.clear()
+  room.follows.clear()
+
+  await flushRoom(registry, room)
+  reapIfIdle(registry, room)
+
+  for (const { peer } of seats) hangUp(peer)
+}
+
+/**
+ * Closes guest sockets when a link tightens to members. Reads `seat.userId`
+ * from the upgrade, never the wire-facing `isGuest`.
+ */
+export async function evictNonMembers(
+  registry: RoomRegistry,
+  roomId: string,
+): Promise<void> {
+  const room = registry.rooms.get(roomId)
+  if (!room) return
+
+  // As in `terminateRoom`: let queued strokes merge first.
+  await room.loaded
+
+  const evicted: RoomPeer[] = []
+  for (const [connectionId, seat] of [...room.seats]) {
+    if (seat.userId !== null) continue
+    forgetConnection(room, connectionId)
+    evicted.push(seat.peer)
+  }
+  if (evicted.length === 0) return
+
+  await settleAfterForget(registry, room)
+  for (const peer of evicted) closeAsDead(peer)
+}

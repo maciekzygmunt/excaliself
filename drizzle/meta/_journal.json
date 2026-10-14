@@ -50,6 +50,34 @@
       "when": 1784632142139,
       "tag": "0006_nostalgic_black_widow",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1784971477246,
+      "tag": "0007_shares",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1791903727463,
+      "tag": "0008_storage_columns",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1791903732797,
+      "tag": "0009_drop_base64_and_thumbnail",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1791919860204,
+      "tag": "0010_user_name_not_null",
+      "breakpoints": true
     }
   ]
 }

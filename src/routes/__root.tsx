@@ -16,6 +16,9 @@ import { resolveOrigin } from "@/lib/site-origin"
 import { THEME_COLORS, themeBootstrapScript } from "@/lib/theme"
 import appCss from "../styles.css?url"
 
+// Set by the excalidrawFonts plugin in vite.config.ts.
+declare const __EXCALIDRAW_ASSET_PATH__: string
+
 interface MyRouterContext {
   queryClient: QueryClient
 }
@@ -171,6 +174,13 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         <script
           // biome-ignore lint/security/noDangerouslySetInnerHtml: static theme bootstrap, no user input
           dangerouslySetInnerHTML={{ __html: themeBootstrapScript }}
+        />
+        {/* Excalidraw loads its fonts from here, not from esm.sh. */}
+        <script
+          // biome-ignore lint/security/noDangerouslySetInnerHtml: static build-time path, no user input
+          dangerouslySetInnerHTML={{
+            __html: `window.EXCALIDRAW_ASSET_PATH=${JSON.stringify(__EXCALIDRAW_ASSET_PATH__)}`,
+          }}
         />
       </head>
       <body className="min-h-screen bg-background font-sans antialiased">

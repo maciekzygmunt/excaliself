@@ -1,11 +1,13 @@
 import { Link, useParams } from "@tanstack/react-router"
 import { Star, StarOff } from "lucide-react"
+import { LiveCountChip } from "@/components/live-badge"
 import {
   SidebarMenu,
   SidebarMenuAction,
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
+import { useLiveDrawing } from "@/features/collab/queries"
 import { useToggleStarDrawing } from "@/features/drawings/mutations"
 import { cn } from "@/lib/utils"
 import type { Drawing } from "./tree"
@@ -36,6 +38,7 @@ function StarredItem({ drawing }: { drawing: Drawing }) {
   const { id: currentDrawingId } = useParams({ strict: false })
   const isActive = drawing.id === currentDrawingId
   const starMutation = useToggleStarDrawing()
+  const live = useLiveDrawing(drawing.id)
 
   return (
     <SidebarMenuItem className="group/starred-row">
@@ -55,6 +58,11 @@ function StarredItem({ drawing }: { drawing: Drawing }) {
           )}
         />
         <span className="truncate transition-colors">{drawing.name}</span>
+        {/* mr-4 clears the unstar action (always visible on touch). */}
+        <LiveCountChip
+          live={live}
+          className="mr-4 ml-auto animate-in fade-in-0 duration-200"
+        />
       </SidebarMenuButton>
 
       <SidebarMenuAction

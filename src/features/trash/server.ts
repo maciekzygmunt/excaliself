@@ -5,6 +5,7 @@ import { and, eq, isNotNull } from "drizzle-orm"
 import { z } from "zod"
 import { db } from "@/db"
 import { drawings, folders } from "@/db/schema"
+import { drawingListColumns } from "@/features/drawings/list-columns"
 import { authMiddleware } from "@/middleware/auth"
 import { destroyTrashUnit } from "./destroy"
 
@@ -23,7 +24,7 @@ export const getTrashItems = createServerFn({ method: "GET" })
     const [drawingUnits, folderUnits, trashedFolders, trashedDrawings] =
       await Promise.all([
         db
-          .select()
+          .select(drawingListColumns)
           .from(drawings)
           .where(
             and(

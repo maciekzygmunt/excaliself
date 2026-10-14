@@ -52,11 +52,9 @@ afterEach(cleanup)
 function makeDrawing(overrides: Partial<Drawing> & { id: string }): Drawing {
   return {
     name: `Drawing ${overrides.id}`,
-    data: "{}",
-    thumbnail: null,
+    searchText: "",
     folderId: null,
     ownerId: "user-1",
-    isPublic: false,
     starred: false,
     deletedAt: null,
     trashRootId: null,
@@ -375,9 +373,7 @@ test("scene-text matches follow title matches and show the matching words", () =
       makeDrawing({
         id: "d1",
         name: "Architecture",
-        data: JSON.stringify({
-          elements: [{ type: "text", text: "Roadmap review" }],
-        }),
+        searchText: "Roadmap review",
       }),
       makeDrawing({ id: "d2", name: "Roadmap" }),
     ],
