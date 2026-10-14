@@ -6,15 +6,17 @@ import type * as schema from "@/db/schema"
 import { drawingFiles, drawings } from "@/db/schema"
 import { referencedFileIds } from "@/features/drawings/scene-write"
 import { sceneText } from "@/features/drawings/search"
+import type { AccessRow } from "@/features/spaces/access"
 import type { SceneElement } from "./protocol"
 import { DELETED_ELEMENT_TIMEOUT_MS } from "./scene-sync"
 
 type Db = NodePgDatabase<typeof schema>
 
-/** The stored scene plus the owner the live badge needs. */
+/** The stored scene plus what the live badge's access check needs. */
 export type StoredScene = {
   elements: SceneElement[]
-  ownerId: string | null
+  /** Null when the drawing is gone. */
+  access: AccessRow | null
   /** False when the stored JSON could not be read. */
   readable: boolean
 }
@@ -72,12 +74,18 @@ export async function loadRoomScene(
   drawingId: string,
 ): Promise<StoredScene> {
   const [drawing] = await db
-    .select({ data: drawings.data, ownerId: drawings.ownerId })
+    .select({
+      data: drawings.data,
+      space: drawings.space,
+      createdBy: drawings.createdBy,
+    })
     .from(drawings)
     .where(eq(drawings.id, drawingId))
   return {
     ...parseStoredScene(drawing?.data),
-    ownerId: drawing?.ownerId ?? null,
+    access: drawing
+      ? { space: drawing.space, createdBy: drawing.createdBy }
+      : null,
   }
 }
 

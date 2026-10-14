@@ -2,6 +2,8 @@ import type { SQL } from "drizzle-orm"
 import { PgDialect } from "drizzle-orm/pg-core"
 import { expect, test, vi } from "vitest"
 import { drawingFiles, drawings, shares } from "@/db/schema"
+import { accessibleTo } from "@/features/spaces/access"
+import { expectCondition } from "@/features/spaces/expect-condition"
 import {
   createShareLink,
   getShareLink,
@@ -116,7 +118,7 @@ test("mintShareToken is 256-bit hex and never repeats", () => {
   expect(a).not.toBe(b)
 })
 
-test("createShareLink verifies ownership of a live drawing before inserting", async () => {
+test("createShareLink checks access to a live drawing before inserting", async () => {
   const { db, calls } = fakeDb({ ownedDrawingIds: ["d1"] })
 
   const share = await createShareLink(db, "user-1", "d1", "anyone")
@@ -124,9 +126,8 @@ test("createShareLink verifies ownership of a live drawing before inserting", as
   expect(calls.map((call) => call.kind)).toEqual(["select", "insert"])
   const ownership = calls[0] as Extract<Call, { kind: "select" }>
   expect(ownership.table).toBe(drawings)
-  const sql = toSql(ownership.where)
-  expect(sql).toContain(`"drawings"."ownerId" =`)
-  expect(sql).toContain(`"drawings"."deletedAt" is null`)
+  expectCondition(ownership.where, accessibleTo(drawings, "user-1"))
+  expect(toSql(ownership.where)).toContain(`"drawings"."deletedAt" is null`)
 
   const insert = calls[1] as Extract<Call, { kind: "insert" }>
   expect(insert.table).toBe(shares)
@@ -135,7 +136,7 @@ test("createShareLink verifies ownership of a live drawing before inserting", as
   expect(share.audience).toBe("anyone")
 })
 
-test("createShareLink throws not-found for a drawing the caller doesn't own, without touching shares", async () => {
+test("createShareLink throws not-found for a drawing the caller can't access, without touching shares", async () => {
   const { db, calls } = fakeDb({ ownedDrawingIds: [] })
 
   await expect(createShareLink(db, "user-2", "d1", "members")).rejects.toThrow(
@@ -159,14 +160,14 @@ test("createShareLink on an already-shared drawing returns the live link unchang
   expect(calls.map((call) => call.kind)).toEqual(["select", "insert", "select"])
 })
 
-test("getShareLink scopes the read to the drawing's owner", async () => {
+test("getShareLink scopes the read by the access rule", async () => {
   const { db, calls } = fakeDb({ shareRows: [SHARE_ROW] })
 
   const share = await getShareLink(db, "user-1", "d1")
 
   expect(share).toEqual(SHARE_ROW)
   const read = calls[0] as Extract<Call, { kind: "select" }>
-  expect(toSql(read.where)).toContain(`"drawings"."ownerId" =`)
+  expectCondition(read.where, accessibleTo(drawings, "user-1"))
 })
 
 test("getShareLink returns null for an unshared drawing", async () => {

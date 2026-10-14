@@ -78,6 +78,13 @@
       "when": 1791919860204,
       "tag": "0010_user_name_not_null",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1791998779569,
+      "tag": "0011_team_space",
+      "breakpoints": true
     }
   ]
 }

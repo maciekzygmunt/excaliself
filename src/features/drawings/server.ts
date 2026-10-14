@@ -5,13 +5,14 @@ import { createServerFn } from "@tanstack/react-start"
 import { and, desc, eq, isNotNull, isNull } from "drizzle-orm"
 import { z } from "zod"
 import { db } from "@/db"
-import { drawingFiles, drawings, folders } from "@/db/schema"
+import { drawingFiles, drawings, folders, stars } from "@/db/schema"
 import { endRooms } from "@/features/collab/room-registry"
 import { assertFolderTarget } from "@/features/folders/ownership"
 import { findNearestLiveAncestorId } from "@/features/folders/subtree"
+import { accessibleTo } from "@/features/spaces/access"
 import { authMiddleware } from "@/middleware/auth"
 import { bytesToDataUrl } from "./file-bytes"
-import { drawingListColumns } from "./list-columns"
+import { drawingListColumns, starOf } from "./list-columns"
 import { writeDrawingScene } from "./scene-write"
 
 export const getDrawings = createServerFn({ method: "GET" })
@@ -21,7 +22,8 @@ export const getDrawings = createServerFn({ method: "GET" })
     return db
       .select(drawingListColumns)
       .from(drawings)
-      .where(and(eq(drawings.ownerId, userId), isNull(drawings.deletedAt)))
+      .leftJoin(stars, starOf(userId))
+      .where(and(accessibleTo(drawings, userId), isNull(drawings.deletedAt)))
       .orderBy(desc(drawings.updatedAt))
   })
 
@@ -34,7 +36,10 @@ export const getDrawingScene = createServerFn({ method: "GET" })
       .select({ data: drawings.data })
       .from(drawings)
       .where(
-        and(eq(drawings.id, id), eq(drawings.ownerId, context.session.user.id)),
+        and(
+          eq(drawings.id, id),
+          accessibleTo(drawings, context.session.user.id),
+        ),
       )
     return drawing?.data ?? null
   })
@@ -50,7 +55,7 @@ export const getDrawingWithFiles = createServerFn({ method: "GET" })
     const [drawing] = await db
       .select()
       .from(drawings)
-      .where(and(eq(drawings.id, id), eq(drawings.ownerId, userId)))
+      .where(and(eq(drawings.id, id), accessibleTo(drawings, userId)))
     if (!drawing) return null
 
     const files = await db
@@ -91,7 +96,7 @@ export const createDrawing = createServerFn({ method: "POST" })
       name: data.name ?? "Untitled",
       data: JSON.stringify({ elements: [], appState: {} }),
       folderId: data.folderId ?? null,
-      ownerId: userId,
+      createdBy: userId,
       createdAt: now,
       updatedAt: now,
     })
@@ -115,8 +120,8 @@ export const updateDrawing = createServerFn({ method: "POST" })
     if (updateData.folderId) {
       await assertFolderTarget(db, userId, updateData.folderId)
     }
-    // Ownership is enforced in the statement itself; zero rows means "not
-    // found" so non-owners can't tell the resource exists. Trashed drawings
+    // Access is enforced in the statement itself; zero rows means "not
+    // found" so others can't tell a private drawing exists. Trashed drawings
     // are treated the same — no edits while in the trash.
     const updated = await db
       .update(drawings)
@@ -124,7 +129,7 @@ export const updateDrawing = createServerFn({ method: "POST" })
       .where(
         and(
           eq(drawings.id, id),
-          eq(drawings.ownerId, userId),
+          accessibleTo(drawings, userId),
           isNull(drawings.deletedAt),
         ),
       )
@@ -142,20 +147,30 @@ export const setDrawingStarred = createServerFn({ method: "POST" })
   )
   .handler(async ({ data: { id, starred }, context }) => {
     const userId = context.session.user.id
-    // Deliberately leaves updatedAt alone: starring is not an edit and must
-    // not reshuffle recency-ordered lists.
-    const updated = await db
-      .update(drawings)
-      .set({ starred })
+    // A star is the caller's own row, so the drawing's updatedAt stays put:
+    // starring is not an edit and must not reshuffle recency-ordered lists.
+    const [drawing] = await db
+      .select({ id: drawings.id })
+      .from(drawings)
       .where(
         and(
           eq(drawings.id, id),
-          eq(drawings.ownerId, userId),
+          accessibleTo(drawings, userId),
           isNull(drawings.deletedAt),
         ),
       )
-      .returning({ id: drawings.id })
-    if (updated.length === 0) throw new Error("Drawing not found")
+    if (!drawing) throw new Error("Drawing not found")
+
+    if (starred) {
+      await db
+        .insert(stars)
+        .values({ userId, drawingId: id })
+        .onConflictDoNothing()
+    } else {
+      await db
+        .delete(stars)
+        .where(and(eq(stars.userId, userId), eq(stars.drawingId, id)))
+    }
   })
 
 export const saveDrawingScene = createServerFn({ method: "POST" })
@@ -189,7 +204,7 @@ export const trashDrawing = createServerFn({ method: "POST" })
       .where(
         and(
           eq(drawings.id, id),
-          eq(drawings.ownerId, userId),
+          accessibleTo(drawings, userId),
           isNull(drawings.deletedAt),
         ),
       )
@@ -221,7 +236,7 @@ export const restoreDrawing = createServerFn({ method: "POST" })
         .where(
           and(
             eq(drawings.id, id),
-            eq(drawings.ownerId, userId),
+            accessibleTo(drawings, userId),
             isNotNull(drawings.deletedAt),
           ),
         )
@@ -231,17 +246,17 @@ export const restoreDrawing = createServerFn({ method: "POST" })
       const originalFolderId = restored[0].folderId
       if (!originalFolderId) return { originalFolderGone: false }
 
-      const ownerFolders = await tx
+      const visibleFolders = await tx
         .select({
           id: folders.id,
           parentId: folders.parentId,
           deletedAt: folders.deletedAt,
         })
         .from(folders)
-        .where(eq(folders.ownerId, userId))
+        .where(accessibleTo(folders, userId))
 
       const landingId = findNearestLiveAncestorId(
-        ownerFolders,
+        visibleFolders,
         originalFolderId,
       )
       if (landingId !== originalFolderId) {
@@ -252,7 +267,7 @@ export const restoreDrawing = createServerFn({ method: "POST" })
       }
 
       return {
-        originalFolderGone: !ownerFolders.some(
+        originalFolderGone: !visibleFolders.some(
           (folder) => folder.id === originalFolderId,
         ),
       }

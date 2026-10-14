@@ -7,6 +7,7 @@ import { z } from "zod"
 import { db } from "@/db"
 import { drawings, folders } from "@/db/schema"
 import { endRooms } from "@/features/collab/room-registry"
+import { accessibleTo } from "@/features/spaces/access"
 import { authMiddleware } from "@/middleware/auth"
 import { assertFolderTarget } from "./ownership"
 import { collectFolderSubtreeIds, findNearestLiveAncestorId } from "./subtree"
@@ -18,7 +19,7 @@ export const getFolders = createServerFn({ method: "GET" })
     return db
       .select()
       .from(folders)
-      .where(and(eq(folders.ownerId, userId), isNull(folders.deletedAt)))
+      .where(and(accessibleTo(folders, userId), isNull(folders.deletedAt)))
       .orderBy(asc(folders.name))
   })
 
@@ -37,23 +38,18 @@ export const createFolder = createServerFn({ method: "POST" })
     const parentId = data.parentId ?? null
     if (parentId) await assertFolderTarget(db, userId, parentId)
 
-    await db.insert(folders).values({
-      id,
-      name: data.name,
-      ownerId: userId,
-      parentId,
-      createdAt: now,
-      updatedAt: now,
-    })
-
-    return {
-      id,
-      name: data.name,
-      ownerId: userId,
-      parentId,
-      createdAt: now,
-      updatedAt: now,
-    }
+    const [folder] = await db
+      .insert(folders)
+      .values({
+        id,
+        name: data.name,
+        createdBy: userId,
+        parentId,
+        createdAt: now,
+        updatedAt: now,
+      })
+      .returning()
+    return folder
   })
 
 export const updateFolder = createServerFn({ method: "POST" })
@@ -74,8 +70,8 @@ export const updateFolder = createServerFn({ method: "POST" })
     if (data.parentId)
       await assertFolderTarget(db, userId, data.parentId, data.id)
 
-    // Ownership is enforced in the statement itself; zero rows means "not
-    // found" so non-owners can't tell the resource exists. Trashed folders
+    // Access is enforced in the statement itself; zero rows means "not
+    // found" so others can't tell a private folder exists. Trashed folders
     // are treated the same — no edits while in the trash.
     const updated = await db
       .update(folders)
@@ -83,7 +79,7 @@ export const updateFolder = createServerFn({ method: "POST" })
       .where(
         and(
           eq(folders.id, data.id),
-          eq(folders.ownerId, userId),
+          accessibleTo(folders, userId),
           isNull(folders.deletedAt),
         ),
       )
@@ -109,7 +105,7 @@ export const trashFolder = createServerFn({ method: "POST" })
       const liveFolders = await tx
         .select({ id: folders.id, parentId: folders.parentId })
         .from(folders)
-        .where(and(eq(folders.ownerId, userId), isNull(folders.deletedAt)))
+        .where(and(accessibleTo(folders, userId), isNull(folders.deletedAt)))
       if (!liveFolders.some((folder) => folder.id === id))
         throw new Error("Folder not found")
 
@@ -121,7 +117,7 @@ export const trashFolder = createServerFn({ method: "POST" })
         .where(
           and(
             inArray(folders.id, subtreeIds),
-            eq(folders.ownerId, userId),
+            accessibleTo(folders, userId),
             isNull(folders.deletedAt),
           ),
         )
@@ -132,7 +128,7 @@ export const trashFolder = createServerFn({ method: "POST" })
         .where(
           and(
             inArray(drawings.folderId, subtreeIds),
-            eq(drawings.ownerId, userId),
+            accessibleTo(drawings, userId),
             isNull(drawings.deletedAt),
           ),
         )
@@ -160,30 +156,32 @@ export const restoreFolder = createServerFn({ method: "POST" })
       const restored = await tx
         .update(folders)
         .set({ deletedAt: null, trashRootId: null })
-        .where(and(eq(folders.trashRootId, id), eq(folders.ownerId, userId)))
+        .where(and(eq(folders.trashRootId, id), accessibleTo(folders, userId)))
         .returning({ id: folders.id, parentId: folders.parentId })
       if (restored.length === 0) throw new Error("Folder not found")
 
       await tx
         .update(drawings)
         .set({ deletedAt: null, trashRootId: null })
-        .where(and(eq(drawings.trashRootId, id), eq(drawings.ownerId, userId)))
+        .where(
+          and(eq(drawings.trashRootId, id), accessibleTo(drawings, userId)),
+        )
 
       const originalParentId =
         restored.find((folder) => folder.id === id)?.parentId ?? null
       if (!originalParentId) return { originalParentGone: false }
 
-      const ownerFolders = await tx
+      const visibleFolders = await tx
         .select({
           id: folders.id,
           parentId: folders.parentId,
           deletedAt: folders.deletedAt,
         })
         .from(folders)
-        .where(eq(folders.ownerId, userId))
+        .where(accessibleTo(folders, userId))
 
       const landingId = findNearestLiveAncestorId(
-        ownerFolders,
+        visibleFolders,
         originalParentId,
       )
       if (landingId !== originalParentId) {
@@ -194,7 +192,7 @@ export const restoreFolder = createServerFn({ method: "POST" })
       }
 
       return {
-        originalParentGone: !ownerFolders.some(
+        originalParentGone: !visibleFolders.some(
           (folder) => folder.id === originalParentId,
         ),
       }

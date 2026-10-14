@@ -72,7 +72,7 @@ const registryFrom = (load: SceneLoader, save: SceneSaver = async () => {}) =>
 /** A registry over an empty stored drawing — the presence tests' default. */
 const emptyRegistry = (load?: SceneLoader) =>
   registryFrom(
-    load ?? (async () => ({ elements: [], ownerId: null, readable: true })),
+    load ?? (async () => ({ elements: [], access: null, readable: true })),
   )
 
 const member = (displayName: string) => ({
@@ -500,22 +500,25 @@ test("a joiner is handed the stored scene", async () => {
   const stored = [element("rect", 3)]
   const registry = registryFrom(async () => ({
     elements: stored,
-    ownerId: "owner-1",
+    access: { space: "private", createdBy: "owner-1" },
     readable: true,
   }))
   const ada = fakePeer("peer-ada")
   await joinRoom(registry, ROOM, ada, member("Ada"))
 
   expect(elementsOf(framesOf(ada, "SCENE_INIT")[0])).toEqual(stored)
-  // Cached for the live badge, which the badge slice will read.
-  expect(registry.rooms.get(ROOM)?.ownerId).toBe("owner-1")
+  // Cached for the live badge and the reserved seat.
+  expect(registry.rooms.get(ROOM)?.access).toEqual({
+    space: "private",
+    createdBy: "owner-1",
+  })
 })
 
 test("the drawing is read once however many peers pile in at the same moment", async () => {
   let reads = 0
   const registry = registryFrom(async () => {
     reads += 1
-    return { elements: [element("rect", 1)], ownerId: null, readable: true }
+    return { elements: [element("rect", 1)], access: null, readable: true }
   })
   const peers = ["a", "b", "c"].map((id) => fakePeer(id))
 
@@ -530,7 +533,7 @@ test("the drawing is read once however many peers pile in at the same moment", a
 test("a late joiner gets the scene as edited, not as stored", async () => {
   const registry = registryFrom(async () => ({
     elements: [element("rect", 1)],
-    ownerId: null,
+    access: null,
     readable: true,
   }))
   const ada = fakePeer("peer-ada")
@@ -618,7 +621,7 @@ test("an edit that arrives before the scene has loaded still merges into it", as
     await opened
     return {
       elements: [element("stored", 1, { index: "a0" })],
-      ownerId: null,
+      access: null,
       readable: true,
     }
   })
@@ -665,7 +668,7 @@ test("a peer that left mid-load is not sent a scene", async () => {
   })
   const registry = registryFrom(async () => {
     await opened
-    return { elements: [], ownerId: null, readable: true }
+    return { elements: [], access: null, readable: true }
   })
   const ada = fakePeer("peer-ada")
   const grace = fakePeer("peer-grace")
@@ -695,7 +698,7 @@ async function fillRoom(registry: RoomRegistry) {
 const ownedRegistry = () =>
   emptyRegistry(async () => ({
     elements: [],
-    ownerId: member("Owen").userId,
+    access: { space: "private", createdBy: member("Owen").userId },
     readable: true,
   }))
 
@@ -736,6 +739,19 @@ test("a member who is not the owner stops with the guests", async () => {
   ).toEqual({ status: "full" })
 })
 
+test("in a Team room, any member gets the seat guests can't take", async () => {
+  const registry = emptyRegistry(async () => ({
+    elements: [],
+    access: { space: "team", createdBy: member("Owen").userId },
+    readable: true,
+  }))
+  await fillRoom(registry)
+
+  expect(
+    await joinRoom(registry, ROOM, fakePeer("peer-ada"), member("Ada")),
+  ).toEqual({ status: "ok" })
+})
+
 test("the socket past the cap is refused and joins nothing", async () => {
   const registry = emptyRegistry()
   await fillRoom(registry)
@@ -763,7 +779,7 @@ test("a refused join does not start a scene read", async () => {
   let reads = 0
   const registry = registryFrom(async () => {
     reads += 1
-    return { elements: [], ownerId: null, readable: true }
+    return { elements: [], access: null, readable: true }
   })
   await fillRoom(registry)
 
@@ -821,7 +837,7 @@ test("a PING is answered while the room is still reading its scene", async () =>
 function clockedRegistry() {
   let clock = 1_000_000
   const registry = createRoomRegistry(
-    async () => ({ elements: [], ownerId: null, readable: true }),
+    async () => ({ elements: [], access: null, readable: true }),
     async () => {},
     () => clock,
   )
@@ -935,7 +951,7 @@ test("a sweep that empties the room writes the scene and takes the room with it"
   let clock = 1_000_000
   const writes: string[][] = []
   const registry = createRoomRegistry(
-    async () => ({ elements: [], ownerId: null, readable: true }),
+    async () => ({ elements: [], access: null, readable: true }),
     async (_, elements) => {
       writes.push(elements.map((el) => el.id))
     },
@@ -995,7 +1011,7 @@ function recordingRegistry(
   const registry = registryFrom(
     async () => ({
       elements: stored,
-      ownerId: "owner-1",
+      access: { space: "private", createdBy: "owner-1" },
       readable: options.readable ?? true,
     }),
     async (roomId, elements) => {
@@ -1341,7 +1357,11 @@ test("a terminated room is gone, so re-sharing reads the drawing fresh", async (
   let reads = 0
   const registry = registryFrom(async () => {
     reads += 1
-    return { elements: [], ownerId: "owner-1", readable: true }
+    return {
+      elements: [],
+      access: { space: "private", createdBy: "owner-1" },
+      readable: true,
+    }
   })
   await joinRoom(registry, ROOM, fakePeer("peer-ada"), member("Ada"))
 
@@ -1495,7 +1515,11 @@ test("a stroke still in flight rides out on the final write", async () => {
   const registry = registryFrom(
     async () => {
       await loaded
-      return { elements: [], ownerId: "owner-1", readable: true }
+      return {
+        elements: [],
+        access: { space: "private", createdBy: "owner-1" },
+        readable: true,
+      }
     },
     async (_roomId, elements) => {
       writes.push(elements)
@@ -1538,7 +1562,11 @@ test("an edit sent during the final write is refused, not left owing", async () 
   })
   const writes: SceneElement[][] = []
   const registry = registryFrom(
-    async () => ({ elements: [], ownerId: "owner-1", readable: true }),
+    async () => ({
+      elements: [],
+      access: { space: "private", createdBy: "owner-1" },
+      readable: true,
+    }),
     async (_roomId, elements) => {
       writes.push(elements)
       beginSave?.()

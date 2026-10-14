@@ -3,6 +3,8 @@ import { PgDialect } from "drizzle-orm/pg-core"
 import { expect, test } from "vitest"
 import { drawingFiles, drawings } from "@/db/schema"
 import { MAX_DRAWING_IMAGE_BYTES } from "@/features/collab/room-files"
+import { accessibleTo } from "@/features/spaces/access"
+import { expectCondition } from "@/features/spaces/expect-condition"
 import { writeDrawingScene } from "./scene-write"
 
 type Call =
@@ -103,16 +105,15 @@ test("a solo save writes the scene, its search text, and bumps updatedAt", async
   expect(update?.set.updatedAt).toBeInstanceOf(Date)
 })
 
-test("the gate is one statement: owner, not trashed, and whether it is shared", async () => {
+test("the gate is one statement: access rule, not trashed, and whether it is shared", async () => {
   const { db, calls } = fakeDb({ target: { id: "d1", shareId: null } })
 
   await writeDrawingScene(db, "user-1", { id: "d1", data: SCENE, files: [] })
 
   const gate = calls[0] as Extract<Call, { kind: "select" }>
   expect(gate.table).toBe(drawings)
-  const sql = toSql(gate.where)
-  expect(sql).toContain(`"drawings"."ownerId" =`)
-  expect(sql).toContain(`"drawings"."deletedAt" is null`)
+  expectCondition(gate.where, accessibleTo(drawings, "user-1"))
+  expect(toSql(gate.where)).toContain(`"drawings"."deletedAt" is null`)
 })
 
 test("a shared drawing refuses the write — the room owns its data", async () => {

@@ -9,7 +9,19 @@ The state of the canvas area when no drawing is open. Shown inside the normal ap
 Drawings ordered by when they were last edited (not created, not opened). Editing a Drawing is the only thing that makes it "recent".
 
 ### Drawing
-A single Excalidraw document owned by a user, identified by id, living in the folder tree shown in the sidebar.
+A single Excalidraw document created by a member, living in a Space, identified by id, in that Space's folder tree shown in the sidebar.
+
+### Space
+Where a Drawing or folder lives: Private or Team. A folder's whole subtree is always in one Space. A member can see and act on an item iff they are its Creator or it is in Team; this one rule replaces every per-item ownership check.
+
+### Private
+One member's own Space. Only that member sees it. Works the way the app did before Team existed, Share links included. Every Drawing and folder made before Team is Private.
+
+### Team
+The instance's one shared Space. Every member sees and can do everything with every Team Drawing and folder, with no sharing step. Never called "Shared": "shared" means "has a Share link".
+
+### Creator
+The member who created a Drawing or folder. For a Private item, the only member who can see it. A Team item outlives its Creator: when that member is deleted, the item stays with no Creator ("Former member").
 
 ### Canvas area
 The inset region to the right of the sidebar. Shows either an open Drawing or Home.

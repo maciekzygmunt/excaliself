@@ -4,13 +4,14 @@ import { createServerFn } from "@tanstack/react-start"
 import { and, eq, isNotNull } from "drizzle-orm"
 import { z } from "zod"
 import { db } from "@/db"
-import { drawings, folders } from "@/db/schema"
-import { drawingListColumns } from "@/features/drawings/list-columns"
+import { drawings, folders, type Space, stars } from "@/db/schema"
+import { drawingListColumns, starOf } from "@/features/drawings/list-columns"
+import { accessibleTo, inPrivateSpaceOf } from "@/features/spaces/access"
 import { authMiddleware } from "@/middleware/auth"
 import { destroyTrashUnit } from "./destroy"
 
 /**
- * The trash page's data (spec §5.11): the owner's trash *units*, not raw
+ * The trash page's data (spec §5.11): the caller's trash *units*, not raw
  * trashed rows. A drawing trashed on its own is a unit (trashRootId is its
  * own id); a trashed folder subtree is one unit represented by its root
  * folder plus a contents count — its children are never dispersed as loose
@@ -26,9 +27,10 @@ export const getTrashItems = createServerFn({ method: "GET" })
         db
           .select(drawingListColumns)
           .from(drawings)
+          .leftJoin(stars, starOf(userId))
           .where(
             and(
-              eq(drawings.ownerId, userId),
+              accessibleTo(drawings, userId),
               isNotNull(drawings.deletedAt),
               eq(drawings.trashRootId, drawings.id),
             ),
@@ -38,25 +40,34 @@ export const getTrashItems = createServerFn({ method: "GET" })
           .from(folders)
           .where(
             and(
-              eq(folders.ownerId, userId),
+              accessibleTo(folders, userId),
               isNotNull(folders.deletedAt),
               eq(folders.trashRootId, folders.id),
             ),
           ),
         db
-          .select({ id: folders.id, trashRootId: folders.trashRootId })
+          .select({
+            id: folders.id,
+            trashRootId: folders.trashRootId,
+            space: folders.space,
+          })
           .from(folders)
           .where(
-            and(eq(folders.ownerId, userId), isNotNull(folders.deletedAt)),
+            and(accessibleTo(folders, userId), isNotNull(folders.deletedAt)),
           ),
         db
-          .select({ id: drawings.id, trashRootId: drawings.trashRootId })
+          .select({
+            id: drawings.id,
+            trashRootId: drawings.trashRootId,
+            space: drawings.space,
+          })
           .from(drawings)
           .where(
-            and(eq(drawings.ownerId, userId), isNotNull(drawings.deletedAt)),
+            and(accessibleTo(drawings, userId), isNotNull(drawings.deletedAt)),
           ),
       ])
 
+    const isPrivate = (row: { space: Space }) => row.space === "private"
     const countsByRoot = new Map<string, number>()
     const drawingCountsByRoot = new Map<string, number>()
     const count = (
@@ -83,11 +94,11 @@ export const getTrashItems = createServerFn({ method: "GET" })
         // Drawings-only slice of itemCount, for count-aware danger copy
         drawingCount: drawingCountsByRoot.get(folder.id) ?? 0,
       })),
-      // Every trashed row (subtree members included) — what Empty trash
-      // would destroy, for its count-aware danger dialog (spec §4.5).
+      // Every trashed private row (subtree members included) — what Empty
+      // trash would destroy, for its count-aware danger dialog (spec §4.5).
       totals: {
-        drawings: trashedDrawings.length,
-        folders: trashedFolders.length,
+        drawings: trashedDrawings.filter(isPrivate).length,
+        folders: trashedFolders.filter(isPrivate).length,
       },
     }
   })
@@ -106,9 +117,10 @@ export const deleteTrashUnitForever = createServerFn({ method: "POST" })
   })
 
 /**
- * Empty trash (spec §5.11): hard-deletes every trashed row the owner has,
- * freeing embedded drawing_files via FK cascade. Idempotent — an already
- * empty trash is a no-op, not an error (the UI hides the action anyway).
+ * Empty trash (spec §5.11): hard-deletes every trashed row in the caller's
+ * Private space, freeing embedded drawing_files via FK cascade. Team trash is
+ * everyone's, so it is never emptied in one go. Idempotent — an already empty
+ * trash is a no-op, not an error (the UI hides the action anyway).
  */
 export const emptyTrash = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
@@ -121,9 +133,16 @@ export const emptyTrash = createServerFn({ method: "POST" })
       // restore pulls drawings out), so the folder cascade frees nothing live.
       await tx
         .delete(drawings)
-        .where(and(eq(drawings.ownerId, userId), isNotNull(drawings.deletedAt)))
+        .where(
+          and(
+            inPrivateSpaceOf(drawings, userId),
+            isNotNull(drawings.deletedAt),
+          ),
+        )
       await tx
         .delete(folders)
-        .where(and(eq(folders.ownerId, userId), isNotNull(folders.deletedAt)))
+        .where(
+          and(inPrivateSpaceOf(folders, userId), isNotNull(folders.deletedAt)),
+        )
     })
   })

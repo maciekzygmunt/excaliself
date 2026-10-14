@@ -1,9 +1,11 @@
 import { sql } from "drizzle-orm"
 import {
   boolean,
+  check,
   customType,
   foreignKey,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   uniqueIndex,
@@ -123,14 +125,21 @@ export const passwordResets = pgTable(
   }),
 )
 
+// Where a drawing or folder lives: its creator's Private space or the shared
+// Team space. Who may see a row is decided in features/spaces/access.ts.
+export const spaces = ["private", "team"] as const
+export type Space = (typeof spaces)[number]
+
 export const folders = pgTable(
   "folders",
   {
     id: text("id").primaryKey(),
     name: text("name").notNull(),
-    ownerId: text("ownerId")
-      .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
+    space: text("space", { enum: spaces }).notNull().default("private"),
+    // Null once the creator is deleted; only Team rows outlive them.
+    createdBy: text("createdBy").references(() => users.id, {
+      onDelete: "set null",
+    }),
     parentId: text("parentId"),
     // Soft delete: set means "in trash". trashRootId records the trash unit —
     // the id of the folder/drawing whose trashing swept this row along — so a
@@ -138,6 +147,9 @@ export const folders = pgTable(
     // state stays individually knowable.
     deletedAt: timestamp("deletedAt"),
     trashRootId: text("trashRootId"),
+    deletedBy: text("deletedBy").references(() => users.id, {
+      onDelete: "set null",
+    }),
     createdAt: timestamp("createdAt")
       .notNull()
       .$defaultFn(() => new Date()),
@@ -150,33 +162,66 @@ export const folders = pgTable(
       columns: [table.parentId],
       foreignColumns: [table.id],
     }).onDelete("cascade"),
+    creatorUnlessTeam: check(
+      "folders_creator_unless_team",
+      sql`${table.space} = 'team' OR ${table.createdBy} IS NOT NULL`,
+    ),
   }),
 )
 
-export const drawings = pgTable("drawings", {
-  id: text("id").primaryKey(),
-  name: text("name").notNull(),
-  data: text("data").notNull().default("{}"),
-  // The scene's text, derived on every write so lists can search without
-  // shipping scenes.
-  searchText: text("searchText").notNull().default(""),
-  folderId: text("folderId").references(() => folders.id, {
-    onDelete: "cascade",
+export const drawings = pgTable(
+  "drawings",
+  {
+    id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    data: text("data").notNull().default("{}"),
+    // The scene's text, derived on every write so lists can search without
+    // shipping scenes.
+    searchText: text("searchText").notNull().default(""),
+    folderId: text("folderId").references(() => folders.id, {
+      onDelete: "cascade",
+    }),
+    space: text("space", { enum: spaces }).notNull().default("private"),
+    // See folders.createdBy.
+    createdBy: text("createdBy").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    // Soft delete — see folders.deletedAt/trashRootId for the model.
+    deletedAt: timestamp("deletedAt"),
+    trashRootId: text("trashRootId"),
+    deletedBy: text("deletedBy").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("createdAt")
+      .notNull()
+      .$defaultFn(() => new Date()),
+    updatedAt: timestamp("updatedAt")
+      .notNull()
+      .$defaultFn(() => new Date()),
+  },
+  (table) => ({
+    creatorUnlessTeam: check(
+      "drawings_creator_unless_team",
+      sql`${table.space} = 'team' OR ${table.createdBy} IS NOT NULL`,
+    ),
   }),
-  ownerId: text("ownerId")
-    .notNull()
-    .references(() => users.id, { onDelete: "cascade" }),
-  starred: boolean("starred").notNull().default(false),
-  // Soft delete — see folders.deletedAt/trashRootId for the model.
-  deletedAt: timestamp("deletedAt"),
-  trashRootId: text("trashRootId"),
-  createdAt: timestamp("createdAt")
-    .notNull()
-    .$defaultFn(() => new Date()),
-  updatedAt: timestamp("updatedAt")
-    .notNull()
-    .$defaultFn(() => new Date()),
-})
+)
+
+// Per-member stars; a row means "starred by this member".
+export const stars = pgTable(
+  "stars",
+  {
+    userId: text("userId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    drawingId: text("drawingId")
+      .notNull()
+      .references(() => drawings.id, { onDelete: "cascade" }),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.userId, table.drawingId] }),
+  }),
+)
 
 // A drawing is shared iff it has a row here; at most one link per drawing.
 export const shares = pgTable(
