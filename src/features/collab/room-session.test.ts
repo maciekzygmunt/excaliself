@@ -1,7 +1,9 @@
 import { expect, test, vi } from "vitest"
+import type { AccessRow } from "@/features/spaces/access"
 import { guestNameForConnection } from "./identity"
 import type { SceneElement, ServerMessage } from "./protocol"
 import {
+  DRAWING_TRASHED_CLOSE_CODE,
   LINK_DEAD_CLOSE_CODE,
   ROOM_TOPIC,
   SCENE_UNREADABLE_CLOSE_CODE,
@@ -26,6 +28,7 @@ import {
   type SceneSaver,
   sweepSilentParticipants,
   terminateRoom,
+  trashRoom,
 } from "./room-session"
 
 const ROOM = "drawing-1"
@@ -1007,13 +1010,13 @@ test("a frame for a drawing with no room at all is not an eviction", async () =>
 function recordingRegistry(
   stored: SceneElement[] = [],
   save?: SceneSaver,
-  options: { readable?: boolean } = {},
+  options: { readable?: boolean; access?: AccessRow } = {},
 ): RoomRegistry & { writes: SceneElement[][] } {
   const writes: SceneElement[][] = []
   const registry = registryFrom(
     async () => ({
       elements: stored,
-      access: { space: "private", createdBy: "owner-1" },
+      access: options.access ?? { space: "private", createdBy: "owner-1" },
       readable: options.readable ?? true,
     }),
     async (roomId, elements) => {
@@ -1346,7 +1349,7 @@ test("terminating closes every socket with the dead-link code", async () => {
 
   await terminateRoom(registry, ROOM)
 
-  // Owner and guest alike: stop, regenerate, and trash evict everyone.
+  // Owner and guest alike: stop and regenerate evict everyone.
   expect(ada.closes).toEqual([
     { code: LINK_DEAD_CLOSE_CODE, reason: "Link no longer active" },
   ])
@@ -1429,6 +1432,88 @@ const LINK_DEAD = {
   code: LINK_DEAD_CLOSE_CODE,
   reason: "Link no longer active",
 }
+
+// --- trash mid-session (Team space stories 47, 48) -----------------------
+
+const teamRoom = () =>
+  recordingRegistry([], undefined, {
+    access: { space: "team", createdBy: "owner-1" },
+  })
+
+const ADA = { userId: "u:Ada", name: "Ada" }
+
+test("a trashed Team room tells members who trashed it, and guests nothing", async () => {
+  const registry = teamRoom()
+  const nina = fakePeer("peer-nina")
+  const grace = fakePeer("peer-grace")
+  await joinRoom(registry, ROOM, nina, member("Nina"))
+  await joinRoom(registry, ROOM, grace, guest)
+
+  await trashRoom(registry, ROOM, ADA)
+
+  expect(nina.closes).toEqual([
+    { code: DRAWING_TRASHED_CLOSE_CODE, reason: "Ada" },
+  ])
+  // The same close any dead link gets: no name, no hint it was trashed.
+  expect(grace.closes).toEqual([LINK_DEAD])
+  expect(registry.rooms.has(ROOM)).toBe(false)
+})
+
+test("the trasher's own tab is told it was trashed, without a name", async () => {
+  const registry = teamRoom()
+  const ada = fakePeer("peer-ada")
+  await joinRoom(registry, ROOM, ada, member("Ada"))
+
+  await trashRoom(registry, ROOM, ADA)
+
+  expect(ada.closes).toEqual([{ code: DRAWING_TRASHED_CLOSE_CODE, reason: "" }])
+})
+
+test("a trashed room writes the session's work before any socket closes", async () => {
+  const registry = teamRoom()
+  const nina = fakePeer("peer-nina")
+  await joinRoom(registry, ROOM, nina, member("Nina"))
+  await receiveFromPeer(registry, ROOM, nina, sceneUpdate([element("n", 1)]))
+
+  let writesWhenClosed: number | null = null
+  nina.close = () => {
+    writesWhenClosed = registry.writes.length
+  }
+
+  await trashRoom(registry, ROOM, ADA)
+
+  expect(registry.writes.map(idsOf)).toEqual([["n"]])
+  expect(writesWhenClosed).toBe(1)
+})
+
+test("a member who can't see a trashed Private drawing gets the dead-link close", async () => {
+  // A members link let Nina in; only the creator can see the drawing.
+  const registry = recordingRegistry([], undefined, {
+    access: { space: "private", createdBy: "u:Ada" },
+  })
+  const nina = fakePeer("peer-nina")
+  await joinRoom(registry, ROOM, nina, member("Nina"))
+
+  await trashRoom(registry, ROOM, ADA)
+
+  expect(nina.closes).toEqual([LINK_DEAD])
+})
+
+test("a long trasher name is cut to the close-reason limit on a whole character", async () => {
+  const registry = teamRoom()
+  const nina = fakePeer("peer-nina")
+  await joinRoom(registry, ROOM, nina, member("Nina"))
+
+  // 1 + 40 × 4 bytes; 123 bytes fit "a" and 30 emoji, with no half emoji.
+  await trashRoom(registry, ROOM, {
+    userId: "u:x",
+    name: `a${"😀".repeat(40)}`,
+  })
+
+  expect(nina.closes).toEqual([
+    { code: DRAWING_TRASHED_CLOSE_CODE, reason: `a${"😀".repeat(30)}` },
+  ])
+})
 
 test("a stopped link ends a Private drawing's room for everyone in it", async () => {
   const registry = recordingRegistry()

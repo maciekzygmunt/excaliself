@@ -12,6 +12,7 @@ import { RECONNECT_MAX_DELAY_MS } from "./backoff"
 import { HEARTBEAT_INTERVAL_MS, HEARTBEAT_TIMEOUT_MS } from "./heartbeat"
 import type { SceneElement, ServerMessage } from "./protocol"
 import {
+  DRAWING_TRASHED_CLOSE_CODE,
   LINK_DEAD_CLOSE_CODE,
   ROOM_FULL_CLOSE_CODE,
   SCENE_UNREADABLE_CLOSE_CODE,
@@ -74,10 +75,10 @@ class FakeSocket {
    * hook's reconnect hangs off that event, so a `close()` that only set the
    * state would let every retry test pass without a retry happening.
    */
-  close(code = 1005) {
+  close(code = 1005, reason = "") {
     if (this.readyState === 3) return
     this.readyState = 3
-    this.emit("close", { code })
+    this.emit("close", { code, reason })
   }
 
   /**
@@ -438,6 +439,17 @@ test("a link that died is reported, not retried", () => {
   waitOutBackoff()
 
   expect(onLinkDead).toHaveBeenCalledTimes(1)
+  expect(sockets).toHaveLength(1)
+})
+
+test("a drawing trashed mid-session names who trashed it, and is not retried", () => {
+  const { socket, onLinkDead } = renderRoom(fakeExcalidraw())
+  act(() => socket.receive(joined()))
+
+  act(() => socket.close(DRAWING_TRASHED_CLOSE_CODE, "Ada"))
+  waitOutBackoff()
+
+  expect(onLinkDead).toHaveBeenCalledWith("Ada")
   expect(sockets).toHaveLength(1)
 })
 

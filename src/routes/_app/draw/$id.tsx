@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query"
 import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router"
 import { createClientOnlyFn } from "@tanstack/react-start"
-import { lazy, Suspense, useEffect } from "react"
+import { lazy, Suspense, useEffect, useState } from "react"
 import { toast } from "sonner"
 import { Mark } from "@/components/identity"
 import {
@@ -78,6 +78,12 @@ function DrawingPage() {
     navigate({ to: "/draw", replace: true })
   }, [isGone, navigate])
 
+  // Who trashed the drawing while this tab was in its Room, from the close.
+  const [trashedBy, setTrashedBy] = useState<{
+    drawingId: string
+    name: string | null
+  } | null>(null)
+
   if (isGone) return <LoadingState />
 
   // Trashed drawings render read-only under a purge banner (spec §5.11).
@@ -94,7 +100,10 @@ function DrawingPage() {
     <div className="flex h-full min-h-0 flex-col">
       <DrawingPaletteContext drawingId={id} />
       {trashedAt && drawing && (
-        <TrashedDrawingBanner drawing={{ ...drawing, deletedAt: trashedAt }} />
+        <TrashedDrawingBanner
+          drawing={{ ...drawing, deletedAt: trashedAt }}
+          trashedBy={trashedBy?.drawingId === id ? trashedBy.name : null}
+        />
       )}
       <div className="relative min-h-0 flex-1">
         <Suspense fallback={<LoadingState />}>
@@ -102,6 +111,7 @@ function DrawingPage() {
             key={`${id}:${isTrashed}`}
             drawingId={id}
             readOnly={isTrashed}
+            onLinkDead={(name) => setTrashedBy({ drawingId: id, name })}
           />
         </Suspense>
       </div>

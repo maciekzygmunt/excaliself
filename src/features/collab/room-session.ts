@@ -5,6 +5,7 @@ import { type AccessRow, canAccess } from "@/features/spaces/access"
 import { guestNameForConnection, pickParticipantColor } from "./identity"
 import type { Participant, SceneElement, ServerMessage } from "./protocol"
 import {
+  DRAWING_TRASHED_CLOSE_CODE,
   LINK_DEAD_CLOSE_CODE,
   LINK_DEAD_CLOSE_REASON,
   parseClientMessage,
@@ -204,7 +205,7 @@ export async function closeAllRooms(registry: RoomRegistry): Promise<void> {
   registry.closing = true
   await Promise.all(
     [...registry.rooms.keys()].map((roomId) =>
-      endRoom(registry, roomId, (peer) =>
+      endRoom(registry, roomId, ({ peer }) =>
         peer.close(SERVER_RESTART_CLOSE_CODE, SERVER_RESTART_CLOSE_REASON),
       ),
     ),
@@ -539,14 +540,52 @@ const closeAsDead = (peer: RoomPeer) =>
   peer.close(LINK_DEAD_CLOSE_CODE, LINK_DEAD_CLOSE_REASON)
 
 /**
- * Stop, regenerate and trash all end here: freeze, write, then hang up. The
- * awaited write lets the owner resume autosave once the mutation resolves.
+ * Stop, regenerate and member deletion end here: freeze, write, then hang up.
+ * The awaited write lets the owner resume autosave once the mutation resolves.
  */
 export function terminateRoom(
   registry: RoomRegistry,
   roomId: string,
 ): Promise<void> {
-  return endRoom(registry, roomId, closeAsDead)
+  return endRoom(registry, roomId, ({ peer }) => closeAsDead(peer))
+}
+
+/** Close reasons are capped at 123 UTF-8 bytes. */
+const MAX_CLOSE_REASON_BYTES = 123
+
+/** Cuts whole code points, so a long name never splits a character. */
+function toCloseReason(text: string): string {
+  const encoder = new TextEncoder()
+  let reason = ""
+  let bytes = 0
+  for (const char of text) {
+    bytes += encoder.encode(char).length
+    if (bytes > MAX_CLOSE_REASON_BYTES) break
+    reason += char
+  }
+  return reason
+}
+
+/**
+ * The drawing was trashed: ends its Room like `terminateRoom`. Members who can
+ * see the drawing learn who trashed it; everyone else gets the dead-link close,
+ * so nothing reaches a guest.
+ */
+export function trashRoom(
+  registry: RoomRegistry,
+  roomId: string,
+  trasher: { userId: string; name: string },
+): Promise<void> {
+  const reason = toCloseReason(trasher.name)
+  return endRoom(registry, roomId, ({ peer, userId }, access) => {
+    if (userId === null || !access || !canAccess(access, userId))
+      return closeAsDead(peer)
+    // The trasher's own tabs need no name.
+    peer.close(
+      DRAWING_TRASHED_CLOSE_CODE,
+      userId === trasher.userId ? "" : reason,
+    )
+  })
 }
 
 /**
@@ -580,11 +619,11 @@ export async function moveRoomToTeam(
   if (room.access) room.access = { ...room.access, space: "team" }
 }
 
-/** Freeze, write, then hang up each peer with `hangUp`. */
+/** Freeze, write, then hang up each seat with `hangUp`. */
 async function endRoom(
   registry: RoomRegistry,
   roomId: string,
-  hangUp: (peer: RoomPeer) => void,
+  hangUp: (seat: Seat, access: AccessRow | null) => void,
 ): Promise<void> {
   const room = registry.rooms.get(roomId)
   if (!room) return
@@ -601,7 +640,7 @@ async function endRoom(
   await flushRoom(registry, room)
   reapIfIdle(registry, room)
 
-  for (const { peer } of seats) hangUp(peer)
+  for (const seat of seats) hangUp(seat, room.access)
 }
 
 /**

@@ -6,7 +6,8 @@ import { and, desc, eq, isNull } from "drizzle-orm"
 import { z } from "zod"
 import { db } from "@/db"
 import { drawingFiles, drawings, spaces, stars } from "@/db/schema"
-import { endRooms } from "@/features/collab/room-registry"
+import { userDisplayName } from "@/features/account/display-name"
+import { endTrashedRooms } from "@/features/collab/room-registry"
 import { assertFolderTarget } from "@/features/folders/ownership"
 import { accessibleTo } from "@/features/spaces/access"
 import { restoreDrawingUnit } from "@/features/trash/restore"
@@ -220,7 +221,10 @@ export const trashDrawing = createServerFn({ method: "POST" })
 
     // Flush and close the live room. The share row survives, so restore
     // revives the link.
-    await endRooms([id])
+    await endTrashedRooms([id], {
+      userId,
+      name: userDisplayName(context.session.user),
+    })
   })
 
 /** Restores a trashed drawing; see restoreDrawingUnit for the landing rules. */

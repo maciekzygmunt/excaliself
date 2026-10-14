@@ -6,7 +6,8 @@ import { and, asc, eq, inArray, isNull } from "drizzle-orm"
 import { z } from "zod"
 import { db } from "@/db"
 import { drawings, folders, spaces } from "@/db/schema"
-import { endRooms } from "@/features/collab/room-registry"
+import { userDisplayName } from "@/features/account/display-name"
+import { endTrashedRooms } from "@/features/collab/room-registry"
 import { accessibleTo } from "@/features/spaces/access"
 import { restoreFolderUnit } from "@/features/trash/restore"
 import { authMiddleware } from "@/middleware/auth"
@@ -145,7 +146,10 @@ export const trashFolder = createServerFn({ method: "POST" })
     })
 
     // Swept drawings end their live rooms too, like a direct trash.
-    await endRooms(swept.map((drawing) => drawing.id))
+    await endTrashedRooms(
+      swept.map((drawing) => drawing.id),
+      { userId, name: userDisplayName(context.session.user) },
+    )
   })
 
 /** Restores a folder trash unit; see restoreFolderUnit for the landing rules. */
