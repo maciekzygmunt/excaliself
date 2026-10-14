@@ -317,6 +317,10 @@ const checks: {
         type: "USER_VISIBLE_SCENE_BOUNDS",
         payload: { bounds: [0, 0, 1, 1] },
       })
+      // Sockets aren't ordered against each other: the PONG proves the
+      // viewport above was handled before the follow below starts.
+      watched.send({ type: "PING", payload: {} })
+      await watched.expect("PONG")
 
       follower.send({
         type: "USER_FOLLOW",
