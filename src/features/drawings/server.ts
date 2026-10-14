@@ -2,44 +2,23 @@
 
 import { randomUUID } from "node:crypto"
 import { createServerFn } from "@tanstack/react-start"
-import { and, desc, eq, isNull } from "drizzle-orm"
+import { and, eq, isNull } from "drizzle-orm"
 import { z } from "zod"
 import { db } from "@/db"
-import { drawingFiles, drawings, spaces, stars, users } from "@/db/schema"
-import { userDisplayName, userInitials } from "@/features/account/display-name"
+import { drawingFiles, drawings, spaces, stars } from "@/db/schema"
+import { userDisplayName } from "@/features/account/display-name"
 import { endTrashedRooms } from "@/features/collab/room-registry"
 import { assertFolderTarget } from "@/features/folders/ownership"
 import { accessibleTo } from "@/features/spaces/access"
 import { restoreDrawingUnit } from "@/features/trash/restore"
 import { authMiddleware } from "@/middleware/auth"
 import { bytesToDataUrl } from "./file-bytes"
-import { drawingListColumns, starOf } from "./list-columns"
+import { listDrawings } from "./list"
 import { writeDrawingScene } from "./scene-write"
 
 export const getDrawings = createServerFn({ method: "GET" })
   .middleware([authMiddleware])
-  .handler(async ({ context }) => {
-    const userId = context.session.user.id
-    const rows = await db
-      .select({
-        ...drawingListColumns,
-        creatorUser: { name: users.name, email: users.email },
-      })
-      .from(drawings)
-      .leftJoin(stars, starOf(userId))
-      .leftJoin(users, eq(users.id, drawings.createdBy))
-      .where(and(accessibleTo(drawings, userId), isNull(drawings.deletedAt)))
-      .orderBy(desc(drawings.updatedAt))
-    // Team cards show who made each drawing. Null once the creator is
-    // deleted; emails stay on the server.
-    return rows.map(({ creatorUser, ...drawing }) => ({
-      ...drawing,
-      creator: creatorUser && {
-        name: userDisplayName(creatorUser),
-        initials: userInitials(creatorUser),
-      },
-    }))
-  })
+  .handler(({ context }) => listDrawings(db, context.session.user.id))
 
 /** One drawing's stored scene, for its card preview. Trashed ones too. */
 export const getDrawingScene = createServerFn({ method: "GET" })

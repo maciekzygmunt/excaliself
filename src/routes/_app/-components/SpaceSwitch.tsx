@@ -1,12 +1,12 @@
 import { Link } from "@tanstack/react-router"
-import { Lock, type LucideIcon, Users } from "lucide-react"
+import { SPACES } from "@/components/space-label"
 import type { Space } from "@/db/schema"
 import { cn } from "@/lib/utils"
 
-const segments: { space: Space; label: string; icon: LucideIcon }[] = [
-  { space: "private", label: "Private", icon: Lock },
-  { space: "team", label: "Team", icon: Users },
-]
+const segments = (["private", "team"] as const).map((space) => ({
+  space,
+  ...SPACES[space],
+}))
 
 /**
  * The Private | Team scope of a browse surface. Each segment is a link that

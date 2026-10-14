@@ -43,6 +43,11 @@ vi.mock("@/features/folders/server", () => ({
   restoreFolder: vi.fn(),
 }))
 
+// The palette reads teamEnabled off the current user.
+vi.mock("@/features/account/server", () => ({
+  getCurrentUser: vi.fn(async () => ({ teamEnabled: false })),
+}))
+
 vi.mock("./CreateDialog", () => ({
   useCreateDialog: () => ({
     openCreateDrawingDialog: vi.fn(),

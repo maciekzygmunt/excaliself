@@ -23,8 +23,11 @@ import {
   useMemo,
   useState,
 } from "react"
+import { SpaceLabel } from "@/components/space-label"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { Kbd } from "@/components/ui/kbd"
+import type { Space } from "@/db/schema"
+import { currentUserQueryOptions } from "@/features/account/queries"
 import { drawingsQueryOptions } from "@/features/drawings/queries"
 import { findInScene } from "@/features/drawings/search"
 import { foldersQueryOptions } from "@/features/folders/queries"
@@ -68,6 +71,8 @@ type PaletteRow =
       label: string
       // Muted trailing text: why a drawing matched when it wasn't its title
       detail?: string
+      // A drawing's space, labelled while Team is on
+      space?: Space
       icon: LucideIcon
       to: string
       params?: { id: string }
@@ -153,6 +158,10 @@ export function CommandPalette({
 
   const { data: drawings } = useQuery(drawingsQueryOptions())
   const { data: folders } = useQuery(foldersQueryOptions())
+  const { data: teamEnabled = false } = useQuery({
+    ...currentUserQueryOptions(),
+    select: (user) => user.teamEnabled,
+  })
 
   // Fuzzy matching: "rdmap" finds "Roadmap". Static sections (Context, Go to,
   // Actions) only filter — their fixed order is muscle memory, so a score
@@ -205,6 +214,7 @@ export function CommandPalette({
     id: `drawing-${d.id}`,
     label: d.name,
     detail: snippet,
+    space: teamEnabled ? d.space : undefined,
     icon: File,
     to: "/draw/$id",
     params: { id: d.id },
@@ -414,6 +424,12 @@ export function CommandPalette({
                         <span className="min-w-0 flex-1 truncate text-muted-foreground/70">
                           {row.detail}
                         </span>
+                      )}
+                      {row.kind === "goto" && row.space && (
+                        <SpaceLabel
+                          space={row.space}
+                          className="ml-auto pl-2 text-[11px] text-muted-foreground/60"
+                        />
                       )}
                     </button>
                   )

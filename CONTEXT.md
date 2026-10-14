@@ -36,7 +36,7 @@ The app's one grid of Drawing cards (Preview, name, folder attribution, edited-a
 The browse surface at `/drawings`: the Gallery over every Drawing the user owns, uncapped, under the Browse toolbar. Reached from Home's "View all" link.
 
 ### Browse toolbar
-The Gallery's filter chrome on All drawings: on-page search (the app's only inline filter — there is no search-results page), folder chips (All / one per folder / Unfiled) that scope the grid, and a sort dropdown (Last edited default / Date created / Name). Search and chip scope compose. Folder pages reuse it without the chip row.
+The Gallery's filter chrome on All drawings: on-page search (the app's only inline filter — there is no search-results page), folder chips (All / one per folder / Unfiled) that scope the grid, and a sort dropdown (Last edited default / Date created / Name). Search and chip scope compose. While Team is on, search covers both Spaces even on a page scoped to one, and each match carries a Space label; the chips (the page Space's folders) still narrow it. Folder pages reuse it without the chip row.
 
 ### Preview
 A non-interactive visual rendering of a Drawing's scene, shown on Gallery cards so drawings are recognizable by shape rather than name.
