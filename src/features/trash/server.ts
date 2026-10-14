@@ -1,14 +1,28 @@
 "use server"
 
 import { createServerFn } from "@tanstack/react-start"
-import { and, eq, isNotNull } from "drizzle-orm"
+import { and, eq, getTableColumns, isNotNull } from "drizzle-orm"
 import { z } from "zod"
 import { db } from "@/db"
-import { drawings, folders, type Space, stars } from "@/db/schema"
+import { drawings, folders, type Space, stars, users } from "@/db/schema"
+import { userDisplayName } from "@/features/account/display-name"
 import { drawingListColumns, starOf } from "@/features/drawings/list-columns"
 import { accessibleTo, inPrivateSpaceOf } from "@/features/spaces/access"
 import { authMiddleware } from "@/middleware/auth"
 import { destroyTrashUnit } from "./destroy"
+
+// The member who trashed a unit, joined on deletedBy. Null once deleted.
+const trasherColumns = { name: users.name, email: users.email }
+
+/** Swaps the joined trasher for their display name; emails stay on the server. */
+function withTrasherName<
+  T extends { trasher: { name: string; email: string } | null },
+>({
+  trasher,
+  ...unit
+}: T): Omit<T, "trasher"> & { deletedByName: string | null } {
+  return { ...unit, deletedByName: trasher && userDisplayName(trasher) }
+}
 
 /**
  * The trash page's data (spec §5.11): the caller's trash *units*, not raw
@@ -25,9 +39,10 @@ export const getTrashItems = createServerFn({ method: "GET" })
     const [drawingUnits, folderUnits, trashedFolders, trashedDrawings] =
       await Promise.all([
         db
-          .select(drawingListColumns)
+          .select({ ...drawingListColumns, trasher: trasherColumns })
           .from(drawings)
           .leftJoin(stars, starOf(userId))
+          .leftJoin(users, eq(users.id, drawings.deletedBy))
           .where(
             and(
               accessibleTo(drawings, userId),
@@ -36,8 +51,9 @@ export const getTrashItems = createServerFn({ method: "GET" })
             ),
           ),
         db
-          .select()
+          .select({ ...getTableColumns(folders), trasher: trasherColumns })
           .from(folders)
+          .leftJoin(users, eq(users.id, folders.deletedBy))
           .where(
             and(
               accessibleTo(folders, userId),
@@ -87,8 +103,8 @@ export const getTrashItems = createServerFn({ method: "GET" })
     }
 
     return {
-      drawings: drawingUnits,
-      folders: folderUnits.map((folder) => ({
+      drawings: drawingUnits.map(withTrasherName),
+      folders: folderUnits.map(withTrasherName).map((folder) => ({
         ...folder,
         itemCount: countsByRoot.get(folder.id) ?? 0,
         // Drawings-only slice of itemCount, for count-aware danger copy

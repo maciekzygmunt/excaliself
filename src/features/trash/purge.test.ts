@@ -293,6 +293,22 @@ test("the post-delete evacuation moves EVERY drawing left in an expired folder, 
   )
 })
 
+test("Team rows purge like Private ones: no statement is scoped to a space or creator", async () => {
+  const { db, calls } = fakeDb({
+    folderRows: [folderRow("expired", null, daysAgo(31))],
+    deletedFolderIds: ["expired"],
+  })
+
+  await purgeExpiredTrash(db, NOW)
+
+  for (const call of calls) {
+    if (call.kind === "select") continue
+    const { sql } = toSql(call.where)
+    expect(sql).not.toContain(`"space"`)
+    expect(sql).not.toContain(`"createdBy"`)
+  }
+})
+
 // --- startTrashPurgeJob -----------------------------------------------------
 
 test("runs a pass at boot and again every interval, logging counts", async () => {

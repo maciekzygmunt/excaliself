@@ -2,14 +2,14 @@
 
 import { randomUUID } from "node:crypto"
 import { createServerFn } from "@tanstack/react-start"
-import { and, desc, eq, isNotNull, isNull } from "drizzle-orm"
+import { and, desc, eq, isNull } from "drizzle-orm"
 import { z } from "zod"
 import { db } from "@/db"
-import { drawingFiles, drawings, folders, spaces, stars } from "@/db/schema"
+import { drawingFiles, drawings, spaces, stars } from "@/db/schema"
 import { endRooms } from "@/features/collab/room-registry"
 import { assertFolderTarget } from "@/features/folders/ownership"
-import { findNearestLiveAncestorId } from "@/features/folders/subtree"
 import { accessibleTo } from "@/features/spaces/access"
+import { restoreDrawingUnit } from "@/features/trash/restore"
 import { authMiddleware } from "@/middleware/auth"
 import { bytesToDataUrl } from "./file-bytes"
 import { drawingListColumns, starOf } from "./list-columns"
@@ -207,7 +207,7 @@ export const trashDrawing = createServerFn({ method: "POST" })
     // not reshuffle recency-ordered lists once the drawing is restored.
     const trashed = await db
       .update(drawings)
-      .set({ deletedAt: new Date(), trashRootId: id })
+      .set({ deletedAt: new Date(), trashRootId: id, deletedBy: userId })
       .where(
         and(
           eq(drawings.id, id),
@@ -223,60 +223,10 @@ export const trashDrawing = createServerFn({ method: "POST" })
     await endRooms([id])
   })
 
-/**
- * Restores a trashed drawing with the full landing rules (spec §5.11): back
- * to its original folder when that folder is live; to the nearest live
- * ancestor when the folder is trashed (never resurrecting a trashed parent
- * chain); to root when the folder no longer exists at all — the caller gets
- * `originalFolderGone` so it can show the "Restored to root" toast.
- */
+/** Restores a trashed drawing; see restoreDrawingUnit for the landing rules. */
 export const restoreDrawing = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
   .validator(z.string())
-  .handler(async ({ data: id, context }) => {
-    const userId = context.session.user.id
-
-    return db.transaction(async (tx) => {
-      const restored = await tx
-        .update(drawings)
-        .set({ deletedAt: null, trashRootId: null })
-        .where(
-          and(
-            eq(drawings.id, id),
-            accessibleTo(drawings, userId),
-            isNotNull(drawings.deletedAt),
-          ),
-        )
-        .returning({ id: drawings.id, folderId: drawings.folderId })
-      if (restored.length === 0) throw new Error("Drawing not found")
-
-      const originalFolderId = restored[0].folderId
-      if (!originalFolderId) return { originalFolderGone: false }
-
-      const visibleFolders = await tx
-        .select({
-          id: folders.id,
-          parentId: folders.parentId,
-          deletedAt: folders.deletedAt,
-        })
-        .from(folders)
-        .where(accessibleTo(folders, userId))
-
-      const landingId = findNearestLiveAncestorId(
-        visibleFolders,
-        originalFolderId,
-      )
-      if (landingId !== originalFolderId) {
-        await tx
-          .update(drawings)
-          .set({ folderId: landingId })
-          .where(eq(drawings.id, id))
-      }
-
-      return {
-        originalFolderGone: !visibleFolders.some(
-          (folder) => folder.id === originalFolderId,
-        ),
-      }
-    })
-  })
+  .handler(async ({ data: id, context }) =>
+    restoreDrawingUnit(db, context.session.user.id, id),
+  )

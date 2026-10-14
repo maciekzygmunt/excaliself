@@ -1,7 +1,8 @@
 -- Team space: drawings and folders live in a space ('private' or 'team'),
 -- ownerId becomes a nullable createdBy (Team rows outlive their creator),
--- deletedBy records who trashed a row, and stars become per member. Every
--- existing row becomes private; every star is kept for the drawing's owner.
+-- deletedBy records who trashed a row (the creator for rows already in
+-- trash), and stars become per member. Every existing row becomes private;
+-- every star is kept for the drawing's owner.
 --
 -- Migrations run on boot with no down-migrations. The safe rollback is a
 -- database backup taken before the deploy (docs/deployment.md). Without one,
@@ -49,6 +50,11 @@ ALTER TABLE "drawings" ADD COLUMN "deletedBy" text;--> statement-breakpoint
 ALTER TABLE "folders" ADD COLUMN "deletedBy" text;--> statement-breakpoint
 ALTER TABLE "drawings" ADD CONSTRAINT "drawings_deletedBy_users_id_fk" FOREIGN KEY ("deletedBy") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "folders" ADD CONSTRAINT "folders_deletedBy_users_id_fk" FOREIGN KEY ("deletedBy") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+-- Rows trashed before this release were trashed by their creator, the only
+-- member who could see them. Without this, a trashed row moved to Team later
+-- reads "Former member".
+UPDATE "drawings" SET "deletedBy" = "createdBy" WHERE "deletedAt" IS NOT NULL;--> statement-breakpoint
+UPDATE "folders" SET "deletedBy" = "createdBy" WHERE "deletedAt" IS NOT NULL;--> statement-breakpoint
 CREATE TABLE "stars" (
 	"userId" text NOT NULL,
 	"drawingId" text NOT NULL,
