@@ -16,6 +16,7 @@ import {
   joinRoom,
   leaveRoom,
   MAX_ROOM_PARTICIPANTS,
+  moveRoomToTeam,
   PARTICIPANT_IDLE_TIMEOUT_MS,
   ROOM_FLUSH_INTERVAL_MS,
   type RoomPeer,
@@ -1460,6 +1461,28 @@ test("a stopped link sends only the guests out of a Team drawing's room", async 
   expect(ada.closes).toEqual([])
   expect(grace.closes).toEqual([LINK_DEAD])
   expect(registry.rooms.get(ROOM)?.seats.size).toBe(1)
+})
+
+// Story 25: a guest on an anyone link stays through a move to Team, and the
+// Room is Team from then on.
+test("a Room moved to Team keeps every seat and then outlives its link", async () => {
+  const registry = emptyRegistry(async () => ({
+    elements: [],
+    access: { space: "private", createdBy: "owner-1" },
+    readable: true,
+  }))
+  const ada = fakePeer("peer-ada")
+  const grace = fakePeer("peer-grace")
+  await joinRoom(registry, ROOM, ada, member("Ada"))
+  await joinRoom(registry, ROOM, grace, guest)
+
+  await moveRoomToTeam(registry, ROOM)
+  expect(ada.closes).toEqual([])
+  expect(grace.closes).toEqual([])
+
+  await endLinkRoom(registry, ROOM)
+  expect(ada.closes).toEqual([])
+  expect(grace.closes).toEqual([LINK_DEAD])
 })
 
 test("tightening to members closes the guests and leaves the members", async () => {

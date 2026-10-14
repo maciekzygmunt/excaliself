@@ -6,7 +6,7 @@ import type {
   ExcalidrawImperativeAPI,
 } from "@excalidraw/excalidraw/types"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
-import { PanelLeftIcon, Share2Icon } from "lucide-react"
+import { PanelLeftIcon, Share2Icon, Users } from "lucide-react"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
 import {
@@ -30,7 +30,10 @@ import {
   toastImageCapFull,
 } from "@/features/collab/use-room-files"
 import { useRenameDrawing } from "@/features/drawings/mutations"
-import { drawingQueryOptions } from "@/features/drawings/queries"
+import {
+  drawingQueryOptions,
+  drawingsQueryOptions,
+} from "@/features/drawings/queries"
 import {
   buildScenePayload,
   getScenePayloadSignature,
@@ -43,6 +46,7 @@ import { drawingShareQueryOptions } from "@/features/shares/queries"
 import { useAutoSave } from "@/hooks/use-auto-save"
 import { usePreloadTextFont } from "@/hooks/use-preload-text-font"
 import { useCanvasTheme } from "@/hooks/use-theme"
+import { useMoveToTeamDialog } from "./MoveToTeamDialog"
 import { SaveStatusPill } from "./SaveStatusPill"
 import { ShareDialog } from "./ShareDialog"
 import { TopLeftControls } from "./TopLeftControls"
@@ -131,9 +135,16 @@ export function DrawingCanvas({ drawingId, readOnly = false }: Props) {
     })
   }, [queryClient, drawingId])
 
+  // The polled list also carries the space, so a tab that missed a move to
+  // Team (another tab, another device) flips without waiting for its next
+  // save to be refused. Moves are one-way, so either source saying Team wins.
+  const { data: listedSpace } = useQuery({
+    ...drawingsQueryOptions(),
+    select: (drawings) => drawings.find((d) => d.id === drawingId)?.space,
+  })
   // A Team drawing is always a Room, joined by id; a Private one only while
   // its Share link exists. Either way the Room is the only writer.
-  const isTeam = drawing?.space === "team"
+  const isTeam = drawing?.space === "team" || listedSpace === "team"
   const roomPath = readOnly
     ? null
     : isTeam
@@ -235,6 +246,12 @@ export function DrawingCanvas({ drawingId, readOnly = false }: Props) {
     },
   })
 
+  // Any move to Team flushes this canvas first, whichever menu started it.
+  const { requestMoveToTeam, registerFlush } = useMoveToTeamDialog()
+  useEffect(() => {
+    if (!readOnly) return registerFlush(flushAutoSave)
+  }, [readOnly, registerFlush, flushAutoSave])
+
   const roomChange = room.onChange
   const handleSceneChange = useCallback(
     (
@@ -335,6 +352,19 @@ export function DrawingCanvas({ drawingId, readOnly = false }: Props) {
                 Share
                 {share != null && <SharingDot />}
               </span>
+            </MainMenu.Item>
+          )}
+          {!readOnly && !isTeam && requestMoveToTeam && (
+            <MainMenu.Item
+              icon={<Users className="h-4 w-4" />}
+              onSelect={() =>
+                requestMoveToTeam(
+                  { type: "drawing", id: drawingId },
+                  drawing.name,
+                )
+              }
+            >
+              Move to Team
             </MainMenu.Item>
           )}
           <MainMenu.Separator />

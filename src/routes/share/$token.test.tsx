@@ -9,6 +9,7 @@ import type { ReactNode } from "react"
 import { afterEach, beforeEach, expect, test, vi } from "vitest"
 import type { ShareVisit } from "@/features/shares/server"
 import type { ShareResolution } from "@/features/shares/store"
+import { isOpenAsTeam } from "@/features/spaces/server"
 
 const TOKEN = "a-share-token"
 const invalidate = vi.fn()
@@ -34,21 +35,28 @@ vi.mock("@tanstack/react-router", () => ({
 }))
 
 vi.mock("@/features/shares/server", () => ({ resolveShareToken: vi.fn() }))
+vi.mock("@/features/spaces/server", () => ({ isOpenAsTeam: vi.fn() }))
 
 // The real one drags Excalidraw into jsdom; this slice is about the states
 // around the canvas, not the canvas. The buttons stand in for the room
-// closing the socket at its participant cap, or on a damaged scene.
+// closing the socket at its participant cap, on a damaged scene, or on a
+// dead link.
 vi.mock("./-components/SharedCanvas", () => ({
   default: ({
     token,
     onRoomFull,
     onSceneUnreadable,
+    onLinkDead,
   }: {
     token: string
     onRoomFull: () => void
     onSceneUnreadable: () => void
+    onLinkDead: () => void
   }) => (
     <div data-testid="shared-canvas" data-token={token}>
+      <button type="button" onClick={onLinkDead}>
+        Kill the link
+      </button>
       <button type="button" onClick={onRoomFull}>
         Refuse the join
       </button>
@@ -289,4 +297,37 @@ test("the ?full flag can't turn a throttled visit into the room-full state", asy
   expect(
     screen.getByRole("heading", { name: "Too many attempts" }),
   ).toBeDefined()
+})
+
+// A members link dies when its drawing moves to Team; members in its Room
+// can open it by id from then on.
+test("a member whose link died with a move to Team rejoins the drawing by id", async () => {
+  vi.mocked(isOpenAsTeam).mockResolvedValue(true)
+  await renderShare({ ...OK, audience: "members" })
+  fireEvent.click(await screen.findByRole("button", { name: "Kill the link" }))
+
+  await waitFor(() =>
+    expect(navigate).toHaveBeenCalledWith({
+      to: "/draw/$id",
+      params: { id: "d1" },
+    }),
+  )
+  expect(invalidate).not.toHaveBeenCalled()
+})
+
+test("a members link that died any other way goes back to the loader", async () => {
+  vi.mocked(isOpenAsTeam).mockResolvedValue(false)
+  await renderShare({ ...OK, audience: "members" })
+  fireEvent.click(await screen.findByRole("button", { name: "Kill the link" }))
+
+  await waitFor(() => expect(invalidate).toHaveBeenCalled())
+  expect(navigate).not.toHaveBeenCalled()
+})
+
+test("a guest whose link died never asks about Team", async () => {
+  await renderShare(OK)
+  fireEvent.click(await screen.findByRole("button", { name: "Kill the link" }))
+
+  await waitFor(() => expect(invalidate).toHaveBeenCalled())
+  expect(isOpenAsTeam).not.toHaveBeenCalled()
 })

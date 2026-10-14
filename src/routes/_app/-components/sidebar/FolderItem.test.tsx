@@ -1,10 +1,19 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
-import { cleanup, fireEvent, render, screen } from "@testing-library/react"
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react"
 import { type ReactNode, useState } from "react"
 import { afterAll, afterEach, beforeAll, expect, test, vi } from "vitest"
 import { SidebarProvider } from "@/components/ui/sidebar"
+import { getCurrentUser } from "@/features/account/server"
 import type { Folder } from "@/features/folders/queries"
 import { CreateDialogProvider } from "../CreateDialog"
+import { MoveToTeamProvider } from "../MoveToTeamDialog"
 import { FolderItem } from "./FolderItem"
 import type { TreeNode } from "./tree"
 import { SidebarDnDProvider } from "./use-sidebar-dnd"
@@ -22,6 +31,8 @@ vi.mock("@tanstack/react-router", () => ({
 }))
 
 vi.mock("@/features/account/server", () => ({ getCurrentUser: vi.fn() }))
+vi.mock("@/features/spaces/server", () => ({ moveToTeam: vi.fn() }))
+vi.mock("@/features/shares/server", () => ({ getDrawingShare: vi.fn() }))
 
 vi.mock("@/features/folders/server", () => ({
   getFolders: vi.fn(),
@@ -83,9 +94,11 @@ function Providers({ children }: { children: ReactNode }) {
     <QueryClientProvider client={client}>
       <SidebarProvider>
         <CreateDialogProvider>
-          <SidebarDnDProvider drawings={[]} foldersById={new Map()}>
-            {children}
-          </SidebarDnDProvider>
+          <MoveToTeamProvider>
+            <SidebarDnDProvider drawings={[]} foldersById={new Map()}>
+              {children}
+            </SidebarDnDProvider>
+          </MoveToTeamProvider>
         </CreateDialogProvider>
       </SidebarProvider>
     </QueryClientProvider>
@@ -161,4 +174,54 @@ test("dropping onto an empty folder marks it expanded for when children arrive",
   rerenderFolder([childNode(makeFolder("f2", "Dropped child", "f1"))])
   expect(rowState()).toBe("open")
   expect(screen.getByText("Dropped child")).toBeTruthy()
+})
+
+function openRowMenu() {
+  const trigger = document.querySelector('[data-sidebar="menu-action"]')
+  if (!(trigger instanceof HTMLElement)) throw new Error("trigger not found")
+  fireEvent.pointerDown(trigger)
+  fireEvent.click(trigger)
+}
+
+const userWithTeam = (teamEnabled: boolean) => ({
+  id: "user-1",
+  email: "ada@example.com",
+  name: "Ada",
+  role: "user" as const,
+  teamEnabled,
+})
+
+test("a private row offers Move to Team, above Move to trash", async () => {
+  vi.mocked(getCurrentUser).mockResolvedValue(userWithTeam(true))
+  renderFolder(makeFolder("f1", "Projects"), [])
+  openRowMenu()
+  // The flag arrives with the current user; the open menu picks it up.
+  await screen.findByRole("menuitem", { name: "Move to Team" })
+
+  const labels = screen.getAllByRole("menuitem").map((item) => item.textContent)
+  expect(labels.indexOf("Move to Team")).toBe(
+    labels.indexOf("Move to trash") - 1,
+  )
+  fireEvent.click(screen.getByRole("menuitem", { name: "Move to Team" }))
+  expect(screen.getByRole("heading").textContent).toBe(
+    "Move “Projects” to Team?",
+  )
+})
+
+test("a Team row, or any row while Team is hidden, has no Move to Team", async () => {
+  for (const [folder, teamEnabled] of [
+    [{ ...makeFolder("f1", "Shared work"), space: "team" as const }, true],
+    [makeFolder("f2", "Projects"), false],
+  ] as const) {
+    vi.mocked(getCurrentUser).mockResolvedValue(userWithTeam(teamEnabled))
+    renderFolder(folder, [])
+    await waitFor(() => expect(getCurrentUser).toHaveBeenCalled())
+    // Let the answer land before asserting what it hides.
+    await act(() => Promise.resolve())
+    openRowMenu()
+
+    screen.getByRole("menuitem", { name: "Move to trash" })
+    expect(screen.queryByRole("menuitem", { name: "Move to Team" })).toBeNull()
+    cleanup()
+  }
 })

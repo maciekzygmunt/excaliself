@@ -12,6 +12,7 @@ import { authMiddleware } from "@/middleware/auth"
 import { setupMiddleware } from "@/middleware/setup"
 import { CommandPaletteProvider } from "./-components/CommandPalette"
 import { CreateDialogProvider } from "./-components/CreateDialog"
+import { MoveToTeamProvider } from "./-components/MoveToTeamDialog"
 import { SidebarReopenButton } from "./-components/SidebarReopenButton"
 import { DrawSidebar } from "./-components/sidebar"
 
@@ -54,20 +55,22 @@ function AppShellLayout() {
       style={{ "--sidebar-width": "240px" } as React.CSSProperties}
     >
       <CreateDialogProvider>
-        <CommandPaletteProvider>
-          <DrawSidebar
-            user={{
-              email: currentUser?.email ?? session.user?.email ?? "",
-              name: currentUser?.name ?? null,
-              isAdmin,
-            }}
-          />
-          {/* The Etched panel look lives in the SidebarInset primitive. */}
-          <SidebarInset className="overflow-clip">
-            <SidebarReopenButton />
-            <Outlet />
-          </SidebarInset>
-        </CommandPaletteProvider>
+        <MoveToTeamProvider>
+          <CommandPaletteProvider>
+            <DrawSidebar
+              user={{
+                email: currentUser?.email ?? session.user?.email ?? "",
+                name: currentUser?.name ?? null,
+                isAdmin,
+              }}
+            />
+            {/* The Etched panel look lives in the SidebarInset primitive. */}
+            <SidebarInset className="overflow-clip">
+              <SidebarReopenButton />
+              <Outlet />
+            </SidebarInset>
+          </CommandPaletteProvider>
+        </MoveToTeamProvider>
       </CreateDialogProvider>
     </SidebarProvider>
   )

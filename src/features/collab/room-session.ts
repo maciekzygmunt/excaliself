@@ -565,6 +565,21 @@ export async function endLinkRoom(
   return terminateRoom(registry, roomId)
 }
 
+/**
+ * The drawing moved to Team. Its Room, if live, keeps every seat; only the
+ * cached access changes, so the Live badge, the seat cap and later link
+ * changes treat it as Team.
+ */
+export async function moveRoomToTeam(
+  registry: RoomRegistry,
+  roomId: string,
+): Promise<void> {
+  const room = registry.rooms.get(roomId)
+  if (!room) return
+  await room.loaded
+  if (room.access) room.access = { ...room.access, space: "team" }
+}
+
 /** Freeze, write, then hang up each peer with `hangUp`. */
 async function endRoom(
   registry: RoomRegistry,

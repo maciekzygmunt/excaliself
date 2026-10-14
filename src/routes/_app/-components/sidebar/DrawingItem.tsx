@@ -11,6 +11,7 @@ import {
 } from "@/features/drawings/mutations"
 import { useInlineRename } from "@/hooks/use-inline-rename"
 import { cn } from "@/lib/utils"
+import { useMoveToTeamDialog } from "../MoveToTeamDialog"
 import { TreeRowActions } from "./TreeRowActions"
 import type { Drawing } from "./tree"
 import { useSidebarDnD } from "./use-sidebar-dnd"
@@ -42,6 +43,7 @@ export function DrawingItem({ drawing }: DrawingItemProps) {
   const trashDrawing = useTrashDrawing()
   const starMutation = useToggleStarDrawing()
   const live = useLiveDrawing(drawing.id)
+  const { requestMoveToTeam } = useMoveToTeamDialog()
 
   const handleTrash = () => {
     // Instant, no confirm — the mutation shows the undo toast itself
@@ -111,6 +113,15 @@ export function DrawingItem({ drawing }: DrawingItemProps) {
         onStartRename={() => rename.start(drawing.name)}
         menuFinalFocus={rename.menuFinalFocus}
         onTrash={handleTrash}
+        onMoveToTeam={
+          requestMoveToTeam && drawing.space === "private"
+            ? () =>
+                requestMoveToTeam(
+                  { type: "drawing", id: drawing.id },
+                  drawing.name,
+                )
+            : undefined
+        }
       />
     </SidebarMenuItem>
   )

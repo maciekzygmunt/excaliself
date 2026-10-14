@@ -16,6 +16,7 @@ import { useRenameFolder, useTrashFolder } from "@/features/folders/mutations"
 import { useInlineRename } from "@/hooks/use-inline-rename"
 import { cn } from "@/lib/utils"
 import { useCreateDialog } from "../CreateDialog"
+import { useMoveToTeamDialog } from "../MoveToTeamDialog"
 import { TreeNodeItem } from "./TreeNodeItem"
 import { TreeRowActions } from "./TreeRowActions"
 import {
@@ -58,6 +59,7 @@ export function FolderItem({ folder, childNodes }: FolderItemProps) {
 
   const trashFolder = useTrashFolder()
   const { openCreateDrawingDialog } = useCreateDialog()
+  const { requestMoveToTeam } = useMoveToTeamDialog()
 
   const containsActive = hasActiveDrawing(childNodes, currentDrawingId)
   const [isExpanded, setIsExpanded] = useState(containsActive)
@@ -134,6 +136,15 @@ export function FolderItem({ folder, childNodes }: FolderItemProps) {
         }
         menuFinalFocus={rename.menuFinalFocus}
         onTrash={handleTrash}
+        onMoveToTeam={
+          requestMoveToTeam && folder.space === "private"
+            ? () =>
+                requestMoveToTeam(
+                  { type: "folder", id: folder.id },
+                  folder.name,
+                )
+            : undefined
+        }
       />
     </div>
   )
