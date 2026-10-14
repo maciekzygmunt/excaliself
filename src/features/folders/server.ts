@@ -8,9 +8,10 @@ import { db } from "@/db"
 import { drawings, folders, spaces } from "@/db/schema"
 import { endRooms } from "@/features/collab/room-registry"
 import { accessibleTo } from "@/features/spaces/access"
+import { restoreFolderUnit } from "@/features/trash/restore"
 import { authMiddleware } from "@/middleware/auth"
 import { assertFolderTarget } from "./ownership"
-import { collectFolderSubtreeIds, findNearestLiveAncestorId } from "./subtree"
+import { collectFolderSubtreeIds } from "./subtree"
 
 export const getFolders = createServerFn({ method: "GET" })
   .middleware([authMiddleware])
@@ -121,7 +122,7 @@ export const trashFolder = createServerFn({ method: "POST" })
 
       await tx
         .update(folders)
-        .set({ deletedAt: now, trashRootId: id })
+        .set({ deletedAt: now, trashRootId: id, deletedBy: userId })
         .where(
           and(
             inArray(folders.id, subtreeIds),
@@ -132,7 +133,7 @@ export const trashFolder = createServerFn({ method: "POST" })
       // Leaves updatedAt alone (see trashDrawing) so restore is in place.
       return tx
         .update(drawings)
-        .set({ deletedAt: now, trashRootId: id })
+        .set({ deletedAt: now, trashRootId: id, deletedBy: userId })
         .where(
           and(
             inArray(drawings.folderId, subtreeIds),
@@ -147,62 +148,10 @@ export const trashFolder = createServerFn({ method: "POST" })
     await endRooms(swept.map((drawing) => drawing.id))
   })
 
-/**
- * Restores a folder trash unit: everything trashFolder(id) swept, with the
- * subtree intact. The root folder lands under its original parent when that
- * parent is live, under the nearest live ancestor when the parent is trashed
- * (a trashed parent chain is never resurrected), or at root when the parent
- * no longer exists — flagged as `originalParentGone` for the caller's toast.
- */
+/** Restores a folder trash unit; see restoreFolderUnit for the landing rules. */
 export const restoreFolder = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
   .validator(z.string())
-  .handler(async ({ data: id, context }) => {
-    const userId = context.session.user.id
-
-    return db.transaction(async (tx) => {
-      const restored = await tx
-        .update(folders)
-        .set({ deletedAt: null, trashRootId: null })
-        .where(and(eq(folders.trashRootId, id), accessibleTo(folders, userId)))
-        .returning({ id: folders.id, parentId: folders.parentId })
-      if (restored.length === 0) throw new Error("Folder not found")
-
-      await tx
-        .update(drawings)
-        .set({ deletedAt: null, trashRootId: null })
-        .where(
-          and(eq(drawings.trashRootId, id), accessibleTo(drawings, userId)),
-        )
-
-      const originalParentId =
-        restored.find((folder) => folder.id === id)?.parentId ?? null
-      if (!originalParentId) return { originalParentGone: false }
-
-      const visibleFolders = await tx
-        .select({
-          id: folders.id,
-          parentId: folders.parentId,
-          deletedAt: folders.deletedAt,
-        })
-        .from(folders)
-        .where(accessibleTo(folders, userId))
-
-      const landingId = findNearestLiveAncestorId(
-        visibleFolders,
-        originalParentId,
-      )
-      if (landingId !== originalParentId) {
-        await tx
-          .update(folders)
-          .set({ parentId: landingId })
-          .where(eq(folders.id, id))
-      }
-
-      return {
-        originalParentGone: !visibleFolders.some(
-          (folder) => folder.id === originalParentId,
-        ),
-      }
-    })
-  })
+  .handler(async ({ data: id, context }) =>
+    restoreFolderUnit(db, context.session.user.id, id),
+  )
