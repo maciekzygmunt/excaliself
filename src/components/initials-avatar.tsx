@@ -1,17 +1,15 @@
-import { userInitials } from "@/features/account/display-name"
 import { cn } from "@/lib/utils"
 
 // The one initials circle for every surface a user appears on (sidebar user
-// card, member lists) — spec §5.12: no uploads, `users.image` stays
-// dormant. Decorative — the accessible name lives in the adjacent text.
-// Size via className (defaults to the sidebar's 24px).
+// card, member lists, Team card creators) — spec §5.12: no uploads,
+// `users.image` stays dormant. Pass `userInitials(user)`. Decorative — the
+// accessible name lives in the adjacent text. Size via className (defaults
+// to the sidebar's 24px).
 export function InitialsAvatar({
-  name,
-  email,
+  initials,
   className,
 }: {
-  name: string | null | undefined
-  email: string
+  initials: string
   className?: string
 }) {
   return (
@@ -22,7 +20,7 @@ export function InitialsAvatar({
         className,
       )}
     >
-      {userInitials({ name, email })}
+      {initials}
     </span>
   )
 }
