@@ -112,7 +112,8 @@ export function createSceneBroadcaster(now: () => number = () => Date.now()) {
       const kept = new Map(reconciled.map((element) => [element.id, element]))
       for (const element of remote) {
         // A local copy that won the merge (e.g. a version tie) is news to the room.
-        if (kept.get(element.id)?.versionNonce !== element.versionNonce) continue
+        if (kept.get(element.id)?.versionNonce !== element.versionNonce)
+          continue
         const known = roomElementVersions.get(element.id) ?? -1
         if (element.version > known)
           roomElementVersions.set(element.id, element.version)
