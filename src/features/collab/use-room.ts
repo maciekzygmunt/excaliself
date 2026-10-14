@@ -24,6 +24,7 @@ import type {
   SceneElement,
 } from "./protocol"
 import {
+  DRAWING_TRASHED_CLOSE_CODE,
   LINK_DEAD_CLOSE_CODE,
   parseServerMessage,
   ROOM_FULL_CLOSE_CODE,
@@ -62,8 +63,12 @@ export function useRoom(options: {
   excalidrawAPI: ExcalidrawImperativeAPI | null
   /** The room turned this tab away at its participant cap. */
   onRoomFull: () => void
-  /** The room refused this tab (link dead, drawing trashed); the socket stops and the page re-resolves. */
-  onLinkDead: () => void
+  /**
+   * The room refused this tab (link dead, drawing trashed); the socket stops
+   * and the page re-resolves. `trashedBy` names who trashed it, for members
+   * only, and is null on the trasher's own tabs.
+   */
+  onLinkDead: (trashedBy: string | null) => void
   /** The stored scene is damaged, so no room opens; the socket stops. */
   onSceneUnreadable: () => void
   /** Image ids already stored before this visit. Must be referentially stable. */
@@ -324,7 +329,11 @@ export function useRoom(options: {
           return
         }
         if (event.code === LINK_DEAD_CLOSE_CODE) {
-          onLinkDeadRef.current()
+          onLinkDeadRef.current(null)
+          return
+        }
+        if (event.code === DRAWING_TRASHED_CLOSE_CODE) {
+          onLinkDeadRef.current(event.reason || null)
           return
         }
         if (event.code === SCENE_UNREADABLE_CLOSE_CODE) {

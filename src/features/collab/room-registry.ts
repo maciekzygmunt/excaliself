@@ -9,6 +9,7 @@ import {
   type RoomRegistry,
   sweepSilentParticipants,
   terminateRoom,
+  trashRoom,
 } from "./room-session"
 import { loadRoomScene, saveRoomScene } from "./scene-store"
 import { registerShutdownFlush } from "./shutdown"
@@ -31,4 +32,12 @@ export const rooms: RoomRegistry = processSingleton("collab-rooms", () => {
 /** Ends these drawings' Rooms: each one flushes, then hangs up. */
 export async function endRooms(drawingIds: string[]): Promise<void> {
   await Promise.all(drawingIds.map((id) => terminateRoom(rooms, id)))
+}
+
+/** Ends these trashed drawings' Rooms, telling members who trashed them. */
+export async function endTrashedRooms(
+  drawingIds: string[],
+  trasher: { userId: string; name: string },
+): Promise<void> {
+  await Promise.all(drawingIds.map((id) => trashRoom(rooms, id, trasher)))
 }

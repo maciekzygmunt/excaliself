@@ -76,9 +76,15 @@ type Props = {
    * when the flag flips, so it can be treated as fixed for a mount.
    */
   readOnly?: boolean
+  /** The Room ended for good; `trashedBy` names the member who trashed it. */
+  onLinkDead?: (trashedBy: string | null) => void
 }
 
-export function DrawingCanvas({ drawingId, readOnly = false }: Props) {
+export function DrawingCanvas({
+  drawingId,
+  readOnly = false,
+  onLinkDead,
+}: Props) {
   const { toggleSidebar } = useSidebar()
   const canvasTheme = useCanvasTheme()
 
@@ -126,14 +132,18 @@ export function DrawingCanvas({ drawingId, readOnly = false }: Props) {
   // Link stopped, regenerated, or drawing trashed. Trash keeps the share row,
   // so only re-reading the drawing flips this tab to read-only.
   const queryClient = useQueryClient()
-  const handleLinkDead = useCallback(() => {
-    void queryClient.invalidateQueries({
-      queryKey: drawingShareQueryOptions(drawingId).queryKey,
-    })
-    void queryClient.invalidateQueries({
-      queryKey: drawingQueryOptions(drawingId).queryKey,
-    })
-  }, [queryClient, drawingId])
+  const handleLinkDead = useCallback(
+    (trashedBy: string | null) => {
+      onLinkDead?.(trashedBy)
+      void queryClient.invalidateQueries({
+        queryKey: drawingShareQueryOptions(drawingId).queryKey,
+      })
+      void queryClient.invalidateQueries({
+        queryKey: drawingQueryOptions(drawingId).queryKey,
+      })
+    },
+    [queryClient, drawingId, onLinkDead],
+  )
 
   // The polled list also carries the space, so a tab that missed a move to
   // Team (another tab, another device) flips without waiting for its next

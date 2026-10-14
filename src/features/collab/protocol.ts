@@ -11,6 +11,12 @@ export const LINK_DEAD_CLOSE_CODE = 4010
 
 export const LINK_DEAD_CLOSE_REASON = "Link no longer active"
 
+/**
+ * The drawing was trashed. Sent only to members who can see it; the reason is
+ * who trashed it, empty on the trasher's own tabs. Final, like a dead link.
+ */
+export const DRAWING_TRASHED_CLOSE_CODE = 4011
+
 /** Standard "Service Restart". The client retries it like any outage. */
 export const SERVER_RESTART_CLOSE_CODE = 1012
 
