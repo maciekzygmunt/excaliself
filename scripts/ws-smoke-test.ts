@@ -46,6 +46,9 @@ const socketUrl = (httpUrl: string, token: string) => {
 
 type Frame = { type: string; payload: Record<string, unknown> }
 
+/** Sockets not yet closed, so the runner can hang up on what a failed check left. */
+const openPeers = new Set<Peer>()
+
 class Peer {
   readonly frames: Frame[] = []
   private socket: WebSocket
@@ -54,11 +57,13 @@ class Peer {
 
   private constructor(socket: WebSocket) {
     this.socket = socket
+    openPeers.add(this)
     socket.addEventListener("message", (event) => {
       this.frames.push(JSON.parse(String(event.data)))
     })
     this.closeCode = new Promise((resolve) => {
       socket.addEventListener("close", (event) => {
+        openPeers.delete(this)
         resolve(event.code)
       })
     })
@@ -255,8 +260,8 @@ const checks: {
       const joined = await peer.expect("ROOM_JOINED")
       if (typeof joined.payload.connectionId !== "string")
         throw new Error("ROOM_JOINED carried no connection id")
-      if (participantsOf(joined).length !== 1)
-        throw new Error("a fresh room should hold exactly the joiner")
+      // The last check's sockets can still be on their way out.
+      await roomSettlesAt(peer, 1)
       peer.close()
     },
   },
@@ -566,6 +571,14 @@ async function main() {
         }
         failed++
         console.error(`  ✗ ${check.name}\n      ${(error as Error).message}`)
+      } finally {
+        // A failed check skips its own closes; its seats would fail every later check.
+        await Promise.all(
+          [...openPeers].map((peer) => {
+            peer.close()
+            return peer.closedWith().catch(() => {})
+          }),
+        )
       }
     }
   } finally {
