@@ -14,13 +14,14 @@ import {
   patchById,
   useOptimisticListMutation,
 } from "@/hooks/use-optimistic-list-mutation"
-import { isDescendantFolder } from "./tree"
+import { useMoveToTeamDialog } from "../MoveToTeamDialog"
+import { canDrop, type DragItem, type DropTarget } from "./tree"
 
-export type DragItem = { type: "drawing" | "folder"; id: string }
-export type DropTarget =
-  | { type: "root" }
-  | { type: "folder"; id: string }
-  | null
+const sameTarget = (a: DropTarget | null, b: DropTarget) =>
+  a !== null &&
+  a.type === b.type &&
+  a.space === b.space &&
+  (a.type !== "folder" || b.type !== "folder" || a.id === b.id)
 
 type Options = {
   drawings: Drawing[]
@@ -29,7 +30,8 @@ type Options = {
 
 function useSidebarDnDValue({ drawings, foldersById }: Options) {
   const [dragItem, setDragItem] = useState<DragItem | null>(null)
-  const [dropTarget, setDropTarget] = useState<DropTarget>(null)
+  const [dropTarget, setDropTarget] = useState<DropTarget | null>(null)
+  const { requestMoveToTeam } = useMoveToTeamDialog()
 
   const moveDrawing = useOptimisticListMutation<
     Drawing,
@@ -51,12 +53,8 @@ function useSidebarDnDValue({ drawings, foldersById }: Options) {
       patchById(list, data.id, { parentId: data.parentId }),
   })
 
-  const isInvalidFolderTarget = useCallback(
-    (item: DragItem, target: DropTarget) =>
-      item.type === "folder" &&
-      target?.type === "folder" &&
-      (item.id === target.id ||
-        isDescendantFolder(item.id, target.id, foldersById)),
+  const isAllowed = useCallback(
+    (item: DragItem, target: DropTarget) => canDrop(item, target, foldersById),
     [foldersById],
   )
 
@@ -76,13 +74,14 @@ function useSidebarDnDValue({ drawings, foldersById }: Options) {
 
   const onDragOver = useCallback(
     (target: DropTarget) => (e: DragEvent) => {
-      if (!dragItem || isInvalidFolderTarget(dragItem, target)) return
+      if (!dragItem || !isAllowed(dragItem, target)) return
       e.preventDefault()
       e.stopPropagation()
       e.dataTransfer.dropEffect = "move"
-      setDropTarget(target)
+      // dragover fires continuously; keep the old object so nothing re-renders.
+      setDropTarget((prev) => (sameTarget(prev, target) ? prev : target))
     },
-    [dragItem, isInvalidFolderTarget],
+    [dragItem, isAllowed],
   )
 
   const onDragLeave = useCallback(() => setDropTarget(null), [])
@@ -93,12 +92,26 @@ function useSidebarDnDValue({ drawings, foldersById }: Options) {
       e.stopPropagation()
       if (!dragItem) return
 
-      const targetFolderId = target?.type === "folder" ? target.id : null
+      const targetFolderId = target.type === "folder" ? target.id : null
 
       setDropTarget(null)
       setDragItem(null)
 
-      if (isInvalidFolderTarget(dragItem, target)) return
+      if (!isAllowed(dragItem, target)) return
+
+      // Private → Team: never silent, always through the confirm.
+      if (dragItem.space !== target.space) {
+        const name =
+          dragItem.type === "drawing"
+            ? drawings.find((d) => d.id === dragItem.id)?.name
+            : foldersById.get(dragItem.id)?.name
+        requestMoveToTeam?.(
+          { type: dragItem.type, id: dragItem.id },
+          name ?? "",
+          targetFolderId,
+        )
+        return
+      }
 
       if (dragItem.type === "folder") {
         moveFolder.mutate({
@@ -113,12 +126,21 @@ function useSidebarDnDValue({ drawings, foldersById }: Options) {
         data: { id: dragItem.id, updateData: { folderId: targetFolderId } },
       })
     },
-    [dragItem, drawings, isInvalidFolderTarget, moveDrawing, moveFolder],
+    [
+      dragItem,
+      drawings,
+      foldersById,
+      isAllowed,
+      requestMoveToTeam,
+      moveDrawing,
+      moveFolder,
+    ],
   )
 
   return {
     dragItem,
     dropTarget,
+    canDrop: isAllowed,
     onDragStart,
     onDragEnd,
     onDragOver,

@@ -11,7 +11,6 @@ import { foldersQueryOptions } from "@/features/folders/queries"
 import { inBrowsedSpace, useBrowsedSpace } from "@/features/spaces/browse"
 import { cn } from "@/lib/utils"
 import { useCreateDialog } from "../CreateDialog"
-import { SpaceSwitch } from "../SpaceSwitch"
 
 const RECENT_LIMIT = 8
 
@@ -28,12 +27,9 @@ export function Home({ isAdmin }: { isAdmin: boolean }) {
     <div className="h-full overflow-y-auto">
       <div className="mx-auto flex min-h-full w-full max-w-4xl flex-col px-6 py-8">
         <div className="flex items-center justify-between pb-5">
-          <div className="flex items-center gap-3">
-            <h1 className="text-sm font-semibold tracking-[-0.01em] text-foreground">
-              Recent
-            </h1>
-            {space && <SpaceSwitch to="/draw" space={space} />}
-          </div>
+          <h1 className="text-sm font-semibold tracking-[-0.01em] text-foreground">
+            Recent
+          </h1>
           <div className="flex items-center gap-4">
             {/* Pointless next to the empty state — only offered once there is
                 something to browse */}

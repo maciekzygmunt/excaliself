@@ -20,12 +20,13 @@ import { useMoveToTeamDialog } from "../MoveToTeamDialog"
 import { TreeNodeItem } from "./TreeNodeItem"
 import { TreeRowActions } from "./TreeRowActions"
 import {
+  type DropTarget,
   type Folder as FolderModel,
   hasActiveDrawing,
   type TreeNode,
   treeNodeKey,
 } from "./tree"
-import { type DropTarget, useSidebarDnD } from "./use-sidebar-dnd"
+import { useSidebarDnD } from "./use-sidebar-dnd"
 
 type FolderItemProps = {
   folder: FolderModel
@@ -81,10 +82,15 @@ export function FolderItem({ folder, childNodes }: FolderItemProps) {
     setIsExpanded(true)
   }
 
+  const target: DropTarget = {
+    type: "folder",
+    id: folder.id,
+    space: folder.space,
+  }
   const dropTargetProps = {
-    onDragOver: onDragOver({ type: "folder", id: folder.id }),
+    onDragOver: onDragOver(target),
     onDragLeave,
-    onDrop: handleDrop({ type: "folder", id: folder.id }),
+    onDrop: handleDrop(target),
   }
 
   // An empty folder has nothing to reveal, so it gets no collapsible at all —
@@ -102,7 +108,11 @@ export function FolderItem({ folder, childNodes }: FolderItemProps) {
     >
       <SidebarMenuButton
         draggable
-        onDragStart={onDragStart({ type: "folder", id: folder.id })}
+        onDragStart={onDragStart({
+          type: "folder",
+          id: folder.id,
+          space: folder.space,
+        })}
         onDragEnd={onDragEnd}
         className={cn(
           "h-auto cursor-pointer gap-1.5 px-2 py-1.5 pr-2! text-[13px] active:cursor-grabbing [&>svg]:size-auto",

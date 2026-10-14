@@ -19,23 +19,38 @@ import {
   SidebarMenu,
   useSidebar,
 } from "@/components/ui/sidebar"
-import { type Drawing, drawingsQueryOptions } from "@/features/drawings/queries"
+import type { Space } from "@/db/schema"
+import { drawingsQueryOptions } from "@/features/drawings/queries"
 import { foldersQueryOptions } from "@/features/folders/queries"
 import { useIsApplePlatform } from "@/hooks/use-is-apple-platform"
 import { cn } from "@/lib/utils"
+import { useActiveSpace } from "../ActiveSpace"
 import { useCommandPalette } from "../CommandPalette"
 import { useCreateDialog } from "../CreateDialog"
 import { SidebarNav, SidebarNavItem } from "./SidebarNav"
 import { type SidebarUser, SidebarUserMenu } from "./SidebarUserMenu"
+import { SpaceSegments } from "./SpaceSegments"
 import { StarredSection } from "./StarredSection"
+import { useSpaceSwipe } from "./space-gestures"
 import { TreeNodeItem } from "./TreeNodeItem"
-import { buildTree, treeNodeKey } from "./tree"
+import {
+  buildTree,
+  type Drawing,
+  type Folder as FolderModel,
+  treeNodeKey,
+} from "./tree"
 import { SidebarDnDProvider, useSidebarDnD } from "./use-sidebar-dnd"
+
+const bySpace = <T extends { space: Space }>(rows: T[]) => ({
+  private: rows.filter((row) => row.space === "private"),
+  team: rows.filter((row) => row.space === "team"),
+})
 
 export function DrawSidebar({ user }: { user: SidebarUser }) {
   const { data: drawings = [] } = useQuery(drawingsQueryOptions())
   const { data: folders = [] } = useQuery(foldersQueryOptions())
-  const { openCreateDrawingDialog, openCreateFolderDialog } = useCreateDialog()
+  const { activeSpace } = useActiveSpace()
+  const { openCreateDrawingDialog } = useCreateDialog()
   const { openCommandPalette } = useCommandPalette()
   const isApplePlatform = useIsApplePlatform()
 
@@ -63,10 +78,8 @@ export function DrawSidebar({ user }: { user: SidebarUser }) {
     [folders],
   )
 
-  const displayTree = useMemo(
-    () => buildTree(folders, drawings),
-    [drawings, folders],
-  )
+  const drawingsBySpace = useMemo(() => bySpace(drawings), [drawings])
+  const foldersBySpace = useMemo(() => bySpace(folders), [folders])
 
   return (
     <SidebarDnDProvider drawings={drawings} foldersById={foldersById}>
@@ -122,14 +135,27 @@ export function DrawSidebar({ user }: { user: SidebarUser }) {
           </button>
         </div>
 
+        {activeSpace && (
+          <SpaceSegments
+            activeSpace={activeSpace}
+            teamDrawings={drawingsBySpace.team}
+          />
+        )}
+
         <SidebarNav />
 
-        <TreeBody
-          displayTree={displayTree}
-          drawings={drawings}
-          onCreateDrawing={() => openCreateDrawingDialog()}
-          onCreateFolder={openCreateFolderDialog}
-        />
+        {activeSpace ? (
+          <SpaceTrack
+            activeSpace={activeSpace}
+            drawingsBySpace={drawingsBySpace}
+            foldersBySpace={foldersBySpace}
+          />
+        ) : (
+          // Solo instance: today's sidebar, one scroll region, no track.
+          <SidebarContent className="gap-0 pt-0.5 [scrollbar-width:none]">
+            <SpaceBody space="private" drawings={drawings} folders={folders} />
+          </SidebarContent>
+        )}
 
         <SidebarFooter className="gap-0 p-2">
           {/* Pinned below the scroll region — Trash stays reachable no
@@ -158,23 +184,68 @@ function SidebarToggle() {
   )
 }
 
-// Starred and the tree share the sidebar's single scroll region — a fixed
-// starred list would otherwise squeeze the tree out of view as stars grow.
-function TreeBody({
-  displayTree,
-  drawings,
-  onCreateDrawing,
-  onCreateFolder,
+/**
+ * Variant A's track: one pane per space side by side, sliding to the active
+ * one. A horizontal swipe over it switches space.
+ */
+function SpaceTrack({
+  activeSpace,
+  drawingsBySpace,
+  foldersBySpace,
 }: {
-  displayTree: ReturnType<typeof buildTree>
-  drawings: Drawing[]
-  onCreateDrawing: () => void
-  onCreateFolder: () => void
+  activeSpace: Space
+  drawingsBySpace: Record<Space, Drawing[]>
+  foldersBySpace: Record<Space, FolderModel[]>
 }) {
-  const { dropTarget, onDragOver, onDragLeave, onDrop } = useSidebarDnD()
+  const { setActiveSpace } = useActiveSpace()
+  const onWheel = useSpaceSwipe(setActiveSpace)
 
   return (
-    <SidebarContent className="gap-0 pt-0.5 [scrollbar-width:none]">
+    <div className="relative min-h-0 flex-1 overflow-hidden" onWheel={onWheel}>
+      <div
+        className={cn(
+          "flex h-full w-[200%] transition-transform duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)] motion-reduce:transition-none",
+          activeSpace === "team" && "-translate-x-1/2",
+        )}
+      >
+        {(["private", "team"] as const).map((space) => (
+          // Each pane scrolls on its own; the hidden one is out of reach.
+          <div
+            key={space}
+            inert={space !== activeSpace}
+            aria-hidden={space !== activeSpace}
+            className="flex h-full w-1/2 min-w-0 flex-col overflow-auto pt-0.5 [scrollbar-width:none]"
+          >
+            <SpaceBody
+              space={space}
+              drawings={drawingsBySpace[space]}
+              folders={foldersBySpace[space]}
+            />
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// Starred and the tree share one scroll region — a fixed starred list would
+// otherwise squeeze the tree out of view as stars grow.
+function SpaceBody({
+  space,
+  drawings,
+  folders,
+}: {
+  space: Space
+  drawings: Drawing[]
+  folders: FolderModel[]
+}) {
+  const { dropTarget, onDragOver, onDragLeave, onDrop } = useSidebarDnD()
+  const { openCreateDrawingDialog, openCreateFolderDialog } = useCreateDialog()
+  const tree = useMemo(() => buildTree(folders, drawings), [folders, drawings])
+  const target = { type: "root", space } as const
+
+  return (
+    <>
       <StarredSection drawings={drawings} />
 
       <div className="flex items-center justify-between pt-2 pb-0.5 pr-3 pl-4">
@@ -186,8 +257,8 @@ function TreeBody({
             {drawings.length}
           </span>
           <CreateMenu
-            onCreateDrawing={onCreateDrawing}
-            onCreateFolder={onCreateFolder}
+            onCreateDrawing={() => openCreateDrawingDialog(undefined, space)}
+            onCreateFolder={() => openCreateFolderDialog(space)}
           />
         </div>
       </div>
@@ -197,20 +268,21 @@ function TreeBody({
           className={cn(
             "min-h-50 rounded-md pb-4 transition-colors",
             dropTarget?.type === "root" &&
+              dropTarget.space === space &&
               "bg-iris-muted ring-2 ring-iris-ring",
           )}
-          onDragOver={onDragOver({ type: "root" })}
+          onDragOver={onDragOver(target)}
           onDragLeave={onDragLeave}
-          onDrop={onDrop({ type: "root" })}
+          onDrop={onDrop(target)}
         >
           <SidebarMenu className="gap-0">
-            {displayTree.map((node) => (
+            {tree.map((node) => (
               <TreeNodeItem key={treeNodeKey(node)} node={node} />
             ))}
           </SidebarMenu>
         </div>
       </div>
-    </SidebarContent>
+    </>
   )
 }
 

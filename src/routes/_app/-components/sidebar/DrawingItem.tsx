@@ -79,7 +79,11 @@ export function DrawingItem({ drawing }: DrawingItemProps) {
     <SidebarMenuItem
       className={cn("group/tree-row", isDragging && "opacity-50")}
       draggable
-      onDragStart={onDragStart({ type: "drawing", id: drawing.id })}
+      onDragStart={onDragStart({
+        type: "drawing",
+        id: drawing.id,
+        space: drawing.space,
+      })}
       onDragEnd={onDragEnd}
     >
       <SidebarMenuButton

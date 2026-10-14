@@ -10,6 +10,7 @@ import { useSettingsShortcut } from "@/hooks/use-settings-shortcut"
 import { useStoredTheme } from "@/hooks/use-theme"
 import { authMiddleware } from "@/middleware/auth"
 import { setupMiddleware } from "@/middleware/setup"
+import { ActiveSpaceProvider } from "./-components/ActiveSpace"
 import { CommandPaletteProvider } from "./-components/CommandPalette"
 import { CreateDialogProvider } from "./-components/CreateDialog"
 import { MoveToTeamProvider } from "./-components/MoveToTeamDialog"
@@ -54,24 +55,26 @@ function AppShellLayout() {
       defaultOpen
       style={{ "--sidebar-width": "240px" } as React.CSSProperties}
     >
-      <CreateDialogProvider>
-        <MoveToTeamProvider>
-          <CommandPaletteProvider>
-            <DrawSidebar
-              user={{
-                email: currentUser?.email ?? session.user?.email ?? "",
-                name: currentUser?.name ?? null,
-                isAdmin,
-              }}
-            />
-            {/* The Etched panel look lives in the SidebarInset primitive. */}
-            <SidebarInset className="overflow-clip">
-              <SidebarReopenButton />
-              <Outlet />
-            </SidebarInset>
-          </CommandPaletteProvider>
-        </MoveToTeamProvider>
-      </CreateDialogProvider>
+      <ActiveSpaceProvider>
+        <CreateDialogProvider>
+          <MoveToTeamProvider>
+            <CommandPaletteProvider>
+              <DrawSidebar
+                user={{
+                  email: currentUser?.email ?? session.user?.email ?? "",
+                  name: currentUser?.name ?? null,
+                  isAdmin,
+                }}
+              />
+              {/* The Etched panel look lives in the SidebarInset primitive. */}
+              <SidebarInset className="overflow-clip">
+                <SidebarReopenButton />
+                <Outlet />
+              </SidebarInset>
+            </CommandPaletteProvider>
+          </MoveToTeamProvider>
+        </CreateDialogProvider>
+      </ActiveSpaceProvider>
     </SidebarProvider>
   )
 }
