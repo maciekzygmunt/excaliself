@@ -88,15 +88,22 @@ test("offers a single enabled Delete account action", () => {
 })
 
 test("Delete account runs the tier-3 confirm with own counts, then signs out to login", async () => {
-  vi.mocked(getMyContentCounts).mockResolvedValue({ drawings: 3, folders: 1 })
+  vi.mocked(getMyContentCounts).mockResolvedValue({
+    drawings: 3,
+    folders: 1,
+    teamDrawings: 0,
+  })
   vi.mocked(deleteMyAccount).mockResolvedValue(undefined)
   renderSection()
 
   fireEvent.click(deleteButton())
   await flush()
 
+  // With no Team drawings the copy names only what is destroyed.
   expect(
-    await screen.findByText(/permanently delete your 3 drawings and 1 folder/),
+    await screen.findByText(
+      "This will delete your account and permanently delete your 3 drawings and 1 folder. This can't be undone.",
+    ),
   ).toBeTruthy()
 
   // Armed only by typing the exact email.
@@ -122,13 +129,21 @@ test("Delete account runs the tier-3 confirm with own counts, then signs out to 
 })
 
 test("a failed deletion keeps the dialog open and explains via toast", async () => {
-  vi.mocked(getMyContentCounts).mockResolvedValue({ drawings: 0, folders: 0 })
+  vi.mocked(getMyContentCounts).mockResolvedValue({
+    drawings: 0,
+    folders: 0,
+    teamDrawings: 0,
+  })
   vi.mocked(deleteMyAccount).mockRejectedValue(new Error("boom"))
   renderSection()
 
   fireEvent.click(deleteButton())
   // Confirm stays gated until the counts land in the danger copy.
-  expect(await screen.findByText(/no drawings or folders/)).toBeTruthy()
+  expect(
+    await screen.findByText(
+      "This will delete your account. You have no drawings or folders. This can't be undone.",
+    ),
+  ).toBeTruthy()
 
   fireEvent.change(screen.getByRole("textbox"), {
     target: { value: "ada@example.com" },
@@ -154,4 +169,38 @@ test("the sole admin is blocked with an explanation instead of a dead control", 
   // The control says why (issue #67) — promote someone else first.
   expect(screen.getByText(/only admin/i)).toBeTruthy()
   expect(screen.getByText(/promote/i)).toBeTruthy()
+})
+
+test("the confirm counts only Private items and says Team drawings stay", async () => {
+  vi.mocked(getMyContentCounts).mockResolvedValue({
+    drawings: 3,
+    folders: 1,
+    teamDrawings: 2,
+  })
+  renderSection()
+
+  fireEvent.click(deleteButton())
+
+  expect(
+    await screen.findByText(
+      "This will delete your account and permanently delete your 3 drawings and 1 folder. This can't be undone. Your 2 Team drawings stay with the team.",
+    ),
+  ).toBeTruthy()
+})
+
+test("with only Team work the confirm says nothing private is destroyed", async () => {
+  vi.mocked(getMyContentCounts).mockResolvedValue({
+    drawings: 0,
+    folders: 0,
+    teamDrawings: 1,
+  })
+  renderSection()
+
+  fireEvent.click(deleteButton())
+
+  expect(
+    await screen.findByText(
+      "This will delete your account. You have no private drawings or folders. This can't be undone. Your 1 Team drawing stays with the team.",
+    ),
+  ).toBeTruthy()
 })

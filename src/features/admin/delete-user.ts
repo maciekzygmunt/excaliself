@@ -3,7 +3,7 @@
 // Kept out of server.ts — which imports the live db — so tests can drive it
 // with a fake db, mirroring trash/destroy.ts.
 
-import { count, eq, or } from "drizzle-orm"
+import { and, count, eq, or } from "drizzle-orm"
 import type { NodePgDatabase } from "drizzle-orm/node-postgres"
 import type * as schema from "@/db/schema"
 import { drawings, folders, shares, users, verifications } from "@/db/schema"
@@ -11,26 +11,45 @@ import { inPrivateSpaceOf } from "@/features/spaces/access"
 
 type Db = NodePgDatabase<typeof schema>
 
+/** What both delete confirms state: the Private rows destroyed, the Team drawings kept. */
+export type OwnedContentCounts = {
+  drawings: number
+  folders: number
+  teamDrawings: number
+}
+
 /**
- * Counts everything the delete destroys — the user's Private rows, trashed
- * ones included — so both tier-3 confirms (admin delete and the Account
- * danger zone) can state real numbers in their danger copy.
+ * Counts for both tier-3 confirms (admin delete and the Account danger
+ * zone): everything the delete destroys — the user's Private rows, trashed
+ * ones included — plus the Team drawings they created, which stay.
  */
 export async function countOwnedContent(
   db: Db,
   userId: string,
-): Promise<{ drawings: number; folders: number }> {
-  const [[drawingCount], [folderCount]] = await Promise.all([
-    db
-      .select({ count: count() })
-      .from(drawings)
-      .where(inPrivateSpaceOf(drawings, userId)),
-    db
-      .select({ count: count() })
-      .from(folders)
-      .where(inPrivateSpaceOf(folders, userId)),
-  ])
-  return { drawings: drawingCount.count, folders: folderCount.count }
+): Promise<OwnedContentCounts> {
+  const [[drawingCount], [folderCount], [teamDrawingCount]] = await Promise.all(
+    [
+      db
+        .select({ count: count() })
+        .from(drawings)
+        .where(inPrivateSpaceOf(drawings, userId)),
+      db
+        .select({ count: count() })
+        .from(folders)
+        .where(inPrivateSpaceOf(folders, userId)),
+      // Not an access check: a count of what the user created in Team, for
+      // the "N Team drawings stay with the team" sentence.
+      db
+        .select({ count: count() })
+        .from(drawings)
+        .where(and(eq(drawings.createdBy, userId), eq(drawings.space, "team"))),
+    ],
+  )
+  return {
+    drawings: drawingCount.count,
+    folders: folderCount.count,
+    teamDrawings: teamDrawingCount.count,
+  }
 }
 
 /** The user's shared Private drawings, whose live rooms must close on delete. */

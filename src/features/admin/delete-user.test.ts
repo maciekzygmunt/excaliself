@@ -4,7 +4,11 @@ import { expect, test } from "vitest"
 import { drawings, folders, users, verifications } from "@/db/schema"
 import { inPrivateSpaceOf } from "@/features/spaces/access"
 import { expectCondition } from "@/features/spaces/expect-condition"
-import { deleteUserAccount, hardDeleteUser } from "./delete-user"
+import {
+  countOwnedContent,
+  deleteUserAccount,
+  hardDeleteUser,
+} from "./delete-user"
 
 type Call =
   | { kind: "select"; where: SQL; lock?: string }
@@ -63,6 +67,37 @@ function fakeDb(options: {
     transaction: (fn: (tx: unknown) => Promise<unknown>) => fn(tx),
   } as unknown as Parameters<typeof deleteUserAccount>[0]
   return { db, calls }
+}
+
+// Answers each count query from a fixed set of rows by rendering its where
+// clause, so the test checks which rows each count actually matches.
+function countingDb(
+  rows: Array<{
+    table: typeof drawings | typeof folders
+    createdBy: string
+    space: "private" | "team"
+  }>,
+) {
+  const matches = (where: SQL, row: (typeof rows)[number]) => {
+    const { sql, params } = toSql(where)
+    const creatorOk = params.includes(row.createdBy)
+    const spaceOk = params.includes(row.space)
+    // Both must hold: an "or" (the access rule) is the wrong condition.
+    return creatorOk && spaceOk && !sql.includes(" or ")
+  }
+  return {
+    select: () => ({
+      from: (table: unknown) => ({
+        where: async (where: SQL) => [
+          {
+            count: rows.filter(
+              (row) => row.table === table && matches(where, row),
+            ).length,
+          },
+        ],
+      }),
+    }),
+  } as unknown as Parameters<typeof countOwnedContent>[0]
 }
 
 const shape = (call: Call) =>
@@ -256,4 +291,26 @@ test("an unknown user id throws not-found", async () => {
   await expect(deleteUserAccount(db, "admin-1", "nope")).rejects.toThrow(
     "User not found",
   )
+})
+
+test("counts split the member's Private rows from the Team drawings they created", async () => {
+  const db = countingDb([
+    { table: drawings, createdBy: "user-bea", space: "private" },
+    { table: drawings, createdBy: "user-bea", space: "private" },
+    { table: folders, createdBy: "user-bea", space: "private" },
+    { table: drawings, createdBy: "user-bea", space: "team" },
+    { table: drawings, createdBy: "user-bea", space: "team" },
+    { table: drawings, createdBy: "user-bea", space: "team" },
+    // Team folders are not counted; Team drawings carry the sentence.
+    { table: folders, createdBy: "user-bea", space: "team" },
+    // Another member's rows count for nobody but them.
+    { table: drawings, createdBy: "user-cy", space: "private" },
+    { table: drawings, createdBy: "user-cy", space: "team" },
+  ])
+
+  expect(await countOwnedContent(db, "user-bea")).toEqual({
+    drawings: 2,
+    folders: 1,
+    teamDrawings: 3,
+  })
 })
