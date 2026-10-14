@@ -19,6 +19,7 @@ import {
 import { fetchRoomFile, uploadRoomFile } from "./file-transport"
 import type { SceneElement } from "./protocol"
 import { MAX_DRAWING_IMAGE_BYTES } from "./room-files"
+import type { RoomPath } from "./room-url"
 
 const MAX_FETCH_ATTEMPTS = 3
 
@@ -59,18 +60,18 @@ export function markImageStatus(
 }
 
 export function useRoomFiles(options: {
-  /** The share token; null keeps both directions closed. */
-  token: string | null
+  /** The Room's address; null keeps both directions closed. */
+  room: RoomPath | null
   excalidrawAPI: ExcalidrawImperativeAPI | null
   /** Already stored; `restore()` marks them `pending`, so skip re-uploading. */
   storedFileIds: readonly string[]
 }) {
-  const { token, excalidrawAPI, storedFileIds } = options
+  const { room, excalidrawAPI, storedFileIds } = options
 
   const apiRef = useRef(excalidrawAPI)
   apiRef.current = excalidrawAPI
-  const tokenRef = useRef(token)
-  tokenRef.current = token
+  const roomRef = useRef(room)
+  roomRef.current = room
 
   /** Stored, in flight, or given up on. Claimed before the request goes out. */
   const skipUploadRef = useRef<Set<string>>(new Set(storedFileIds))
@@ -78,7 +79,7 @@ export function useRoomFiles(options: {
   const inFlightFetchRef = useRef<Set<string>>(new Set())
   const fetchAttemptsRef = useRef<Map<string, number>>(new Map())
   const retryTimersRef = useRef<Set<ReturnType<typeof setTimeout>>>(new Set())
-  const seededForRef = useRef(token)
+  const seededForRef = useRef(room)
 
   const cancelRetries = useCallback(() => {
     for (const timer of retryTimersRef.current) clearTimeout(timer)
@@ -86,9 +87,9 @@ export function useRoomFiles(options: {
   }, [])
 
   useEffect(() => {
-    // A new token is a new drawing; drop all per-room state.
-    if (seededForRef.current !== token) {
-      seededForRef.current = token
+    // A new room is a new drawing; drop all per-room state.
+    if (seededForRef.current !== room) {
+      seededForRef.current = room
       skipUploadRef.current = new Set()
       uploadAttemptsRef.current = new Map()
       inFlightFetchRef.current = new Set()
@@ -96,14 +97,14 @@ export function useRoomFiles(options: {
       cancelRetries()
     }
     for (const fileId of storedFileIds) skipUploadRef.current.add(fileId)
-  }, [token, storedFileIds, cancelRetries])
+  }, [room, storedFileIds, cancelRetries])
 
   useEffect(() => cancelRetries, [cancelRetries])
 
   const uploadPending = useCallback(
     (elements: readonly SceneElement[], files: BinaryFiles) => {
-      const token = tokenRef.current
-      if (!token) return
+      const room = roomRef.current
+      if (!room) return
 
       for (const file of selectUploads(
         elements,
@@ -114,7 +115,7 @@ export function useRoomFiles(options: {
         const attempt = (uploadAttemptsRef.current.get(file.fileId) ?? 0) + 1
         uploadAttemptsRef.current.set(file.fileId, attempt)
 
-        void uploadRoomFile(token, file).then((outcome) => {
+        void uploadRoomFile(room, file).then((outcome) => {
           // A network blip leaves it `pending` for the next onChange to retry.
           if (outcome === "failed" && attempt < MAX_UPLOAD_ATTEMPTS) {
             skipUploadRef.current.delete(file.fileId)
@@ -134,37 +135,37 @@ export function useRoomFiles(options: {
     [],
   )
 
-  // A ref so the retry can call itself and see the latest token.
-  const requestFileRef = useRef<(token: string, fileId: string) => void>(
+  // A ref so the retry can call itself and see the latest room.
+  const requestFileRef = useRef<(room: RoomPath, fileId: string) => void>(
     () => {},
   )
-  requestFileRef.current = (token, fileId) => {
+  requestFileRef.current = (room, fileId) => {
     if (inFlightFetchRef.current.has(fileId)) return
     const attempts = fetchAttemptsRef.current.get(fileId) ?? 0
     if (attempts >= MAX_FETCH_ATTEMPTS) return
 
     fetchAttemptsRef.current.set(fileId, attempts + 1)
     inFlightFetchRef.current.add(fileId)
-    void fetchRoomFile(token, fileId).then((file) => {
+    void fetchRoomFile(room, fileId).then((file) => {
       inFlightFetchRef.current.delete(fileId)
       if (file) return apiRef.current?.addFiles([file])
 
       const timer = setTimeout(() => {
         retryTimersRef.current.delete(timer)
-        if (tokenRef.current === token) requestFileRef.current(token, fileId)
+        if (roomRef.current === room) requestFileRef.current(room, fileId)
       }, FETCH_RETRY_MS)
       retryTimersRef.current.add(timer)
     })
   }
 
   const fetchMissing = useCallback((elements: readonly SceneElement[]) => {
-    const token = tokenRef.current
+    const room = roomRef.current
     const api = apiRef.current
-    if (!token || !api) return
+    if (!room || !api) return
 
     const known = new Set(Object.keys(api.getFiles()))
     for (const fileId of selectMissingFileIds(elements, known)) {
-      requestFileRef.current(token, fileId)
+      requestFileRef.current(room, fileId)
     }
   }, [])
 

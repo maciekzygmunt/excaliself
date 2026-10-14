@@ -29,6 +29,7 @@ import { Route as AppSettingsInstanceRouteImport } from './routes/_app/settings/
 import { Route as AppSettingsInvitesRouteImport } from './routes/_app/settings/invites'
 import { Route as AppSettingsMembersRouteImport } from './routes/_app/settings/members'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
+import { Route as ApiDrawingsIdFilesFileIdRouteImport } from './routes/api/drawings/$id/files/$fileId'
 import { Route as ApiRoomsTokenFilesFileIdRouteImport } from './routes/api/rooms/$token/files/$fileId'
 
 const IndexRoute = IndexRouteImport.update({
@@ -130,6 +131,12 @@ const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   path: '/api/auth/$',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiDrawingsIdFilesFileIdRoute =
+  ApiDrawingsIdFilesFileIdRouteImport.update({
+    id: '/api/drawings/$id/files/$fileId',
+    path: '/api/drawings/$id/files/$fileId',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiRoomsTokenFilesFileIdRoute =
   ApiRoomsTokenFilesFileIdRouteImport.update({
     id: '/api/rooms/$token/files/$fileId',
@@ -157,6 +164,7 @@ export interface FileRoutesByFullPath {
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/draw/': typeof AppDrawIndexRoute
   '/settings/': typeof AppSettingsIndexRoute
+  '/api/drawings/$id/files/$fileId': typeof ApiDrawingsIdFilesFileIdRoute
   '/api/rooms/$token/files/$fileId': typeof ApiRoomsTokenFilesFileIdRoute
 }
 export interface FileRoutesByTo {
@@ -178,6 +186,7 @@ export interface FileRoutesByTo {
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/draw': typeof AppDrawIndexRoute
   '/settings': typeof AppSettingsIndexRoute
+  '/api/drawings/$id/files/$fileId': typeof ApiDrawingsIdFilesFileIdRoute
   '/api/rooms/$token/files/$fileId': typeof ApiRoomsTokenFilesFileIdRoute
 }
 export interface FileRoutesById {
@@ -202,6 +211,7 @@ export interface FileRoutesById {
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/_app/draw/': typeof AppDrawIndexRoute
   '/_app/settings/': typeof AppSettingsIndexRoute
+  '/api/drawings/$id/files/$fileId': typeof ApiDrawingsIdFilesFileIdRoute
   '/api/rooms/$token/files/$fileId': typeof ApiRoomsTokenFilesFileIdRoute
 }
 export interface FileRouteTypes {
@@ -226,6 +236,7 @@ export interface FileRouteTypes {
     | '/api/auth/$'
     | '/draw/'
     | '/settings/'
+    | '/api/drawings/$id/files/$fileId'
     | '/api/rooms/$token/files/$fileId'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -247,6 +258,7 @@ export interface FileRouteTypes {
     | '/api/auth/$'
     | '/draw'
     | '/settings'
+    | '/api/drawings/$id/files/$fileId'
     | '/api/rooms/$token/files/$fileId'
   id:
     | '__root__'
@@ -270,6 +282,7 @@ export interface FileRouteTypes {
     | '/api/auth/$'
     | '/_app/draw/'
     | '/_app/settings/'
+    | '/api/drawings/$id/files/$fileId'
     | '/api/rooms/$token/files/$fileId'
   fileRoutesById: FileRoutesById
 }
@@ -284,6 +297,7 @@ export interface RootRouteChildren {
   ApiHealthRoute: typeof ApiHealthRoute
   ShareTokenRoute: typeof ShareTokenRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
+  ApiDrawingsIdFilesFileIdRoute: typeof ApiDrawingsIdFilesFileIdRoute
   ApiRoomsTokenFilesFileIdRoute: typeof ApiRoomsTokenFilesFileIdRoute
 }
 
@@ -429,6 +443,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAuthSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/drawings/$id/files/$fileId': {
+      id: '/api/drawings/$id/files/$fileId'
+      path: '/api/drawings/$id/files/$fileId'
+      fullPath: '/api/drawings/$id/files/$fileId'
+      preLoaderRoute: typeof ApiDrawingsIdFilesFileIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/rooms/$token/files/$fileId': {
       id: '/api/rooms/$token/files/$fileId'
       path: '/api/rooms/$token/files/$fileId'
@@ -489,6 +510,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiHealthRoute: ApiHealthRoute,
   ShareTokenRoute: ShareTokenRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
+  ApiDrawingsIdFilesFileIdRoute: ApiDrawingsIdFilesFileIdRoute,
   ApiRoomsTokenFilesFileIdRoute: ApiRoomsTokenFilesFileIdRoute,
 }
 export const routeTree = rootRouteImport

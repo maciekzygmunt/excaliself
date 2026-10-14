@@ -2,7 +2,7 @@
 
 import type { BinaryFileData } from "@excalidraw/excalidraw/types"
 import { parseFilePayload, type RoomFileUpload } from "./room-files"
-import { roomFileUrl } from "./room-url"
+import { type RoomPath, roomFileUrl } from "./room-url"
 
 // Statuses about the image itself; a 401/5xx/network error must not mark it broken.
 const IMAGE_VERDICTS = new Set([400, 413, 429])
@@ -17,11 +17,11 @@ export type UploadOutcome =
   | "failed"
 
 export async function uploadRoomFile(
-  token: string,
+  room: RoomPath,
   file: RoomFileUpload,
 ): Promise<UploadOutcome> {
   try {
-    const response = await fetch(roomFileUrl(token, file.fileId), {
+    const response = await fetch(roomFileUrl(room, file.fileId), {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ dataUrl: file.dataUrl }),
@@ -35,11 +35,11 @@ export async function uploadRoomFile(
 }
 
 export async function fetchRoomFile(
-  token: string,
+  room: RoomPath,
   fileId: string,
 ): Promise<BinaryFileData | null> {
   try {
-    const response = await fetch(roomFileUrl(token, fileId))
+    const response = await fetch(roomFileUrl(room, fileId))
     if (!response.ok) return null
     const payload = parseFilePayload(await response.json())
     if (!payload) return null

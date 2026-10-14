@@ -1,20 +1,28 @@
 // The socket shares the app's origin, so no extra port or env var.
 
-/** Matches the nitro route file at `server/routes/ws/rooms/[token].ts`. */
-export const ROOM_ROUTE_PREFIX = "/ws/rooms"
+/**
+ * How a tab reaches a Room: by a Share link's token, or, for a Team Drawing,
+ * by its id. A string, so hooks can key their effects on it.
+ */
+export type RoomPath = `rooms/${string}` | `drawings/${string}`
 
-/** Matches the route file at `src/routes/api/rooms/$token/files/$fileId.ts`. */
-export const ROOM_FILES_ROUTE_PREFIX = "/api/rooms"
+/** Matches `server/routes/ws/rooms/[token].ts` and `src/routes/api/rooms/`. */
+export const roomPathForToken = (token: string): RoomPath =>
+  `rooms/${encodeURIComponent(token)}`
+
+/** Matches `server/routes/ws/drawings/[id].ts` and `src/routes/api/drawings/`. */
+export const roomPathForDrawing = (drawingId: string): RoomPath =>
+  `drawings/${encodeURIComponent(drawingId)}`
 
 export function roomSocketUrl(
-  token: string,
+  room: RoomPath,
   location: { protocol: string; host: string },
 ): string {
   const scheme = location.protocol === "https:" ? "wss:" : "ws:"
-  return `${scheme}//${location.host}${ROOM_ROUTE_PREFIX}/${encodeURIComponent(token)}`
+  return `${scheme}//${location.host}/ws/${room}`
 }
 
 /** One image's URL, for both its POST and GET. Relative, so host-agnostic. */
-export function roomFileUrl(token: string, fileId: string): string {
-  return `${ROOM_FILES_ROUTE_PREFIX}/${encodeURIComponent(token)}/files/${encodeURIComponent(fileId)}`
+export function roomFileUrl(room: RoomPath, fileId: string): string {
+  return `/api/${room}/files/${encodeURIComponent(fileId)}`
 }

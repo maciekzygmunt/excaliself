@@ -1,7 +1,7 @@
 import type { SQL } from "drizzle-orm"
 import { PgDialect } from "drizzle-orm/pg-core"
 import { expect, test } from "vitest"
-import { drawingFiles, drawings } from "@/db/schema"
+import { drawingFiles, drawings, type Space } from "@/db/schema"
 import { MAX_DRAWING_IMAGE_BYTES } from "@/features/collab/room-files"
 import { accessibleTo } from "@/features/spaces/access"
 import { expectCondition } from "@/features/spaces/expect-condition"
@@ -20,7 +20,7 @@ const SCENE = '{"elements":[]}'
 
 function fakeDb(options: {
   /** What the ownership + share lookup resolves to; none means "not found". */
-  target?: { id: string; shareId: string | null }
+  target?: { id: string; space?: Space; shareId: string | null }
   /** Rows already in drawing_files for this drawing. */
   storedFileIds?: string[]
   /** When false, the guarded UPDATE matches nothing — a share landed first. */
@@ -131,6 +131,21 @@ test("a shared drawing refuses the write — the room owns its data", async () =
   expect(calls.map((call) => call.kind)).toEqual(["select"])
 })
 
+test("a Team drawing refuses the write — it is always a Room", async () => {
+  const { db, calls } = fakeDb({
+    target: { id: "d1", space: "team", shareId: null },
+  })
+
+  const result = await writeDrawingScene(db, "user-1", {
+    id: "d1",
+    data: SCENE,
+    files: [file("f1")],
+  })
+
+  expect(result).toEqual({ status: "shared" })
+  expect(calls.map((call) => call.kind)).toEqual(["select"])
+})
+
 test("a drawing the caller doesn't own is not found, and nothing is written", async () => {
   const { db, calls } = fakeDb({})
 
@@ -234,7 +249,7 @@ test("a stored file the scene still uses is kept, even if the payload lacks it",
 
 // Spec §5.5's single-writer invariant has to survive another tab of the
 // owner's minting a link between the gate and the write.
-test("a share created between the gate and the write still refuses the save", async () => {
+test("a share or a move to Team between the gate and the write still refuses the save", async () => {
   const { db, calls } = fakeDb({
     target: { id: "d1", shareId: null },
     updateHits: false,
@@ -251,6 +266,7 @@ test("a share created between the gate and the write still refuses the save", as
   // and the files must not be reconciled behind a write that never landed.
   const update = calls.find((call) => call.kind === "update")
   expect(toSql(update?.where as SQL)).toContain("not exists")
+  expect(toSql(update?.where as SQL)).toContain(`"drawings"."space" = $`)
   expect(calls.some((call) => call.kind === "insert")).toBe(false)
   expect(calls.some((call) => call.kind === "delete")).toBe(false)
 })
