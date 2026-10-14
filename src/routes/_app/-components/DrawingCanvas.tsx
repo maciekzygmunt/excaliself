@@ -408,6 +408,7 @@ export function DrawingCanvas({ drawingId, readOnly = false }: Props) {
       {!readOnly && (
         <ShareDialog
           drawingId={drawingId}
+          isTeam={isTeam}
           open={shareOpen}
           onOpenChange={setShareOpen}
           onBeforeCreate={flushAutoSave}

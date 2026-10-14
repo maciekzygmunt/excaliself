@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query"
-import { Check, Copy, Link2, RefreshCw } from "lucide-react"
+import { Check, Copy, Link2, RefreshCw, Users } from "lucide-react"
 import { useEffect, useState } from "react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
@@ -96,6 +96,37 @@ function LinkRow({ url }: { url: string }) {
   )
 }
 
+/** Team drawings only: every member already has access, so this just copies. */
+function MemberLinkRow({ url }: { url: string }) {
+  const { copied, copy } = useCopy(url)
+  return (
+    <div className="flex items-center gap-3 rounded-lg border border-border/60 p-3">
+      <Users className="h-4 w-4 shrink-0 text-muted-foreground" />
+      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <span className="text-[13px] font-medium text-foreground">
+          Members already have access
+        </span>
+        <span className="text-xs text-muted-foreground">
+          They find it in Team.
+        </span>
+      </span>
+      <Button
+        variant="secondary"
+        size="sm"
+        onClick={copy}
+        className="h-7 shrink-0 gap-1.5 px-2 text-xs"
+      >
+        {copied ? (
+          <Check className="h-3.5 w-3.5 text-emerald-600" />
+        ) : (
+          <Copy className="h-3.5 w-3.5" />
+        )}
+        {copied ? "Copied" : "Copy member link"}
+      </Button>
+    </div>
+  )
+}
+
 function AudienceCards({
   value,
   onChange,
@@ -153,6 +184,8 @@ function AudienceCards({
 
 type Props = {
   drawingId: string
+  /** A Team drawing takes only a guest link: members already have access. */
+  isTeam: boolean
   open: boolean
   onOpenChange: (open: boolean) => void
   /** Flushes autosave; once shared, the server refuses classic writes. */
@@ -161,6 +194,7 @@ type Props = {
 
 export function ShareDialog({
   drawingId,
+  isTeam,
   open,
   onOpenChange,
   onBeforeCreate,
@@ -169,7 +203,7 @@ export function ShareDialog({
   const createMutation = useCreateShare(drawingId, {
     beforeCreate: onBeforeCreate,
   })
-  const stopMutation = useStopSharing(drawingId)
+  const stopMutation = useStopSharing(drawingId, { isTeam })
   const regenerateMutation = useRegenerateShare(drawingId)
   const audienceMutation = useSetShareAudience(drawingId)
 
@@ -192,6 +226,13 @@ export function ShareDialog({
 
   const shared = share !== null
   const url = shared ? `${window.location.origin}/share/${share.token}` : null
+  const description = isTeam
+    ? shared
+      ? "Anyone with this link can edit, live. No account needed."
+      : "Create a guest link that lets people outside this instance edit this drawing with you, live."
+    : shared
+      ? "Everyone with this link can edit, live."
+      : "Create a link that lets others edit this drawing with you, live."
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -200,32 +241,41 @@ export function ShareDialog({
             URL would otherwise widen the panel instead of truncating. */}
         <div className="min-w-0 px-5 pt-5 pb-1">
           <DialogTitle>Share drawing</DialogTitle>
-          <DialogDescription className="mt-1">
-            {shared
-              ? "Everyone with this link can edit, live."
-              : "Create a link that lets others edit this drawing with you, live."}
-          </DialogDescription>
+          <DialogDescription className="mt-1">{description}</DialogDescription>
         </div>
         <div className="min-w-0 space-y-4 px-5 py-4">
           {shared && url && <LinkRow key={share.token} url={url} />}
-          <AudienceCards
-            value={shared ? share.audience : draftAudience}
-            disabled={shared && busy}
-            onChange={(audience) =>
-              shared
-                ? audienceMutation.mutate(audience)
-                : setDraftAudience(audience)
-            }
-          />
+          {!isTeam && (
+            <AudienceCards
+              value={shared ? share.audience : draftAudience}
+              disabled={shared && busy}
+              onChange={(audience) =>
+                shared
+                  ? audienceMutation.mutate(audience)
+                  : setDraftAudience(audience)
+              }
+            />
+          )}
           {!shared && (
             <Button
-              onClick={() => createMutation.mutate(draftAudience)}
+              onClick={() =>
+                createMutation.mutate(isTeam ? "anyone" : draftAudience)
+              }
               disabled={busy}
               className="w-full gap-1.5"
             >
               <Link2 className="h-4 w-4" />
-              {createMutation.isPending ? "Creating…" : "Create share link"}
+              {createMutation.isPending
+                ? "Creating…"
+                : isTeam
+                  ? "Create guest link"
+                  : "Create share link"}
             </Button>
+          )}
+          {isTeam && (
+            <MemberLinkRow
+              url={`${window.location.origin}/draw/${drawingId}`}
+            />
           )}
         </div>
         {shared && (

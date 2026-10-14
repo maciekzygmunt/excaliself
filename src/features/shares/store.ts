@@ -4,7 +4,7 @@ import { randomBytes, randomUUID } from "node:crypto"
 import { and, eq, isNull } from "drizzle-orm"
 import type { NodePgDatabase } from "drizzle-orm/node-postgres"
 import type * as schema from "@/db/schema"
-import { drawingFiles, drawings, shares } from "@/db/schema"
+import { drawingFiles, drawings, type Space, shares } from "@/db/schema"
 import { bytesToDataUrl } from "@/features/drawings/file-bytes"
 import { accessibleTo } from "@/features/spaces/access"
 import { resolveShareAccess, type ShareAudience } from "./access"
@@ -17,14 +17,15 @@ export function mintShareToken() {
 }
 
 // Throws the same "not found" as a missing id, so private drawings can't be
-// probed.
+// probed. Inside a transaction, the share lock makes a concurrent move to Team
+// wait for this write, or makes this read see the moved row.
 async function requireAccessibleLiveDrawing(
   db: Db,
   userId: string,
   drawingId: string,
 ) {
   const [drawing] = await db
-    .select({ id: drawings.id })
+    .select({ space: drawings.space })
     .from(drawings)
     .where(
       and(
@@ -33,7 +34,15 @@ async function requireAccessibleLiveDrawing(
         isNull(drawings.deletedAt),
       ),
     )
+    .for("share")
   if (!drawing) throw new Error("Drawing not found")
+  return drawing
+}
+
+// Every member already opens a Team drawing, so a members link grants nothing.
+function requireAudienceFits(space: Space, audience: ShareAudience) {
+  if (space === "team" && audience === "members")
+    throw new Error("Team drawings take only guest links")
 }
 
 const shareColumns = {
@@ -58,18 +67,24 @@ export async function createShareLink(
   drawingId: string,
   audience: ShareAudience,
 ) {
-  await requireAccessibleLiveDrawing(db, userId, drawingId)
-  const [created] = await db
-    .insert(shares)
-    .values({
-      id: randomUUID(),
-      token: mintShareToken(),
-      drawingId,
-      audience,
-      createdAt: new Date(),
-    })
-    .onConflictDoNothing({ target: shares.drawingId })
-    .returning(shareColumns)
+  // One transaction with the space check, so a move to Team can't slip in
+  // between and leave a Team drawing with a members link.
+  const created = await db.transaction(async (tx) => {
+    const { space } = await requireAccessibleLiveDrawing(tx, userId, drawingId)
+    requireAudienceFits(space, audience)
+    const [row] = await tx
+      .insert(shares)
+      .values({
+        id: randomUUID(),
+        token: mintShareToken(),
+        drawingId,
+        audience,
+        createdAt: new Date(),
+      })
+      .onConflictDoNothing({ target: shares.drawingId })
+      .returning(shareColumns)
+    return row
+  })
   // Return an existing link unchanged: only setShareLinkAudience evicts guests.
   return created ?? getShareLink(db, userId, drawingId)
 }
@@ -104,12 +119,15 @@ export async function setShareLinkAudience(
   drawingId: string,
   audience: ShareAudience,
 ) {
-  await requireAccessibleLiveDrawing(db, userId, drawingId)
-  const updated = await db
-    .update(shares)
-    .set({ audience })
-    .where(eq(shares.drawingId, drawingId))
-    .returning(shareColumns)
+  const updated = await db.transaction(async (tx) => {
+    const { space } = await requireAccessibleLiveDrawing(tx, userId, drawingId)
+    requireAudienceFits(space, audience)
+    return tx
+      .update(shares)
+      .set({ audience })
+      .where(eq(shares.drawingId, drawingId))
+      .returning(shareColumns)
+  })
   if (updated.length === 0) throw new Error("Share not found")
   return updated[0]
 }
