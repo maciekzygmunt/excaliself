@@ -246,6 +246,15 @@ export const shares = pgTable(
   }),
 )
 
+// A members link dropped by a move to Team. Not a share: it only sends
+// signed-in members on to the drawing.
+export const shareRedirects = pgTable("share_redirects", {
+  token: text("token").primaryKey(),
+  drawingId: text("drawingId")
+    .notNull()
+    .references(() => drawings.id, { onDelete: "cascade" }),
+})
+
 // node-postgres reads and writes bytea as a Buffer.
 const bytea = customType<{ data: Buffer }>({ dataType: () => "bytea" })
 

@@ -8,6 +8,7 @@ import {
 import type { ReactNode } from "react"
 import { afterEach, beforeEach, expect, test, vi } from "vitest"
 import type { ShareVisit } from "@/features/shares/server"
+import { resolveShareToken } from "@/features/shares/server"
 import type { ShareResolution } from "@/features/shares/store"
 import { isOpenAsTeam } from "@/features/spaces/server"
 
@@ -17,7 +18,10 @@ const navigate = vi.fn()
 let loaderData: ShareVisit
 let search: { full?: boolean } = {}
 
+const redirect = vi.fn((opts: unknown) => ({ isRedirect: true, opts }))
+
 vi.mock("@tanstack/react-router", () => ({
+  redirect,
   createFileRoute: () => (options: { component: React.ComponentType }) => ({
     options,
     useLoaderData: () => loaderData,
@@ -330,4 +334,26 @@ test("a guest whose link died never asks about Team", async () => {
 
   await waitFor(() => expect(invalidate).toHaveBeenCalled())
   expect(isOpenAsTeam).not.toHaveBeenCalled()
+})
+
+test("a members link a move to Team dropped redirects to the drawing", async () => {
+  vi.mocked(resolveShareToken).mockResolvedValue({
+    status: "moved",
+    drawingId: "d1",
+  })
+  const { Route } = await import("./$token")
+  const { loader } = (
+    Route as unknown as {
+      options: { loader: (ctx: { params: { token: string } }) => unknown }
+    }
+  ).options
+
+  await expect(loader({ params: { token: TOKEN } })).rejects.toMatchObject({
+    isRedirect: true,
+  })
+  expect(redirect).toHaveBeenCalledWith({
+    to: "/draw/$id",
+    params: { id: "d1" },
+    replace: true,
+  })
 })

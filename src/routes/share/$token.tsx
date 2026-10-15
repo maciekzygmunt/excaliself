@@ -1,4 +1,9 @@
-import { createFileRoute, useNavigate, useRouter } from "@tanstack/react-router"
+import {
+  createFileRoute,
+  redirect,
+  useNavigate,
+  useRouter,
+} from "@tanstack/react-router"
 import { createClientOnlyFn } from "@tanstack/react-start"
 import { lazy, Suspense, useState } from "react"
 import { Mark } from "@/components/identity"
@@ -33,7 +38,17 @@ export const Route = createFileRoute("/share/$token")({
   validateSearch: (search: Record<string, unknown>): { full?: boolean } =>
     "full" in search ? { full: true } : {},
   // Re-runs per navigation (staleTime 0), so a stopped link dies on next load.
-  loader: ({ params }) => resolveShareToken({ data: params.token }),
+  loader: async ({ params }) => {
+    const visit = await resolveShareToken({ data: params.token })
+    // The drawing page applies the usual Team access rule.
+    if (visit.status === "moved")
+      throw redirect({
+        to: "/draw/$id",
+        params: { id: visit.drawingId },
+        replace: true,
+      })
+    return visit
+  },
   component: SharePage,
   pendingComponent: LoadingState,
 })
