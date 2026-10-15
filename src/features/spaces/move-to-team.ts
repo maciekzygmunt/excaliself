@@ -5,7 +5,7 @@
 import { and, eq, inArray, isNull } from "drizzle-orm"
 import type { NodePgDatabase } from "drizzle-orm/node-postgres"
 import type * as schema from "@/db/schema"
-import { drawings, folders, shares } from "@/db/schema"
+import { drawings, folders, shareRedirects, shares } from "@/db/schema"
 import { collectFolderSubtreeIds } from "@/features/folders/subtree"
 import { lockFolderTree } from "@/features/folders/tree-lock"
 import { accessibleTo, inPrivateSpaceOf } from "./access"
@@ -19,8 +19,8 @@ export type MoveItem = { type: "drawing" | "folder"; id: string }
  * `targetFolderId` (a live Team folder) or at Team root when null. A folder
  * takes its whole subtree, trashed rows included, so a later restore never
  * lands a Private row under a Team folder. Creators are kept. `members` Share
- * links go (every member can now open it anyway); `anyone` links stay, so
- * guests keep their way in. Returns the moved drawing ids for the Handoff.
+ * links go (every member can now open it anyway) and leave a redirect to the
+ * drawing; `anyone` links stay, so guests keep their way in. Returns the moved drawing ids for the Handoff.
  */
 export async function moveToTeam(
   db: Db,
@@ -104,8 +104,8 @@ export async function moveToTeam(
           .where(inArray(drawings.id, drawingIds))
     }
 
-    if (drawingIds.length > 0)
-      await tx
+    if (drawingIds.length > 0) {
+      const membersLinks = await tx
         .delete(shares)
         .where(
           and(
@@ -113,6 +113,10 @@ export async function moveToTeam(
             eq(shares.audience, "members"),
           ),
         )
+        .returning({ token: shares.token, drawingId: shares.drawingId })
+      if (membersLinks.length > 0)
+        await tx.insert(shareRedirects).values(membersLinks)
+    }
 
     return drawingIds
   })

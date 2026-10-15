@@ -1,7 +1,7 @@
 import type { SQL } from "drizzle-orm"
 import { PgDialect } from "drizzle-orm/pg-core"
 import { expect, test } from "vitest"
-import { drawings, folders, shares } from "@/db/schema"
+import { drawings, folders, shareRedirects, shares } from "@/db/schema"
 import { inPrivateSpaceOf } from "./access"
 import { expectCondition } from "./expect-condition"
 import { moveToTeam } from "./move-to-team"
@@ -15,16 +15,20 @@ const toSql = (where: SQL) => new PgDialect().sqlToQuery(where)
 
 /**
  * Each select on a table returns the next of `selects[table]`: what the
- * database would match. Writes are recorded, and so are locks with the
- * number of reads before them.
+ * database would match; a delete returns `deleted`. Writes and inserts are
+ * recorded, and so are locks with the number of reads before them.
  */
-function fakeDb(selects: { folders?: Row[][]; drawings?: Row[][] }) {
+function fakeDb(
+  selects: { folders?: Row[][]; drawings?: Row[][] },
+  deleted: Row[] = [],
+) {
   const queues = new Map<unknown, Row[][]>([
     [folders, [...(selects.folders ?? [])]],
     [drawings, [...(selects.drawings ?? [])]],
   ])
   const reads: { table: unknown; where: SQL }[] = []
   const writes: Write[] = []
+  const inserts: { table: unknown; values: Row[] }[] = []
   const locks: { sql: string; readsBefore: number }[] = []
   const tx = {
     execute: (query: SQL) => {
@@ -50,6 +54,12 @@ function fakeDb(selects: { folders?: Row[][]; drawings?: Row[][] }) {
     delete: (table: unknown) => ({
       where: (where: SQL) => {
         writes.push({ kind: "delete", table, where })
+        return { returning: () => Promise.resolve(deleted) }
+      },
+    }),
+    insert: (table: unknown) => ({
+      values: (values: Row[]) => {
+        inserts.push({ table, values })
         return Promise.resolve()
       },
     }),
@@ -57,7 +67,7 @@ function fakeDb(selects: { folders?: Row[][]; drawings?: Row[][] }) {
   const db = {
     transaction: (fn: (tx: unknown) => Promise<unknown>) => fn(tx),
   } as unknown as Parameters<typeof moveToTeam>[0]
-  return { db, reads, writes, locks }
+  return { db, reads, writes, inserts, locks }
 }
 
 /** Ids a write's where clause names. */
@@ -169,11 +179,12 @@ test("a drawing moves to Team root and returns its own id", async () => {
   expectCondition(reads[0].where, inPrivateSpaceOf(drawings, "user-1"))
 })
 
-test("members links on the moved drawings are deleted; anyone links are kept", async () => {
-  const { db, writes } = fakeDb({
-    folders: [privateFolders],
-    drawings: [[{ id: "d1" }, { id: "d2" }]],
-  })
+test("members links on the moved drawings become redirects; anyone links are kept", async () => {
+  const membersLink = { token: "members-token", drawingId: "d1" }
+  const { db, writes, inserts } = fakeDb(
+    { folders: [privateFolders], drawings: [[{ id: "d1" }, { id: "d2" }]] },
+    [membersLink],
+  )
 
   await moveToTeam(db, "user-1", { type: "folder", id: "f1" }, null)
 
@@ -184,6 +195,15 @@ test("members links on the moved drawings are deleted; anyone links are kept", a
   expect(sql).toContain(`"shares"."audience" = `)
   expect(params).toEqual(expect.arrayContaining(["d1", "d2", "members"]))
   expect(params).not.toContain("anyone")
+  expect(inserts).toEqual([{ table: shareRedirects, values: [membersLink] }])
+})
+
+test("no members link, no redirect", async () => {
+  const { db, inserts } = fakeDb({ drawings: [[{ id: "d1" }]] })
+
+  await moveToTeam(db, "user-1", { type: "drawing", id: "d1" }, null)
+
+  expect(inserts).toEqual([])
 })
 
 test("a Team item or someone else's item is refused, and nothing is written", async () => {

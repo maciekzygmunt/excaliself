@@ -1,7 +1,13 @@
 import type { SQL } from "drizzle-orm"
 import { PgDialect } from "drizzle-orm/pg-core"
 import { expect, test, vi } from "vitest"
-import { drawingFiles, drawings, type Space, shares } from "@/db/schema"
+import {
+  drawingFiles,
+  drawings,
+  type Space,
+  shareRedirects,
+  shares,
+} from "@/db/schema"
 import { accessibleTo } from "@/features/spaces/access"
 import { expectCondition } from "@/features/spaces/expect-condition"
 import {
@@ -49,6 +55,8 @@ function fakeDb(options: {
   shareRows?: unknown[]
   /** Rows the drawing_files select resolves to. */
   fileRows?: unknown[]
+  /** Rows the share_redirects select resolves to. */
+  redirectRows?: unknown[]
   /** When false, updates match zero rows. */
   updateHits?: boolean
   /** When true, the insert hits the unique index and returns nothing. */
@@ -83,7 +91,9 @@ function fakeDb(options: {
                   }))
                 : table === drawingFiles
                   ? (options.fileRows ?? [])
-                  : (options.shareRows ?? [])
+                  : table === shareRedirects
+                    ? (options.redirectRows ?? [])
+                    : (options.shareRows ?? [])
             return Object.assign(Promise.resolve(rows), {
               for: (lock: string) => {
                 Object.assign(call, { lock })
@@ -332,6 +342,25 @@ test("visit with an unknown token serves the bare dead arm and nothing else", as
 
   await expect(
     resolveShareVisit(db, "no-such-token", async () => true),
+  ).resolves.toEqual({ status: "dead" })
+})
+
+test("visit with a members link a move to Team dropped sends a signed-in member to the drawing", async () => {
+  const { db, calls } = fakeDb({ redirectRows: [{ drawingId: "d1" }] })
+
+  await expect(
+    resolveShareVisit(db, "moved-token", async () => true),
+  ).resolves.toEqual({ status: "moved", drawingId: "d1" })
+  const read = calls[1] as Extract<Call, { kind: "select" }>
+  expect(read.table).toBe(shareRedirects)
+  expect(toSql(read.where)).toContain(`"share_redirects"."token" =`)
+})
+
+test("visit with a dropped members link and no session serves the bare dead arm", async () => {
+  const { db } = fakeDb({ redirectRows: [{ drawingId: "d1" }] })
+
+  await expect(
+    resolveShareVisit(db, "moved-token", async () => false),
   ).resolves.toEqual({ status: "dead" })
 })
 

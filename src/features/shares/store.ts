@@ -4,7 +4,13 @@ import { randomBytes, randomUUID } from "node:crypto"
 import { and, eq, isNull } from "drizzle-orm"
 import type { NodePgDatabase } from "drizzle-orm/node-postgres"
 import type * as schema from "@/db/schema"
-import { drawingFiles, drawings, type Space, shares } from "@/db/schema"
+import {
+  drawingFiles,
+  drawings,
+  type Space,
+  shareRedirects,
+  shares,
+} from "@/db/schema"
 import { bytesToDataUrl } from "@/features/drawings/file-bytes"
 import { accessibleTo } from "@/features/spaces/access"
 import { resolveShareAccess, type ShareAudience } from "./access"
@@ -165,6 +171,8 @@ export async function resolveShareForRoom(db: Db, token: string) {
 
 export type ShareResolution =
   | { status: "dead" }
+  /** A members link the move to Team dropped; only members get this arm. */
+  | { status: "moved"; drawingId: string }
   | { status: "signin"; drawingName: string }
   | {
       status: "ok"
@@ -180,13 +188,24 @@ export async function resolveShareVisit(
   hasSession: () => Promise<boolean>,
 ): Promise<ShareResolution> {
   const resolved = await resolveShareByToken(db, token)
+  // A members link left by a move to Team sends signed-in members on to the
+  // drawing; anyone else gets what a dead members link gives.
+  if (!resolved) {
+    const [moved] = await db
+      .select({ drawingId: shareRedirects.drawingId })
+      .from(shareRedirects)
+      .where(eq(shareRedirects.token, token))
+    return moved && (await hasSession())
+      ? { status: "moved", drawingId: moved.drawingId }
+      : { status: "dead" }
+  }
 
   const access = resolveShareAccess({
     share: resolved,
     hasSession: resolved?.audience === "members" ? await hasSession() : false,
   })
 
-  if (access === "dead" || !resolved) return { status: "dead" }
+  if (access === "dead") return { status: "dead" }
   if (access === "signin")
     return { status: "signin", drawingName: resolved.drawing.name }
 
