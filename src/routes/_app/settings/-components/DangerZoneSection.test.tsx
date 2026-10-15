@@ -87,6 +87,15 @@ test("offers a single enabled Delete account action", () => {
   expect(screen.getByText(/permanently delete your account/i)).toBeTruthy()
 })
 
+test("with Team on, the card says Team drawings stay", () => {
+  renderSection({ user: { ...viewer, teamEnabled: true } })
+
+  expect(screen.getByText(/Team drawings stay/)).toBeTruthy()
+  expect(
+    screen.getByText(/all of your private drawings and folders/),
+  ).toBeTruthy()
+})
+
 test("Delete account runs the tier-3 confirm with own counts, then signs out to login", async () => {
   vi.mocked(getMyContentCounts).mockResolvedValue({
     drawings: 3,

@@ -14,9 +14,9 @@ import { describeKeptTeamDrawings } from "@/features/admin/delete-user-copy"
 import { describeContents } from "@/features/trash/destroy-copy"
 
 // The Account danger zone (issue #67, spec §4.5 tier 3): one isolated card,
-// one action — hard-delete your own account and everything it owns. The
-// sole admin is blocked with the reason inline; the server enforces the
-// same guard regardless.
+// one action — hard-delete your own account and your private work (Team
+// drawings stay). The sole admin is blocked with the reason inline; the
+// server enforces the same guard regardless.
 export function DangerZoneSection({ user }: { user: CurrentUser }) {
   const [confirmOpen, setConfirmOpen] = useState(false)
   const { data: state } = useQuery(deleteAccountStateQueryOptions())
@@ -44,7 +44,9 @@ export function DangerZoneSection({ user }: { user: CurrentUser }) {
       <div className="mb-4">
         <h2 className="text-sm font-medium text-destructive">Danger zone</h2>
         <p className="text-xs text-muted-foreground">
-          Irreversible. Everything you own goes with the account.
+          {user.teamEnabled
+            ? "Irreversible. Your private work goes with the account. Team drawings stay."
+            : "Irreversible. Everything you own goes with the account."}
         </p>
       </div>
 
@@ -54,7 +56,7 @@ export function DangerZoneSection({ user }: { user: CurrentUser }) {
           <p className="text-xs text-muted-foreground">
             {blocked
               ? "You're the instance's only admin. Promote another member to admin before deleting your account."
-              : "Permanently delete your account and all of your drawings and folders."}
+              : `Permanently delete your account and all of your ${user.teamEnabled ? "private " : ""}drawings and folders.`}
           </p>
         </div>
         <Button
