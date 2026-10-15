@@ -7,6 +7,8 @@ import {
 } from "@/features/collab/room-socket"
 import { resolveRoomForToken } from "@/features/collab/room-token"
 
-export default defineRoomSocket((request) =>
-  resolveRoomForToken(db, lastPathSegment(request), request.headers),
+export default defineRoomSocket(
+  (request) =>
+    resolveRoomForToken(db, lastPathSegment(request), request.headers),
+  { limitFailures: true },
 )
