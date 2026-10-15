@@ -35,12 +35,8 @@ export const auth = betterAuth({
       }
     }),
   },
-  session: {
-    cookieCache: {
-      enabled: true,
-      maxAge: 60 * 5,
-    },
-  },
+  // No cookie cache: every request reads the session row, so a deleted or
+  // signed-out member loses access at once.
   user: {
     additionalFields: {
       role: {
