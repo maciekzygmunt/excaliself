@@ -15,7 +15,8 @@ const toSql = (where: SQL) => new PgDialect().sqlToQuery(where)
 
 /**
  * Each select on a table returns the next of `selects[table]`: what the
- * database would match. Writes are recorded.
+ * database would match. Writes are recorded, and so are locks with the
+ * number of reads before them.
  */
 function fakeDb(selects: { folders?: Row[][]; drawings?: Row[][] }) {
   const queues = new Map<unknown, Row[][]>([
@@ -24,7 +25,12 @@ function fakeDb(selects: { folders?: Row[][]; drawings?: Row[][] }) {
   ])
   const reads: { table: unknown; where: SQL }[] = []
   const writes: Write[] = []
+  const locks: { sql: string; readsBefore: number }[] = []
   const tx = {
+    execute: (query: SQL) => {
+      locks.push({ sql: toSql(query).sql, readsBefore: reads.length })
+      return Promise.resolve()
+    },
     select: () => ({
       from: (table: unknown) => ({
         where: (where: SQL) => {
@@ -51,7 +57,7 @@ function fakeDb(selects: { folders?: Row[][]; drawings?: Row[][] }) {
   const db = {
     transaction: (fn: (tx: unknown) => Promise<unknown>) => fn(tx),
   } as unknown as Parameters<typeof moveToTeam>[0]
-  return { db, reads, writes }
+  return { db, reads, writes, locks }
 }
 
 /** Ids a write's where clause names. */
@@ -102,6 +108,24 @@ test("a folder moves to Team with its whole subtree, trashed rows included", asy
       where,
       inPrivateSpaceOf(table as typeof folders | typeof drawings, "user-1"),
     )
+  }
+})
+
+test("the folder tree is locked before the first read: alone to move a folder, shared to move a drawing", async () => {
+  for (const [item, lock] of [
+    [{ type: "folder", id: "f1" }, "select pg_advisory_xact_lock("],
+    [{ type: "drawing", id: "d1" }, "select pg_advisory_xact_lock_shared("],
+  ] as const) {
+    const { db, locks } = fakeDb({
+      folders: [[{ id: "team-folder" }], privateFolders],
+      drawings: [[{ id: "d1" }]],
+    })
+
+    await moveToTeam(db, "user-1", item, "team-folder")
+
+    expect(locks).toEqual([
+      { sql: expect.stringContaining(lock), readsBefore: 0 },
+    ])
   }
 })
 

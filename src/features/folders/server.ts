@@ -13,6 +13,7 @@ import { restoreFolderUnit } from "@/features/trash/restore"
 import { authMiddleware } from "@/middleware/auth"
 import { assertFolderTarget } from "./ownership"
 import { collectFolderSubtreeIds } from "./subtree"
+import { lockFolderTree } from "./tree-lock"
 
 export const getFolders = createServerFn({ method: "GET" })
   .middleware([authMiddleware])
@@ -40,23 +41,26 @@ export const createFolder = createServerFn({ method: "POST" })
     const id = randomUUID()
     const now = new Date()
     const parentId = data.parentId ?? null
-    const space = parentId
-      ? await assertFolderTarget(db, userId, parentId)
-      : data.space
 
-    const [folder] = await db
-      .insert(folders)
-      .values({
-        id,
-        name: data.name,
-        space,
-        createdBy: userId,
-        parentId,
-        createdAt: now,
-        updatedAt: now,
-      })
-      .returning()
-    return folder
+    return db.transaction(async (tx) => {
+      await lockFolderTree(tx, "place")
+      const space = parentId
+        ? await assertFolderTarget(tx, userId, parentId)
+        : data.space
+      const [folder] = await tx
+        .insert(folders)
+        .values({
+          id,
+          name: data.name,
+          space,
+          createdBy: userId,
+          parentId,
+          createdAt: now,
+          updatedAt: now,
+        })
+        .returning()
+      return folder
+    })
   })
 
 export const updateFolder = createServerFn({ method: "POST" })
@@ -74,27 +78,31 @@ export const updateFolder = createServerFn({ method: "POST" })
     const updateFields: { name?: string; parentId?: string | null } = {}
     if (data.name !== undefined) updateFields.name = data.name
     if (data.parentId !== undefined) updateFields.parentId = data.parentId
-    const targetSpace = data.parentId
-      ? await assertFolderTarget(db, userId, data.parentId, data.id)
-      : undefined
 
-    // Access is enforced in the statement itself; zero rows means "not
-    // found" so others can't tell a private folder exists. Trashed folders
-    // are treated the same — no edits while in the trash — and so is a move
-    // into a folder of the other space.
-    const updated = await db
-      .update(folders)
-      .set({ ...updateFields, updatedAt: new Date() })
-      .where(
-        and(
-          eq(folders.id, data.id),
-          accessibleTo(folders, userId),
-          isNull(folders.deletedAt),
-          targetSpace && eq(folders.space, targetSpace),
-        ),
-      )
-      .returning({ id: folders.id })
-    if (updated.length === 0) throw new Error("Folder not found")
+    await db.transaction(async (tx) => {
+      if (data.parentId !== undefined) await lockFolderTree(tx, "change")
+      const targetSpace = data.parentId
+        ? await assertFolderTarget(tx, userId, data.parentId, data.id)
+        : undefined
+
+      // Access is enforced in the statement itself; zero rows means "not
+      // found" so others can't tell a private folder exists. Trashed folders
+      // are treated the same — no edits while in the trash — and so is a move
+      // into a folder of the other space.
+      const updated = await tx
+        .update(folders)
+        .set({ ...updateFields, updatedAt: new Date() })
+        .where(
+          and(
+            eq(folders.id, data.id),
+            accessibleTo(folders, userId),
+            isNull(folders.deletedAt),
+            targetSpace && eq(folders.space, targetSpace),
+          ),
+        )
+        .returning({ id: folders.id })
+      if (updated.length === 0) throw new Error("Folder not found")
+    })
   })
 
 /**
@@ -112,6 +120,7 @@ export const trashFolder = createServerFn({ method: "POST" })
     const now = new Date()
 
     const swept = await db.transaction(async (tx) => {
+      await lockFolderTree(tx, "change")
       const liveFolders = await tx
         .select({ id: folders.id, parentId: folders.parentId })
         .from(folders)
