@@ -29,12 +29,18 @@ afterEach(cleanup)
 
 // Projects ─┬─ Q4 ── Archive ── d-old
 //           └─ d-plan, d-notes            Loose: d-loose
+// Solo ── Sub ── d-sub    Empty    One ── d-one    Nest ─┬─ A, B
 const folders = [
   { id: "f-projects", name: "Projects", parentId: null },
   { id: "f-q4", name: "Q4", parentId: "f-projects" },
   { id: "f-archive", name: "Archive", parentId: "f-q4" },
   { id: "f-solo", name: "Solo", parentId: null },
   { id: "f-solo-sub", name: "Sub", parentId: "f-solo" },
+  { id: "f-empty", name: "Empty", parentId: null },
+  { id: "f-one", name: "One", parentId: null },
+  { id: "f-nest", name: "Nest", parentId: null },
+  { id: "f-nest-a", name: "A", parentId: "f-nest" },
+  { id: "f-nest-b", name: "B", parentId: "f-nest" },
 ] as Folder[]
 const drawings = [
   { id: "d-plan", name: "Plan", folderId: "f-projects" },
@@ -42,6 +48,7 @@ const drawings = [
   { id: "d-old", name: "Old", folderId: "f-archive" },
   { id: "d-loose", name: "Retro board", folderId: null },
   { id: "d-sub", name: "Sub drawing", folderId: "f-solo-sub" },
+  { id: "d-one", name: "One drawing", folderId: "f-one" },
 ] as Drawing[]
 
 function Opener({
@@ -122,6 +129,19 @@ test("a folder's counts are singular for one", () => {
 
   expect(body()).toBe(
     "All members can see and edit it. You can't move it back to Private. This also moves the 1 drawing and 1 folder inside it.",
+  )
+})
+
+test.each([
+  ["f-one", " This also moves the 1 drawing inside it."],
+  ["f-nest", " This also moves the 2 folders inside it."],
+  ["f-empty", ""],
+])("a folder's count leaves out zero parts (%s)", (id, sentence) => {
+  renderOpener({ type: "folder", id })
+  open()
+
+  expect(body()).toBe(
+    `All members can see and edit it. You can't move it back to Private.${sentence}`,
   )
 })
 

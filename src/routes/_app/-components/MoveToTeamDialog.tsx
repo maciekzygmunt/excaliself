@@ -50,8 +50,17 @@ export function MoveToTeamDialog({
   onConfirm: () => void
   onCancel: () => void
 }) {
-  const isFolder = pendingMove?.item.type === "folder"
-  const counts = pendingMove?.counts ?? { drawings: 0, folders: 0 }
+  const { drawings, folders } = pendingMove?.counts ?? {
+    drawings: 0,
+    folders: 0,
+  }
+  // Zero parts drop out; a drawing or an empty folder gets no sentence.
+  const contents = [
+    drawings && plural(drawings, "drawing"),
+    folders && plural(folders, "folder"),
+  ]
+    .filter(Boolean)
+    .join(" and ")
 
   return (
     <AlertDialog
@@ -67,8 +76,7 @@ export function MoveToTeamDialog({
           </AlertDialogTitle>
           <AlertDialogDescription>
             All members can see and edit it. You can't move it back to Private.
-            {isFolder &&
-              ` This also moves the ${plural(counts.drawings, "drawing")} and ${plural(counts.folders, "folder")} inside it.`}
+            {contents && ` This also moves the ${contents} inside it.`}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
