@@ -479,7 +479,7 @@ test("loading holds the grid with the delayed skeleton, not a spinner", () => {
   ).toBeNull()
 })
 
-test("while Team is hidden there is no space switch and the space param is ignored", () => {
+test("while Team is hidden the space param is ignored", () => {
   renderAllDrawings({
     drawings: [makeDrawing({ id: "d1" })],
     folders: [makeFolder("f1", "Projects")],
@@ -487,7 +487,6 @@ test("while Team is hidden there is no space switch and the space param is ignor
     space: "team",
   })
 
-  expect(screen.queryByRole("navigation", { name: "Space" })).toBeNull()
   expect(cardHrefs()).toEqual(["/draw/d1"])
   expect(screen.getByRole("button", { name: "Projects" })).toBeTruthy()
 })
@@ -512,9 +511,6 @@ test("with Team on, the grid and folder chips scope to the browsed space", () =>
   expect(cardHrefs()).toEqual(["/draw/ours"])
   expect(screen.getByRole("button", { name: "Roadmap" })).toBeTruthy()
   expect(screen.queryByRole("button", { name: "Sketches" })).toBeNull()
-  expect(
-    screen.getByRole("link", { name: "Private" }).getAttribute("href"),
-  ).toBe("/drawings")
 })
 
 // The card around a drawing's stretched link

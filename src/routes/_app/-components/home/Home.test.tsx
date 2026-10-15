@@ -493,10 +493,9 @@ const cardHrefs = () =>
     .map((link) => link.getAttribute("href"))
     .filter((href) => href?.startsWith("/draw/"))
 
-test("while Team is hidden there is no space switch and the space param is ignored", () => {
+test("while Team is hidden the space param is ignored", () => {
   renderHome({ drawings: mixedSpaces, teamEnabled: false, space: "team" })
 
-  expect(screen.queryByRole("navigation", { name: "Space" })).toBeNull()
   expect(cardHrefs()).toEqual(["/draw/mine", "/draw/ours"])
   expect(
     screen.getByRole("link", { name: /view all/i }).getAttribute("href"),
@@ -507,18 +506,12 @@ test("with Team on, Home shows Private by default", () => {
   renderHome({ drawings: mixedSpaces, teamEnabled: true })
 
   expect(cardHrefs()).toEqual(["/draw/mine"])
-  expect(
-    screen.getByRole("link", { name: "Private" }).getAttribute("aria-current"),
-  ).toBe("page")
 })
 
 test("browsing Team shows Team drawings and View all keeps the scope", () => {
   renderHome({ drawings: mixedSpaces, teamEnabled: true, space: "team" })
 
   expect(cardHrefs()).toEqual(["/draw/ours"])
-  expect(
-    screen.getByRole("link", { name: "Team" }).getAttribute("aria-current"),
-  ).toBe("page")
   expect(
     screen.getByRole("link", { name: /view all/i }).getAttribute("href"),
   ).toBe("/drawings?space=team")

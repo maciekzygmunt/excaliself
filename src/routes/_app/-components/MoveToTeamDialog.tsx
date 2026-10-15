@@ -27,6 +27,7 @@ import { foldersQueryOptions } from "@/features/folders/queries"
 import { collectFolderSubtreeIds } from "@/features/folders/subtree"
 import type { MoveItem } from "@/features/spaces/move-to-team"
 import { useMoveToTeam } from "@/features/spaces/mutations"
+import { useActiveSpace } from "./ActiveSpace"
 
 export type PendingMove = {
   item: MoveItem
@@ -100,6 +101,7 @@ export function MoveToTeamProvider({ children }: { children: ReactNode }) {
     select: (user) => user.teamEnabled,
   })
   const move = useMoveToTeam()
+  const { setActiveSpace } = useActiveSpace()
   const [open, setOpen] = useState(false)
   // Kept across close so the copy doesn't blank during the exit animation.
   const [pendingMove, setPendingMove] = useState<PendingMove | null>(null)
@@ -135,6 +137,8 @@ export function MoveToTeamProvider({ children }: { children: ReactNode }) {
       beforeMove: flushRef.current ?? undefined,
     })
     setOpen(false)
+    // The sidebar shows Team, so the item is seen landing.
+    setActiveSpace("team")
   }
 
   const registerFlush = useCallback((flush: () => Promise<void>) => {
