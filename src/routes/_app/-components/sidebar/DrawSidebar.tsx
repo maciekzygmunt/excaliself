@@ -135,12 +135,7 @@ export function DrawSidebar({ user }: { user: SidebarUser }) {
           </button>
         </div>
 
-        {activeSpace && (
-          <SpaceSegments
-            activeSpace={activeSpace}
-            teamDrawings={drawingsBySpace.team}
-          />
-        )}
+        {activeSpace && <SpaceSegments activeSpace={activeSpace} />}
 
         <SidebarNav />
 

@@ -1,11 +1,12 @@
 import { expect, test } from "vitest"
-import { liveDrawingsFor, MAX_LIVE_AVATARS } from "./live"
+import { liveFor, MAX_LIVE_AVATARS } from "./live"
 import type { ServerMessage } from "./protocol"
 import {
   createRoomRegistry,
   joinRoom,
   leaveRoom,
   type RoomPeer,
+  type RoomRegistry,
   type SceneLoader,
 } from "./room-session"
 
@@ -29,6 +30,9 @@ const ownedByOwner: SceneLoader = async () => ({
 /** Presence, not persistence — these rooms never write. */
 const registryOf = (load: SceneLoader = ownedByOwner) =>
   createRoomRegistry(load, async () => {})
+
+const liveDrawingsFor = (registry: RoomRegistry, userId: string) =>
+  liveFor(registry, userId).drawings
 
 const member = (userId: string, displayName: string) => ({
   userId,
@@ -128,12 +132,58 @@ test("the owner's other tabs don't count either, but everyone else does", async 
   ])
 })
 
-test("guests always count — they have no userId to match the caller's", async () => {
+test("guests always count, one per connection, even with the same name", async () => {
   const registry = registryOf()
   await joinRoom(registry, "d1", fakePeer("p1"), guest("Quiet Otter"))
-  await joinRoom(registry, "d1", fakePeer("p2"), guest("Brisk Auk"))
+  await joinRoom(registry, "d1", fakePeer("p2"), guest("Quiet Otter"))
 
   expect(liveDrawingsFor(registry, OWNER)[0].count).toBe(2)
+})
+
+test("a member in two tabs is one person, one avatar", async () => {
+  const registry = registryOf()
+  await joinRoom(registry, "d1", fakePeer("p1"), member("u:ada", "Ada"))
+  await joinRoom(registry, "d1", fakePeer("p2"), member("u:ada", "Ada"))
+
+  expect(liveDrawingsFor(registry, OWNER)).toEqual([
+    {
+      drawingId: "d1",
+      count: 1,
+      participants: [{ name: "Ada", color: expect.anything() }],
+    },
+  ])
+})
+
+test("two members who share a name are two people", async () => {
+  const registry = registryOf()
+  await joinRoom(registry, "d1", fakePeer("p1"), member("u:ada", "Ada"))
+  await joinRoom(registry, "d1", fakePeer("p2"), member("u:ada2", "Ada"))
+
+  const [badge] = liveDrawingsFor(registry, OWNER)
+  expect(badge.count).toBe(2)
+  expect(badge.participants).toHaveLength(2)
+})
+
+test("the Team count is people across all Team rooms, once each, minus the caller", async () => {
+  const registry = registryOf(async (roomId) => ({
+    elements: [],
+    access: {
+      space: roomId === "private" ? "private" : "team",
+      createdBy: OWNER,
+    },
+    readable: true,
+  }))
+  await joinRoom(registry, "t1", fakePeer("p1"), member("u:ada", "Ada"))
+  await joinRoom(registry, "t1", fakePeer("p2"), member("u:ada", "Ada"))
+  await joinRoom(registry, "t2", fakePeer("p3"), member("u:ada", "Ada"))
+  await joinRoom(registry, "t2", fakePeer("p4"), member("u:bob", "Bob"))
+  await joinRoom(registry, "t2", fakePeer("p5"), guest("Quiet Otter"))
+  await joinRoom(registry, "t2", fakePeer("p6"), member(OWNER, "Owner"))
+  await joinRoom(registry, "private", fakePeer("p7"), member("u:cy", "Cy"))
+
+  expect(liveFor(registry, OWNER).teamCount).toBe(3)
+  // Owner, Bob and the guest; not Ada's own tabs.
+  expect(liveFor(registry, "u:ada").teamCount).toBe(3)
 })
 
 test("the stack caps at four avatars while the count stays true", async () => {

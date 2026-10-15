@@ -5,40 +5,17 @@
 import { useQuery } from "@tanstack/react-query"
 import { SPACES } from "@/components/space-label"
 import type { Space } from "@/db/schema"
-import type { LiveDrawing } from "@/features/collab/live"
 import { liveDrawingsQueryOptions } from "@/features/collab/queries"
 import { cn } from "@/lib/utils"
 import { useActiveSpace } from "../ActiveSpace"
 import { useSpringLoad } from "./space-gestures"
-import type { Drawing, DropTarget } from "./tree"
+import type { DropTarget } from "./tree"
 import { useSidebarDnD } from "./use-sidebar-dnd"
 
-/**
- * People live anywhere in these drawings, one per name. A Room's participant
- * list is capped, so its true count is a floor.
- */
-export function peopleLiveIn(live: LiveDrawing[], drawingIds: Set<string>) {
-  const names = new Set<string>()
-  let largestRoom = 0
-  for (const entry of live) {
-    if (!drawingIds.has(entry.drawingId)) continue
-    largestRoom = Math.max(largestRoom, entry.count)
-    for (const participant of entry.participants) names.add(participant.name)
-  }
-  return Math.max(names.size, largestRoom)
-}
-
-export function SpaceSegments({
-  activeSpace,
-  teamDrawings,
-}: {
-  activeSpace: Space
-  teamDrawings: Drawing[]
-}) {
-  const teamIds = new Set(teamDrawings.map((d) => d.id))
+export function SpaceSegments({ activeSpace }: { activeSpace: Space }) {
   const { data: teamLive = 0 } = useQuery({
     ...liveDrawingsQueryOptions(),
-    select: (live) => peopleLiveIn(live, teamIds),
+    select: (live) => live.teamCount,
   })
 
   return (

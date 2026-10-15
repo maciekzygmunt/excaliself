@@ -9,9 +9,15 @@ export type LiveParticipant = { name: string; color: ParticipantColor }
 
 export type LiveDrawing = {
   drawingId: string
-  /** True total; `participants` is capped. */
+  /** People, not tabs. True total; `participants` is capped. */
   count: number
   participants: LiveParticipant[]
+}
+
+export type LiveSnapshot = {
+  drawings: LiveDrawing[]
+  /** People live anywhere in Team, once each, minus the caller. */
+  teamCount: number
 }
 
 /** Avatars shown before a "+N" tail. */
@@ -19,28 +25,32 @@ export const MAX_LIVE_AVATARS = 4
 
 /**
  * Drawings `userId` can access with someone else in them. Their own tabs
- * don't count; a Room that failed to load is never shown.
+ * don't count; a Room that failed to load is never shown. A member counts
+ * once however many tabs they have; each guest connection is one person.
  */
-export function liveDrawingsFor(
-  registry: RoomRegistry,
-  userId: string,
-): LiveDrawing[] {
-  const live: LiveDrawing[] = []
+export function liveFor(registry: RoomRegistry, userId: string): LiveSnapshot {
+  const drawings: LiveDrawing[] = []
+  const inTeam = new Set<string>()
   for (const [drawingId, room] of registry.rooms) {
     if (!room.access || !canAccess(room.access, userId)) continue
 
-    const others = [...room.seats.values()]
-      .filter((seat) => seat.userId !== userId)
-      .map((seat) => seat.participant)
-    if (others.length === 0) continue
+    // Keyed by userId, or by connection id for guests.
+    const people = new Map<string, LiveParticipant>()
+    for (const [connectionId, seat] of room.seats) {
+      if (seat.userId === userId) continue
+      const key = seat.userId ?? connectionId
+      if (people.has(key)) continue
+      const { name, color } = seat.participant
+      people.set(key, { name, color })
+      if (room.access.space === "team") inTeam.add(key)
+    }
+    if (people.size === 0) continue
 
-    live.push({
+    drawings.push({
       drawingId,
-      count: others.length,
-      participants: others
-        .slice(0, MAX_LIVE_AVATARS)
-        .map(({ name, color }) => ({ name, color })),
+      count: people.size,
+      participants: [...people.values()].slice(0, MAX_LIVE_AVATARS),
     })
   }
-  return live
+  return { drawings, teamCount: inTeam.size }
 }
