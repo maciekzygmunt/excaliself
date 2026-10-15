@@ -15,6 +15,7 @@ import {
   createRoomRegistry,
   endLinkRoom,
   evictNonMembers,
+  evictUser,
   joinRoom,
   leaveRoom,
   MAX_ROOM_PARTICIPANTS,
@@ -1751,4 +1752,45 @@ test("evicting from a drawing nobody is in is a no-op", async () => {
   await evictNonMembers(registry, ROOM)
 
   expect(registry.writes).toEqual([])
+})
+
+test("a deleted member is closed out of every Room, and nobody else is", async () => {
+  const registry = recordingRegistry()
+  const daveTeam = fakePeer("peer-dave-team")
+  const daveLink = fakePeer("peer-dave-link")
+  const ada = fakePeer("peer-ada")
+  const grace = fakePeer("peer-grace")
+  await joinRoom(registry, ROOM, daveTeam, member("Dave"))
+  await joinRoom(registry, ROOM, ada, member("Ada"))
+  await joinRoom(registry, "drawing-2", daveLink, member("Dave"))
+  await joinRoom(registry, "drawing-2", grace, guest)
+
+  await evictUser(registry, "u:Dave")
+
+  for (const peer of [daveTeam, daveLink])
+    expect(peer.closes).toEqual([
+      { code: LINK_DEAD_CLOSE_CODE, reason: "Link no longer active" },
+    ])
+  expect(ada.closes).toEqual([])
+  expect(grace.closes).toEqual([])
+  expect(rosterOf(ada.sent.at(-1))).toEqual(["Ada"])
+})
+
+test("an edit a deleted member sends after the eviction is refused", async () => {
+  const registry = recordingRegistry()
+  const dave = fakePeer("peer-dave")
+  const ada = fakePeer("peer-ada")
+  await joinRoom(registry, ROOM, dave, member("Dave"))
+  await joinRoom(registry, ROOM, ada, member("Ada"))
+
+  await evictUser(registry, "u:Dave")
+  const outcome = await receiveFromPeer(
+    registry,
+    ROOM,
+    dave,
+    sceneUpdate([element("d", 1)]),
+  )
+
+  expect(outcome).toBe("evicted")
+  expect(registry.rooms.get(ROOM)?.elements).toEqual([])
 })

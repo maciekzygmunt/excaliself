@@ -657,9 +657,33 @@ export async function evictNonMembers(
   // As in `terminateRoom`: let queued strokes merge first.
   await room.loaded
 
+  await evictSeats(registry, room, (seat) => seat.userId === null)
+}
+
+/**
+ * A member was deleted: closes their seats in every Room at once. Their
+ * queued frames then find no seat, so nothing they send is merged.
+ */
+export async function evictUser(
+  registry: RoomRegistry,
+  userId: string,
+): Promise<void> {
+  await Promise.all(
+    [...registry.rooms.values()].map((room) =>
+      evictSeats(registry, room, (seat) => seat.userId === userId),
+    ),
+  )
+}
+
+/** Drops the picked seats, settles the Room, then hangs up on them as dead. */
+async function evictSeats(
+  registry: RoomRegistry,
+  room: Room,
+  pick: (seat: Seat) => boolean,
+) {
   const evicted: RoomPeer[] = []
   for (const [connectionId, seat] of [...room.seats]) {
-    if (seat.userId !== null) continue
+    if (!pick(seat)) continue
     forgetConnection(room, connectionId)
     evicted.push(seat.peer)
   }
