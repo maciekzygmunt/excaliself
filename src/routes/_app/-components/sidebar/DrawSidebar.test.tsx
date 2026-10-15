@@ -47,7 +47,7 @@ vi.mock("@tanstack/react-router", () => ({
 }))
 
 vi.mock("@/features/collab/server", () => ({
-  getLiveDrawings: vi.fn(async () => []),
+  getLiveDrawings: vi.fn(async () => ({ drawings: [], teamCount: 0 })),
 }))
 vi.mock("@/features/account/server", () => ({ getCurrentUser: vi.fn() }))
 vi.mock("@/features/drawings/server", () => ({
@@ -151,7 +151,7 @@ beforeEach(() => {
   vi.mocked(getDrawings).mockImplementation(async () => drawings)
   vi.mocked(getFolders).mockResolvedValue(FOLDERS)
   vi.mocked(moveToTeam).mockResolvedValue([])
-  vi.mocked(getLiveDrawings).mockResolvedValue([])
+  vi.mocked(getLiveDrawings).mockResolvedValue({ drawings: [], teamCount: 0 })
 })
 
 function renderSidebar(teamEnabled: boolean) {
@@ -234,16 +234,8 @@ test("the + of a pane creates in that pane's space", () => {
   expect(openCreateDrawingDialog).toHaveBeenCalledWith(undefined, "team")
 })
 
-test("the Team segment counts people live anywhere in Team, once each", async () => {
-  const anna = { name: "Anna", color: { background: "#000", stroke: "#000" } }
-  const piotr = { ...anna, name: "Piotr" }
-  const guest = { ...anna, name: "Guest" }
-  vi.mocked(getLiveDrawings).mockResolvedValue([
-    { drawingId: "t-roadmap", count: 2, participants: [anna, piotr] },
-    { drawingId: "t-hiring", count: 1, participants: [anna] },
-    // A private Room (shared by link) isn't Team
-    { drawingId: "p-notes", count: 1, participants: [guest] },
-  ])
+test("the Team segment shows the server's count of people live in Team", async () => {
+  vi.mocked(getLiveDrawings).mockResolvedValue({ drawings: [], teamCount: 2 })
   renderSidebar(true)
 
   expect(await screen.findByRole("button", { name: /^Team\s*2$/ })).toBeTruthy()

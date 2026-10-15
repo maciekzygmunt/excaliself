@@ -15,7 +15,7 @@ import { renderPreviewSvg } from "./preview"
 // Cards poll for live sessions (spec §1.5); these tests are not about the
 // badge, so the poll answers "nobody".
 vi.mock("@/features/collab/server", () => ({
-  getLiveDrawings: vi.fn(async () => []),
+  getLiveDrawings: vi.fn(async () => ({ drawings: [], teamCount: 0 })),
 }))
 
 // Each card fetches its own scene for the preview.

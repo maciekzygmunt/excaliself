@@ -16,7 +16,7 @@ export function useLiveDrawing(drawingId: string): LiveDrawing | null {
   const { data } = useQuery({
     ...liveDrawingsQueryOptions(),
     select: (live) =>
-      live.find((entry) => entry.drawingId === drawingId) ?? null,
+      live.drawings.find((entry) => entry.drawingId === drawingId) ?? null,
   })
   return data ?? null
 }

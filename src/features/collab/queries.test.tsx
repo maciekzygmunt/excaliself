@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { act, cleanup, render, screen, waitFor } from "@testing-library/react"
 import { afterEach, beforeEach, expect, test, vi } from "vitest"
 import { POLL_INTERVAL_MS } from "@/lib/polling"
-import type { LiveDrawing } from "./live"
+import type { LiveDrawing, LiveSnapshot } from "./live"
 import { useLiveDrawing } from "./queries"
 import { getLiveDrawings } from "./server"
 
@@ -16,9 +16,14 @@ const badge = (drawingId: string, count: number): LiveDrawing => ({
   participants: [{ name: "Quiet Otter", color }],
 })
 
+const snapshot = (...drawings: LiveDrawing[]): LiveSnapshot => ({
+  drawings,
+  teamCount: 0,
+})
+
 beforeEach(() => {
   vi.clearAllMocks()
-  vi.mocked(getLiveDrawings).mockResolvedValue([])
+  vi.mocked(getLiveDrawings).mockResolvedValue(snapshot())
 })
 
 afterEach(() => {
@@ -47,7 +52,7 @@ function renderRows(ids: string[]) {
 }
 
 test("a drawing with a live room reports its count, the rest stay quiet", async () => {
-  vi.mocked(getLiveDrawings).mockResolvedValue([badge("d1", 3)])
+  vi.mocked(getLiveDrawings).mockResolvedValue(snapshot(badge("d1", 3)))
   renderRows(["d1", "d2"])
 
   await waitFor(() => {
@@ -75,7 +80,7 @@ test("the badge refreshes on the poll interval", async () => {
   })
   expect(rowText("d1")).toBe("quiet")
 
-  vi.mocked(getLiveDrawings).mockResolvedValue([badge("d1", 1)])
+  vi.mocked(getLiveDrawings).mockResolvedValue(snapshot(badge("d1", 1)))
   await act(async () => {
     await vi.advanceTimersByTimeAsync(POLL_INTERVAL_MS)
   })
