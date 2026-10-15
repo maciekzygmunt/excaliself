@@ -19,6 +19,10 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default: KEYCAP_SURFACE,
+        // A confirm's main action. Light-theme iris in both themes: white
+        // text on the dark-theme iris is too low contrast.
+        primary:
+          "border border-[#5f56b8] bg-gradient-to-b from-[#7870cf] to-[#6f66c9] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.16),0_1px_2px_rgba(0,0,0,0.12)] hover:to-[#645bbd] active:to-[#5f56b8]",
         destructive:
           "bg-destructive text-white hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/60",
         outline:

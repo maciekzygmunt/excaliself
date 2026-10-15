@@ -73,7 +73,9 @@ export function MoveToTeamDialog({
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <Button onClick={onConfirm}>Move to Team</Button>
+          <Button variant="primary" onClick={onConfirm}>
+            Move to Team
+          </Button>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
