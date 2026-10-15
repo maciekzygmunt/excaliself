@@ -7,6 +7,8 @@ import {
   lastPathSegment,
 } from "@/features/collab/room-socket"
 
-export default defineRoomSocket((request) =>
-  resolveRoomForDrawing(db, lastPathSegment(request), request.headers),
+export default defineRoomSocket(
+  (request) =>
+    resolveRoomForDrawing(db, lastPathSegment(request), request.headers),
+  { limitFailures: false },
 )

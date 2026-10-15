@@ -47,10 +47,13 @@ function roomContextOf(peer: { context: Record<string, unknown> }) {
 
 /**
  * `resolve` admits or refuses a socket. It runs on the upgrade and again once
- * the socket is seated, and refuses every failure alike.
+ * the socket is seated, and refuses every failure alike. `limitFailures` puts
+ * the entry under the token-guessing budget; by-id joins need a session, so
+ * guessing ids gains nothing and their refusals must not block share links.
  */
 export const defineRoomSocket = (
   resolve: (request: Request) => Promise<RoomJoin>,
+  { limitFailures }: { limitFailures: boolean },
 ) =>
   defineWebSocketHandler({
     async upgrade(request) {
@@ -58,7 +61,7 @@ export const defineRoomSocket = (
         headers: request.headers,
         socketIp: socketIpOf(request),
       }
-      if (tokenLookupsBlocked(visitor))
+      if (limitFailures && tokenLookupsBlocked(visitor))
         throw new Response("Too Many Requests", { status: 429 })
 
       // Runs on every (re)connect, so link changes apply on the next join.
@@ -66,7 +69,7 @@ export const defineRoomSocket = (
       // Accept and close in `open`: a refused handshake is an opaque 1006 the
       // client can't tell from an outage, so it would retry forever.
       if (join.status !== "ok") {
-        recordFailedTokenLookup(visitor)
+        if (limitFailures) recordFailedTokenLookup(visitor)
         return
       }
 
