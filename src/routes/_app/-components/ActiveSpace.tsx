@@ -4,7 +4,7 @@
 // last-used space.
 
 import { useQuery } from "@tanstack/react-query"
-import { useMatchRoute, useNavigate, useSearch } from "@tanstack/react-router"
+import { useLocation, useNavigate } from "@tanstack/react-router"
 import {
   createContext,
   type ReactNode,
@@ -54,23 +54,22 @@ export function ActiveSpaceProvider({ children }: { children: ReactNode }) {
   })
   const { data: drawings = [] } = useQuery(drawingsQueryOptions())
   const { data: folders = [] } = useQuery(foldersQueryOptions())
-  const matchRoute = useMatchRoute()
   const navigate = useNavigate()
-  const { space: param } = useSearch({ strict: false })
+  // Path and search from one location: mid-navigation, matchRoute still
+  // sees the old path while useSearch already has the new search.
+  const { pathname, search } = useLocation()
+  const param = search.space
+  const [, section, id] = pathname.split("/")
 
-  const onHome = matchRoute({ to: "/draw" }) !== false
-  const onBrowse = onHome || matchRoute({ to: "/drawings" }) !== false
-  const openDrawing = matchRoute({ to: "/draw/$id" })
-  const openFolder = matchRoute({ to: "/folder/$id" })
-  const openId = openDrawing
-    ? openDrawing.id
-    : openFolder
-      ? openFolder.id
-      : null
+  const onHome = section === "draw" && !id
+  const onBrowse = onHome || section === "drawings"
+  const openDrawing = section === "draw" && id ? id : null
+  const openFolder = section === "folder" && id ? id : null
+  const openId = openDrawing ?? openFolder
   const openSpace = openDrawing
-    ? drawings.find((d) => d.id === openDrawing.id)?.space
+    ? drawings.find((d) => d.id === openDrawing)?.space
     : openFolder
-      ? folders.find((f) => f.id === openFolder.id)?.space
+      ? folders.find((f) => f.id === openFolder)?.space
       : undefined
   const browseSpace = onBrowse ? (param ?? "private") : undefined
 

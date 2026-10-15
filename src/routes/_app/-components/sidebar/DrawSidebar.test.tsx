@@ -42,6 +42,7 @@ vi.mock("@tanstack/react-router", () => ({
   useSearch: () => ({}),
   useNavigate: () => vi.fn(),
   // Not on Home or All drawings, nothing open: the sidebar's own state rules.
+  useLocation: () => ({ pathname: "/trash", search: {} }),
   useMatchRoute: () => () => false,
 }))
 
