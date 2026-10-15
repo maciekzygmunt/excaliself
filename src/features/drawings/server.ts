@@ -9,6 +9,7 @@ import { drawingFiles, drawings, spaces, stars } from "@/db/schema"
 import { userDisplayName } from "@/features/account/display-name"
 import { endTrashedRooms } from "@/features/collab/room-registry"
 import { assertFolderTarget } from "@/features/folders/ownership"
+import { lockFolderTree } from "@/features/folders/tree-lock"
 import { accessibleTo } from "@/features/spaces/access"
 import { restoreDrawingUnit } from "@/features/trash/restore"
 import { authMiddleware } from "@/middleware/auth"
@@ -82,21 +83,24 @@ export const createDrawing = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const userId = context.session.user.id
-    const space = data.folderId
-      ? await assertFolderTarget(db, userId, data.folderId)
-      : data.space
     const id = randomUUID()
     const now = new Date()
 
-    await db.insert(drawings).values({
-      id,
-      name: data.name ?? "Untitled",
-      data: JSON.stringify({ elements: [], appState: {} }),
-      folderId: data.folderId ?? null,
-      space,
-      createdBy: userId,
-      createdAt: now,
-      updatedAt: now,
+    await db.transaction(async (tx) => {
+      await lockFolderTree(tx, "place")
+      const space = data.folderId
+        ? await assertFolderTarget(tx, userId, data.folderId)
+        : data.space
+      await tx.insert(drawings).values({
+        id,
+        name: data.name ?? "Untitled",
+        data: JSON.stringify({ elements: [], appState: {} }),
+        folderId: data.folderId ?? null,
+        space,
+        createdBy: userId,
+        createdAt: now,
+        updatedAt: now,
+      })
     })
 
     return id
@@ -115,26 +119,29 @@ export const updateDrawing = createServerFn({ method: "POST" })
   )
   .handler(async ({ data: { id, updateData }, context }) => {
     const userId = context.session.user.id
-    const targetSpace = updateData.folderId
-      ? await assertFolderTarget(db, userId, updateData.folderId)
-      : undefined
-    // Access is enforced in the statement itself; zero rows means "not
-    // found" so others can't tell a private drawing exists. Trashed drawings
-    // are treated the same — no edits while in the trash — and so is a move
-    // into a folder of the other space.
-    const updated = await db
-      .update(drawings)
-      .set({ ...updateData, updatedAt: new Date() })
-      .where(
-        and(
-          eq(drawings.id, id),
-          accessibleTo(drawings, userId),
-          isNull(drawings.deletedAt),
-          targetSpace && eq(drawings.space, targetSpace),
-        ),
-      )
-      .returning({ id: drawings.id })
-    if (updated.length === 0) throw new Error("Drawing not found")
+    await db.transaction(async (tx) => {
+      if (updateData.folderId !== undefined) await lockFolderTree(tx, "place")
+      const targetSpace = updateData.folderId
+        ? await assertFolderTarget(tx, userId, updateData.folderId)
+        : undefined
+      // Access is enforced in the statement itself; zero rows means "not
+      // found" so others can't tell a private drawing exists. Trashed
+      // drawings are treated the same — no edits while in the trash — and so
+      // is a move into a folder of the other space.
+      const updated = await tx
+        .update(drawings)
+        .set({ ...updateData, updatedAt: new Date() })
+        .where(
+          and(
+            eq(drawings.id, id),
+            accessibleTo(drawings, userId),
+            isNull(drawings.deletedAt),
+            targetSpace && eq(drawings.space, targetSpace),
+          ),
+        )
+        .returning({ id: drawings.id })
+      if (updated.length === 0) throw new Error("Drawing not found")
+    })
   })
 
 export const setDrawingStarred = createServerFn({ method: "POST" })

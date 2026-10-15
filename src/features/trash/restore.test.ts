@@ -1,4 +1,5 @@
 import type { SQL } from "drizzle-orm"
+import { PgDialect } from "drizzle-orm/pg-core"
 import { expect, test } from "vitest"
 import { drawings, folders, type Space } from "@/db/schema"
 import { accessibleTo } from "@/features/spaces/access"
@@ -21,7 +22,8 @@ const folder = (
 ): FolderRow => ({ id, parentId, deletedAt, space })
 
 // The first update is the restore itself and returns `restored`; the folder
-// select returns `visibleFolders`, every folder the caller can see.
+// select returns `visibleFolders`, every folder the caller can see. Locks are
+// recorded with the number of updates before them.
 function fakeDb(options: {
   restored: unknown[]
   visibleFolders?: FolderRow[]
@@ -31,7 +33,13 @@ function fakeDb(options: {
     set: Record<string, unknown>
     where: SQL
   }[] = []
+  const locks: { sql: string; updatesBefore: number }[] = []
   const tx = {
+    execute: (query: SQL) => {
+      const { sql } = new PgDialect().sqlToQuery(query)
+      locks.push({ sql, updatesBefore: updates.length })
+      return Promise.resolve()
+    },
     update: (table: unknown) => ({
       set: (set: Record<string, unknown>) => ({
         where: (where: SQL) => {
@@ -52,7 +60,7 @@ function fakeDb(options: {
   const db = {
     transaction: (fn: (tx: unknown) => Promise<unknown>) => fn(tx),
   } as unknown as Parameters<typeof restoreDrawingUnit>[0]
-  return { db, updates }
+  return { db, updates, locks }
 }
 
 const UNTRASHED = { deletedAt: null, trashRootId: null, deletedBy: null }
@@ -117,4 +125,28 @@ test("a Team folder unit restores whole, clears who trashed it, and falls back t
   expect(unitDrawings.table).toBe(drawings)
   expect(unitDrawings.set).toEqual(UNTRASHED)
   expect(landing.set).toEqual({ parentId: null })
+})
+
+test("the folder tree is locked before the restore: alone for a folder, shared for a drawing", async () => {
+  const folderRestore = fakeDb({
+    restored: [{ id: "f1", parentId: null, space: "team" }],
+  })
+  await restoreFolderUnit(folderRestore.db, "member-b", "f1")
+  expect(folderRestore.locks).toEqual([
+    {
+      sql: expect.stringContaining("select pg_advisory_xact_lock("),
+      updatesBefore: 0,
+    },
+  ])
+
+  const drawingRestore = fakeDb({
+    restored: [{ id: "d1", folderId: null, space: "team" }],
+  })
+  await restoreDrawingUnit(drawingRestore.db, "member-b", "d1")
+  expect(drawingRestore.locks).toEqual([
+    {
+      sql: expect.stringContaining("select pg_advisory_xact_lock_shared("),
+      updatesBefore: 0,
+    },
+  ])
 })

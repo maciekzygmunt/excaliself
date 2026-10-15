@@ -7,6 +7,7 @@ import type { NodePgDatabase } from "drizzle-orm/node-postgres"
 import type * as schema from "@/db/schema"
 import { drawings, folders, shares } from "@/db/schema"
 import { collectFolderSubtreeIds } from "@/features/folders/subtree"
+import { lockFolderTree } from "@/features/folders/tree-lock"
 import { accessibleTo, inPrivateSpaceOf } from "./access"
 
 type Db = NodePgDatabase<typeof schema>
@@ -28,6 +29,7 @@ export async function moveToTeam(
   targetFolderId: string | null,
 ): Promise<string[]> {
   return db.transaction(async (tx) => {
+    await lockFolderTree(tx, item.type === "folder" ? "change" : "place")
     if (targetFolderId) {
       const [target] = await tx
         .select({ id: folders.id })

@@ -7,10 +7,10 @@ import type { NodePgDatabase } from "drizzle-orm/node-postgres"
 import type * as schema from "@/db/schema"
 import { drawings, folders, type Space } from "@/db/schema"
 import { findNearestLiveAncestorId } from "@/features/folders/subtree"
+import { lockFolderTree, type Tx } from "@/features/folders/tree-lock"
 import { accessibleTo } from "@/features/spaces/access"
 
 type Db = NodePgDatabase<typeof schema>
-type Tx = Parameters<Parameters<Db["transaction"]>[0]>[0]
 
 // Clears every trash mark a row gets when it is trashed as or within a unit.
 const UNTRASHED = { deletedAt: null, trashRootId: null, deletedBy: null }
@@ -54,6 +54,7 @@ export async function restoreDrawingUnit(
   id: string,
 ): Promise<{ originalFolderGone: boolean }> {
   return db.transaction(async (tx) => {
+    await lockFolderTree(tx, "place")
     const [restored] = await tx
       .update(drawings)
       .set(UNTRASHED)
@@ -99,6 +100,7 @@ export async function restoreFolderUnit(
   id: string,
 ): Promise<{ originalParentGone: boolean }> {
   return db.transaction(async (tx) => {
+    await lockFolderTree(tx, "change")
     const restored = await tx
       .update(folders)
       .set(UNTRASHED)
