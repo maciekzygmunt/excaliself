@@ -1,6 +1,6 @@
-# Same as docker-compose.yaml, but builds the app image from source:
-#   docker compose -f docker-compose.build.yaml up -d --build
-# Also works as a Coolify compose file to deploy every push to main.
+# Coolify compose file that builds the app image from source, to deploy every push to main.
+# No host port, so only the Coolify proxy reaches the app. Without Coolify, add the port from docker-compose.yaml:
+#   docker compose -f docker-compose.yaml -f docker-compose.build.yaml up -d --build
 # The build needs ~4 GB of RAM; prefer the prebuilt image on small servers.
 services:
   db:
@@ -21,8 +21,6 @@ services:
   excaliself:
     image: excaliself:local
     build: .
-    ports:
-      - "${EXCALISELF_PORT:-3000}:3000"
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-excaliself}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-excaliself}
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?Set BETTER_AUTH_SECRET in .env}

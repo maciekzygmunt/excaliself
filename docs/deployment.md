@@ -63,8 +63,11 @@ To build the image on the server instead of pulling it (needs ~4 GB RAM),
 clone the repo and run:
 
 ```bash
-docker compose -f docker-compose.build.yaml up -d --build
+docker compose -f docker-compose.yaml -f docker-compose.build.yaml up -d --build
 ```
+
+`docker-compose.build.yaml` alone publishes no port; `docker-compose.yaml` adds
+it.
 
 ## Coolify
 
@@ -91,6 +94,8 @@ run the pushed commit, build it on the server instead: set **Docker Compose
 Location** to `/docker-compose.build.yaml` and keep **Auto Deploy** on. Set
 `POSTGRES_PASSWORD`, `BETTER_AUTH_SECRET` and `BASE_URL` in the resource's
 environment variables (see the table above). The build needs ~4 GB of RAM.
+The file publishes no host port, so it does not conflict with other apps on
+port 3000.
 
 ## Backup and restore
 
