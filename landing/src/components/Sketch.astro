@@ -1,0 +1,20 @@
+---
+// Renders rough.js parts. Pen strokes get pathLength=1 so the page script can draw them in.
+import type { Part } from "../lib/sketch"
+
+interface Props {
+  parts: Part[]
+  class?: string
+}
+const { parts, class: className } = Astro.props
+---
+
+<g class={className}>
+  {parts.map((p) =>
+    p.draw ? (
+      <path class="sk-s" d={p.d} stroke={p.stroke} stroke-width={p.width} fill="none" stroke-linecap="round" stroke-linejoin="round" pathLength="1" />
+    ) : (
+      <path class="sk-f" d={p.d} fill={p.fill ?? "none"} stroke={p.stroke ?? "none"} stroke-width={p.width} stroke-linecap="round" />
+    ),
+  )}
+</g>

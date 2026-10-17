@@ -2,68 +2,62 @@
 @import "@fontsource-variable/geist/wght.css";
 @import "@fontsource-variable/geist-mono/wght.css";
 
-/* Etched light tokens, copied from the app's src/styles.css so the page
-   matches the product. The page is light only. */
+/* Excalidraw's hand font. Latin subset from the Excalidraw repo, SIL OFL 1.1. */
+@font-face {
+  font-family: "Excalifont";
+  src: url("../assets/fonts/excalifont-latin.woff2") format("woff2");
+  font-display: swap;
+}
+
+/* Whiteboard tokens: Excalidraw's canvas, stroke and default fills, plus the product's iris. */
 :root {
-  --background: #ebebee;
-  --foreground: #18181b;
-  --panel: #ffffff;
-  --muted-foreground: #68686f;
-  --border: rgba(9, 9, 11, 0.1);
+  --ground: #ffffff;
+  --ink: #1e1e1e;
+  --muted: #5c5c66;
+  --line: rgb(30 30 30 / 0.12);
   --iris: #6f66c9;
-  --iris-strong: #453da5;
-  --iris-muted: rgba(111, 102, 201, 0.1);
-  --panel-shadow:
-    0 1px 2px rgba(0, 0, 0, 0.04), 0 16px 40px rgba(0, 0, 0, 0.05);
-  --keycap-border: rgba(9, 9, 11, 0.13);
-  --keycap-border-hover: rgba(9, 9, 11, 0.2);
-  --keycap-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.9), 0 1px 2px rgba(0, 0, 0, 0.06);
-  --card-border: rgba(9, 9, 11, 0.09);
-  --card-border-hover: rgba(9, 9, 11, 0.16);
-  --card-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.8), 0 1px 2px rgba(0, 0, 0, 0.05);
-  --card-hover-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.8), 0 3px 10px rgba(0, 0, 0, 0.07);
-  --well: rgba(24, 24, 27, 0.05);
-  --well-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.04);
-  --hairline: rgba(9, 9, 11, 0.06);
+  --pen: #5f56c0;
+  --well: #f4f4f6;
+  --sk-blue: #a5d8ff;
+  --sk-green: #b2f2bb;
+  --sk-yellow: #ffec99;
+  --sk-red: #ffc9c9;
+  --sk-violet: #d0bfff;
+  --gutter: clamp(1.25rem, 0.6rem + 2vw, 2.5rem);
   color-scheme: light;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-panel: var(--panel);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-border: var(--border);
+  --color-ground: var(--ground);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
   --color-iris: var(--iris);
-  --color-iris-strong: var(--iris-strong);
-  --color-iris-muted: var(--iris-muted);
-  --color-keycap-border: var(--keycap-border);
-  --color-keycap-border-hover: var(--keycap-border-hover);
-  --color-card-border: var(--card-border);
-  --color-card-border-hover: var(--card-border-hover);
+  --color-pen: var(--pen);
   --color-well: var(--well);
-  --color-hairline: var(--hairline);
-  --shadow-panel: var(--panel-shadow);
-  --shadow-keycap: var(--keycap-shadow);
-  --shadow-card: var(--card-shadow);
-  --shadow-card-hover: var(--card-hover-shadow);
-  --shadow-well: var(--well-shadow);
   --font-sans: "Geist Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --font-mono: "Geist Mono Variable", ui-monospace, SFMono-Regular, Menlo, monospace;
-  /* One easing for every transition on the page. */
-  --ease-fluid: cubic-bezier(0.32, 0.72, 0, 1);
+  --font-hand: "Excalifont", "Comic Sans MS", cursive;
+  --text-mega: clamp(3rem, 0.9rem + 7.4vw, 7.75rem);
+  --text-display: clamp(2.6rem, 1.5rem + 3.9vw, 5rem);
+  --text-head: clamp(1.6rem, 1.2rem + 1.8vw, 2.75rem);
+  --text-lede: clamp(1.0625rem, 1rem + 0.25vw, 1.25rem);
+  --spacing-gutter: var(--gutter);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 @layer base {
-  * {
-    @apply border-border;
-  }
   html {
-    @apply bg-background text-foreground font-sans antialiased;
-    scroll-behavior: smooth;
+    @apply bg-ground font-sans text-ink antialiased;
+    font-size: 100%;
+  }
+  body {
+    font-size: 1.0625rem;
+    line-height: 1.55;
+  }
+  /* Clip here, not on body: body's overflow moves to the viewport, which can still scroll sideways. */
+  main {
+    overflow-x: clip;
   }
   h1,
   h2,
@@ -74,185 +68,233 @@
   li {
     text-wrap: pretty;
   }
+  ::selection {
+    background: var(--sk-violet);
+    color: var(--ink);
+  }
   :focus-visible {
     outline: 2px solid var(--iris);
-    outline-offset: 2px;
+    outline-offset: 3px;
+    border-radius: 4px;
   }
 }
 
-/* Raised secondary button, flat panel colour with the Etched edge. */
-@utility keycap {
-  @apply rounded-md border border-keycap-border bg-panel text-foreground shadow-keycap transition-[border-color,scale,background-color] duration-300 ease-fluid hover:border-keycap-border-hover active:scale-[0.98] active:bg-well;
+/* Page grid: 12 columns, max 1440, outer margin = gutter. */
+@utility page {
+  width: 100%;
+  max-width: 1440px;
+  margin-inline: auto;
+  padding-inline: var(--gutter);
+}
+@utility grid-12 {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  column-gap: var(--gutter);
 }
 
-/* Primary button. */
-@utility button-primary {
-  @apply inline-flex items-center justify-center gap-2 rounded-md bg-iris px-3 py-2 text-base font-semibold text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.2)] transition-[background-color,scale] duration-300 ease-fluid hover:bg-iris-strong active:scale-[0.98];
+@utility display {
+  font-weight: 620;
+  letter-spacing: -0.045em;
+  line-height: 0.92;
+  margin-left: -0.05em;
+}
+@utility heading {
+  font-size: var(--text-display);
+  font-weight: 600;
+  letter-spacing: -0.04em;
+  line-height: 0.95;
+  margin-left: -0.04em;
+}
+@utility hand {
+  font-family: var(--font-hand);
+  letter-spacing: 0;
 }
 
-@utility card {
-  @apply rounded-xl border border-card-border bg-panel shadow-card transition-[border-color,box-shadow] duration-300 ease-fluid hover:border-card-border-hover hover:shadow-card-hover;
+/* Inline links in text keep an underline at rest; it thickens on hover. */
+@utility link {
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.2em;
+  text-decoration-color: var(--iris);
+  transition: text-decoration-thickness 0.3s var(--ease-out);
+  @media (hover: hover) {
+    &:hover {
+      text-decoration-thickness: 3px;
+    }
+  }
 }
 
-/* Scroll reveal: starts hidden only when JS is present, so no-JS still reads. */
-.js [data-reveal] {
-  opacity: 0;
-  translate: 0 64px;
-  filter: blur(8px);
-  transition:
-    opacity 800ms var(--ease-fluid),
-    translate 800ms var(--ease-fluid),
-    filter 800ms var(--ease-fluid);
-}
-.js [data-reveal].is-visible {
-  opacity: 1;
-  translate: 0 0;
-  filter: blur(0);
-}
+@layer components {
+  /* Buttons. The hover/focus answer is the Excalidraw selection box (<Selection />). */
+  .btn {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    min-height: 3rem;
+    padding: 0 1.25rem;
+    border-radius: 8px;
+    font-weight: 600;
+    white-space: nowrap;
+    transition:
+      translate 0.4s var(--ease-out),
+      background-color 0.3s var(--ease-out);
+  }
+  .btn:active {
+    translate: 0 1px;
+  }
+  .btn-ink {
+    background: var(--ink);
+    color: #fff;
+  }
+  .btn-line {
+    background: var(--ground);
+    color: var(--ink);
+    box-shadow: inset 0 0 0 1px rgb(30 30 30 / 0.22);
+  }
+  @media (hover: hover) {
+    .btn-line:hover {
+      background: var(--well);
+    }
+  }
 
-/* Tagline reveal: each word brightens as it crosses the trigger line. */
-.js .tagline-word {
-  opacity: 0.3;
-  transition: opacity 700ms var(--ease-fluid);
-}
-.js .tagline-word.is-visible {
-  opacity: 1;
-}
-
-/* Island nav: hamburger lines morph into an X, menu links slide up staggered. */
-.menu-line {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 16px;
-  height: 2px;
-  margin-left: -8px;
-  border-radius: 9999px;
-  background: currentColor;
-  transition:
-    translate 700ms var(--ease-fluid),
-    rotate 700ms var(--ease-fluid);
-}
-.menu-line:first-child {
-  translate: 0 -4px;
-}
-.menu-line:last-child {
-  translate: 0 3px;
-}
-[aria-expanded="true"] .menu-line:first-child {
-  translate: 0 -1px;
-  rotate: 45deg;
-}
-[aria-expanded="true"] .menu-line:last-child {
-  translate: 0 -1px;
-  rotate: -45deg;
-}
-.menu-overlay {
-  opacity: 0;
-  visibility: hidden;
-  transition:
-    opacity 700ms var(--ease-fluid),
-    visibility 0s linear 700ms;
-}
-.menu-overlay.is-open {
-  opacity: 1;
-  visibility: visible;
-  transition-delay: 0s;
-}
-.menu-overlay a {
-  opacity: 0;
-  translate: 0 48px;
-  transition:
-    opacity 700ms var(--ease-fluid),
-    translate 700ms var(--ease-fluid);
-}
-.menu-overlay.is-open a {
-  opacity: 1;
-  translate: 0 0;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .js [data-reveal],
-  .js .tagline-word,
-  .menu-overlay,
-  .menu-overlay a {
+  /* Excalidraw selection box: thin iris frame with four square handles. */
+  .sel {
+    position: absolute;
+    inset: -7px;
+    border: 1px solid var(--iris);
+    border-radius: 3px;
+    pointer-events: none;
+    opacity: 0;
+    scale: 1.06;
+    transition:
+      opacity 0.25s var(--ease-out),
+      scale 0.45s var(--ease-out);
+  }
+  .sel i {
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    background: #fff;
+    border: 1px solid var(--iris);
+    border-radius: 2px;
+  }
+  .sel i:nth-child(1) { left: -4.5px; top: -4.5px; }
+  .sel i:nth-child(2) { right: -4.5px; top: -4.5px; }
+  .sel i:nth-child(3) { left: -4.5px; bottom: -4.5px; }
+  .sel i:nth-child(4) { right: -4.5px; bottom: -4.5px; }
+  @media (hover: hover) {
+    .selectable:hover .sel {
+      opacity: 1;
+      scale: 1;
+    }
+  }
+  .selectable:focus-visible {
+    outline: none;
+  }
+  .selectable:focus-visible .sel {
     opacity: 1;
-    translate: none;
-    filter: none;
-    transition: none;
+    scale: 1;
   }
-  .menu-line {
-    transition: none;
+
+  /* Nav links draw a rough underline on hover; the current section keeps it. */
+  .draw-link {
+    position: relative;
+    display: inline-flex;
+    padding-block: 0.5rem;
   }
-  html {
-    scroll-behavior: auto;
+  .draw-link svg {
+    position: absolute;
+    left: -2px;
+    right: -2px;
+    bottom: 0.15rem;
+    width: calc(100% + 4px);
+    height: 8px;
+    overflow: visible;
+  }
+  .draw-link path {
+    stroke-dasharray: 1 2;
+    stroke-dashoffset: 1.02;
+    transition: stroke-dashoffset 0.45s var(--ease-out);
+  }
+  @media (hover: hover) {
+    .draw-link:hover path {
+      stroke-dashoffset: 0;
+    }
+  }
+  .draw-link:focus-visible {
+  outline-offset: 6px;
+}
+.draw-link:focus-visible path,
+  .draw-link[aria-current="true"] path {
+    stroke-dashoffset: 0;
   }
 }
 
-/* FAQ: rotate the caret when open, no marker. */
+/* Pen strokes start undrawn only when motion is allowed and JS runs. */
+.motion [data-draw] .sk-s {
+  stroke-dasharray: 1 2;
+  stroke-dashoffset: 1.02;
+}
+.motion [data-draw] .sk-f,
+.motion [data-draw] .sk-t {
+  opacity: 0;
+}
+.motion [data-reveal] {
+  opacity: 0;
+}
+
+/* Whiteboard dot grid, faded out at the section edges. */
+.dots {
+  position: relative;
+  isolation: isolate;
+}
+.dots::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background-image: radial-gradient(rgb(30 30 30 / 0.16) 1px, transparent 1.2px);
+  background-size: 24px 24px;
+  background-position: -12px -12px;
+  mask-image: linear-gradient(transparent, #000 10%, #000 80%, transparent);
+  pointer-events: none;
+}
+
+/* FAQ: no marker, caret turns when open. */
 details > summary {
   list-style: none;
 }
 details > summary::-webkit-details-marker {
   display: none;
 }
-details .faq-caret {
-  transition: rotate 700ms var(--ease-fluid);
+details .caret {
+  transition: rotate 0.5s var(--ease-out);
 }
-details[open] .faq-caret {
-  rotate: 180deg;
+details[open] .caret {
+  rotate: 45deg;
 }
 
-/* Light/dark screenshot comparison: the dark image sits on top and is
-   clipped at --pos; an invisible range input drives the position. */
-.compare {
-  --pos: 62%;
-  position: relative;
-  overflow: hidden;
-  user-select: none;
-}
-.compare > img {
-  display: block;
-  width: 100%;
-}
-.compare .compare-dark {
-  position: absolute;
-  inset: 0;
-  clip-path: inset(0 0 0 var(--pos));
-}
-.compare .compare-handle {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: var(--pos);
-  width: 2px;
-  margin-left: -1px;
-  background: var(--iris);
-  pointer-events: none;
-}
-.compare .compare-handle::after {
-  content: "";
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 32px;
-  height: 32px;
-  translate: -50% -50%;
-  border-radius: 9999px;
-  background: var(--panel);
-  border: 1px solid var(--keycap-border);
-  box-shadow: var(--keycap-shadow);
-}
-.compare input[type="range"] {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  margin: 0;
+/* Mobile menu */
+.menu-overlay {
   opacity: 0;
-  cursor: ew-resize;
+  visibility: hidden;
+  transition:
+    opacity 0.4s var(--ease-out),
+    visibility 0s linear 0.4s;
 }
-.compare:has(input:focus-visible) {
-  outline: 2px solid var(--iris);
-  outline-offset: 2px;
+.menu-overlay.is-open {
+  opacity: 1;
+  visibility: visible;
+  transition-delay: 0s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
 }

@@ -1,0 +1,127 @@
+---
+// The home screen, marked up by hand. Large screens: notes sit around the screenshot with arrows
+// into it (one 1300×700 coordinate space: image at 150,100 sized 1000×500). Smaller screens: the
+// sidebar alone, each note beside its row with a short arrow.
+import { Image } from "astro:assets"
+import Sketch from "./Sketch.astro"
+import { arrow, pen } from "../lib/sketch"
+import homeLight from "../assets/home-light.png"
+import homeSidebar from "../assets/home-sidebar.png"
+
+type Point = [number, number]
+// `side` is the short note beside the sidebar crop: `y` is its row in CSS px of the 236×600 crop.
+// Notes without one show on the board only.
+const notes: { text: string; x: number; y: number; w: number; arrow: Point[]; side?: { y: number; text: string } }[] = [
+  { text: "press N for a new drawing", x: 1166, y: 118, w: 134, arrow: [[1158, 136], [1120, 150], [1080, 150]], side: { y: 64, text: "or press N" } },
+  { text: "find anything from here, or press ⌘K", x: 0, y: 72, w: 136, arrow: [[104, 142], [132, 160], [156, 180]], side: { y: 107, text: "or press ⌘K" } },
+  { text: "yours, or the team's", x: 0, y: 204, w: 132, arrow: [[96, 222], [130, 218], [158, 213]], side: { y: 143, text: "or the team's" } },
+  { text: "star the ones you open daily", x: 0, y: 296, w: 130, arrow: [[104, 332], [134, 328], [158, 324]], side: { y: 317, text: "the ones you open daily" } },
+  { text: "folders nest as deep as you like", x: 0, y: 424, w: 132, arrow: [[84, 494], [130, 482], [158, 458]], side: { y: 450, text: "nest as deep as you like" } },
+  { text: "trash keeps deletes for 30 days", x: 0, y: 552, w: 132, arrow: [[128, 570], [146, 563], [160, 557]], side: { y: 584, text: "kept for 30 days" } },
+  { text: "previews, so you spot a drawing by its shape", x: 520, y: 18, w: 330, arrow: [[700, 72], [748, 110], [790, 168]] },
+]
+const arrows = notes.map((n, i) => arrow(n.arrow, { seed: 200 + i * 5, stroke: pen, width: 2, head: 12, roughness: 1.1 }))
+const sides = notes.flatMap((n) => (n.side ? [n.side] : []))
+const sideArrows = sides.map((_, i) => arrow([[30, 9], [16, 7], [3, 9]], { seed: 260 + i * 3, stroke: pen, width: 1.6, head: 7 }))
+const pct = (v: number, of: number) => `${(v / of) * 100}%`
+---
+
+<figure class="tour mt-14 md:mt-20">
+  <div class="tour-board relative" data-draw>
+    <div class="tour-shot overflow-hidden rounded-xl shadow-[0_0_0_1px_rgb(30_30_30/0.1),0_24px_60px_-20px_rgb(30_30_30/0.25)]">
+      <Image
+        src={homeLight}
+        widths={[1000, 2000]}
+        sizes="(min-width: 1440px) 1050px, 77vw"
+        alt="The Excaliself home screen: a sidebar with search, a Private and Team switch, starred drawings, folders and trash, next to a grid of recent drawing previews"
+        class="block h-auto w-full"
+        loading="lazy"
+      />
+    </div>
+    <svg viewBox="0 0 1300 700" class="tour-arrows" aria-hidden="true">
+      {arrows.map((a) => <Sketch parts={a} />)}
+    </svg>
+    <ul class="tour-notes" aria-hidden="true">
+      {notes.map((n) => (
+        <li class="sk-t" style={`left:${pct(n.x, 1300)};top:${pct(n.y, 700)};width:${pct(n.w, 1300)}`}>{n.text}</li>
+      ))}
+    </ul>
+  </div>
+
+  <div class="tour-mini grid max-w-[30rem] grid-cols-[minmax(0,1fr)_minmax(0,1fr)]" data-draw>
+    <div class="overflow-hidden rounded-xl shadow-[0_0_0_1px_rgb(30_30_30/0.1),0_20px_40px_-20px_rgb(30_30_30/0.25)]">
+      <Image
+        src={homeSidebar}
+        widths={[240, 472]}
+        sizes="(min-width: 640px) 15rem, 50vw"
+        alt="The Excaliself sidebar: New drawing, search, a Private and Team switch, starred drawings, folders and trash"
+        class="block h-auto w-full"
+        loading="lazy"
+      />
+    </div>
+    <ul class="relative" aria-hidden="true">
+      {sides.map((n, i) => (
+        <li class="tour-side" style={`top:${pct(n.y, 600)}`}>
+          <svg viewBox="0 0 34 18" class="w-7 shrink-0 overflow-visible"><Sketch parts={sideArrows[i]} /></svg>
+          <span class="sk-t">{n.text}</span>
+        </li>
+      ))}
+    </ul>
+  </div>
+
+  <figcaption class="sr-only">
+    Notes on the screenshot:
+    <ul>{notes.map((n) => <li>{n.text}</li>)}</ul>
+  </figcaption>
+</figure>
+
+<style>
+  .tour-board {
+    display: none;
+  }
+  /* Centered on its row. Keep the top three to one line: those rows sit close together. */
+  .tour-side {
+    position: absolute;
+    left: 0.25rem;
+    right: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    translate: 0 -50%;
+    font-family: var(--font-hand);
+    font-size: clamp(0.875rem, 3.8vw, 1.125rem);
+    line-height: 1.2;
+    color: var(--pen);
+  }
+  @media (min-width: 1024px) {
+    .tour-mini {
+      display: none;
+    }
+    .tour-board {
+      display: block;
+      aspect-ratio: 1300 / 700;
+      container-type: inline-size;
+    }
+    .tour-shot {
+      position: absolute;
+      left: 11.538%;
+      top: 14.286%;
+      width: 76.923%;
+    }
+    .tour-arrows {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      overflow: visible;
+      pointer-events: none;
+    }
+    .tour-notes li {
+      position: absolute;
+      font-family: var(--font-hand);
+      font-size: 1.62cqi;
+      line-height: 1.2;
+      color: var(--pen);
+    }
+  }
+</style>

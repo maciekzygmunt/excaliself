@@ -1,12 +1,27 @@
 ---
 import Layout from "../layouts/Layout.astro"
+import Selection from "../components/Selection.astro"
 ---
 
 <Layout title="Page not found: Excaliself" description="This page does not exist." noindex>
-  <main id="main" class="mx-auto flex max-w-6xl flex-col items-center px-6 pt-24 pb-20 text-center">
-    <p class="font-mono text-sm text-muted-foreground">404</p>
-    <h1 class="mt-6 max-w-[680px] text-5xl font-semibold tracking-tight">This page is not on the canvas.</h1>
-    <p class="mt-6 max-w-md text-lg text-muted-foreground">The address may be old or mistyped. The home page has everything that exists here.</p>
-    <a href={import.meta.env.BASE_URL} class="button-primary mt-8">Back to the home page</a>
+  <main id="main" class="dots">
+    <div class="page grid-12 min-h-[calc(100svh-4rem)] content-center gap-y-12 py-20">
+      <div class="col-span-12 lg:col-span-6">
+        <p class="hand text-xl text-pen">404</p>
+        <h1 class="display mt-4 text-display">This page is not on the canvas.</h1>
+        <p class="mt-6 max-w-[30rem] text-lede text-muted">The address may be old or mistyped. The home page has everything that exists here.</p>
+        <a href={import.meta.env.BASE_URL} class="btn btn-ink selectable mt-10">Back to the home page<Selection /></a>
+      </div>
+      <!-- An empty selection: the handles are there, the drawing is not. -->
+      <div class="col-span-12 mt-10 lg:col-span-5 lg:col-start-8 lg:mt-0" aria-hidden="true">
+        <div class="relative mx-auto aspect-[4/3] w-full max-w-[460px] border border-iris">
+          {["-left-[5px] -top-[5px]", "-right-[5px] -top-[5px]", "-left-[5px] -bottom-[5px]", "-right-[5px] -bottom-[5px]"].map((pos) => (
+            <span class={`absolute size-[10px] rounded-[2px] border border-iris bg-white ${pos}`}></span>
+          ))}
+          <span class="absolute -top-9 left-1/2 size-[10px] -translate-x-1/2 rounded-full border border-iris bg-white"></span>
+          <p class="hand absolute inset-0 grid place-items-center text-xl text-pen">nothing selected here</p>
+        </div>
+      </div>
+    </div>
   </main>
 </Layout>

@@ -1,5 +1,7 @@
 {
   "include": ["**/*.ts", "**/*.tsx"],
+  // landing/ is a separate Astro project with its own tsconfig and dependencies.
+  "exclude": ["node_modules", "landing"],
   "compilerOptions": {
     "target": "ES2022",
     "jsx": "react-jsx",
