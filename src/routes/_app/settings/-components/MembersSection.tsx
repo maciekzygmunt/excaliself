@@ -35,11 +35,13 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-import { userDisplayName } from "@/features/account/display-name"
+import { userDisplayName, userInitials } from "@/features/account/display-name"
 import {
   type CurrentUser,
   currentUserQueryOptions,
 } from "@/features/account/queries"
+import type { OwnedContentCounts } from "@/features/admin/delete-user"
+import { describeKeptTeamDrawings } from "@/features/admin/delete-user-copy"
 import { ROLE_CHANGE_ERROR_TOAST, useSetRole } from "@/features/admin/mutations"
 import {
   type AdminUser,
@@ -131,8 +133,7 @@ export function MembersSection() {
           >
             <div className="flex min-w-0 items-center gap-3">
               <InitialsAvatar
-                name={member.name}
-                email={member.email}
+                initials={userInitials(member)}
                 className="h-7 w-7"
               />
               <div className="min-w-0">
@@ -237,10 +238,15 @@ function MemberRowActions({ user }: { user: AdminUser }) {
 
   const deleteMutation = useMutation({
     mutationFn: () => deleteUser({ data: user.id }),
-    onSuccess: () =>
+    onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: usersQueryOptions().queryKey,
-      }),
+      })
+      // The member count drives teamEnabled.
+      queryClient.invalidateQueries({
+        queryKey: currentUserQueryOptions().queryKey,
+      })
+    },
     onError: () => toast.error(`Couldn't delete ${displayName}`),
   })
 
@@ -292,7 +298,7 @@ function MemberRowActions({ user }: { user: AdminUser }) {
 
 function deleteDescription(
   displayName: string,
-  counts: { drawings: number; folders: number } | undefined,
+  counts: OwnedContentCounts | undefined,
   countsFailed: boolean,
 ) {
   if (countsFailed)
@@ -300,9 +306,11 @@ function deleteDescription(
   if (!counts)
     return `This will delete ${displayName}'s account and permanently delete all of their content. This can't be undone.`
   const contents = describeContents(counts.drawings, counts.folders)
-  return contents
-    ? `This will delete ${displayName}'s account and permanently delete their ${contents}. This can't be undone.`
-    : `This will delete ${displayName}'s account. They have no drawings or folders. This can't be undone.`
+  const kept = describeKeptTeamDrawings("Their", counts.teamDrawings)
+  const destroyed = contents
+    ? `This will delete ${displayName}'s account and permanently delete their ${contents}.`
+    : `This will delete ${displayName}'s account. They have no ${kept ? "private " : ""}drawings or folders.`
+  return [destroyed, "This can't be undone.", kept].filter(Boolean).join(" ")
 }
 
 function RoleSelect({

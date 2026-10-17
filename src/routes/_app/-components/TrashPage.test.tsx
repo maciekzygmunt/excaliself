@@ -10,6 +10,8 @@ import {
 } from "@testing-library/react"
 import { afterEach, beforeEach, expect, test, vi } from "vitest"
 import { renderPreviewSvg } from "@/components/drawing-gallery/preview"
+import { currentUserQueryOptions } from "@/features/account/queries"
+import { getCurrentUser } from "@/features/account/server"
 import { getDrawings, restoreDrawing } from "@/features/drawings/server"
 import { getFolders, restoreFolder } from "@/features/folders/server"
 import type {
@@ -34,7 +36,7 @@ const { toastMock, navigateMock } = vi.hoisted(() => ({
 // Cards and rows poll for live sessions (spec §1.5); these tests are not
 // about the badge, so the poll answers "nobody".
 vi.mock("@/features/collab/server", () => ({
-  getLiveDrawings: vi.fn(async () => []),
+  getLiveDrawings: vi.fn(async () => ({ drawings: [], teamCount: 0 })),
 }))
 
 vi.mock("sonner", () => ({ toast: toastMock }))
@@ -96,6 +98,9 @@ vi.mock("@/features/drawings/server", () => ({
   restoreDrawing: vi.fn(),
 }))
 
+// The current user only matters here for teamEnabled.
+vi.mock("@/features/account/server", () => ({ getCurrentUser: vi.fn() }))
+
 vi.mock("@/features/folders/server", () => ({
   getFolders: vi.fn(),
   restoreFolder: vi.fn(),
@@ -125,7 +130,10 @@ function makeTrashedDrawing(
     name: `Drawing ${overrides.id}`,
     searchText: "",
     folderId: null,
-    ownerId: "user-1",
+    space: "private",
+    createdBy: "user-1",
+    deletedBy: null,
+    deletedByName: null,
     starred: false,
     deletedAt: daysAgo(5),
     trashRootId: overrides.id,
@@ -140,7 +148,10 @@ function makeTrashedFolder(
 ): TrashedFolder {
   return {
     name: `Folder ${overrides.id}`,
-    ownerId: "user-1",
+    space: "private",
+    createdBy: "user-1",
+    deletedBy: null,
+    deletedByName: null,
     parentId: null,
     deletedAt: daysAgo(2),
     trashRootId: overrides.id,
@@ -176,12 +187,24 @@ const EMPTY_TRASH: TrashItems = {
   totals: { drawings: 0, folders: 0 },
 }
 
-function renderTrashPage(items: TrashItems = fixture) {
+function renderTrashPage(
+  items: TrashItems = fixture,
+  { teamEnabled = false } = {},
+) {
   const client = new QueryClient({
     defaultOptions: { queries: { staleTime: Infinity, retry: false } },
   })
+  const user = {
+    id: "user-1",
+    email: "ada@example.com",
+    name: "Ada",
+    role: "user" as const,
+    teamEnabled,
+  }
   client.setQueryData(trashQueryOptions().queryKey, items)
+  client.setQueryData(currentUserQueryOptions().queryKey, user)
   vi.mocked(getTrashItems).mockResolvedValue(items)
+  vi.mocked(getCurrentUser).mockResolvedValue(user)
   const view = render(
     <QueryClientProvider client={client}>
       <CommandPaletteProvider>
@@ -527,4 +550,127 @@ test("loading holds the grid with the delayed skeleton, not a spinner", () => {
   expect(
     loading.querySelectorAll('[data-slot="skeleton"]').length,
   ).toBeGreaterThan(0)
+})
+
+// --- Team trash -------------------------------------------------------------
+
+// Private holds the fixture; Team holds a drawing trashed by Grace and a
+// folder trashed by a member who was deleted since.
+const withTeam: TrashItems = {
+  ...fixture,
+  drawings: [
+    ...fixture.drawings,
+    makeTrashedDrawing({
+      id: "t1",
+      name: "Roadmap",
+      space: "team",
+      createdBy: "user-2",
+      deletedBy: "user-2",
+      deletedByName: "Grace",
+      deletedAt: daysAgo(3),
+    }),
+  ],
+  folders: [
+    ...fixture.folders,
+    makeTrashedFolder({
+      id: "tf1",
+      name: "Q3 planning",
+      space: "team",
+      createdBy: null,
+      deletedAt: daysAgo(1),
+    }),
+  ],
+}
+
+const region = (name: string) => screen.getByRole("region", { name })
+
+test("with Team enabled, Team units sit in their own section with who trashed them and when", () => {
+  renderTrashPage(withTeam, { teamEnabled: true })
+
+  const team = within(region("Team trash"))
+  expect(team.getByText("Roadmap")).toBeTruthy()
+  // The icon carries "Trashed by" visually; screen readers get the words
+  expect(team.getAllByText("Trashed by")).toHaveLength(2)
+  expect(team.getByText("Grace")).toBeTruthy()
+  expect(team.getByText("3d ago")).toBeTruthy()
+  // A deleted member's attribution stays honest
+  expect(team.getByText("Former member")).toBeTruthy()
+  expect(team.queryByText("Old sketch")).toBeNull()
+
+  const personal = within(region("Private trash"))
+  expect(personal.getByText("Old sketch")).toBeTruthy()
+  expect(personal.getByText("Archive")).toBeTruthy()
+  expect(personal.queryByText("Trashed by")).toBeNull()
+})
+
+test("any member can restore or delete forever a Team unit someone else created", async () => {
+  vi.mocked(restoreDrawing).mockReturnValue(new Promise(() => {}))
+  renderTrashPage(withTeam, { teamEnabled: true })
+  const team = within(region("Team trash"))
+
+  expect(
+    team.getByRole("button", { name: "Delete forever Roadmap" }),
+  ).toBeTruthy()
+  fireEvent.click(team.getByRole("button", { name: "Restore Roadmap" }))
+
+  await waitFor(() => expect(screen.queryByText("Roadmap")).toBeNull())
+  expect(restoreDrawing).toHaveBeenCalledWith({ data: "t1" }, expect.anything())
+})
+
+test("Empty trash belongs to the Private section only", () => {
+  renderTrashPage(withTeam, { teamEnabled: true })
+
+  expect(
+    within(region("Private trash")).getByRole("button", {
+      name: "Empty trash",
+    }),
+  ).toBeTruthy()
+  expect(
+    within(region("Team trash")).queryByRole("button", { name: "Empty trash" }),
+  ).toBeNull()
+})
+
+test("with only Team units in trash there is nothing to empty", () => {
+  renderTrashPage(
+    {
+      drawings: withTeam.drawings.filter((d) => d.space === "team"),
+      folders: withTeam.folders.filter((f) => f.space === "team"),
+      totals: { drawings: 0, folders: 0 },
+    },
+    { teamEnabled: true },
+  )
+  openPalette()
+
+  expect(screen.queryByRole("button", { name: "Empty trash" })).toBeNull()
+  expect(screen.queryByRole("option", { name: "Empty trash" })).toBeNull()
+  expect(screen.getByText(/^Nothing in Private trash/)).toBeTruthy()
+})
+
+test("a confirmed Empty trash leaves the Team units on the page", async () => {
+  vi.mocked(emptyTrash).mockResolvedValue(undefined)
+  renderTrashPage(withTeam, { teamEnabled: true })
+  // Hold the revalidation so the page shows the cache Empty trash wrote
+  vi.mocked(getTrashItems).mockReturnValue(new Promise(() => {}))
+
+  fireEvent.click(screen.getByRole("button", { name: "Empty trash" }))
+  await flush()
+  const dialog = screen.getByRole("alertdialog")
+  expect(
+    within(dialog).getByText(
+      `This will permanently delete 3 drawings and 2 folders in your Private trash. This can't be undone.`,
+    ),
+  ).toBeTruthy()
+  fireEvent.click(within(dialog).getByRole("button", { name: "Empty trash" }))
+  await flush()
+
+  await waitFor(() => expect(screen.queryByText("Old sketch")).toBeNull())
+  expect(screen.getByText("Roadmap")).toBeTruthy()
+  expect(screen.getByText("Q3 planning")).toBeTruthy()
+})
+
+test("with Team disabled the page has no sections", () => {
+  renderTrashPage(fixture, { teamEnabled: false })
+
+  expect(screen.queryByRole("region")).toBeNull()
+  expect(screen.queryByText("Team")).toBeNull()
 })

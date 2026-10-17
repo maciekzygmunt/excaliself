@@ -9,7 +9,19 @@ The state of the canvas area when no drawing is open. Shown inside the normal ap
 Drawings ordered by when they were last edited (not created, not opened). Editing a Drawing is the only thing that makes it "recent".
 
 ### Drawing
-A single Excalidraw document owned by a user, identified by id, living in the folder tree shown in the sidebar.
+A single Excalidraw document created by a member, living in a Space, identified by id, in that Space's folder tree shown in the sidebar.
+
+### Space
+Where a Drawing or folder lives: Private or Team. A folder's whole subtree is always in one Space. A member can see and act on an item iff they are its Creator or it is in Team; this one rule replaces every per-item ownership check.
+
+### Private
+One member's own Space. Only that member sees it. Works the way the app did before Team existed, Share links included. Every Drawing and folder made before Team is Private.
+
+### Team
+The instance's one shared Space. Every member sees and can do everything with every Team Drawing and folder, with no sharing step. Never called "Shared": "shared" means "has a Share link".
+
+### Creator
+The member who created a Drawing or folder. For a Private item, the only member who can see it. A Team item outlives its Creator: when that member is deleted, the item stays with no Creator ("Former member").
 
 ### Canvas area
 The inset region to the right of the sidebar. Shows either an open Drawing or Home.
@@ -24,16 +36,16 @@ The app's one grid of Drawing cards (Preview, name, folder attribution, edited-a
 The browse surface at `/drawings`: the Gallery over every Drawing the user owns, uncapped, under the Browse toolbar. Reached from Home's "View all" link.
 
 ### Browse toolbar
-The Gallery's filter chrome on All drawings: on-page search (the app's only inline filter — there is no search-results page), folder chips (All / one per folder / Unfiled) that scope the grid, and a sort dropdown (Last edited default / Date created / Name). Search and chip scope compose. Folder pages reuse it without the chip row.
+The Gallery's filter chrome on All drawings: on-page search (the app's only inline filter — there is no search-results page), folder chips (All / one per folder / Unfiled) that scope the grid, and a sort dropdown (Last edited default / Date created / Name). Search and chip scope compose. While Team is on, search covers both Spaces even on a page scoped to one, and each match carries a Space label; the chips (the page Space's folders) still narrow it. Folder pages reuse it without the chip row.
 
 ### Preview
 A non-interactive visual rendering of a Drawing's scene, shown on Gallery cards so drawings are recognizable by shape rather than name.
 
 ### Room
-The live collaboration session around one shared Drawing. Exists only while at least one participant (owner or guest) is connected; holds the authoritative scene while live. There is at most one Room per Drawing.
+The live collaboration session around one shared or Team Drawing. Exists only while at least one participant (member or guest) is connected; holds the authoritative scene while live. There is at most one Room per Drawing. Guests enter through a Share link; members open a Team Drawing and enter by its id, with no link.
 
 ### Handoff
-The swap of who owns a Drawing's stored data. Unshared, its owner's canvas writes it directly (autosave); the moment a Share link exists the Room becomes the only writer, every tab — the owner's included — edits through the socket, and the server refuses direct writes. Stopping sharing hands it back. Both directions flush before they let go, so no edit lives only in the writer being retired.
+The swap of who owns a Drawing's stored data. An unshared Private Drawing is written directly by its Creator's canvas (autosave); the moment a Share link exists, or the Drawing moves to Team, the Room becomes the only writer, every tab edits through the socket, and the server refuses direct writes. Stopping sharing hands a Private Drawing back. A Team Drawing never hands back to a solo writer: it is always a Room, a Room of one when only one member has it open (ADR 0002). Both directions flush before they let go, so no edit lives only in the writer being retired.
 
 ### Share link
 The one live edit link a Drawing can have (`/share/<token>`), minted and managed by the owner from the Share dialog. "Shared" is derived — a Drawing is shared iff its link exists; stopping sharing deletes it, regenerating replaces the token (old URL dies). Carries an Audience: `members` (any signed-in member of this instance, the default) or `anyone` (no account needed). A link whose token, Audience, or Drawing no longer checks out is dead — every dead link looks identical, revealing nothing about whether the Drawing exists.
@@ -54,7 +66,7 @@ The state of a Participant whose socket has dropped: the canvas stays live and e
 A one-way arrangement between two Participants in a Room: the follower's canvas rides along with the followed Participant's viewport, marked by a ring in that Participant's color and a chip naming them. Started by clicking their avatar, ended by clicking the chip, their avatar, panning or zooming, or by them leaving. Nobody can be made to follow, and being followed changes nothing about what the followed Participant can do — only that their viewport is relayed to whoever is watching.
 
 ### Live badge
-What the owner sees on a Drawing of theirs that has a Room with someone *else* in it: a stack of Participant avatars on the Gallery card, a count on the sidebar row. Their own connections never count, so a Drawing they alone have open wears no badge. Ambient rather than exact — it is polled, so it trails joins and leaves by up to half a minute, and it is not a control: clicking a badged card just opens the Drawing, which joins the Room.
+What a member sees on a Drawing they can see that has a Room with someone *else* in it — any Team Drawing, or a Private one they created: a stack of Participant avatars on the Gallery card, a count on the sidebar row. Their own connections never count, so a Drawing they alone have open wears no badge. Ambient rather than exact — it is polled, so it trails joins and leaves by up to half a minute, and it is not a control: clicking a badged card just opens the Drawing, which joins the Room.
 
 ### Scene image
 An image on a Drawing's canvas, stored as bytes under a content-addressed file id that the image element on the scene points at. Bytes and elements travel separately in a Room: the element syncs like any other element, while the bytes go over a room-scoped HTTP endpoint the same Share link opens. An image is *saved* once its bytes are stored — which is the signal other Participants use to fetch them — *pending* until then, and *errored* when the store refused it (too large, or too many uploads), in which case nobody fetches it and everyone sees a placeholder.

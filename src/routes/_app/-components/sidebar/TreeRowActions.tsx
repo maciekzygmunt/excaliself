@@ -5,6 +5,7 @@ import {
   Star,
   StarOff,
   Trash2,
+  Users,
 } from "lucide-react"
 import {
   DropdownMenu,
@@ -28,6 +29,8 @@ type TreeRowActionsProps = {
   // Drawing rows offer starring; the label follows current state
   starred?: boolean
   onToggleStar?: () => void
+  // Private rows offer the move to Team (opens its confirm)
+  onMoveToTeam?: () => void
 }
 
 // Callers must wrap the row in `group/tree-row` on whichever element should
@@ -41,6 +44,7 @@ export function TreeRowActions({
   onCreateDrawing,
   starred,
   onToggleStar,
+  onMoveToTeam,
 }: TreeRowActionsProps) {
   return (
     <DropdownMenu>
@@ -94,6 +98,15 @@ export function TreeRowActions({
           <Pencil className="mr-2 h-4 w-4" />
           Rename
         </DropdownMenuItem>
+        {onMoveToTeam && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={onMoveToTeam}>
+              <Users className="mr-2 h-4 w-4" />
+              Move to Team
+            </DropdownMenuItem>
+          </>
+        )}
         <DropdownMenuSeparator />
         <DropdownMenuItem
           onClick={onTrash}

@@ -4,8 +4,15 @@ import { randomBytes, randomUUID } from "node:crypto"
 import { and, eq, isNull } from "drizzle-orm"
 import type { NodePgDatabase } from "drizzle-orm/node-postgres"
 import type * as schema from "@/db/schema"
-import { drawingFiles, drawings, shares } from "@/db/schema"
+import {
+  drawingFiles,
+  drawings,
+  type Space,
+  shareRedirects,
+  shares,
+} from "@/db/schema"
 import { bytesToDataUrl } from "@/features/drawings/file-bytes"
+import { accessibleTo } from "@/features/spaces/access"
 import { resolveShareAccess, type ShareAudience } from "./access"
 
 type Db = NodePgDatabase<typeof schema>
@@ -15,23 +22,33 @@ export function mintShareToken() {
   return randomBytes(32).toString("hex")
 }
 
-// Throws the same "not found" as a missing id, so non-owners can't probe.
-async function requireOwnedLiveDrawing(
+// Throws the same "not found" as a missing id, so private drawings can't be
+// probed. Inside a transaction, the share lock makes a concurrent move to Team
+// wait for this write, or makes this read see the moved row.
+async function requireAccessibleLiveDrawing(
   db: Db,
   userId: string,
   drawingId: string,
 ) {
   const [drawing] = await db
-    .select({ id: drawings.id })
+    .select({ space: drawings.space })
     .from(drawings)
     .where(
       and(
         eq(drawings.id, drawingId),
-        eq(drawings.ownerId, userId),
+        accessibleTo(drawings, userId),
         isNull(drawings.deletedAt),
       ),
     )
+    .for("share")
   if (!drawing) throw new Error("Drawing not found")
+  return drawing
+}
+
+// Every member already opens a Team drawing, so a members link grants nothing.
+function requireAudienceFits(space: Space, audience: ShareAudience) {
+  if (space === "team" && audience === "members")
+    throw new Error("Team drawings take only guest links")
 }
 
 const shareColumns = {
@@ -40,13 +57,13 @@ const shareColumns = {
   createdAt: shares.createdAt,
 }
 
-/** The owner's live link for a drawing, or null when unshared. */
+/** The live link for a drawing the caller can access, or null when unshared. */
 export async function getShareLink(db: Db, userId: string, drawingId: string) {
   const [share] = await db
     .select(shareColumns)
     .from(shares)
     .innerJoin(drawings, eq(shares.drawingId, drawings.id))
-    .where(and(eq(shares.drawingId, drawingId), eq(drawings.ownerId, userId)))
+    .where(and(eq(shares.drawingId, drawingId), accessibleTo(drawings, userId)))
   return share ?? null
 }
 
@@ -56,18 +73,24 @@ export async function createShareLink(
   drawingId: string,
   audience: ShareAudience,
 ) {
-  await requireOwnedLiveDrawing(db, userId, drawingId)
-  const [created] = await db
-    .insert(shares)
-    .values({
-      id: randomUUID(),
-      token: mintShareToken(),
-      drawingId,
-      audience,
-      createdAt: new Date(),
-    })
-    .onConflictDoNothing({ target: shares.drawingId })
-    .returning(shareColumns)
+  // One transaction with the space check, so a move to Team can't slip in
+  // between and leave a Team drawing with a members link.
+  const created = await db.transaction(async (tx) => {
+    const { space } = await requireAccessibleLiveDrawing(tx, userId, drawingId)
+    requireAudienceFits(space, audience)
+    const [row] = await tx
+      .insert(shares)
+      .values({
+        id: randomUUID(),
+        token: mintShareToken(),
+        drawingId,
+        audience,
+        createdAt: new Date(),
+      })
+      .onConflictDoNothing({ target: shares.drawingId })
+      .returning(shareColumns)
+    return row
+  })
   // Return an existing link unchanged: only setShareLinkAudience evicts guests.
   return created ?? getShareLink(db, userId, drawingId)
 }
@@ -77,7 +100,7 @@ export async function stopSharingDrawing(
   userId: string,
   drawingId: string,
 ) {
-  await requireOwnedLiveDrawing(db, userId, drawingId)
+  await requireAccessibleLiveDrawing(db, userId, drawingId)
   await db.delete(shares).where(eq(shares.drawingId, drawingId))
 }
 
@@ -86,7 +109,7 @@ export async function regenerateShareLink(
   userId: string,
   drawingId: string,
 ) {
-  await requireOwnedLiveDrawing(db, userId, drawingId)
+  await requireAccessibleLiveDrawing(db, userId, drawingId)
   const updated = await db
     .update(shares)
     .set({ token: mintShareToken() })
@@ -102,12 +125,15 @@ export async function setShareLinkAudience(
   drawingId: string,
   audience: ShareAudience,
 ) {
-  await requireOwnedLiveDrawing(db, userId, drawingId)
-  const updated = await db
-    .update(shares)
-    .set({ audience })
-    .where(eq(shares.drawingId, drawingId))
-    .returning(shareColumns)
+  const updated = await db.transaction(async (tx) => {
+    const { space } = await requireAccessibleLiveDrawing(tx, userId, drawingId)
+    requireAudienceFits(space, audience)
+    return tx
+      .update(shares)
+      .set({ audience })
+      .where(eq(shares.drawingId, drawingId))
+      .returning(shareColumns)
+  })
   if (updated.length === 0) throw new Error("Share not found")
   return updated[0]
 }
@@ -145,6 +171,8 @@ export async function resolveShareForRoom(db: Db, token: string) {
 
 export type ShareResolution =
   | { status: "dead" }
+  /** A members link the move to Team dropped; only members get this arm. */
+  | { status: "moved"; drawingId: string }
   | { status: "signin"; drawingName: string }
   | {
       status: "ok"
@@ -160,13 +188,24 @@ export async function resolveShareVisit(
   hasSession: () => Promise<boolean>,
 ): Promise<ShareResolution> {
   const resolved = await resolveShareByToken(db, token)
+  // A members link left by a move to Team sends signed-in members on to the
+  // drawing; anyone else gets what a dead members link gives.
+  if (!resolved) {
+    const [moved] = await db
+      .select({ drawingId: shareRedirects.drawingId })
+      .from(shareRedirects)
+      .where(eq(shareRedirects.token, token))
+    return moved && (await hasSession())
+      ? { status: "moved", drawingId: moved.drawingId }
+      : { status: "dead" }
+  }
 
   const access = resolveShareAccess({
     share: resolved,
     hasSession: resolved?.audience === "members" ? await hasSession() : false,
   })
 
-  if (access === "dead" || !resolved) return { status: "dead" }
+  if (access === "dead") return { status: "dead" }
   if (access === "signin")
     return { status: "signin", drawingName: resolved.drawing.name }
 

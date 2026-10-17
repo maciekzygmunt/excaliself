@@ -7,7 +7,8 @@ import z from "zod"
 import { db } from "@/db"
 import { sessions, users } from "@/db/schema"
 import { setupFieldsSchema } from "@/features/auth/schema"
-import { endRooms } from "@/features/collab/room-registry"
+import { endRooms, rooms } from "@/features/collab/room-registry"
+import { evictUser } from "@/features/collab/room-session"
 import { auth } from "@/lib/auth"
 import { adminMiddleware } from "@/middleware/admin"
 import {
@@ -121,8 +122,9 @@ export const deleteUser = createServerFn({ method: "POST" })
   .handler(async ({ data: userId, context }) => {
     const shared = await sharedDrawingIds(db, userId)
     await deleteUserAccount(db, context.session.user.id, userId)
-    // Hang up on live rooms; their flush finds no row and writes nothing.
-    await endRooms(shared)
+    // Hang up on their shared drawings' Rooms (the flush finds no row and
+    // writes nothing), and on their seats in every other Room.
+    await Promise.all([endRooms(shared), evictUser(rooms, userId)])
   })
 
 // Feeds the tier-3 confirm's count-aware copy ("…and permanently delete

@@ -10,8 +10,10 @@ import { useSettingsShortcut } from "@/hooks/use-settings-shortcut"
 import { useStoredTheme } from "@/hooks/use-theme"
 import { authMiddleware } from "@/middleware/auth"
 import { setupMiddleware } from "@/middleware/setup"
+import { ActiveSpaceProvider } from "./-components/ActiveSpace"
 import { CommandPaletteProvider } from "./-components/CommandPalette"
 import { CreateDialogProvider } from "./-components/CreateDialog"
+import { MoveToTeamProvider } from "./-components/MoveToTeamDialog"
 import { SidebarReopenButton } from "./-components/SidebarReopenButton"
 import { DrawSidebar } from "./-components/sidebar"
 
@@ -25,10 +27,8 @@ export const Route = createFileRoute("/_app")({
   },
   loader: async ({ context }) => {
     const session = await getSession()
-    // isAdmin comes from the currentUser query (a fresh row read), not the
-    // session, whose cookie-cached role can lag a demotion by five minutes —
-    // a self-demote updates that cache and invalidates the router, and the
-    // admin-only chrome has to disappear right then (issue #65).
+    // isAdmin comes from the currentUser query, which a self-demote updates,
+    // so the admin-only chrome disappears right then (issue #65).
     const [user] = await Promise.all([
       context.queryClient.ensureQueryData(currentUserQueryOptions()),
       context.queryClient.ensureQueryData(drawingsQueryOptions()),
@@ -53,22 +53,26 @@ function AppShellLayout() {
       defaultOpen
       style={{ "--sidebar-width": "240px" } as React.CSSProperties}
     >
-      <CreateDialogProvider>
-        <CommandPaletteProvider>
-          <DrawSidebar
-            user={{
-              email: currentUser?.email ?? session.user?.email ?? "",
-              name: currentUser?.name ?? null,
-              isAdmin,
-            }}
-          />
-          {/* The Etched panel look lives in the SidebarInset primitive. */}
-          <SidebarInset className="overflow-clip">
-            <SidebarReopenButton />
-            <Outlet />
-          </SidebarInset>
-        </CommandPaletteProvider>
-      </CreateDialogProvider>
+      <ActiveSpaceProvider>
+        <CreateDialogProvider>
+          <MoveToTeamProvider>
+            <CommandPaletteProvider>
+              <DrawSidebar
+                user={{
+                  email: currentUser?.email ?? session.user?.email ?? "",
+                  name: currentUser?.name ?? null,
+                  isAdmin,
+                }}
+              />
+              {/* The Etched panel look lives in the SidebarInset primitive. */}
+              <SidebarInset className="overflow-clip">
+                <SidebarReopenButton />
+                <Outlet />
+              </SidebarInset>
+            </CommandPaletteProvider>
+          </MoveToTeamProvider>
+        </CreateDialogProvider>
+      </ActiveSpaceProvider>
     </SidebarProvider>
   )
 }

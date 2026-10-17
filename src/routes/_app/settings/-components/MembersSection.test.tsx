@@ -99,6 +99,7 @@ const viewer = {
   email: "ada@example.com",
   name: "",
   role: "admin" as const,
+  teamEnabled: false,
 }
 
 const clipboardWriteText = vi.fn()
@@ -301,7 +302,11 @@ test("rows without a pending reset show no hint or revoke", () => {
 })
 
 test("Delete user opens the tier-3 dialog with live content counts and an email challenge", async () => {
-  vi.mocked(getUserContentCounts).mockResolvedValue({ drawings: 3, folders: 1 })
+  vi.mocked(getUserContentCounts).mockResolvedValue({
+    drawings: 3,
+    folders: 1,
+    teamDrawings: 0,
+  })
   renderSection()
 
   openRowMenu("Bea")
@@ -309,8 +314,11 @@ test("Delete user opens the tier-3 dialog with live content counts and an email 
   await flush()
 
   expect(getUserContentCounts).toHaveBeenCalledWith({ data: "user-bea" })
+  // With no Team drawings the copy names only what is destroyed.
   expect(
-    await screen.findByText(/permanently delete their 3 drawings and 1 folder/),
+    await screen.findByText(
+      "This will delete Bea's account and permanently delete their 3 drawings and 1 folder. This can't be undone.",
+    ),
   ).toBeTruthy()
 
   // Armed only by typing the exact email.
@@ -325,6 +333,42 @@ test("Delete user opens the tier-3 dialog with live content counts and an email 
     target: { value: "bea@example.com" },
   })
   expect(confirm().disabled).toBe(false)
+})
+
+test("the delete confirm counts only Bea's Private items and says their Team drawings stay", async () => {
+  vi.mocked(getUserContentCounts).mockResolvedValue({
+    drawings: 3,
+    folders: 1,
+    teamDrawings: 2,
+  })
+  renderSection()
+
+  openRowMenu("Bea")
+  fireEvent.click(screen.getByRole("menuitem", { name: /delete user/i }))
+
+  expect(
+    await screen.findByText(
+      "This will delete Bea's account and permanently delete their 3 drawings and 1 folder. This can't be undone. Their 2 Team drawings stay with the team.",
+    ),
+  ).toBeTruthy()
+})
+
+test("with only Team work the delete confirm says nothing private is destroyed", async () => {
+  vi.mocked(getUserContentCounts).mockResolvedValue({
+    drawings: 0,
+    folders: 0,
+    teamDrawings: 1,
+  })
+  renderSection()
+
+  openRowMenu("Bea")
+  fireEvent.click(screen.getByRole("menuitem", { name: /delete user/i }))
+
+  expect(
+    await screen.findByText(
+      "This will delete Bea's account. They have no private drawings or folders. This can't be undone. Their 1 Team drawing stays with the team.",
+    ),
+  ).toBeTruthy()
 })
 
 test("a failed counts fetch explains itself and keeps confirm gated", async () => {
@@ -364,7 +408,11 @@ test("the confirm stays gated while the counts are still loading", async () => {
 })
 
 test("confirming deletes the user and the refreshed list drops them", async () => {
-  vi.mocked(getUserContentCounts).mockResolvedValue({ drawings: 0, folders: 0 })
+  vi.mocked(getUserContentCounts).mockResolvedValue({
+    drawings: 0,
+    folders: 0,
+    teamDrawings: 0,
+  })
   vi.mocked(deleteUser).mockResolvedValue(undefined)
   renderSection()
   // Installed after renderSection (which pins getAllUsers to the seed list):

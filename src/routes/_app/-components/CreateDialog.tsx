@@ -1,5 +1,5 @@
 import { useNavigate } from "@tanstack/react-router"
-import { Folder, Plus } from "lucide-react"
+import { Folder, Lock, Plus, Users } from "lucide-react"
 import {
   createContext,
   type ReactNode,
@@ -12,14 +12,19 @@ import {
 import { toast } from "sonner"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { Kbd } from "@/components/ui/kbd"
+import type { Space } from "@/db/schema"
 import { useCreateDrawing } from "@/features/drawings/mutations"
 import { useCreateFolder } from "@/features/folders/mutations"
+import { useBrowsedSpace } from "@/features/spaces/browse"
+import { useActiveSpace } from "./ActiveSpace"
 
 export type FolderScope = { id: string; name: string }
 
+// `space` picks where a root-level item lands; without it, the space being
+// browsed. Inside a folder the server uses the folder's space instead.
 export type CreateTarget =
-  | { kind: "drawing"; folder?: FolderScope | null }
-  | { kind: "folder" }
+  | { kind: "drawing"; folder?: FolderScope | null; space?: Space }
+  | { kind: "folder"; space?: Space }
 
 type CreateDialogProps = {
   open: boolean
@@ -35,6 +40,9 @@ export function CreateDialog({
   const navigate = useNavigate()
   const createDrawingMutation = useCreateDrawing()
   const createFolderMutation = useCreateFolder()
+  const browsedSpace = useBrowsedSpace()
+  const shownSpace = target.space ?? browsedSpace
+  const space = shownSpace ?? "private"
   const [name, setName] = useState("")
   // Synchronous guard against a double Enter racing ahead of isPending's
   // re-render (same pattern the inline folder row used).
@@ -56,13 +64,13 @@ export function CreateDialog({
     try {
       if (target.kind === "drawing") {
         const id = await createDrawingMutation.mutateAsync({
-          data: { name: trimmed, folderId: target.folder?.id ?? null },
+          data: { name: trimmed, folderId: target.folder?.id ?? null, space },
         })
         onOpenChange(false)
         navigate({ to: "/draw/$id", params: { id } })
       } else {
         await createFolderMutation.mutateAsync({
-          data: { name: trimmed, parentId: null },
+          data: { name: trimmed, parentId: null, space },
         })
         onOpenChange(false)
       }
@@ -115,6 +123,15 @@ export function CreateDialog({
               <Folder className="h-3 w-3 shrink-0 fill-iris/70 text-iris" />
               in {folder.name}
             </span>
+          ) : shownSpace ? (
+            <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              {shownSpace === "team" ? (
+                <Users className="h-3 w-3 shrink-0 text-iris" />
+              ) : (
+                <Lock className="h-3 w-3 shrink-0 text-iris" />
+              )}
+              in {shownSpace === "team" ? "Team" : "Private"}
+            </span>
           ) : (
             <span className="text-xs text-muted-foreground/60">
               {target.kind === "drawing" ? "New drawing" : "New folder"}
@@ -130,26 +147,43 @@ export function CreateDialog({
 }
 
 type CreateDialogContextValue = {
-  openCreateDrawingDialog: (folder?: FolderScope) => void
-  openCreateFolderDialog: () => void
+  /** Without a space, creates in the sidebar's active space. */
+  openCreateDrawingDialog: (folder?: FolderScope, space?: Space) => void
+  openCreateFolderDialog: (space?: Space) => void
 }
 
 const CreateDialogContext = createContext<CreateDialogContextValue | null>(null)
 
 export function CreateDialogProvider({ children }: { children: ReactNode }) {
+  const { activeSpace } = useActiveSpace()
+  // While Team is hidden there is one space, so the dialog names none.
+  const inSpace = useCallback(
+    (space?: Space) => (activeSpace ? (space ?? activeSpace) : undefined),
+    [activeSpace],
+  )
   const [open, setOpen] = useState(false)
   // Kept across close so the content doesn't flip during the exit animation
   const [target, setTarget] = useState<CreateTarget>({ kind: "drawing" })
 
-  const openCreateDrawingDialog = useCallback((folder?: FolderScope) => {
-    setTarget({ kind: "drawing", folder: folder ?? null })
-    setOpen(true)
-  }, [])
+  const openCreateDrawingDialog = useCallback(
+    (folder?: FolderScope, space?: Space) => {
+      setTarget({
+        kind: "drawing",
+        folder: folder ?? null,
+        space: inSpace(space),
+      })
+      setOpen(true)
+    },
+    [inSpace],
+  )
 
-  const openCreateFolderDialog = useCallback(() => {
-    setTarget({ kind: "folder" })
-    setOpen(true)
-  }, [])
+  const openCreateFolderDialog = useCallback(
+    (space?: Space) => {
+      setTarget({ kind: "folder", space: inSpace(space) })
+      setOpen(true)
+    },
+    [inSpace],
+  )
 
   return (
     <CreateDialogContext.Provider

@@ -1,7 +1,9 @@
 import { expect, test, vi } from "vitest"
+import type { AccessRow } from "@/features/spaces/access"
 import { guestNameForConnection } from "./identity"
 import type { SceneElement, ServerMessage } from "./protocol"
 import {
+  DRAWING_TRASHED_CLOSE_CODE,
   LINK_DEAD_CLOSE_CODE,
   ROOM_TOPIC,
   SCENE_UNREADABLE_CLOSE_CODE,
@@ -11,10 +13,13 @@ import {
 import {
   closeAllRooms,
   createRoomRegistry,
+  endLinkRoom,
   evictNonMembers,
+  evictUser,
   joinRoom,
   leaveRoom,
   MAX_ROOM_PARTICIPANTS,
+  moveRoomToTeam,
   PARTICIPANT_IDLE_TIMEOUT_MS,
   ROOM_FLUSH_INTERVAL_MS,
   type RoomPeer,
@@ -24,6 +29,7 @@ import {
   type SceneSaver,
   sweepSilentParticipants,
   terminateRoom,
+  trashRoom,
 } from "./room-session"
 
 const ROOM = "drawing-1"
@@ -72,7 +78,7 @@ const registryFrom = (load: SceneLoader, save: SceneSaver = async () => {}) =>
 /** A registry over an empty stored drawing — the presence tests' default. */
 const emptyRegistry = (load?: SceneLoader) =>
   registryFrom(
-    load ?? (async () => ({ elements: [], ownerId: null, readable: true })),
+    load ?? (async () => ({ elements: [], access: null, readable: true })),
   )
 
 const member = (displayName: string) => ({
@@ -500,22 +506,25 @@ test("a joiner is handed the stored scene", async () => {
   const stored = [element("rect", 3)]
   const registry = registryFrom(async () => ({
     elements: stored,
-    ownerId: "owner-1",
+    access: { space: "private", createdBy: "owner-1" },
     readable: true,
   }))
   const ada = fakePeer("peer-ada")
   await joinRoom(registry, ROOM, ada, member("Ada"))
 
   expect(elementsOf(framesOf(ada, "SCENE_INIT")[0])).toEqual(stored)
-  // Cached for the live badge, which the badge slice will read.
-  expect(registry.rooms.get(ROOM)?.ownerId).toBe("owner-1")
+  // Cached for the live badge and the reserved seat.
+  expect(registry.rooms.get(ROOM)?.access).toEqual({
+    space: "private",
+    createdBy: "owner-1",
+  })
 })
 
 test("the drawing is read once however many peers pile in at the same moment", async () => {
   let reads = 0
   const registry = registryFrom(async () => {
     reads += 1
-    return { elements: [element("rect", 1)], ownerId: null, readable: true }
+    return { elements: [element("rect", 1)], access: null, readable: true }
   })
   const peers = ["a", "b", "c"].map((id) => fakePeer(id))
 
@@ -530,7 +539,7 @@ test("the drawing is read once however many peers pile in at the same moment", a
 test("a late joiner gets the scene as edited, not as stored", async () => {
   const registry = registryFrom(async () => ({
     elements: [element("rect", 1)],
-    ownerId: null,
+    access: null,
     readable: true,
   }))
   const ada = fakePeer("peer-ada")
@@ -618,7 +627,7 @@ test("an edit that arrives before the scene has loaded still merges into it", as
     await opened
     return {
       elements: [element("stored", 1, { index: "a0" })],
-      ownerId: null,
+      access: null,
       readable: true,
     }
   })
@@ -665,7 +674,7 @@ test("a peer that left mid-load is not sent a scene", async () => {
   })
   const registry = registryFrom(async () => {
     await opened
-    return { elements: [], ownerId: null, readable: true }
+    return { elements: [], access: null, readable: true }
   })
   const ada = fakePeer("peer-ada")
   const grace = fakePeer("peer-grace")
@@ -695,7 +704,7 @@ async function fillRoom(registry: RoomRegistry) {
 const ownedRegistry = () =>
   emptyRegistry(async () => ({
     elements: [],
-    ownerId: member("Owen").userId,
+    access: { space: "private", createdBy: member("Owen").userId },
     readable: true,
   }))
 
@@ -736,6 +745,19 @@ test("a member who is not the owner stops with the guests", async () => {
   ).toEqual({ status: "full" })
 })
 
+test("in a Team room, any member gets the seat guests can't take", async () => {
+  const registry = emptyRegistry(async () => ({
+    elements: [],
+    access: { space: "team", createdBy: member("Owen").userId },
+    readable: true,
+  }))
+  await fillRoom(registry)
+
+  expect(
+    await joinRoom(registry, ROOM, fakePeer("peer-ada"), member("Ada")),
+  ).toEqual({ status: "ok" })
+})
+
 test("the socket past the cap is refused and joins nothing", async () => {
   const registry = emptyRegistry()
   await fillRoom(registry)
@@ -763,7 +785,7 @@ test("a refused join does not start a scene read", async () => {
   let reads = 0
   const registry = registryFrom(async () => {
     reads += 1
-    return { elements: [], ownerId: null, readable: true }
+    return { elements: [], access: null, readable: true }
   })
   await fillRoom(registry)
 
@@ -821,7 +843,7 @@ test("a PING is answered while the room is still reading its scene", async () =>
 function clockedRegistry() {
   let clock = 1_000_000
   const registry = createRoomRegistry(
-    async () => ({ elements: [], ownerId: null, readable: true }),
+    async () => ({ elements: [], access: null, readable: true }),
     async () => {},
     () => clock,
   )
@@ -935,7 +957,7 @@ test("a sweep that empties the room writes the scene and takes the room with it"
   let clock = 1_000_000
   const writes: string[][] = []
   const registry = createRoomRegistry(
-    async () => ({ elements: [], ownerId: null, readable: true }),
+    async () => ({ elements: [], access: null, readable: true }),
     async (_, elements) => {
       writes.push(elements.map((el) => el.id))
     },
@@ -989,13 +1011,13 @@ test("a frame for a drawing with no room at all is not an eviction", async () =>
 function recordingRegistry(
   stored: SceneElement[] = [],
   save?: SceneSaver,
-  options: { readable?: boolean } = {},
+  options: { readable?: boolean; access?: AccessRow } = {},
 ): RoomRegistry & { writes: SceneElement[][] } {
   const writes: SceneElement[][] = []
   const registry = registryFrom(
     async () => ({
       elements: stored,
-      ownerId: "owner-1",
+      access: options.access ?? { space: "private", createdBy: "owner-1" },
       readable: options.readable ?? true,
     }),
     async (roomId, elements) => {
@@ -1328,7 +1350,7 @@ test("terminating closes every socket with the dead-link code", async () => {
 
   await terminateRoom(registry, ROOM)
 
-  // Owner and guest alike: stop, regenerate, and trash evict everyone.
+  // Owner and guest alike: stop and regenerate evict everyone.
   expect(ada.closes).toEqual([
     { code: LINK_DEAD_CLOSE_CODE, reason: "Link no longer active" },
   ])
@@ -1341,7 +1363,11 @@ test("a terminated room is gone, so re-sharing reads the drawing fresh", async (
   let reads = 0
   const registry = registryFrom(async () => {
     reads += 1
-    return { elements: [], ownerId: "owner-1", readable: true }
+    return {
+      elements: [],
+      access: { space: "private", createdBy: "owner-1" },
+      readable: true,
+    }
   })
   await joinRoom(registry, ROOM, fakePeer("peer-ada"), member("Ada"))
 
@@ -1401,6 +1427,148 @@ test("a termination whose final write fails keeps the room until it lands", asyn
     errors.mockRestore()
     vi.useRealTimers()
   }
+})
+
+const LINK_DEAD = {
+  code: LINK_DEAD_CLOSE_CODE,
+  reason: "Link no longer active",
+}
+
+// --- trash mid-session (Team space stories 47, 48) -----------------------
+
+const teamRoom = () =>
+  recordingRegistry([], undefined, {
+    access: { space: "team", createdBy: "owner-1" },
+  })
+
+const ADA = { userId: "u:Ada", name: "Ada" }
+
+test("a trashed Team room tells members who trashed it, and guests nothing", async () => {
+  const registry = teamRoom()
+  const nina = fakePeer("peer-nina")
+  const grace = fakePeer("peer-grace")
+  await joinRoom(registry, ROOM, nina, member("Nina"))
+  await joinRoom(registry, ROOM, grace, guest)
+
+  await trashRoom(registry, ROOM, ADA)
+
+  expect(nina.closes).toEqual([
+    { code: DRAWING_TRASHED_CLOSE_CODE, reason: "Ada" },
+  ])
+  // The same close any dead link gets: no name, no hint it was trashed.
+  expect(grace.closes).toEqual([LINK_DEAD])
+  expect(registry.rooms.has(ROOM)).toBe(false)
+})
+
+test("the trasher's own tab is told it was trashed, without a name", async () => {
+  const registry = teamRoom()
+  const ada = fakePeer("peer-ada")
+  await joinRoom(registry, ROOM, ada, member("Ada"))
+
+  await trashRoom(registry, ROOM, ADA)
+
+  expect(ada.closes).toEqual([{ code: DRAWING_TRASHED_CLOSE_CODE, reason: "" }])
+})
+
+test("a trashed room writes the session's work before any socket closes", async () => {
+  const registry = teamRoom()
+  const nina = fakePeer("peer-nina")
+  await joinRoom(registry, ROOM, nina, member("Nina"))
+  await receiveFromPeer(registry, ROOM, nina, sceneUpdate([element("n", 1)]))
+
+  let writesWhenClosed: number | null = null
+  nina.close = () => {
+    writesWhenClosed = registry.writes.length
+  }
+
+  await trashRoom(registry, ROOM, ADA)
+
+  expect(registry.writes.map(idsOf)).toEqual([["n"]])
+  expect(writesWhenClosed).toBe(1)
+})
+
+test("a member who can't see a trashed Private drawing gets the dead-link close", async () => {
+  // A members link let Nina in; only the creator can see the drawing.
+  const registry = recordingRegistry([], undefined, {
+    access: { space: "private", createdBy: "u:Ada" },
+  })
+  const nina = fakePeer("peer-nina")
+  await joinRoom(registry, ROOM, nina, member("Nina"))
+
+  await trashRoom(registry, ROOM, ADA)
+
+  expect(nina.closes).toEqual([LINK_DEAD])
+})
+
+test("a long trasher name is cut to the close-reason limit on a whole character", async () => {
+  const registry = teamRoom()
+  const nina = fakePeer("peer-nina")
+  await joinRoom(registry, ROOM, nina, member("Nina"))
+
+  // 1 + 40 × 4 bytes; 123 bytes fit "a" and 30 emoji, with no half emoji.
+  await trashRoom(registry, ROOM, {
+    userId: "u:x",
+    name: `a${"😀".repeat(40)}`,
+  })
+
+  expect(nina.closes).toEqual([
+    { code: DRAWING_TRASHED_CLOSE_CODE, reason: `a${"😀".repeat(30)}` },
+  ])
+})
+
+test("a stopped link ends a Private drawing's room for everyone in it", async () => {
+  const registry = recordingRegistry()
+  const ada = fakePeer("peer-ada")
+  const grace = fakePeer("peer-grace")
+  await joinRoom(registry, ROOM, ada, member("Ada"))
+  await joinRoom(registry, ROOM, grace, guest)
+
+  await endLinkRoom(registry, ROOM)
+
+  expect(ada.closes).toEqual([LINK_DEAD])
+  expect(grace.closes).toEqual([LINK_DEAD])
+  expect(registry.rooms.has(ROOM)).toBe(false)
+})
+
+// Members reach a Team drawing by id, so its Room never hangs on a link.
+test("a stopped link sends only the guests out of a Team drawing's room", async () => {
+  const registry = emptyRegistry(async () => ({
+    elements: [],
+    access: { space: "team", createdBy: "owner-1" },
+    readable: true,
+  }))
+  const ada = fakePeer("peer-ada")
+  const grace = fakePeer("peer-grace")
+  await joinRoom(registry, ROOM, ada, member("Ada"))
+  await joinRoom(registry, ROOM, grace, guest)
+
+  await endLinkRoom(registry, ROOM)
+
+  expect(ada.closes).toEqual([])
+  expect(grace.closes).toEqual([LINK_DEAD])
+  expect(registry.rooms.get(ROOM)?.seats.size).toBe(1)
+})
+
+// Story 25: a guest on an anyone link stays through a move to Team, and the
+// Room is Team from then on.
+test("a Room moved to Team keeps every seat and then outlives its link", async () => {
+  const registry = emptyRegistry(async () => ({
+    elements: [],
+    access: { space: "private", createdBy: "owner-1" },
+    readable: true,
+  }))
+  const ada = fakePeer("peer-ada")
+  const grace = fakePeer("peer-grace")
+  await joinRoom(registry, ROOM, ada, member("Ada"))
+  await joinRoom(registry, ROOM, grace, guest)
+
+  await moveRoomToTeam(registry, ROOM)
+  expect(ada.closes).toEqual([])
+  expect(grace.closes).toEqual([])
+
+  await endLinkRoom(registry, ROOM)
+  expect(ada.closes).toEqual([])
+  expect(grace.closes).toEqual([LINK_DEAD])
 })
 
 test("tightening to members closes the guests and leaves the members", async () => {
@@ -1495,7 +1663,11 @@ test("a stroke still in flight rides out on the final write", async () => {
   const registry = registryFrom(
     async () => {
       await loaded
-      return { elements: [], ownerId: "owner-1", readable: true }
+      return {
+        elements: [],
+        access: { space: "private", createdBy: "owner-1" },
+        readable: true,
+      }
     },
     async (_roomId, elements) => {
       writes.push(elements)
@@ -1538,7 +1710,11 @@ test("an edit sent during the final write is refused, not left owing", async () 
   })
   const writes: SceneElement[][] = []
   const registry = registryFrom(
-    async () => ({ elements: [], ownerId: "owner-1", readable: true }),
+    async () => ({
+      elements: [],
+      access: { space: "private", createdBy: "owner-1" },
+      readable: true,
+    }),
     async (_roomId, elements) => {
       writes.push(elements)
       beginSave?.()
@@ -1576,4 +1752,45 @@ test("evicting from a drawing nobody is in is a no-op", async () => {
   await evictNonMembers(registry, ROOM)
 
   expect(registry.writes).toEqual([])
+})
+
+test("a deleted member is closed out of every Room, and nobody else is", async () => {
+  const registry = recordingRegistry()
+  const daveTeam = fakePeer("peer-dave-team")
+  const daveLink = fakePeer("peer-dave-link")
+  const ada = fakePeer("peer-ada")
+  const grace = fakePeer("peer-grace")
+  await joinRoom(registry, ROOM, daveTeam, member("Dave"))
+  await joinRoom(registry, ROOM, ada, member("Ada"))
+  await joinRoom(registry, "drawing-2", daveLink, member("Dave"))
+  await joinRoom(registry, "drawing-2", grace, guest)
+
+  await evictUser(registry, "u:Dave")
+
+  for (const peer of [daveTeam, daveLink])
+    expect(peer.closes).toEqual([
+      { code: LINK_DEAD_CLOSE_CODE, reason: "Link no longer active" },
+    ])
+  expect(ada.closes).toEqual([])
+  expect(grace.closes).toEqual([])
+  expect(rosterOf(ada.sent.at(-1))).toEqual(["Ada"])
+})
+
+test("an edit a deleted member sends after the eviction is refused", async () => {
+  const registry = recordingRegistry()
+  const dave = fakePeer("peer-dave")
+  const ada = fakePeer("peer-ada")
+  await joinRoom(registry, ROOM, dave, member("Dave"))
+  await joinRoom(registry, ROOM, ada, member("Ada"))
+
+  await evictUser(registry, "u:Dave")
+  const outcome = await receiveFromPeer(
+    registry,
+    ROOM,
+    dave,
+    sceneUpdate([element("d", 1)]),
+  )
+
+  expect(outcome).toBe("evicted")
+  expect(registry.rooms.get(ROOM)?.elements).toEqual([])
 })

@@ -1,3 +1,4 @@
+import type { Space } from "@/db/schema"
 import type { Drawing } from "@/features/drawings/queries"
 import type { Folder } from "@/features/folders/queries"
 
@@ -76,4 +77,26 @@ export function hasActiveDrawing(
       return true
   }
   return false
+}
+
+export type DragItem = { type: "drawing" | "folder"; id: string; space: Space }
+export type DropTarget =
+  | { type: "root"; space: Space }
+  | { type: "folder"; id: string; space: Space }
+
+/**
+ * The drop rule. One-way: Team never comes back to Private. A folder can't
+ * go into itself or its own subtree.
+ */
+export function canDrop(
+  item: DragItem,
+  target: DropTarget,
+  foldersById: Map<string, Folder>,
+) {
+  if (item.space === "team" && target.space === "private") return false
+  if (target.type === "folder" && item.type === "folder") {
+    if (item.id === target.id) return false
+    if (isDescendantFolder(item.id, target.id, foldersById)) return false
+  }
+  return true
 }

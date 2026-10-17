@@ -29,7 +29,7 @@ import { StarredSection } from "./StarredSection"
 // Cards and rows poll for live sessions (spec §1.5); these tests are not
 // about the badge, so the poll answers "nobody".
 vi.mock("@/features/collab/server", () => ({
-  getLiveDrawings: vi.fn(async () => []),
+  getLiveDrawings: vi.fn(async () => ({ drawings: [], teamCount: 0 })),
 }))
 
 vi.mock("@tanstack/react-router", () => ({
@@ -93,7 +93,10 @@ function makeDrawing(overrides: Partial<Drawing> & { id: string }): Drawing {
     name: `Drawing ${overrides.id}`,
     searchText: "",
     folderId: null,
-    ownerId: "user-1",
+    space: "private",
+    createdBy: "user-1",
+    creator: { name: "Ada", initials: "A" },
+    deletedBy: null,
     starred: false,
     deletedAt: null,
     trashRootId: null,

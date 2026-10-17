@@ -6,6 +6,7 @@ import { and, eq, inArray, isNotNull, not } from "drizzle-orm"
 import type { NodePgDatabase } from "drizzle-orm/node-postgres"
 import type * as schema from "@/db/schema"
 import { drawings, folders } from "@/db/schema"
+import { accessibleTo } from "@/features/spaces/access"
 
 type Db = NodePgDatabase<typeof schema>
 
@@ -24,7 +25,7 @@ type Db = NodePgDatabase<typeof schema>
  * (or was restored mid-flight), so its FK edge is severed — evacuated to
  * root — before the folder delete lets the cascade fire. Those survivors
  * keep their trash cards; restoring them lands at root, their parent chain
- * being gone. The evacuations are deliberately not owner-scoped: any row
+ * being gone. The evacuations are deliberately not access-scoped: any row
  * pointing into a doomed folder would otherwise be cascade-deleted.
  */
 export async function destroyTrashUnit(
@@ -40,7 +41,7 @@ export async function destroyTrashUnit(
       .from(folders)
       .where(
         and(
-          eq(folders.ownerId, userId),
+          accessibleTo(folders, userId),
           eq(folders.trashRootId, unitId),
           isNotNull(folders.deletedAt),
         ),
@@ -48,14 +49,14 @@ export async function destroyTrashUnit(
     const unitFolderIds = unitFolders.map((folder) => folder.id)
 
     // Drawings first: folder deletion would cascade into them anyway, but
-    // the explicit statement keeps the freed rows owner-scoped and audited
+    // the explicit statement keeps the freed rows access-scoped and audited
     // here rather than implied by FK order. The WHERE re-checks deletedAt,
     // so a drawing restored concurrently is skipped (and evacuated below).
     const deletedDrawings = await tx
       .delete(drawings)
       .where(
         and(
-          eq(drawings.ownerId, userId),
+          accessibleTo(drawings, userId),
           eq(drawings.trashRootId, unitId),
           isNotNull(drawings.deletedAt),
         ),
@@ -86,7 +87,7 @@ export async function destroyTrashUnit(
       .delete(folders)
       .where(
         and(
-          eq(folders.ownerId, userId),
+          accessibleTo(folders, userId),
           eq(folders.trashRootId, unitId),
           isNotNull(folders.deletedAt),
         ),

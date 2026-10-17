@@ -6,9 +6,12 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react"
 import { afterEach, beforeEach, expect, test, vi } from "vitest"
 import { renderPreviewSvg } from "@/components/drawing-gallery/preview"
+import type { Space } from "@/db/schema"
+import { currentUserQueryOptions } from "@/features/account/queries"
 import type { Drawing } from "@/features/drawings/queries"
 import { drawingsQueryOptions } from "@/features/drawings/queries"
 import { getDrawings, trashDrawing } from "@/features/drawings/server"
@@ -16,15 +19,17 @@ import type { Folder } from "@/features/folders/queries"
 import { foldersQueryOptions } from "@/features/folders/queries"
 import { AllDrawings } from "./AllDrawings"
 
-const { openCreateDrawingDialog, openCreateFolderDialog } = vi.hoisted(() => ({
-  openCreateDrawingDialog: vi.fn(),
-  openCreateFolderDialog: vi.fn(),
-}))
+const { openCreateDrawingDialog, openCreateFolderDialog, routerSearch } =
+  vi.hoisted(() => ({
+    openCreateDrawingDialog: vi.fn(),
+    openCreateFolderDialog: vi.fn(),
+    routerSearch: { current: {} as { space?: Space } },
+  }))
 
 // Cards and rows poll for live sessions (spec §1.5); these tests are not
 // about the badge, so the poll answers "nobody".
 vi.mock("@/features/collab/server", () => ({
-  getLiveDrawings: vi.fn(async () => []),
+  getLiveDrawings: vi.fn(async () => ({ drawings: [], teamCount: 0 })),
 }))
 
 vi.mock("./CreateDialog", () => ({
@@ -35,24 +40,32 @@ vi.mock("@tanstack/react-router", () => ({
   Link: ({
     to,
     params,
+    search,
     children,
     ...rest
   }: {
     to: string
     params?: Record<string, string>
+    search?: Record<string, string>
     children: React.ReactNode
   }) => (
     <a
-      href={Object.entries(params ?? {}).reduce(
-        (path, [key, value]) => path.replace(`$${key}`, value),
-        to,
-      )}
+      href={
+        Object.entries(params ?? {}).reduce(
+          (path, [key, value]) => path.replace(`$${key}`, value),
+          to,
+        ) + (search?.space ? `?space=${search.space}` : "")
+      }
       {...rest}
     >
       {children}
     </a>
   ),
+  useSearch: () => routerSearch.current,
 }))
+
+// The current user only matters here for teamEnabled.
+vi.mock("@/features/account/server", () => ({ getCurrentUser: vi.fn() }))
 
 // jsdom cannot rasterize Excalidraw scenes — assert cards, not pixels.
 vi.mock("@/components/drawing-gallery/preview", () => ({
@@ -90,7 +103,10 @@ function makeDrawing(overrides: Partial<Drawing> & { id: string }): Drawing {
     name: `Drawing ${overrides.id}`,
     searchText: "",
     folderId: null,
-    ownerId: "user-1",
+    space: "private",
+    createdBy: "user-1",
+    creator: { name: "Ada", initials: "A" },
+    deletedBy: null,
     starred: false,
     deletedAt: null,
     trashRootId: null,
@@ -104,11 +120,17 @@ function renderAllDrawings({
   drawings = [],
   folders = [],
   isAdmin = false,
+  teamEnabled = false,
+  space,
 }: {
   drawings?: Drawing[]
   folders?: Folder[]
   isAdmin?: boolean
+  teamEnabled?: boolean
+  /** The `space` search param. */
+  space?: Space
 } = {}) {
+  routerSearch.current = { space }
   // Seeded data is the fixture — keep react-query from refetching it through
   // the stubbed server functions.
   const client = new QueryClient({
@@ -116,6 +138,13 @@ function renderAllDrawings({
   })
   client.setQueryData(drawingsQueryOptions().queryKey, drawings)
   client.setQueryData(foldersQueryOptions().queryKey, folders)
+  client.setQueryData(currentUserQueryOptions().queryKey, {
+    id: "user-1",
+    email: "ada@example.com",
+    name: "",
+    role: "user",
+    teamEnabled,
+  })
   const view = render(
     <QueryClientProvider client={client}>
       <AllDrawings isAdmin={isAdmin} />
@@ -142,7 +171,9 @@ function makeFolder(id: string, name: string): Folder {
   return {
     id,
     name,
-    ownerId: "user-1",
+    space: "private",
+    createdBy: "user-1",
+    deletedBy: null,
     parentId: null,
     deletedAt: null,
     trashRootId: null,
@@ -446,4 +477,82 @@ test("loading holds the grid with the delayed skeleton, not a spinner", () => {
   expect(
     screen.queryByRole("button", { name: /create your first drawing/i }),
   ).toBeNull()
+})
+
+test("while Team is hidden the space param is ignored", () => {
+  renderAllDrawings({
+    drawings: [makeDrawing({ id: "d1" })],
+    folders: [makeFolder("f1", "Projects")],
+    teamEnabled: false,
+    space: "team",
+  })
+
+  expect(cardHrefs()).toEqual(["/draw/d1"])
+  expect(screen.getByRole("button", { name: "Projects" })).toBeTruthy()
+})
+
+test("with Team on, the grid and folder chips scope to the browsed space", () => {
+  const drawings = [
+    makeDrawing({ id: "mine", folderId: "f1" }),
+    makeDrawing({ id: "ours", space: "team", folderId: "f2" }),
+  ]
+  const folders = [
+    makeFolder("f1", "Sketches"),
+    { ...makeFolder("f2", "Roadmap"), space: "team" as const },
+  ]
+
+  renderAllDrawings({ drawings, folders, teamEnabled: true })
+  expect(cardHrefs()).toEqual(["/draw/mine"])
+  expect(screen.getByRole("button", { name: "Sketches" })).toBeTruthy()
+  expect(screen.queryByRole("button", { name: "Roadmap" })).toBeNull()
+  cleanup()
+
+  renderAllDrawings({ drawings, folders, teamEnabled: true, space: "team" })
+  expect(cardHrefs()).toEqual(["/draw/ours"])
+  expect(screen.getByRole("button", { name: "Roadmap" })).toBeTruthy()
+  expect(screen.queryByRole("button", { name: "Sketches" })).toBeNull()
+})
+
+// The card around a drawing's stretched link
+const card = (name: string) =>
+  screen.getByRole("link", { name }).parentElement as HTMLElement
+
+test("with Team on, search covers both spaces and labels each match; clearing it returns to the space", () => {
+  renderAllDrawings({
+    drawings: [
+      makeDrawing({ id: "ours", name: "Roadmap", space: "team" }),
+      makeDrawing({ id: "mine", name: "Road trip", folderId: "f1" }),
+      makeDrawing({ id: "retro", name: "Retro", space: "team" }),
+    ],
+    folders: [makeFolder("f1", "Sketches")],
+    teamEnabled: true,
+    space: "team",
+  })
+  const search = screen.getByRole("searchbox", { name: /search/i })
+
+  fireEvent.change(search, { target: { value: "road" } })
+  expect(cardHrefs()).toEqual(["/draw/ours", "/draw/mine"])
+  expect(within(card("Roadmap")).getByText("Team")).toBeTruthy()
+  expect(within(card("Road trip")).getByText("Private")).toBeTruthy()
+  // The private match keeps its folder attribution
+  expect(
+    within(card("Road trip")).getByRole("link", { name: "Sketches" }),
+  ).toBeTruthy()
+
+  fireEvent.change(search, { target: { value: "" } })
+  expect(cardHrefs()).toEqual(["/draw/ours", "/draw/retro"])
+  expect(within(card("Roadmap")).queryByText("Team")).toBeNull()
+})
+
+test("while Team is hidden, search results carry no space label", () => {
+  renderAllDrawings({
+    drawings: [makeDrawing({ id: "mine", name: "Road trip" })],
+    teamEnabled: false,
+  })
+
+  fireEvent.change(screen.getByRole("searchbox", { name: /search/i }), {
+    target: { value: "road" },
+  })
+  expect(cardHrefs()).toEqual(["/draw/mine"])
+  expect(within(card("Road trip")).queryByText("Private")).toBeNull()
 })

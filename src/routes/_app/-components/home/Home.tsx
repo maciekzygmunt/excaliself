@@ -2,19 +2,24 @@ import { useQuery } from "@tanstack/react-query"
 import { Link } from "@tanstack/react-router"
 import { Plus } from "lucide-react"
 import { DrawingGallery } from "@/components/drawing-gallery/DrawingGallery"
+import { TeamEmpty } from "@/components/drawing-gallery/GalleryEmpty"
 import { IllustratedEmptyState } from "@/components/illustrated-empty-state"
 import { KEYCAP_CLASS } from "@/components/ui/button"
 import { useTrashDrawing } from "@/features/drawings/mutations"
 import { drawingsQueryOptions } from "@/features/drawings/queries"
 import { foldersQueryOptions } from "@/features/folders/queries"
+import { inBrowsedSpace, useBrowsedSpace } from "@/features/spaces/browse"
 import { cn } from "@/lib/utils"
 import { useCreateDialog } from "../CreateDialog"
 
 const RECENT_LIMIT = 8
 
 export function Home({ isAdmin }: { isAdmin: boolean }) {
-  const { data: drawings = [], isPending } = useQuery(drawingsQueryOptions())
-  const { data: folders = [] } = useQuery(foldersQueryOptions())
+  const space = useBrowsedSpace()
+  const { data: allDrawings = [], isPending } = useQuery(drawingsQueryOptions())
+  const { data: allFolders = [] } = useQuery(foldersQueryOptions())
+  const drawings = inBrowsedSpace(allDrawings, space)
+  const folders = inBrowsedSpace(allFolders, space)
   const { openCreateDrawingDialog } = useCreateDialog()
   const trashDrawing = useTrashDrawing()
 
@@ -31,6 +36,7 @@ export function Home({ isAdmin }: { isAdmin: boolean }) {
             {drawings.length > 0 && (
               <Link
                 to="/drawings"
+                search={space === "team" ? { space } : {}}
                 className="text-[13px] font-medium text-muted-foreground transition-colors hover:text-foreground"
               >
                 View all
@@ -58,10 +64,14 @@ export function Home({ isAdmin }: { isAdmin: boolean }) {
           loadingLabel="Loading recent drawings"
           onTrash={trashDrawing}
           empty={
-            <IllustratedEmptyState
-              isAdmin={isAdmin}
-              onCreate={openCreateDrawingDialog}
-            />
+            space === "team" ? (
+              <TeamEmpty onCreate={openCreateDrawingDialog} />
+            ) : (
+              <IllustratedEmptyState
+                isAdmin={isAdmin}
+                onCreate={openCreateDrawingDialog}
+              />
+            )
           }
         />
       </div>

@@ -9,6 +9,7 @@ import {
 import type { ReactNode } from "react"
 import { toast } from "sonner"
 import { afterEach, beforeEach, expect, test, vi } from "vitest"
+import type { ShareAudience } from "@/features/shares/access"
 import {
   createShare,
   regenerateShare,
@@ -29,15 +30,18 @@ vi.mock("@/features/shares/server", () => ({
 }))
 
 const TOKEN = "a".repeat(64)
-const SHARE = {
+const SHARE: { token: string; audience: ShareAudience; createdAt: Date } = {
   token: TOKEN,
-  audience: "members" as const,
+  audience: "members",
   createdAt: new Date("2026-07-20"),
 }
 
 function renderDialog(
   share: typeof SHARE | null,
-  onBeforeCreate?: () => Promise<void>,
+  {
+    isTeam = false,
+    onBeforeCreate,
+  }: { isTeam?: boolean; onBeforeCreate?: () => Promise<void> } = {},
 ) {
   // staleTime pins the seeded cache: with the default 0 the mounted query
   // refetches in the background against the unconfigured getDrawingShare
@@ -52,6 +56,7 @@ function renderDialog(
   render(
     <ShareDialog
       drawingId="d1"
+      isTeam={isTeam}
       open
       onOpenChange={vi.fn()}
       onBeforeCreate={onBeforeCreate}
@@ -77,6 +82,7 @@ test("unshared: audience cards are pickable before the link exists and seed the 
   expect(screen.getByText("Members of this instance")).toBeDefined()
   expect(screen.getByText("Anyone with the link")).toBeDefined()
   expect(screen.queryByText(/Stop sharing/)).toBeNull()
+  expect(screen.queryByRole("button", { name: /copy member link/i })).toBeNull()
 
   fireEvent.click(screen.getByRole("radio", { name: /anyone with the link/i }))
   fireEvent.click(screen.getByRole("button", { name: /create share link/i }))
@@ -98,6 +104,45 @@ test("shared: shows the link row, both audience cards, and the stop/regenerate f
   expect(screen.getByRole("button", { name: /stop sharing/i })).toBeDefined()
   expect(screen.getByRole("button", { name: /regenerate link/i })).toBeDefined()
   expect(screen.queryByText(/create share link/i)).toBeNull()
+  expect(screen.queryByRole("button", { name: /copy member link/i })).toBeNull()
+})
+
+// Every member already opens a Team drawing, so only a guest link is offered.
+test("Team, unshared: no audience choice; the one link it creates is a guest link", async () => {
+  vi.mocked(createShare).mockResolvedValue({ ...SHARE, audience: "anyone" })
+  renderDialog(null, { isTeam: true })
+
+  expect(screen.queryByRole("radio")).toBeNull()
+  fireEvent.click(screen.getByRole("button", { name: /create guest link/i }))
+
+  await waitFor(() =>
+    expect(createShare).toHaveBeenCalledWith({
+      data: { drawingId: "d1", audience: "anyone" },
+    }),
+  )
+})
+
+test("Team, shared: the guest link with stop/regenerate, and no audience choice", () => {
+  renderDialog({ ...SHARE, audience: "anyone" }, { isTeam: true })
+
+  expect(screen.getByText(new RegExp(`/share/${TOKEN}`))).toBeDefined()
+  expect(screen.queryByRole("radio")).toBeNull()
+  expect(screen.getByRole("button", { name: /stop sharing/i })).toBeDefined()
+  expect(screen.getByRole("button", { name: /regenerate link/i })).toBeDefined()
+})
+
+test("Team: Copy member link copies the drawing's absolute /draw URL", async () => {
+  const writeText = vi.fn().mockResolvedValue(undefined)
+  Object.defineProperty(navigator, "clipboard", {
+    value: { writeText },
+    configurable: true,
+  })
+  renderDialog(null, { isTeam: true })
+
+  fireEvent.click(screen.getByRole("button", { name: /copy member link/i }))
+
+  expect(writeText).toHaveBeenCalledWith(`${window.location.origin}/draw/d1`)
+  await waitFor(() => expect(screen.getByText("Copied")).toBeDefined())
 })
 
 test("copy button gives feedback after copying the link", async () => {
@@ -186,8 +231,10 @@ test("the pending autosave is flushed before the link is minted", async () => {
     order.push("create")
     return SHARE
   })
-  renderDialog(null, async () => {
-    order.push("flush")
+  renderDialog(null, {
+    onBeforeCreate: async () => {
+      order.push("flush")
+    },
   })
 
   fireEvent.click(screen.getByRole("button", { name: /Create share link/ }))
@@ -201,7 +248,7 @@ test("the dialog stays busy while the autosave flush is still in the air", async
     release = resolve
   })
   vi.mocked(createShare).mockResolvedValue(SHARE)
-  renderDialog(null, () => flushed)
+  renderDialog(null, { onBeforeCreate: () => flushed })
 
   fireEvent.click(screen.getByRole("button", { name: /Create share link/ }))
 

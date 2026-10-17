@@ -48,6 +48,11 @@ vi.mock("@/features/folders/server", () => ({
 
 // The palette provider (needed for the banner's context section) pulls in
 // the create dialog and the auth client — stub those edges.
+// The palette reads teamEnabled off the current user.
+vi.mock("@/features/account/server", () => ({
+  getCurrentUser: vi.fn(async () => ({ teamEnabled: false })),
+}))
+
 vi.mock("./CreateDialog", () => ({
   useCreateDialog: () => ({
     openCreateDrawingDialog: vi.fn(),
@@ -84,6 +89,7 @@ const soloDrawing = {
 function renderBanner(
   drawing: typeof soloDrawing = soloDrawing,
   trashItems?: TrashItems,
+  trashedBy?: string,
 ) {
   const client = new QueryClient({
     defaultOptions: { queries: { staleTime: Infinity, retry: false } },
@@ -94,7 +100,7 @@ function renderBanner(
   const view = render(
     <QueryClientProvider client={client}>
       <CommandPaletteProvider>
-        <TrashedDrawingBanner drawing={drawing} />
+        <TrashedDrawingBanner drawing={drawing} trashedBy={trashedBy} />
       </CommandPaletteProvider>
     </QueryClientProvider>,
   )
@@ -115,6 +121,17 @@ test("states the days-until-purge count with Restore and Delete forever", () => 
   ).toBeTruthy()
   expect(screen.getByRole("button", { name: "Restore" })).toBeTruthy()
   expect(screen.getByRole("button", { name: "Delete forever" })).toBeTruthy()
+})
+
+test("a teammate's trash mid-session says who did it, with Restore", async () => {
+  vi.mocked(restoreDrawing).mockResolvedValue({ originalFolderGone: false })
+  renderBanner(soloDrawing, undefined, "Ada")
+
+  expect(screen.getByText("Moved to trash by Ada")).toBeTruthy()
+  fireEvent.click(screen.getByRole("button", { name: "Restore" }))
+  await flush()
+
+  expect(restoreDrawing).toHaveBeenCalledWith({ data: "d1" }, expect.anything())
 })
 
 test("countdown copy collapses at the boundaries", () => {
@@ -210,7 +227,10 @@ test("confirm stays disabled while the folder unit's counts are loading", async 
       {
         id: "f1",
         name: "Archive",
-        ownerId: "user-1",
+        space: "private",
+        createdBy: "user-1",
+        deletedBy: null,
+        deletedByName: null,
         parentId: null,
         deletedAt: daysAgo(5),
         trashRootId: "f1",
@@ -317,7 +337,10 @@ test("a drawing trashed with its folder deletes the whole unit, with count-aware
       {
         id: "f1",
         name: "Archive",
-        ownerId: "user-1",
+        space: "private",
+        createdBy: "user-1",
+        deletedBy: null,
+        deletedByName: null,
         parentId: null,
         deletedAt: daysAgo(5),
         trashRootId: "f1",

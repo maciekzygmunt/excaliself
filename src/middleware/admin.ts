@@ -5,9 +5,8 @@ import { db } from "@/db"
 import { users } from "@/db/schema"
 import { authMiddleware } from "./auth"
 
-// The role rides the session's cookie cache for up to five minutes, so a
-// just-demoted admin would keep admin access until it expires. Read the role
-// fresh — role checks must hold the moment a demotion lands (issue #65).
+// Reads the role from the users row, so a demotion holds the moment it
+// lands (issue #65).
 export const adminMiddleware = createMiddleware()
   .middleware([authMiddleware])
   .server(async ({ next, context }) => {

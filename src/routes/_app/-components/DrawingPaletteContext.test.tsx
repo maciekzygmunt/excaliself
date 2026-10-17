@@ -43,6 +43,11 @@ vi.mock("@/features/folders/server", () => ({
   restoreFolder: vi.fn(),
 }))
 
+// The palette reads teamEnabled off the current user.
+vi.mock("@/features/account/server", () => ({
+  getCurrentUser: vi.fn(async () => ({ teamEnabled: false })),
+}))
+
 vi.mock("./CreateDialog", () => ({
   useCreateDialog: () => ({
     openCreateDrawingDialog: vi.fn(),
@@ -60,7 +65,10 @@ function makeDrawing(overrides: Partial<Drawing> = {}): Drawing {
     name: "Retro board",
     searchText: "",
     folderId: null,
-    ownerId: "user-1",
+    space: "private",
+    createdBy: "user-1",
+    creator: { name: "Ada", initials: "A" },
+    deletedBy: null,
     starred: false,
     deletedAt: null,
     trashRootId: null,
@@ -73,7 +81,9 @@ function makeDrawing(overrides: Partial<Drawing> = {}): Drawing {
 function makeFolder(overrides: Partial<Folder> & { id: string }): Folder {
   return {
     name: `Folder ${overrides.id}`,
-    ownerId: "user-1",
+    space: "private",
+    createdBy: "user-1",
+    deletedBy: null,
     parentId: null,
     deletedAt: null,
     trashRootId: null,

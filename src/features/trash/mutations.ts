@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
+import type { Space } from "@/db/schema"
 import { drawingsQueryOptions } from "@/features/drawings/queries"
 import { restoreDrawing } from "@/features/drawings/server"
 import { foldersQueryOptions } from "@/features/folders/queries"
@@ -11,6 +12,8 @@ import {
   trashQueryOptions,
 } from "./queries"
 import { deleteTrashUnitForever, emptyTrash } from "./server"
+
+const isTeam = (unit: { space: Space }) => unit.space === "team"
 
 const RESTORED_TO_ROOT_TOAST = "Restored to root — its folder no longer exists"
 
@@ -130,7 +133,10 @@ export function useDeleteTrashUnitForever() {
   return (unitId: string) => mutation.mutateAsync({ data: unitId })
 }
 
-/** Empty trash (spec §5.11): pessimistic, same rules as delete forever. */
+/**
+ * Empty trash (spec §5.11): pessimistic, same rules as delete forever. It
+ * empties Private only, so Team units stay in the cache.
+ */
 export function useEmptyTrash() {
   const queryClient = useQueryClient()
   const trashKey = trashQueryOptions().queryKey
@@ -139,11 +145,15 @@ export function useEmptyTrash() {
     mutationFn: () => emptyTrash(),
     onError: () => toast.error("Couldn't empty trash"),
     onSuccess: () => {
-      queryClient.setQueryData<TrashItems>(trashKey, {
-        drawings: [],
-        folders: [],
-        totals: { drawings: 0, folders: 0 },
-      })
+      queryClient.setQueryData<TrashItems>(trashKey, (current) =>
+        current
+          ? {
+              drawings: current.drawings.filter(isTeam),
+              folders: current.folders.filter(isTeam),
+              totals: { drawings: 0, folders: 0 },
+            }
+          : current,
+      )
       queryClient.invalidateQueries({ queryKey: trashKey })
     },
   })

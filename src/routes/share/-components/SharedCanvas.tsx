@@ -16,6 +16,7 @@ import {
   getOrCreateGuestName,
   rememberGuestName,
 } from "@/features/collab/guest-identity"
+import { roomPathForToken } from "@/features/collab/room-url"
 import { useRoom } from "@/features/collab/use-room"
 import {
   buildInitialSceneData,
@@ -72,7 +73,7 @@ export function SharedCanvas({
   const [name, setName] = useState(getOrCreateGuestName)
 
   const room = useRoom({
-    token,
+    room: roomPathForToken(token),
     name,
     excalidrawAPI,
     onRoomFull,

@@ -1,8 +1,10 @@
 import type { SQL } from "drizzle-orm"
 import { PgDialect } from "drizzle-orm/pg-core"
 import { expect, test } from "vitest"
-import { drawingFiles, drawings } from "@/db/schema"
+import { drawingFiles, drawings, type Space } from "@/db/schema"
 import { MAX_DRAWING_IMAGE_BYTES } from "@/features/collab/room-files"
+import { accessibleTo } from "@/features/spaces/access"
+import { expectCondition } from "@/features/spaces/expect-condition"
 import { writeDrawingScene } from "./scene-write"
 
 type Call =
@@ -18,7 +20,7 @@ const SCENE = '{"elements":[]}'
 
 function fakeDb(options: {
   /** What the ownership + share lookup resolves to; none means "not found". */
-  target?: { id: string; shareId: string | null }
+  target?: { id: string; space?: Space; shareId: string | null }
   /** Rows already in drawing_files for this drawing. */
   storedFileIds?: string[]
   /** When false, the guarded UPDATE matches nothing — a share landed first. */
@@ -103,16 +105,15 @@ test("a solo save writes the scene, its search text, and bumps updatedAt", async
   expect(update?.set.updatedAt).toBeInstanceOf(Date)
 })
 
-test("the gate is one statement: owner, not trashed, and whether it is shared", async () => {
+test("the gate is one statement: access rule, not trashed, and whether it is shared", async () => {
   const { db, calls } = fakeDb({ target: { id: "d1", shareId: null } })
 
   await writeDrawingScene(db, "user-1", { id: "d1", data: SCENE, files: [] })
 
   const gate = calls[0] as Extract<Call, { kind: "select" }>
   expect(gate.table).toBe(drawings)
-  const sql = toSql(gate.where)
-  expect(sql).toContain(`"drawings"."ownerId" =`)
-  expect(sql).toContain(`"drawings"."deletedAt" is null`)
+  expectCondition(gate.where, accessibleTo(drawings, "user-1"))
+  expect(toSql(gate.where)).toContain(`"drawings"."deletedAt" is null`)
 })
 
 test("a shared drawing refuses the write — the room owns its data", async () => {
@@ -126,6 +127,21 @@ test("a shared drawing refuses the write — the room owns its data", async () =
 
   // Spec §5.5: while a shares row exists the socket path is the only writer,
   // so a stale tab's autosave must not land at all — not even its files.
+  expect(result).toEqual({ status: "shared" })
+  expect(calls.map((call) => call.kind)).toEqual(["select"])
+})
+
+test("a Team drawing refuses the write — it is always a Room", async () => {
+  const { db, calls } = fakeDb({
+    target: { id: "d1", space: "team", shareId: null },
+  })
+
+  const result = await writeDrawingScene(db, "user-1", {
+    id: "d1",
+    data: SCENE,
+    files: [file("f1")],
+  })
+
   expect(result).toEqual({ status: "shared" })
   expect(calls.map((call) => call.kind)).toEqual(["select"])
 })
@@ -233,7 +249,7 @@ test("a stored file the scene still uses is kept, even if the payload lacks it",
 
 // Spec §5.5's single-writer invariant has to survive another tab of the
 // owner's minting a link between the gate and the write.
-test("a share created between the gate and the write still refuses the save", async () => {
+test("a share or a move to Team between the gate and the write still refuses the save", async () => {
   const { db, calls } = fakeDb({
     target: { id: "d1", shareId: null },
     updateHits: false,
@@ -250,6 +266,7 @@ test("a share created between the gate and the write still refuses the save", as
   // and the files must not be reconciled behind a write that never landed.
   const update = calls.find((call) => call.kind === "update")
   expect(toSql(update?.where as SQL)).toContain("not exists")
+  expect(toSql(update?.where as SQL)).toContain(`"drawings"."space" = $`)
   expect(calls.some((call) => call.kind === "insert")).toBe(false)
   expect(calls.some((call) => call.kind === "delete")).toBe(false)
 })

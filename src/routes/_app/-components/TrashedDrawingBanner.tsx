@@ -39,8 +39,11 @@ function purgeSentence(deletedAt: Date | string): string {
  */
 export function TrashedDrawingBanner({
   drawing,
+  trashedBy = null,
 }: {
   drawing: TrashedDrawingInfo
+  /** Set when a teammate trashed it while this tab was in its Room. */
+  trashedBy?: string | null
 }) {
   const navigate = useNavigate()
   const restoreDrawing = useRestoreTrashedDrawing()
@@ -121,7 +124,9 @@ export function TrashedDrawingBanner({
     >
       <span className="inline-flex items-center gap-2 text-[13px] text-foreground">
         <Trash2 aria-hidden className="h-3.5 w-3.5 text-destructive/70" />
-        {purgeSentence(drawing.deletedAt)}
+        {trashedBy
+          ? `Moved to trash by ${trashedBy}`
+          : purgeSentence(drawing.deletedAt)}
       </span>
       <span className="flex shrink-0 items-center gap-2">
         <Button

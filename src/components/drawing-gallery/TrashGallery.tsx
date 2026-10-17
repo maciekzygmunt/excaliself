@@ -6,6 +6,7 @@ import { describeContents } from "@/features/trash/destroy-copy"
 import type { TrashedDrawing, TrashedFolder } from "@/features/trash/queries"
 import { purgeCountdownLabel } from "@/features/trash/retention"
 import { useDelayedVisible } from "@/hooks/use-delayed-visible"
+import { formatAgo } from "@/lib/relative-time"
 import { cn } from "@/lib/utils"
 import {
   CARD_FRAME_CLASS,
@@ -22,7 +23,8 @@ const DEFAULT_SKELETON_COUNT = 8
  * browse, but units instead of drawings — a trashed folder is one card with
  * a contents count, never dispersed children — and the card actions are
  * Restore / Delete forever. Drawing cards open the read-only trashed view
- * at /draw/$id; folder cards don't link anywhere.
+ * at /draw/$id; folder cards don't link anywhere. Team cards also say who
+ * trashed them and when.
  */
 export function TrashGallery({
   drawings,
@@ -141,6 +143,7 @@ function TrashedDrawingCard({
             {drawing.deletedAt ? purgeCountdownLabel(drawing.deletedAt) : null}
           </span>
         }
+        byline={drawing.space === "team" && <TrashedBy unit={drawing} />}
         restoreLabel={`Restore ${drawing.name}`}
         onRestore={onRestore}
         deleteDialog={
@@ -199,6 +202,7 @@ function TrashedFolderCard({
             )}
           </>
         }
+        byline={folder.space === "team" && <TrashedBy unit={folder} />}
         restoreLabel={`Restore ${folder.name}`}
         onRestore={onRestore}
         deleteDialog={
@@ -237,15 +241,56 @@ function DeleteForeverTrigger({
   )
 }
 
+/**
+ * Who trashed a Team unit and when. Every member sees the Team trash, so
+ * this answers "who do I ask?". A deleted member reads "Former member".
+ */
+function TrashedBy({
+  unit,
+}: {
+  unit: Pick<TrashedDrawing, "deletedByName" | "deletedAt">
+}) {
+  return (
+    // The name truncates first, so "when" always stays readable
+    <>
+      <Trash2
+        aria-hidden
+        className="mr-1 h-3 w-3 shrink-0 self-center text-muted-foreground/60"
+      />
+      <span className="truncate">
+        <span className="sr-only">Trashed by </span>
+        {unit.deletedByName ?? "Former member"}
+      </span>
+      {unit.deletedAt && (
+        <span className="shrink-0">
+          <span aria-hidden className="text-muted-foreground/50">
+            {" · "}
+          </span>
+          {/* Server and client can straddle a minute boundary */}
+          <time
+            dateTime={new Date(unit.deletedAt).toISOString()}
+            suppressHydrationWarning
+          >
+            {formatAgo(unit.deletedAt)}
+          </time>
+        </span>
+      )}
+    </>
+  )
+}
+
 function CardFooter({
   name,
   meta,
+  byline,
   restoreLabel,
   onRestore,
   deleteDialog,
 }: {
   name: string
   meta: React.ReactNode
+  /** An optional second meta line, such as who trashed a Team unit. */
+  byline?: React.ReactNode
   restoreLabel: string
   onRestore: () => void
   deleteDialog: React.ReactNode
@@ -277,6 +322,11 @@ function CardFooter({
       <span className="mt-0.5 block truncate text-xs text-muted-foreground">
         {meta}
       </span>
+      {byline && (
+        <span className="mt-0.5 flex min-w-0 whitespace-pre text-xs text-muted-foreground">
+          {byline}
+        </span>
+      )}
     </div>
   )
 }

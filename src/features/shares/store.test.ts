@@ -1,7 +1,15 @@
 import type { SQL } from "drizzle-orm"
 import { PgDialect } from "drizzle-orm/pg-core"
 import { expect, test, vi } from "vitest"
-import { drawingFiles, drawings, shares } from "@/db/schema"
+import {
+  drawingFiles,
+  drawings,
+  type Space,
+  shareRedirects,
+  shares,
+} from "@/db/schema"
+import { accessibleTo } from "@/features/spaces/access"
+import { expectCondition } from "@/features/spaces/expect-condition"
 import {
   createShareLink,
   getShareLink,
@@ -16,8 +24,8 @@ import {
 
 const HEX_256_BIT = /^[0-9a-f]{64}$/
 
-type Call =
-  | { kind: "select"; table: unknown; where: SQL }
+type Op =
+  | { kind: "select"; table: unknown; where: SQL; lock?: string }
   | { kind: "insert"; table: unknown; values: Record<string, unknown> }
   | {
       kind: "update"
@@ -26,6 +34,7 @@ type Call =
       where: SQL
     }
   | { kind: "delete"; table: unknown; where: SQL }
+type Call = Op & { inTransaction: boolean }
 
 // Renders a captured drizzle condition so tests can assert what the SQL
 // actually matches (the crux of the owner-only guarantee).
@@ -40,30 +49,57 @@ const SHARE_ROW = {
 function fakeDb(options: {
   /** Rows the ownership select (from drawings) resolves to. */
   ownedDrawingIds?: string[]
+  /** The space of those drawings. */
+  space?: Space
   /** Rows any share select (from shares, joined) resolves to. */
   shareRows?: unknown[]
   /** Rows the drawing_files select resolves to. */
   fileRows?: unknown[]
+  /** Rows the share_redirects select resolves to. */
+  redirectRows?: unknown[]
   /** When false, updates match zero rows. */
   updateHits?: boolean
   /** When true, the insert hits the unique index and returns nothing. */
   insertConflicts?: boolean
 }) {
   const calls: Call[] = []
+  let inTransaction = false
+  const record = (op: Op) => {
+    const recorded: Call = { ...op, inTransaction }
+    calls.push(recorded)
+    return recorded
+  }
   const db = {
+    transaction: async (fn: (tx: unknown) => Promise<unknown>) => {
+      inTransaction = true
+      try {
+        return await fn(db)
+      } finally {
+        inTransaction = false
+      }
+    },
     select: () => ({
       from: (table: unknown) => {
         const chain = {
           innerJoin: () => chain,
           where: (where: SQL) => {
-            calls.push({ kind: "select", table, where })
-            if (table === drawings)
-              return Promise.resolve(
-                (options.ownedDrawingIds ?? []).map((id) => ({ id })),
-              )
-            if (table === drawingFiles)
-              return Promise.resolve(options.fileRows ?? [])
-            return Promise.resolve(options.shareRows ?? [])
+            const call = record({ kind: "select", table, where })
+            const rows =
+              table === drawings
+                ? (options.ownedDrawingIds ?? []).map(() => ({
+                    space: options.space ?? "private",
+                  }))
+                : table === drawingFiles
+                  ? (options.fileRows ?? [])
+                  : table === shareRedirects
+                    ? (options.redirectRows ?? [])
+                    : (options.shareRows ?? [])
+            return Object.assign(Promise.resolve(rows), {
+              for: (lock: string) => {
+                Object.assign(call, { lock })
+                return Promise.resolve(rows)
+              },
+            })
           },
         }
         return chain
@@ -73,7 +109,7 @@ function fakeDb(options: {
       values: (values: Record<string, unknown>) => ({
         onConflictDoNothing: () => ({
           returning: () => {
-            calls.push({ kind: "insert", table, values })
+            record({ kind: "insert", table, values })
             if (options.insertConflicts) return Promise.resolve([])
             return Promise.resolve([
               {
@@ -90,7 +126,7 @@ function fakeDb(options: {
       set: (set: Record<string, unknown>) => ({
         where: (where: SQL) => ({
           returning: () => {
-            calls.push({ kind: "update", table, set, where })
+            record({ kind: "update", table, set, where })
             return Promise.resolve(
               options.updateHits === false ? [] : [{ ...SHARE_ROW, ...set }],
             )
@@ -100,12 +136,12 @@ function fakeDb(options: {
     }),
     delete: (table: unknown) => ({
       where: (where: SQL) => {
-        calls.push({ kind: "delete", table, where })
+        record({ kind: "delete", table, where })
         return Promise.resolve()
       },
     }),
-  } as unknown as Parameters<typeof getShareLink>[0]
-  return { db, calls }
+  }
+  return { db: db as unknown as Parameters<typeof getShareLink>[0], calls }
 }
 
 test("mintShareToken is 256-bit hex and never repeats", () => {
@@ -116,7 +152,7 @@ test("mintShareToken is 256-bit hex and never repeats", () => {
   expect(a).not.toBe(b)
 })
 
-test("createShareLink verifies ownership of a live drawing before inserting", async () => {
+test("createShareLink checks access to a live drawing before inserting", async () => {
   const { db, calls } = fakeDb({ ownedDrawingIds: ["d1"] })
 
   const share = await createShareLink(db, "user-1", "d1", "anyone")
@@ -124,9 +160,8 @@ test("createShareLink verifies ownership of a live drawing before inserting", as
   expect(calls.map((call) => call.kind)).toEqual(["select", "insert"])
   const ownership = calls[0] as Extract<Call, { kind: "select" }>
   expect(ownership.table).toBe(drawings)
-  const sql = toSql(ownership.where)
-  expect(sql).toContain(`"drawings"."ownerId" =`)
-  expect(sql).toContain(`"drawings"."deletedAt" is null`)
+  expectCondition(ownership.where, accessibleTo(drawings, "user-1"))
+  expect(toSql(ownership.where)).toContain(`"drawings"."deletedAt" is null`)
 
   const insert = calls[1] as Extract<Call, { kind: "insert" }>
   expect(insert.table).toBe(shares)
@@ -135,7 +170,7 @@ test("createShareLink verifies ownership of a live drawing before inserting", as
   expect(share.audience).toBe("anyone")
 })
 
-test("createShareLink throws not-found for a drawing the caller doesn't own, without touching shares", async () => {
+test("createShareLink throws not-found for a drawing the caller can't access, without touching shares", async () => {
   const { db, calls } = fakeDb({ ownedDrawingIds: [] })
 
   await expect(createShareLink(db, "user-2", "d1", "members")).rejects.toThrow(
@@ -159,14 +194,44 @@ test("createShareLink on an already-shared drawing returns the live link unchang
   expect(calls.map((call) => call.kind)).toEqual(["select", "insert", "select"])
 })
 
-test("getShareLink scopes the read to the drawing's owner", async () => {
+// A move to Team between the check and the write would leave a Team drawing
+// with a members link, so the check locks the row inside the write's
+// transaction.
+test("createShareLink checks the space under a row lock in the insert's transaction", async () => {
+  const { db, calls } = fakeDb({ ownedDrawingIds: ["d1"] })
+
+  await createShareLink(db, "user-1", "d1", "members")
+
+  const [check, insert] = calls
+  expect(check).toMatchObject({ kind: "select", lock: "share" })
+  expect(check.inTransaction && insert.inTransaction).toBe(true)
+})
+
+test("createShareLink refuses a members link on a Team drawing, without inserting", async () => {
+  const { db, calls } = fakeDb({ ownedDrawingIds: ["d1"], space: "team" })
+
+  await expect(createShareLink(db, "user-2", "d1", "members")).rejects.toThrow(
+    "Team drawings take only guest links",
+  )
+  expect(calls.map((call) => call.kind)).toEqual(["select"])
+})
+
+test("createShareLink gives a Team drawing a guest link", async () => {
+  const { db } = fakeDb({ ownedDrawingIds: ["d1"], space: "team" })
+
+  const share = await createShareLink(db, "user-2", "d1", "anyone")
+
+  expect(share.audience).toBe("anyone")
+})
+
+test("getShareLink scopes the read by the access rule", async () => {
   const { db, calls } = fakeDb({ shareRows: [SHARE_ROW] })
 
   const share = await getShareLink(db, "user-1", "d1")
 
   expect(share).toEqual(SHARE_ROW)
   const read = calls[0] as Extract<Call, { kind: "select" }>
-  expect(toSql(read.where)).toContain(`"drawings"."ownerId" =`)
+  expectCondition(read.where, accessibleTo(drawings, "user-1"))
 })
 
 test("getShareLink returns null for an unshared drawing", async () => {
@@ -225,6 +290,25 @@ test("setShareLinkAudience updates only the audience", async () => {
   expect(share.token).toBe(SHARE_ROW.token)
 })
 
+test("setShareLinkAudience refuses members on a Team drawing, without updating", async () => {
+  const { db, calls } = fakeDb({ ownedDrawingIds: ["d1"], space: "team" })
+
+  await expect(
+    setShareLinkAudience(db, "user-2", "d1", "members"),
+  ).rejects.toThrow("Team drawings take only guest links")
+  expect(calls.map((call) => call.kind)).toEqual(["select"])
+})
+
+test("setShareLinkAudience checks the space under a row lock in the update's transaction", async () => {
+  const { db, calls } = fakeDb({ ownedDrawingIds: ["d1"] })
+
+  await setShareLinkAudience(db, "user-1", "d1", "members")
+
+  const [check, update] = calls
+  expect(check).toMatchObject({ kind: "select", lock: "share" })
+  expect(check.inTransaction && update.inTransaction).toBe(true)
+})
+
 test("setShareLinkAudience on an unshared drawing throws", async () => {
   const { db } = fakeDb({ ownedDrawingIds: ["d1"], updateHits: false })
   await expect(
@@ -258,6 +342,25 @@ test("visit with an unknown token serves the bare dead arm and nothing else", as
 
   await expect(
     resolveShareVisit(db, "no-such-token", async () => true),
+  ).resolves.toEqual({ status: "dead" })
+})
+
+test("visit with a members link a move to Team dropped sends a signed-in member to the drawing", async () => {
+  const { db, calls } = fakeDb({ redirectRows: [{ drawingId: "d1" }] })
+
+  await expect(
+    resolveShareVisit(db, "moved-token", async () => true),
+  ).resolves.toEqual({ status: "moved", drawingId: "d1" })
+  const read = calls[1] as Extract<Call, { kind: "select" }>
+  expect(read.table).toBe(shareRedirects)
+  expect(toSql(read.where)).toContain(`"share_redirects"."token" =`)
+})
+
+test("visit with a dropped members link and no session serves the bare dead arm", async () => {
+  const { db } = fakeDb({ redirectRows: [{ drawingId: "d1" }] })
+
+  await expect(
+    resolveShareVisit(db, "moved-token", async () => false),
   ).resolves.toEqual({ status: "dead" })
 })
 

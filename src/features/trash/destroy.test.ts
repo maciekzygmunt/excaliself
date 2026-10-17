@@ -2,6 +2,8 @@ import type { SQL } from "drizzle-orm"
 import { PgDialect } from "drizzle-orm/pg-core"
 import { expect, test } from "vitest"
 import { drawings, folders } from "@/db/schema"
+import { accessibleTo } from "@/features/spaces/access"
+import { expectCondition } from "@/features/spaces/expect-condition"
 import { destroyTrashUnit } from "./destroy"
 
 type Call =
@@ -115,7 +117,7 @@ test("the folder evacuation detaches children of unit folders but never the unit
   expect(sql).toContain(`not "folders"."id" in `)
 })
 
-test("the drawings evacuation moves EVERY drawing left in a unit folder — no owner, deletedAt, or trashRootId filter", async () => {
+test("the drawings evacuation moves EVERY drawing left in a unit folder — no access, deletedAt, or trashRootId filter", async () => {
   const { db, calls } = fakeDb({
     unitFolderIds: ["f1"],
     deletedFolderIds: ["f1"],
@@ -133,10 +135,10 @@ test("the drawings evacuation moves EVERY drawing left in a unit folder — no o
   expect(sql).toContain(`"drawings"."folderId" in `)
   expect(sql).not.toContain("deletedAt")
   expect(sql).not.toContain("trashRootId")
-  expect(sql).not.toContain("ownerId")
+  expect(sql).not.toContain("createdBy")
 })
 
-test("the unit deletes stay owner-scoped and re-assert deletedAt", async () => {
+test("the unit deletes stay access-scoped and re-assert deletedAt", async () => {
   const { db, calls } = fakeDb({
     unitFolderIds: ["f1"],
     deletedFolderIds: ["f1"],
@@ -148,11 +150,12 @@ test("the unit deletes stay owner-scoped and re-assert deletedAt", async () => {
     const del = calls.find(
       (call) => call.kind === "delete" && call.table === table,
     )
-    const { sql, params } = toSql((del as { where: SQL }).where)
-    expect(sql).toContain(`"ownerId" = `)
+    const { where } = del as { where: SQL }
+    expectCondition(where, accessibleTo(table, "user-1"))
+    const { sql, params } = toSql(where)
     expect(sql).toContain(`"trashRootId" = `)
     expect(sql).toContain(`"deletedAt" is not null`)
-    expect(params).toEqual(["user-1", "f1"])
+    expect(params).toContain("f1")
   }
 })
 

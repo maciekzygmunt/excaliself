@@ -11,6 +11,7 @@ import {
   parseFileUpload,
   type RoomFileUpload,
 } from "@/features/collab/room-files"
+import { accessibleTo } from "@/features/spaces/access"
 import { dataUrlToBytes } from "./file-bytes"
 import { parseSceneElements, sceneText } from "./search"
 
@@ -27,12 +28,16 @@ export type SceneWriteResult =
       /** Not stored: over `MAX_DRAWING_IMAGE_BYTES`. The client flags them `error`. */
       overCapFileIds: string[]
     }
-  /** Refused: the room owns the data. Not an error; the client joins it. */
+  /**
+   * Refused: the drawing is shared or in Team, so its Room owns the data. Not
+   * an error; the client joins it.
+   */
   | { status: "shared" }
 
 /**
- * Persist a solo edit. Unowned and missing ids both throw "Drawing not found",
- * so ownership can't be probed. Shared drawings are refused.
+ * Persist a solo edit. Inaccessible and missing ids both throw "Drawing not
+ * found", so private drawings can't be probed. Shared and Team drawings are
+ * refused.
  *
  * `files` carries only images the client has not stored yet. Ones that fail
  * the room upload's checks are skipped, not fatal: the client flags oversized
@@ -54,23 +59,24 @@ export async function writeDrawingScene(
     const now = new Date()
 
     // One query for both gates, so the share check never answers for a drawing
-    // the caller doesn't own.
+    // the caller can't access.
     const [target] = await tx
-      .select({ id: drawings.id, shareId: shares.id })
+      .select({ id: drawings.id, space: drawings.space, shareId: shares.id })
       .from(drawings)
       .leftJoin(shares, eq(shares.drawingId, drawings.id))
       .where(
         and(
           eq(drawings.id, id),
-          eq(drawings.ownerId, userId),
+          accessibleTo(drawings, userId),
           isNull(drawings.deletedAt),
         ),
       )
     if (!target) throw new Error("Drawing not found")
-    if (target.shareId) return { status: "shared" as const }
+    if (target.shareId || target.space === "team")
+      return { status: "shared" as const }
 
-    // Re-check on the UPDATE: another tab may share the drawing in between.
-    // The join-time reconcile covers what still slips through.
+    // Re-check on the UPDATE: another tab may share the drawing or move it to
+    // Team in between. The join-time reconcile covers what still slips through.
     const written = await tx
       .update(drawings)
       .set({
@@ -81,6 +87,7 @@ export async function writeDrawingScene(
       .where(
         and(
           eq(drawings.id, id),
+          eq(drawings.space, "private"),
           notExists(
             tx
               .select({ one: sql`1` })

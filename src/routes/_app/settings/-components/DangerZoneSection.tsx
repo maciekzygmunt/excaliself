@@ -9,12 +9,14 @@ import {
   myContentCountsQueryOptions,
 } from "@/features/account/queries"
 import { deleteMyAccount } from "@/features/account/server"
+import type { OwnedContentCounts } from "@/features/admin/delete-user"
+import { describeKeptTeamDrawings } from "@/features/admin/delete-user-copy"
 import { describeContents } from "@/features/trash/destroy-copy"
 
 // The Account danger zone (issue #67, spec §4.5 tier 3): one isolated card,
-// one action — hard-delete your own account and everything it owns. The
-// sole admin is blocked with the reason inline; the server enforces the
-// same guard regardless.
+// one action — hard-delete your own account and your private work (Team
+// drawings stay). The sole admin is blocked with the reason inline; the
+// server enforces the same guard regardless.
 export function DangerZoneSection({ user }: { user: CurrentUser }) {
   const [confirmOpen, setConfirmOpen] = useState(false)
   const { data: state } = useQuery(deleteAccountStateQueryOptions())
@@ -42,7 +44,9 @@ export function DangerZoneSection({ user }: { user: CurrentUser }) {
       <div className="mb-4">
         <h2 className="text-sm font-medium text-destructive">Danger zone</h2>
         <p className="text-xs text-muted-foreground">
-          Irreversible. Everything you own goes with the account.
+          {user.teamEnabled
+            ? "Irreversible. Your private work goes with the account. Team drawings stay."
+            : "Irreversible. Everything you own goes with the account."}
         </p>
       </div>
 
@@ -52,7 +56,7 @@ export function DangerZoneSection({ user }: { user: CurrentUser }) {
           <p className="text-xs text-muted-foreground">
             {blocked
               ? "You're the instance's only admin. Promote another member to admin before deleting your account."
-              : "Permanently delete your account and all of your drawings and folders."}
+              : `Permanently delete your account and all of your ${user.teamEnabled ? "private " : ""}drawings and folders.`}
           </p>
         </div>
         <Button
@@ -85,7 +89,7 @@ export function DangerZoneSection({ user }: { user: CurrentUser }) {
 }
 
 function deleteDescription(
-  counts: { drawings: number; folders: number } | undefined,
+  counts: OwnedContentCounts | undefined,
   countsFailed: boolean,
 ) {
   if (countsFailed)
@@ -93,7 +97,9 @@ function deleteDescription(
   if (!counts)
     return "This will delete your account and permanently delete all of your content. This can't be undone."
   const contents = describeContents(counts.drawings, counts.folders)
-  return contents
-    ? `This will delete your account and permanently delete your ${contents}. This can't be undone.`
-    : "This will delete your account. You have no drawings or folders. This can't be undone."
+  const kept = describeKeptTeamDrawings("Your", counts.teamDrawings)
+  const destroyed = contents
+    ? `This will delete your account and permanently delete your ${contents}.`
+    : `This will delete your account. You have no ${kept ? "private " : ""}drawings or folders.`
+  return [destroyed, "This can't be undone.", kept].filter(Boolean).join(" ")
 }

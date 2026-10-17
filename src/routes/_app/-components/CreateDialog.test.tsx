@@ -8,15 +8,23 @@ import {
 } from "@testing-library/react"
 import type { ReactNode } from "react"
 import { afterEach, beforeEach, expect, test, vi } from "vitest"
+import type { Space } from "@/db/schema"
+import { getCurrentUser } from "@/features/account/server"
 import { createDrawing } from "@/features/drawings/server"
 import { createFolder } from "@/features/folders/server"
 import { CreateDialog } from "./CreateDialog"
 
-const { navigate } = vi.hoisted(() => ({ navigate: vi.fn() }))
+const { navigate, routerSearch } = vi.hoisted(() => ({
+  navigate: vi.fn(),
+  routerSearch: { current: {} as { space?: Space } },
+}))
 
 vi.mock("@tanstack/react-router", () => ({
   useNavigate: () => navigate,
+  useSearch: () => routerSearch.current,
 }))
+
+vi.mock("@/features/account/server", () => ({ getCurrentUser: vi.fn() }))
 
 vi.mock("@/features/drawings/server", () => ({
   createDrawing: vi.fn(),
@@ -40,6 +48,14 @@ function wrapper({ children }: { children: ReactNode }) {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  routerSearch.current = {}
+  vi.mocked(getCurrentUser).mockResolvedValue({
+    id: "user-1",
+    email: "ada@example.com",
+    name: "",
+    role: "user",
+    teamEnabled: false,
+  })
 })
 
 // Auto-cleanup needs vitest globals, which this repo leaves off; without it
@@ -65,7 +81,7 @@ test("typing a name and pressing Enter creates the drawing and navigates to its 
   // payload crossing the server-function edge is the first argument.
   await waitFor(() => expect(createDrawing).toHaveBeenCalledTimes(1))
   expect(vi.mocked(createDrawing).mock.calls[0]?.[0]).toEqual({
-    data: { name: "Retro board", folderId: null },
+    data: { name: "Retro board", folderId: null, space: "private" },
   })
   await waitFor(() =>
     expect(navigate).toHaveBeenCalledWith({
@@ -97,7 +113,7 @@ test("folder-invoked dialog shows its scope and creates the drawing in that fold
 
   await waitFor(() => expect(createDrawing).toHaveBeenCalledTimes(1))
   expect(vi.mocked(createDrawing).mock.calls[0]?.[0]).toEqual({
-    data: { name: "Roadmap", folderId: "folder-1" },
+    data: { name: "Roadmap", folderId: "folder-1", space: "private" },
   })
 })
 
@@ -105,8 +121,12 @@ test("folder target creates a root folder on Enter and does not navigate", async
   vi.mocked(createFolder).mockResolvedValue({
     id: "33333333-3333-3333-3333-333333333333",
     name: "Projects",
-    ownerId: "user-1",
+    space: "private",
+    createdBy: "user-1",
+    deletedBy: null,
     parentId: null,
+    deletedAt: null,
+    trashRootId: null,
     createdAt: new Date(0),
     updatedAt: new Date(0),
   })
@@ -127,7 +147,7 @@ test("folder target creates a root folder on Enter and does not navigate", async
 
   await waitFor(() => expect(createFolder).toHaveBeenCalledTimes(1))
   expect(vi.mocked(createFolder).mock.calls[0]?.[0]).toEqual({
-    data: { name: "Projects", parentId: null },
+    data: { name: "Projects", parentId: null, space: "private" },
   })
   await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
   expect(createDrawing).not.toHaveBeenCalled()
@@ -214,4 +234,31 @@ test("pressing Enter with an empty name creates nothing", async () => {
 
   expect(createDrawing).not.toHaveBeenCalled()
   expect(navigate).not.toHaveBeenCalled()
+})
+
+test("while browsing Team, the dialog says so and creates in Team", async () => {
+  vi.mocked(getCurrentUser).mockResolvedValue({
+    id: "user-1",
+    email: "ada@example.com",
+    name: "",
+    role: "user",
+    teamEnabled: true,
+  })
+  routerSearch.current = { space: "team" }
+  vi.mocked(createDrawing).mockResolvedValue(NEW_DRAWING_ID)
+
+  render(
+    <CreateDialog open onOpenChange={vi.fn()} target={{ kind: "drawing" }} />,
+    { wrapper },
+  )
+
+  expect(await screen.findByText("in Team")).toBeTruthy()
+  const input = screen.getByPlaceholderText(/drawing name/i)
+  fireEvent.change(input, { target: { value: "Team retro" } })
+  fireEvent.keyDown(input, { key: "Enter" })
+
+  await waitFor(() => expect(createDrawing).toHaveBeenCalledTimes(1))
+  expect(vi.mocked(createDrawing).mock.calls[0]?.[0]).toEqual({
+    data: { name: "Team retro", folderId: null, space: "team" },
+  })
 })

@@ -49,7 +49,9 @@ function seededClient(folders: Folder[]) {
 const projects: Folder = {
   id: "f1",
   name: "Projects",
-  ownerId: "user-1",
+  space: "private",
+  createdBy: "user-1",
+  deletedBy: null,
   parentId: null,
   deletedAt: null,
   trashRootId: null,

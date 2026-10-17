@@ -1,8 +1,14 @@
 import type { SQL } from "drizzle-orm"
-import { PgDialect } from "drizzle-orm/pg-core"
+import { getTableConfig, PgDialect } from "drizzle-orm/pg-core"
 import { expect, test } from "vitest"
-import { users, verifications } from "@/db/schema"
-import { deleteUserAccount, hardDeleteUser } from "./delete-user"
+import { drawings, folders, users, verifications } from "@/db/schema"
+import { inPrivateSpaceOf } from "@/features/spaces/access"
+import { expectCondition } from "@/features/spaces/expect-condition"
+import {
+  countOwnedContent,
+  deleteUserAccount,
+  hardDeleteUser,
+} from "./delete-user"
 
 type Call =
   | { kind: "select"; where: SQL; lock?: string }
@@ -63,6 +69,37 @@ function fakeDb(options: {
   return { db, calls }
 }
 
+// Answers each count query from a fixed set of rows by rendering its where
+// clause, so the test checks which rows each count actually matches.
+function countingDb(
+  rows: Array<{
+    table: typeof drawings | typeof folders
+    createdBy: string
+    space: "private" | "team"
+  }>,
+) {
+  const matches = (where: SQL, row: (typeof rows)[number]) => {
+    const { sql, params } = toSql(where)
+    const creatorOk = params.includes(row.createdBy)
+    const spaceOk = params.includes(row.space)
+    // Both must hold: an "or" (the access rule) is the wrong condition.
+    return creatorOk && spaceOk && !sql.includes(" or ")
+  }
+  return {
+    select: () => ({
+      from: (table: unknown) => ({
+        where: async (where: SQL) => [
+          {
+            count: rows.filter(
+              (row) => row.table === table && matches(where, row),
+            ).length,
+          },
+        ],
+      }),
+    }),
+  } as unknown as Parameters<typeof countOwnedContent>[0]
+}
+
 const shape = (call: Call) =>
   call.kind === "select"
     ? { kind: call.kind }
@@ -81,6 +118,8 @@ test("deletes a regular user and sweeps their verification rows", async () => {
 
   expect(calls.map(shape)).toEqual([
     { kind: "select" },
+    { kind: "delete", table: drawings },
+    { kind: "delete", table: folders },
     { kind: "delete", table: users },
     { kind: "delete", table: verifications },
   ])
@@ -98,6 +137,33 @@ test("deletes a regular user and sweeps their verification rows", async () => {
   expect(toSql((verificationsDelete as { where: SQL }).where).params).toEqual([
     "bea@example.com",
   ])
+})
+
+test("deletes the member's Private drawings and folders; their Team rows lose only the creator", async () => {
+  const { db, calls } = fakeDb({
+    rows: [
+      { id: "admin-1", role: "admin" },
+      { id: "user-bea", role: "user" },
+    ],
+    email: "bea@example.com",
+  })
+
+  await deleteUserAccount(db, "admin-1", "user-bea")
+
+  for (const table of [drawings, folders]) {
+    const del = calls.find(
+      (call) => call.kind === "delete" && call.table === table,
+    )
+    expectCondition(
+      (del as { where: SQL }).where,
+      inPrivateSpaceOf(table, "user-bea"),
+    )
+    // Team rows are left to the FK, which keeps them with createdBy = null.
+    const creator = getTableConfig(table).foreignKeys.find(
+      (fk) => fk.reference().columns[0].name === "createdBy",
+    )
+    expect(creator?.onDelete).toBe("set null")
+  }
 })
 
 test("the role read locks the target row even for non-admin targets", async () => {
@@ -134,6 +200,8 @@ test("deleting an admin is allowed while another admin remains, behind a row loc
 
   expect(calls.map(shape)).toEqual([
     { kind: "select" },
+    { kind: "delete", table: drawings },
+    { kind: "delete", table: folders },
     { kind: "delete", table: users },
     { kind: "delete", table: verifications },
   ])
@@ -198,6 +266,8 @@ test("hardDeleteUser lets an admin delete themselves while another admin remains
 
   expect(calls.map(shape)).toEqual([
     { kind: "select" },
+    { kind: "delete", table: drawings },
+    { kind: "delete", table: folders },
     { kind: "delete", table: users },
     { kind: "delete", table: verifications },
   ])
@@ -221,4 +291,26 @@ test("an unknown user id throws not-found", async () => {
   await expect(deleteUserAccount(db, "admin-1", "nope")).rejects.toThrow(
     "User not found",
   )
+})
+
+test("counts split the member's Private rows from the Team drawings they created", async () => {
+  const db = countingDb([
+    { table: drawings, createdBy: "user-bea", space: "private" },
+    { table: drawings, createdBy: "user-bea", space: "private" },
+    { table: folders, createdBy: "user-bea", space: "private" },
+    { table: drawings, createdBy: "user-bea", space: "team" },
+    { table: drawings, createdBy: "user-bea", space: "team" },
+    { table: drawings, createdBy: "user-bea", space: "team" },
+    // Team folders are not counted; Team drawings carry the sentence.
+    { table: folders, createdBy: "user-bea", space: "team" },
+    // Another member's rows count for nobody but them.
+    { table: drawings, createdBy: "user-cy", space: "private" },
+    { table: drawings, createdBy: "user-cy", space: "team" },
+  ])
+
+  expect(await countOwnedContent(db, "user-bea")).toEqual({
+    drawings: 2,
+    folders: 1,
+    teamDrawings: 3,
+  })
 })

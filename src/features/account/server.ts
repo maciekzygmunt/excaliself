@@ -13,27 +13,32 @@ import {
   sharedDrawingIds,
 } from "@/features/admin/delete-user"
 import { isLastAdmin } from "@/features/admin/roles"
-import { endRooms } from "@/features/collab/room-registry"
+import { endRooms, rooms } from "@/features/collab/room-registry"
+import { evictUser } from "@/features/collab/room-session"
+import { isTeamEnabled } from "@/features/spaces/team-enabled"
 import { auth } from "@/lib/auth"
 import { authMiddleware } from "@/middleware/auth"
 import { compareSessions } from "./sessions"
 
-// Read the row fresh rather than trusting the session's cookie cache — a
-// just-saved profile edit must never be masked by a stale cookie snapshot.
+// The caller's users row, plus teamEnabled, the instance-wide gate on every
+// Team UI element.
 export const getCurrentUser = createServerFn({ method: "GET" })
   .middleware([authMiddleware])
   .handler(async ({ context }) => {
-    const [user] = await db
-      .select({
-        id: users.id,
-        email: users.email,
-        name: users.name,
-        role: users.role,
-      })
-      .from(users)
-      .where(eq(users.id, context.session.user.id))
+    const [[user], teamEnabled] = await Promise.all([
+      db
+        .select({
+          id: users.id,
+          email: users.email,
+          name: users.name,
+          role: users.role,
+        })
+        .from(users)
+        .where(eq(users.id, context.session.user.id)),
+      isTeamEnabled(db),
+    ])
     if (!user) throw new Error("User not found")
-    return user
+    return { ...user, teamEnabled }
   })
 
 export type ChangeEmailResult =
@@ -57,8 +62,8 @@ export const changeEmail = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }): Promise<ChangeEmailResult> => {
     try {
-      // Bypasses the session cookie cache and compares against the stored
-      // credential hash; throws BAD_REQUEST on a mismatch.
+      // Compares against the stored credential hash; throws BAD_REQUEST on a
+      // mismatch.
       await auth.api.verifyPassword({
         body: { password: data.currentPassword },
         headers: getRequestHeaders(),
@@ -165,8 +170,7 @@ export const revokeOtherSessions = createServerFn({ method: "POST" })
 
 // Whether the danger zone must block self-deletion (issue #67): the sole
 // admin can't delete their account, or the instance would be locked out of
-// every admin page. Roles are read fresh from the db — the session's cookie
-// cache can lag a demotion by minutes.
+// every admin page.
 export const getDeleteAccountState = createServerFn({ method: "GET" })
   .middleware([authMiddleware])
   .handler(async ({ context }) => {
@@ -198,13 +202,11 @@ export const deleteMyAccount = createServerFn({ method: "POST" })
     const userId = context.session.user.id
     const shared = await sharedDrawingIds(db, userId)
     await hardDeleteUser(db, userId)
-    // Hang up on live rooms; their flush finds no row and writes nothing.
-    await endRooms(shared)
-    // The session rows died with the user, but the browser still holds the
-    // session cookie, whose cookie cache would keep reporting the account
-    // for up to five minutes. Sign out to clear it — best-effort, because a
-    // stale cache makes better-auth re-read the now-empty sessions table and
-    // reject; the client hard-redirects to /login either way.
+    // Hang up on their shared drawings' Rooms (the flush finds no row and
+    // writes nothing), and on their seats in every other Room.
+    await Promise.all([endRooms(shared), evictUser(rooms, userId)])
+    // The session rows died with the user; sign out to clear the browser's
+    // session cookie. Best-effort: the client hard-redirects to /login anyway.
     try {
       await auth.api.signOut({ headers: getRequestHeaders() })
     } catch {}

@@ -1,9 +1,11 @@
 // The Room: who is in a shared drawing and its authoritative scene. Deltas
 // merge here first; peers hear the Room's ruling, not the sender's claim.
 
+import { type AccessRow, canAccess } from "@/features/spaces/access"
 import { guestNameForConnection, pickParticipantColor } from "./identity"
 import type { Participant, SceneElement, ServerMessage } from "./protocol"
 import {
+  DRAWING_TRASHED_CLOSE_CODE,
   LINK_DEAD_CLOSE_CODE,
   LINK_DEAD_CLOSE_REASON,
   parseClientMessage,
@@ -61,8 +63,8 @@ export type Room = {
   follows: Map<string, string>
   loaded: Promise<void>
   elements: SceneElement[]
-  /** Cached for the live badge. */
-  ownerId: string | null
+  /** Cached for the live badge and the reserved seat; null until loaded. */
+  access: AccessRow | null
   dirty: boolean
   flushTimer: ReturnType<typeof setTimeout> | null
   /** The write in flight; overlapping flushes chain onto it. */
@@ -105,7 +107,7 @@ function ensureRoom(registry: RoomRegistry, roomId: string): Room {
     follows: new Map(),
     loaded: Promise.resolve(),
     elements: [],
-    ownerId: null,
+    access: null,
     dirty: false,
     flushTimer: null,
     flushing: Promise.resolve(),
@@ -131,7 +133,7 @@ function ensureRoom(registry: RoomRegistry, roomId: string): Room {
           SCENE_UNREADABLE_CLOSE_REASON,
         )
       room.elements = stored.elements
-      room.ownerId = stored.ownerId
+      room.access = stored.access
     },
     (error) => {
       // Clients reconnect into a fresh read.
@@ -203,7 +205,7 @@ export async function closeAllRooms(registry: RoomRegistry): Promise<void> {
   registry.closing = true
   await Promise.all(
     [...registry.rooms.keys()].map((roomId) =>
-      endRoom(registry, roomId, (peer) =>
+      endRoom(registry, roomId, ({ peer }) =>
         peer.close(SERVER_RESTART_CLOSE_CODE, SERVER_RESTART_CLOSE_REASON),
       ),
     ),
@@ -311,10 +313,13 @@ export async function joinRoom(
     // joiner's own roster publish tells the others.
     const silent = forgetSilentParticipants(existing, registry.now())
     for (const peer of silent) closeToRejoin(peer)
-    // Everyone else stops one short, so guests can't lock the owner out.
-    const isOwner =
-      identity.userId !== null && identity.userId === existing.ownerId
-    const cap = isOwner ? MAX_ROOM_PARTICIPANTS : MAX_ROOM_PARTICIPANTS - 1
+    // Everyone else stops one short, so guests can't lock out a member who
+    // can access the drawing (for a Private one, its creator).
+    const hasAccess =
+      identity.userId !== null &&
+      existing.access !== null &&
+      canAccess(existing.access, identity.userId)
+    const cap = hasAccess ? MAX_ROOM_PARTICIPANTS : MAX_ROOM_PARTICIPANTS - 1
     if (existing.seats.size >= cap) {
       // No joiner publish follows, so tell the others here.
       if (silent.length > 0) await settleAfterForget(registry, existing)
@@ -535,21 +540,90 @@ const closeAsDead = (peer: RoomPeer) =>
   peer.close(LINK_DEAD_CLOSE_CODE, LINK_DEAD_CLOSE_REASON)
 
 /**
- * Stop, regenerate and trash all end here: freeze, write, then hang up. The
- * awaited write lets the owner resume autosave once the mutation resolves.
+ * Stop, regenerate and member deletion end here: freeze, write, then hang up.
+ * The awaited write lets the owner resume autosave once the mutation resolves.
  */
 export function terminateRoom(
   registry: RoomRegistry,
   roomId: string,
 ): Promise<void> {
-  return endRoom(registry, roomId, closeAsDead)
+  return endRoom(registry, roomId, ({ peer }) => closeAsDead(peer))
 }
 
-/** Freeze, write, then hang up each peer with `hangUp`. */
+/** Close reasons are capped at 123 UTF-8 bytes. */
+const MAX_CLOSE_REASON_BYTES = 123
+
+/** Cuts whole code points, so a long name never splits a character. */
+function toCloseReason(text: string): string {
+  const encoder = new TextEncoder()
+  let reason = ""
+  let bytes = 0
+  for (const char of text) {
+    bytes += encoder.encode(char).length
+    if (bytes > MAX_CLOSE_REASON_BYTES) break
+    reason += char
+  }
+  return reason
+}
+
+/**
+ * The drawing was trashed: ends its Room like `terminateRoom`. Members who can
+ * see the drawing learn who trashed it; everyone else gets the dead-link close,
+ * so nothing reaches a guest.
+ */
+export function trashRoom(
+  registry: RoomRegistry,
+  roomId: string,
+  trasher: { userId: string; name: string },
+): Promise<void> {
+  const reason = toCloseReason(trasher.name)
+  return endRoom(registry, roomId, ({ peer, userId }, access) => {
+    if (userId === null || !access || !canAccess(access, userId))
+      return closeAsDead(peer)
+    // The trasher's own tabs need no name.
+    peer.close(
+      DRAWING_TRASHED_CLOSE_CODE,
+      userId === trasher.userId ? "" : reason,
+    )
+  })
+}
+
+/**
+ * A Share link stopped or regenerated. A Private drawing's Room ends with it;
+ * a Team drawing's Room needs no link, so only its guests go.
+ */
+export async function endLinkRoom(
+  registry: RoomRegistry,
+  roomId: string,
+): Promise<void> {
+  const room = registry.rooms.get(roomId)
+  if (!room) return
+  // `access` is read once the scene has loaded.
+  await room.loaded
+  if (room.access?.space === "team") return evictNonMembers(registry, roomId)
+  return terminateRoom(registry, roomId)
+}
+
+/**
+ * The drawing moved to Team. Its Room, if live, keeps every seat; only the
+ * cached access changes, so the Live badge, the seat cap and later link
+ * changes treat it as Team.
+ */
+export async function moveRoomToTeam(
+  registry: RoomRegistry,
+  roomId: string,
+): Promise<void> {
+  const room = registry.rooms.get(roomId)
+  if (!room) return
+  await room.loaded
+  if (room.access) room.access = { ...room.access, space: "team" }
+}
+
+/** Freeze, write, then hang up each seat with `hangUp`. */
 async function endRoom(
   registry: RoomRegistry,
   roomId: string,
-  hangUp: (peer: RoomPeer) => void,
+  hangUp: (seat: Seat, access: AccessRow | null) => void,
 ): Promise<void> {
   const room = registry.rooms.get(roomId)
   if (!room) return
@@ -566,7 +640,7 @@ async function endRoom(
   await flushRoom(registry, room)
   reapIfIdle(registry, room)
 
-  for (const { peer } of seats) hangUp(peer)
+  for (const seat of seats) hangUp(seat, room.access)
 }
 
 /**
@@ -583,9 +657,33 @@ export async function evictNonMembers(
   // As in `terminateRoom`: let queued strokes merge first.
   await room.loaded
 
+  await evictSeats(registry, room, (seat) => seat.userId === null)
+}
+
+/**
+ * A member was deleted: closes their seats in every Room at once. Their
+ * queued frames then find no seat, so nothing they send is merged.
+ */
+export async function evictUser(
+  registry: RoomRegistry,
+  userId: string,
+): Promise<void> {
+  await Promise.all(
+    [...registry.rooms.values()].map((room) =>
+      evictSeats(registry, room, (seat) => seat.userId === userId),
+    ),
+  )
+}
+
+/** Drops the picked seats, settles the Room, then hangs up on them as dead. */
+async function evictSeats(
+  registry: RoomRegistry,
+  room: Room,
+  pick: (seat: Seat) => boolean,
+) {
   const evicted: RoomPeer[] = []
   for (const [connectionId, seat] of [...room.seats]) {
-    if (seat.userId !== null) continue
+    if (!pick(seat)) continue
     forgetConnection(room, connectionId)
     evicted.push(seat.peer)
   }

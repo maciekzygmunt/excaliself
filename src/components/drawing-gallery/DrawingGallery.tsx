@@ -6,9 +6,12 @@ import {
   MoreHorizontal,
   Pencil,
   Trash2,
+  UserRound,
 } from "lucide-react"
 import { useEffect, useMemo, useRef, useState } from "react"
+import { InitialsAvatar } from "@/components/initials-avatar"
 import { LiveAvatarStack } from "@/components/live-badge"
+import { SpaceLabel } from "@/components/space-label"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -16,6 +19,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Skeleton } from "@/components/ui/skeleton"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 import { useLiveDrawing } from "@/features/collab/queries"
 import {
   type Drawing,
@@ -58,6 +66,7 @@ export function DrawingGallery({
   limit,
   sort = DEFAULT_SORT,
   query,
+  spaceLabels = false,
   loadingLabel,
   onTrash,
   empty,
@@ -75,6 +84,8 @@ export function DrawingGallery({
   sort?: SortOrder
   /** The browse search, so title matches sort ahead of scene-text matches. */
   query?: string
+  /** Cards say which space they live in: search results that span both. */
+  spaceLabels?: boolean
   /** Accessible name for the loading grid. */
   loadingLabel: string
   /** Card overflow action "Move to trash" (spec §5.11): tier-1 destructive,
@@ -120,6 +131,7 @@ export function DrawingGallery({
           folder={
             drawing.folderId ? foldersById.get(drawing.folderId) : undefined
           }
+          spaceLabel={spaceLabels}
           onTrash={() => onTrash(drawing)}
         />
       ))}
@@ -161,10 +173,12 @@ export function LoadingGrid({
 function DrawingCard({
   drawing,
   folder,
+  spaceLabel,
   onTrash,
 }: {
   drawing: Drawing
   folder?: Folder
+  spaceLabel: boolean
   onTrash: () => void
 }) {
   // Per card so a poll result re-renders only the changed card.
@@ -192,8 +206,18 @@ function DrawingCard({
           live={live}
           className="absolute bottom-2 left-2 animate-in fade-in-0 zoom-in-95 duration-200"
         />
+        {/* On the preview, not the footer: the footer has no room left */}
+        {spaceLabel && (
+          <SpaceLabel
+            space={drawing.space}
+            className="absolute top-2 right-2 h-5 rounded-[5px] bg-keycap-from px-1.5 text-[11px] font-medium text-muted-foreground shadow-keycap"
+          />
+        )}
       </div>
       <div className="flex items-center gap-2 px-3 py-2.5">
+        {drawing.space === "team" && (
+          <CreatorAvatar creator={drawing.creator} />
+        )}
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
           <span className="truncate text-[13px] font-medium text-foreground">
             {drawing.name}
@@ -223,6 +247,41 @@ function DrawingCard({
         <CardActions name={drawing.name} onTrash={onTrash} />
       </div>
     </div>
+  )
+}
+
+/**
+ * Who made a Team drawing, as a byline face in the footer. The Live stack
+ * ("who is here now") sits on the preview instead, in cursor colors, so the
+ * two never meet. A deleted creator reads "Former member".
+ */
+function CreatorAvatar({ creator }: { creator: Drawing["creator"] }) {
+  const name = creator?.name ?? "Former member"
+  return (
+    <Tooltip>
+      {/* z-10 lifts it above the stretched link so hover reaches it */}
+      <TooltipTrigger
+        render={
+          <span
+            role="img"
+            aria-label={`Created by ${name}`}
+            className="relative z-10 shrink-0 rounded-full"
+          />
+        }
+      >
+        {creator ? (
+          <InitialsAvatar initials={creator.initials} />
+        ) : (
+          <span
+            aria-hidden
+            className="flex h-6 w-6 items-center justify-center rounded-full border border-dashed border-muted-foreground/40 text-muted-foreground/70"
+          >
+            <UserRound className="h-3.5 w-3.5" />
+          </span>
+        )}
+      </TooltipTrigger>
+      <TooltipContent>{name}</TooltipContent>
+    </Tooltip>
   )
 }
 

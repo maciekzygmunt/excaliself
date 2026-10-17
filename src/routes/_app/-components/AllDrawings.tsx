@@ -13,20 +13,32 @@ import {
   FolderEmpty,
   NoMatches,
   QuietLine,
+  TeamEmpty,
 } from "@/components/drawing-gallery/GalleryEmpty"
 import { IllustratedEmptyState } from "@/components/illustrated-empty-state"
 import { useTrashDrawing } from "@/features/drawings/mutations"
 import { drawingsQueryOptions } from "@/features/drawings/queries"
 import type { Folder } from "@/features/folders/queries"
 import { foldersQueryOptions } from "@/features/folders/queries"
+import { inBrowsedSpace, useBrowsedSpace } from "@/features/spaces/browse"
 import { useDocumentTitle } from "@/lib/document-title"
 import { useCreateDialog } from "./CreateDialog"
 
-// The browse surface: every drawing the user owns, in Home's card language,
-// under the toolbar (on-page search, folder chips, sort — spec §5.2).
+// The browse surface: every drawing of the browsed space, in Home's card
+// language, under the toolbar (on-page search, folder chips, sort — spec §5.2).
+// Search reaches past the space into both.
 export function AllDrawings({ isAdmin }: { isAdmin: boolean }) {
-  const { data: drawings = [], isPending } = useQuery(drawingsQueryOptions())
-  const { data: folders = [] } = useQuery(foldersQueryOptions())
+  const space = useBrowsedSpace()
+  const { data: allDrawings = [], isPending } = useQuery(drawingsQueryOptions())
+  const { data: allFolders = [] } = useQuery(foldersQueryOptions())
+  const drawings = useMemo(
+    () => inBrowsedSpace(allDrawings, space),
+    [allDrawings, space],
+  )
+  const folders = useMemo(
+    () => inBrowsedSpace(allFolders, space),
+    [allFolders, space],
+  )
   const { openCreateDrawingDialog } = useCreateDialog()
   const trashDrawing = useTrashDrawing()
   useDocumentTitle("All drawings", { chrome: true })
@@ -43,9 +55,16 @@ export function AllDrawings({ isAdmin }: { isAdmin: boolean }) {
       ? "all"
       : scope
 
+  // A query searches both spaces, whatever the page's space (story 9); the
+  // chips still narrow it. Clearing it returns to the space's grid.
+  const searchesBothSpaces = space !== null && query.trim() !== ""
   const filtered = useMemo(
-    () => filterDrawings(drawings, { query, scope: liveScope }),
-    [drawings, query, liveScope],
+    () =>
+      filterDrawings(searchesBothSpaces ? allDrawings : drawings, {
+        query,
+        scope: liveScope,
+      }),
+    [searchesBothSpaces, allDrawings, drawings, query, liveScope],
   )
 
   // Tier-1 is reserved for a truly empty account; a grid emptied by the
@@ -75,11 +94,13 @@ export function AllDrawings({ isAdmin }: { isAdmin: boolean }) {
 
         <DrawingGallery
           drawings={filtered}
-          // Attribution only in the All view — a scoped grid repeats one folder
-          folders={liveScope === "all" ? folders : undefined}
+          // Attribution only in the All view — a scoped grid repeats one
+          // folder. Every space's folders, for matches from the other one.
+          folders={liveScope === "all" ? allFolders : undefined}
           isPending={isPending}
           sort={sort}
           query={query}
+          spaceLabels={searchesBothSpaces}
           loadingLabel="Loading drawings"
           onTrash={trashDrawing}
           empty={
@@ -92,6 +113,8 @@ export function AllDrawings({ isAdmin }: { isAdmin: boolean }) {
                   openCreateDrawingDialog({ id: folder.id, name: folder.name })
                 }
               />
+            ) : space === "team" ? (
+              <TeamEmpty onCreate={openCreateDrawingDialog} />
             ) : (
               <IllustratedEmptyState
                 isAdmin={isAdmin}

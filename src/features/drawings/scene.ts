@@ -287,12 +287,19 @@ export function useSaveScenePayload(
         if (result.status === "saved")
           for (const fileId of result.overCapFileIds) overCap.add(fileId)
       }
-      // Shared elsewhere: refetching the share flips this canvas to collab,
-      // and joining the room reconciles the local scene.
+      // Shared or moved to Team elsewhere: refetching the share and the
+      // drawing flips this canvas to a Room, and joining it reconciles the
+      // local scene.
       if (result.status === "shared") {
-        await queryClient.invalidateQueries({
-          queryKey: drawingShareQueryOptions(id).queryKey,
-        })
+        await Promise.all([
+          queryClient.invalidateQueries({
+            queryKey: drawingShareQueryOptions(id).queryKey,
+          }),
+          queryClient.invalidateQueries({
+            queryKey: drawingQueryOptions(id).queryKey,
+            exact: true,
+          }),
+        ])
         return "skipped"
       }
       if (overCap.size > 0) onOverCap([...overCap])
