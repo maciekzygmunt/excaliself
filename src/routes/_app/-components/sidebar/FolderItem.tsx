@@ -115,8 +115,9 @@ export function FolderItem({ folder, childNodes }: FolderItemProps) {
         })}
         onDragEnd={onDragEnd}
         className={cn(
-          "h-auto cursor-pointer gap-1.5 px-2 py-1.5 pr-2! text-[13px] active:cursor-grabbing [&>svg]:size-auto",
-          rename.isRenaming && "pr-3!",
+          // Below md the row actions are always shown, so reserve their slot.
+          "h-auto cursor-pointer gap-1.5 px-2 py-1.5 pr-2! text-[13px] active:cursor-grabbing max-md:pr-7! [&>svg]:size-auto",
+          rename.isRenaming && "pr-3! max-md:pr-3!",
         )}
       >
         <Folder className="h-3.5! w-3.5! shrink-0 text-muted-foreground/60" />
@@ -126,12 +127,13 @@ export function FolderItem({ folder, childNodes }: FolderItemProps) {
           <span className="truncate transition-colors">{folder.name}</span>
         )}
         {/* Trailing disclosure per the prototype — shown on every folder,
-            empty ones included; it yields to the hover-revealed row actions,
-            which appear in the same right-edge slot. */}
+            empty ones included. From md up it yields to the hover-revealed
+            row actions in the same right-edge slot; below md it sits beside
+            them. */}
         <ChevronRight
           className={cn(
             "ml-auto h-3! w-3! shrink-0 text-muted-foreground/60 transition-transform duration-150 ease-out",
-            "group-focus-within/tree-row:opacity-0 group-hover/tree-row:opacity-0",
+            "md:group-focus-within/tree-row:opacity-0 md:group-hover/tree-row:opacity-0",
             isExpanded && "rotate-90",
             rename.isRenaming && "opacity-0",
           )}
