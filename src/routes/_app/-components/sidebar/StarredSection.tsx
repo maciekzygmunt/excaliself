@@ -46,7 +46,8 @@ function StarredItem({ drawing }: { drawing: Drawing }) {
         render={<Link to="/draw/$id" params={{ id: drawing.id }} />}
         isActive={isActive}
         className={cn(
-          "h-auto cursor-pointer gap-1.5 px-2 py-1.5 pr-2! text-[13px] [&>svg]:size-auto",
+          // Below md the row action is always shown, so reserve its slot.
+          "h-auto cursor-pointer gap-1.5 px-2 py-1.5 pr-2! text-[13px] max-md:pr-7! [&>svg]:size-auto",
           "data-[active=true]:bg-iris-muted data-[active=true]:font-medium data-[active=true]:text-iris-strong data-[active=true]:shadow-row-active",
         )}
       >
@@ -58,10 +59,10 @@ function StarredItem({ drawing }: { drawing: Drawing }) {
           )}
         />
         <span className="truncate transition-colors">{drawing.name}</span>
-        {/* mr-4 clears the unstar action (always visible on touch). */}
+        {/* md:mr-4 clears the hover-revealed unstar action. */}
         <LiveCountChip
           live={live}
-          className="mr-4 ml-auto animate-in fade-in-0 duration-200"
+          className="ml-auto animate-in fade-in-0 duration-200 md:mr-4"
         />
       </SidebarMenuButton>
 
