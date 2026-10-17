@@ -1,69 +1,78 @@
 ---
 import Layout from "../layouts/Layout.astro"
 import Icon from "../components/Icon.astro"
-import FoldersFigure from "../components/FoldersFigure.astro"
-import TrashFigure from "../components/TrashFigure.astro"
+import Selection from "../components/Selection.astro"
+import Sketch from "../components/Sketch.astro"
+import HeroDiagram from "../components/HeroDiagram.astro"
+import Tour from "../components/Tour.astro"
 import { Image } from "astro:assets"
-import homeLight from "../assets/home-light.png"
-import homeDark from "../assets/home-dark.png"
+import { arrow, ellipse, ink, line, pen, rect } from "../lib/sketch"
 import editorShot from "../assets/shots/editor.png"
 import paletteShot from "../assets/shots/palette.png"
 import membersShot from "../assets/shots/members.png"
+import liveShot from "../assets/shots/live.png"
+import teamShot from "../assets/shots/team.png"
 
 const repo = "https://github.com/maciekzygmunt/excaliself"
 
-const showcase = [
+// Alternating image/text rows. `cols` places the figure on the 12-column grid.
+const features = [
   {
-    icon: "pencil-simple",
     title: "The editor you already know",
-    body: "The full Excalidraw canvas, unchanged. Every stroke saves on its own, and images you paste are stored with the drawing.",
+    body: "The full Excalidraw canvas. Every stroke saves on its own, and images you paste are stored with the drawing.",
+    note: "the official editor package, unchanged",
     image: editorShot,
-    width: 1120,
+    crop: "",
     alt: "The Excalidraw toolbar above a signup flowchart in the Excaliself editor",
+    figure: "lg:col-span-7 lg:col-start-1",
+    text: "lg:col-span-4 lg:col-start-9 lg:self-center",
   },
   {
-    icon: "command",
+    title: "Draw together, live",
+    body: "Open the same drawing and see everyone's cursors and edits as they happen. Send a share link to someone outside the team, and they can draw with you without an account.",
+    note: "Tomasz and Priya, editing right now",
+    image: liveShot,
+    crop: "",
+    alt: "The Signup flow drawing with the cursors of Tomasz and Priya, a box that Tomasz has selected, and a new box that Priya just drew",
+    figure: "lg:col-span-7 lg:col-start-6 lg:row-start-1",
+    text: "lg:col-span-4 lg:col-start-1 lg:row-start-1 lg:self-center",
+  },
+  {
+    title: "A space the whole team shares",
+    body: "A Private | Team switch in the sidebar. Team folders and drawings belong to everyone, and a badge shows who is in each drawing right now. Move a private drawing over when it is ready.",
+    note: "shows up once you invite someone",
+    image: teamShot,
+    crop: "",
+    alt: "The Team space home: the sidebar switch set to Team with two people live, team folders, and drawing cards with their creators",
+    figure: "lg:col-span-7 lg:col-start-1",
+    text: "lg:col-span-4 lg:col-start-9 lg:self-center",
+  },
+  {
     title: "Press ⌘K and jump anywhere",
     body: "Fuzzy search over drawings, folders, and actions. Type a few letters, press enter, and keep your hands on the keyboard.",
+    note: "one word matches folders and drawings",
     image: paletteShot,
-    width: 760,
+    crop: "",
     alt: "The command palette filtering drawings and folders by the word retro",
+    figure: "lg:col-span-7 lg:col-start-6 lg:row-start-1",
+    text: "lg:col-span-4 lg:col-start-1 lg:row-start-1 lg:self-center",
   },
   {
-    icon: "folders",
-    title: "Folders that nest as deep as you like",
-    body: "Drag drawings between folders in the sidebar, star the ones you open daily, and switch the app and canvas to dark separately.",
-    figure: "folders",
-  },
-  {
-    icon: "trash-simple",
-    title: "A wrong click costs nothing",
-    body: "Deleted drawings wait in the trash for 30 days with a one click restore. After that they are purged for good.",
-    figure: "trash",
-  },
-  {
-    icon: "lock-key",
     title: "Your team only",
     body: "The first visitor becomes the admin. Everyone else joins through a single use invite link. Admins manage roles and password resets from Settings.",
+    note: "no public signup page",
     image: membersShot,
-    width: 920,
+    crop: "aspect-[2760/790]",
     alt: "The members list in Settings with admin and member roles",
+    figure: "lg:col-span-7 lg:col-start-1",
+    text: "lg:col-span-4 lg:col-start-9 lg:self-center",
   },
 ]
 
 const steps = [
-  {
-    title: "Download two files",
-    body: "The compose file and an example env file. Both come straight from the repository.",
-  },
-  {
-    title: "Set three variables",
-    body: "A Postgres password, a session secret, and your public URL. Nothing else is required.",
-  },
-  {
-    title: "Start it and open the URL",
-    body: "The first visit creates the admin account. Share invite links from Settings.",
-  },
+  { title: "Download two files", body: "The compose file and an example env file, straight from the repository." },
+  { title: "Set three variables", body: "A Postgres password, a session secret, and your public URL." },
+  { title: "Start it and open the URL", body: "The first visit creates the admin account. Share invite links from Settings." },
 ]
 
 const compose = [
@@ -74,7 +83,8 @@ const compose = [
   "docker compose up -d",
 ]
 
-const faq = [
+// `more` is an optional in-page link after the answer; the FAQ schema gets the plain answer.
+const faq: { q: string; a: string; more?: { href: string; label: string } }[] = [
   {
     q: "Is this a fork of Excalidraw?",
     a: "No. Excaliself embeds the official Excalidraw editor package unchanged and adds accounts, folders, search, and trash around it. Editor updates arrive with each release.",
@@ -85,7 +95,7 @@ const faq = [
   },
   {
     q: "Where are my drawings stored?",
-    a: "In your own Postgres database, including pasted images. Back up the single pgdata volume and you have everything. Nothing is sent to a third party.",
+    a: "In your own Postgres database, including pasted images. Back up the pgdata volume and you have everything. Nothing is sent to a third party.",
   },
   {
     q: "How do updates work?",
@@ -97,15 +107,16 @@ const faq = [
   },
   {
     q: "How do people join?",
-    a: "The first visitor creates the admin account. Admins send invite links from Settings and can manage members, roles, and password resets there. There is no public signup.",
+    a: "The first visitor creates the admin account. Admins send invite links from Settings and can manage members, roles, and password resets there.",
   },
   {
     q: "Does it support live collaboration?",
-    a: "Not yet. Each drawing has one editor at a time, and changes save automatically. Sharing and collaboration are on the roadmap in the repository.",
+    a: "Yes. Everyone in a drawing sees the cursors and edits of the others as they happen. Team drawings are always live, and a share link lets people without an account join a drawing.",
   },
   {
     q: "What does it cost?",
     a: "Nothing. Excaliself is open source under the MIT license. You pay only for the server you run it on.",
+    more: { href: "#sponsors", label: "If it saves your team time, you can sponsor it." },
   },
 ]
 
@@ -113,7 +124,7 @@ const appSchema = {
   "@context": "https://schema.org",
   "@type": "SoftwareApplication",
   name: "Excaliself",
-  description: "Self-hosted Excalidraw for teams, with accounts, folders, search, and a trash can.",
+  description: "Self-hosted Excalidraw for teams, with a shared Team space, live collaboration, folders, search, and a trash can.",
   url: new URL(import.meta.env.BASE_URL, Astro.site).href,
   image: new URL(`${import.meta.env.BASE_URL}og.png`, Astro.site).href,
   applicationCategory: "DesignApplication",
@@ -133,15 +144,35 @@ const faqSchema = {
   })),
 }
 
-// The hero figure is the page width minus padding, so 2560px covers 2x screens.
-const heroSizes = "(min-width: 1152px) 1088px, calc(100vw - 64px)"
-
-const tagline = ["Your drawings, your database.", "Back up one volume", "and you have everything."]
+// Hand-drawn pieces: the circle around "a home", the shelf sketch, step boxes and their arrows.
+const circle = ellipse(200, 60, 384, 104, { seed: 300, stroke: pen, width: 3, roughness: 1.3 })
+const noteArrow = arrow([[66, 60], [34, 46], [24, 6]], { seed: 305, stroke: pen, width: 2, head: 12 })
+// Excaliself as a frame with a folder sidebar, the Excalidraw window inside it unchanged.
+const shelf = [
+  ...rect(10, 40, 420, 250, { seed: 338, stroke: pen, width: 2, roughness: 0.8, r: 18 }),
+  ...[96, 130, 164].flatMap((y, i) => [
+    ...rect(28, y - 9, 18, 14, { seed: 370 + i * 3, fill: ["#a5d8ff", "#b2f2bb", "#ffec99"][i], width: 1.4, r: 3 }),
+    ...line([[54, y - 2], [96 - i * 10, y - 2]], { seed: 371 + i * 3, width: 1.6 }),
+  ]),
+  ...rect(122, 62, 290, 208, { seed: 340, fill: "#ffffff", r: 14 }),
+  ...line([[122, 100], [412, 100]], { seed: 342 }),
+  ...[144, 164, 184].flatMap((x, i) => ellipse(x, 81, 11, 11, { seed: 344 + i, width: 1.6 })),
+  ...rect(187, 136, 160, 96, { seed: 350, fill: "#ffec99", r: 10 }),
+]
+const captionArrow = arrow([[40, 34], [20, 28], [14, 4]], { seed: 360, stroke: pen, width: 2, head: 10 })
+// Empty logo slots, 2×2 in a 560×250 sketch, until the first sponsors arrive.
+const slots = [0, 1, 2, 3].map((i) => ({
+  x: 10 + (i % 2) * 280,
+  y: 10 + Math.floor(i / 2) * 120,
+  parts: rect(10 + (i % 2) * 280, 10 + Math.floor(i / 2) * 120, 260, 100, { seed: 380 + i * 2, stroke: "#8a8a93", width: 2, r: 14 }),
+}))
+const stepBox = (i: number) => rect(4, 4, 492, 132, { seed: 310 + i * 4, fill: ["#d0bfff", "#ffec99", "#b2f2bb"][i], r: 14 })
+const stepArrow = (i: number) => arrow([[20, 2], [22, 26], [20, 50]], { seed: 330 + i * 3, head: 12 })
 ---
 
 <Layout
   title="Excaliself: self-hosted Excalidraw for your team"
-  description="Self-hosted Excalidraw for your team: the full canvas with accounts, folders, search, and a trash can. Every drawing is stored in your own Postgres."
+  description="Self-hosted Excalidraw for your team: the full canvas with a shared Team space, live collaboration, folders, and search. Every drawing is stored in your own Postgres."
 >
   <Fragment slot="head">
     <script type="application/ld+json" set:html={JSON.stringify(appSchema)} />
@@ -149,215 +180,234 @@ const tagline = ["Your drawings, your database.", "Back up one volume", "and you
   </Fragment>
 
   <main id="main">
-    <section class="mx-auto max-w-6xl px-6 pt-16 pb-12 md:pt-24">
-      <div class="mx-auto flex max-w-[680px] flex-col items-center text-center">
-        <p class="inline-flex items-center gap-2 rounded-full border bg-well px-3 py-1 text-xs font-medium text-muted-foreground shadow-well">
-          <span class="size-2 rounded-full bg-iris"></span>
-          Open source, MIT licensed, one compose file
-        </p>
-        <h1 class="mt-6 text-5xl font-semibold tracking-tight md:text-6xl">
-          Your team's whiteboard,<br />on your server.
-        </h1>
-        <p class="mt-6 text-lg text-muted-foreground">
-          Excaliself is self-hosted Excalidraw: the full canvas, plus accounts,<br class="hidden md:block" />{" "}
-          folders, search, and a trash can. Every drawing lives in your own Postgres.
-        </p>
-        <div class="mt-8 flex flex-wrap items-center justify-center gap-3">
-          <a href="#deploy" class="button-primary">Deploy in five minutes</a>
-          <a href={repo} class="keycap inline-flex items-center gap-2 px-3 py-2 text-base font-semibold">
-            <Icon name="github-logo" size={18} />
-            Read the source
-          </a>
+    <!-- Hero: headline over the sketch of where drawings live -->
+    <section class="hero dots" data-hero>
+      <div class="hero-stage page flex flex-col pt-10 pb-12 md:pt-16">
+        <h1 class="display text-mega">Your team's whiteboard,<br class="hidden md:block" /> on your server.</h1>
+        <div class="mt-8 flex flex-col gap-7 md:mt-10 lg:flex-row lg:items-end lg:gap-14">
+          <p class="max-w-[34rem] text-lede text-muted">
+            Excaliself is self-hosted Excalidraw: the full canvas, plus a shared Team space, live collaboration, folders,
+            and search. Every drawing lives in your own Postgres.
+          </p>
+          <div class="flex flex-wrap items-center gap-4">
+            <a href="#deploy" class="btn btn-ink selectable max-sm:w-full">Deploy in five minutes<Selection /></a>
+            <a href={repo} class="btn btn-line selectable max-sm:w-full"><Icon name="github-logo" size={18} />Read the source<Selection /></a>
+          </div>
+        </div>
+        <div class="hero-diagram mt-10 md:mt-12">
+          <HeroDiagram layout="wide" class="hidden h-full w-full md:block" />
+          <HeroDiagram layout="tall" class="mx-auto block w-full max-w-[420px] md:hidden" />
         </div>
       </div>
-
-      <figure class="mt-16 rounded-2xl border bg-panel p-2 shadow-panel md:mt-20" data-reveal>
-        <div class="compare rounded-lg">
-          <Image
-            src={homeLight}
-            widths={[1280, 2560]}
-            sizes={heroSizes}
-            alt="Excaliself home screen in the light theme: a sidebar with starred drawings and folders next to a grid of drawing previews"
-            loading="eager"
-            fetchpriority="high"
-          />
-          <Image
-            src={homeDark}
-            widths={[1280, 2560]}
-            sizes={heroSizes}
-            alt="The same home screen in the dark theme"
-            loading="eager"
-            class="compare-dark"
-          />
-          <div class="compare-handle" aria-hidden="true"></div>
-          <input type="range" min="0" max="100" value="62" aria-label="Compare light and dark theme" />
-        </div>
-        <figcaption class="flex items-center justify-between px-3 py-2 text-xs text-muted-foreground">
-          <span>Light theme</span>
-          <span class="font-medium">Drag to compare</span>
-          <span>Dark theme</span>
-        </figcaption>
-      </figure>
-      <script>
-        for (const el of document.querySelectorAll<HTMLElement>(".compare")) {
-          const input = el.querySelector("input")!
-          input.addEventListener("input", () => el.style.setProperty("--pos", `${input.value}%`))
-        }
-      </script>
     </section>
 
-    <section id="features" class="mx-auto max-w-6xl scroll-mt-24 px-6 py-20">
-      <div class="max-w-xl">
-        <h2 class="text-3xl font-semibold tracking-tight md:text-4xl">Everything around the canvas, nothing on top of it</h2>
-        <p class="mt-3 text-muted-foreground">
+    <!-- Tour: the real home screen, annotated -->
+    <section id="tour" class="page scroll-mt-20 pt-20 pb-16 md:pt-28">
+      <div class="grid-12">
+        <h2 class="heading col-span-12 lg:col-span-9">Everything around the canvas, nothing on top of it.</h2>
+        <p class="col-span-12 mt-6 max-w-[34rem] text-lede text-muted lg:col-span-6">
           Excalidraw stays untouched. Excaliself adds the parts a team needs to keep drawings for years.
         </p>
       </div>
-      <div class="mt-16 flex flex-col gap-20">
-        {showcase.map((f, i) => (
-          <article class={`grid items-center gap-8 lg:gap-12 ${i % 2 ? "lg:grid-cols-[1.5fr_1fr]" : "lg:grid-cols-[1fr_1.5fr]"}`} data-reveal>
-            <div class={i % 2 ? "lg:order-last" : ""}>
-              <span class="inline-flex size-10 items-center justify-center rounded-md bg-iris-muted text-iris">
-                <Icon name={f.icon} size={20} />
-              </span>
-              <h3 class="mt-4 text-2xl font-semibold tracking-tight">{f.title}</h3>
-              <p class="mt-3 text-muted-foreground">{f.body}</p>
+      <Tour />
+    </section>
+
+    <!-- Features: alternating pairs -->
+    <section aria-labelledby="features-title" class="page py-16 md:py-24">
+      <h2 id="features-title" class="sr-only">Features</h2>
+      <div class="flex flex-col gap-20 md:gap-32">
+        {features.map((f) => (
+          <article class="grid-12 items-start gap-y-8" data-reveal>
+            <figure class={`col-span-12 ${f.figure}`}>
+              <div class={`overflow-hidden rounded-xl shadow-[0_0_0_1px_rgb(30_30_30/0.1),0_24px_60px_-24px_rgb(30_30_30/0.22)] ${f.crop}`}>
+              <Image
+                src={f.image}
+                widths={[800, 1600]}
+                sizes="(min-width: 1024px) 60vw, calc(100vw - 2.5rem)"
+                alt={f.alt}
+                class="block h-auto w-full object-cover object-top"
+              />
+              </div>
+              <figcaption class="hand mt-2 flex items-start gap-1 text-lg text-pen" data-draw>
+                <svg viewBox="0 0 48 40" class="w-10 shrink-0 overflow-visible" aria-hidden="true"><Sketch parts={captionArrow} /></svg>
+                <span class="pt-4">{f.note}</span>
+              </figcaption>
+            </figure>
+            <div class={`col-span-12 ${f.text}`}>
+              <h3 class="text-head leading-[1.02] font-semibold tracking-[-0.035em]">{f.title}</h3>
+              <p class="mt-4 text-muted">{f.body}</p>
             </div>
-            {f.image ? (
-              <figure class="flex justify-center overflow-hidden rounded-2xl border bg-panel p-2 shadow-panel">
-                <Image src={f.image} width={f.width} densities={[1, 2]} alt={f.alt} class="h-auto max-w-full rounded-lg" style={`width: ${f.width}px`} />
-              </figure>
-            ) : f.figure === "folders" ? (
-              <FoldersFigure />
-            ) : (
-              <TrashFigure />
-            )}
           </article>
         ))}
       </div>
     </section>
 
-    <section aria-label="Tagline" class="mx-auto max-w-6xl px-6 py-20">
-      <p class="mx-auto max-w-[680px] text-center text-4xl font-semibold tracking-tight md:text-5xl" data-tagline>
-        {tagline.map((line, i) => (
-          <>
-            {i > 0 && <br />}
-            {line.split(" ").map((w) => <span class="tagline-word inline-block">{w}&nbsp;</span>)}
-          </>
-        ))}
-      </p>
-      <script>
-        // Each word brightens as it crosses a line 35% up from the bottom
-        // of the viewport, with a small per-word delay for reading order.
-        const words = [...document.querySelectorAll<HTMLElement>("[data-tagline] .tagline-word")]
-        const io = new IntersectionObserver(
-          (entries) => {
-            for (const e of entries) {
-              if (!e.isIntersecting) continue
-              const el = e.target as HTMLElement
-              el.style.transitionDelay = `${(words.indexOf(el) % 6) * 60}ms`
-              el.classList.add("is-visible")
-              io.unobserve(el)
-            }
-          },
-          { rootMargin: "0px 0px -35% 0px" },
-        )
-        for (const w of words) io.observe(w)
-      </script>
+    <!-- Statement: Excalidraw is the canvas, Excaliself is the home around it -->
+    <section aria-label="Where your drawings live" class="dots py-20 md:py-32">
+      <div class="page grid-12 items-center gap-y-12">
+        <div class="col-span-12 lg:col-span-7">
+          <p class="heading max-w-[17ch]">
+            Excalidraw is the canvas. Excaliself gives every drawing{" "}
+            <span class="relative inline-block whitespace-nowrap" data-draw>
+              a home
+              <svg viewBox="0 0 400 120" class="pointer-events-none absolute -inset-x-[10%] -inset-y-[24%] h-[148%] w-[120%] overflow-visible" preserveAspectRatio="none" aria-hidden="true">
+                <Sketch parts={circle} />
+              </svg>
+            </span>
+            {" "}on your server.
+          </p>
+          <div class="mt-6 flex items-start gap-2 md:ml-[14%]" data-draw>
+            <svg viewBox="0 0 80 64" class="w-14 shrink-0 overflow-visible md:w-20" aria-hidden="true">
+              <Sketch parts={noteArrow} />
+            </svg>
+            <p class="hand pt-9 text-2xl text-pen md:pt-12">so they open on any laptop, for anyone on the team</p>
+          </div>
+        </div>
+        <svg viewBox="0 0 440 340" class="col-span-12 mx-auto w-full max-w-[440px] overflow-visible lg:col-span-5" role="img" aria-labelledby="shelf-title" data-draw>
+          <title id="shelf-title">Sketch: an Excalidraw window inside a larger frame labeled Excaliself, which adds a folder sidebar. Note: the canvas you know, untouched.</title>
+          <Sketch parts={shelf} />
+          <g font-family="Excalifont, cursive">
+            <text class="sk-t" x="24" y="28" font-size="24" fill={pen}>Excaliself</text>
+            <text class="sk-t" x="290" y="88" font-size="17" fill="#5c5c66">excalidraw</text>
+            <text class="sk-t" x="267" y="191" font-size="22" fill={ink} text-anchor="middle">Q4 roadmap</text>
+            <text class="sk-t" x="220" y="330" font-size="22" fill={pen} text-anchor="middle">the canvas you know, untouched</text>
+          </g>
+        </svg>
+      </div>
     </section>
 
-    <section id="deploy" class="mx-auto max-w-6xl scroll-mt-24 px-6 py-20">
-      <div class="max-w-xl">
-        <h2 class="text-3xl font-semibold tracking-tight md:text-4xl">One compose file.<br />That is the whole install.</h2>
-        <p class="mt-3 text-muted-foreground">
-          One compose file starts the prebuilt app image and a Postgres container, on amd64 and arm64. Migrations apply on start, so an update is a redeploy.
+    <!-- Deploy -->
+    <section id="deploy" class="page scroll-mt-20 py-16 md:py-24">
+      <div class="grid-12 gap-y-6">
+        <h2 class="heading col-span-12 lg:col-span-8">One compose file. That is the whole install.</h2>
+        <p class="col-span-12 max-w-[34rem] text-lede text-muted lg:col-span-6">
+          It starts the prebuilt app image and a Postgres container, on amd64 and arm64. Migrations apply on start, so an
+          update is a redeploy.
         </p>
       </div>
-      <div class="mt-10 grid items-start gap-10 lg:grid-cols-[1fr_1.2fr]">
-        <ol class="flex flex-col gap-6">
-          {steps.map((s, i) => (
-            <li class="flex gap-4" data-reveal>
-              <span class="flex size-8 shrink-0 items-center justify-center rounded-full bg-iris-muted font-mono text-sm font-semibold text-iris">
-                {i + 1}
-              </span>
-              <div>
-                <h3 class="font-semibold">{s.title}</h3>
-                <p class="mt-2 text-sm text-muted-foreground">{s.body}</p>
-              </div>
-            </li>
-          ))}
-          <li class="flex gap-4" data-reveal>
-            <span class="size-8 shrink-0"></span>
-            <a href={`${repo}#deploy`} class="inline-flex items-center gap-2 text-sm font-semibold text-iris transition-colors duration-300 ease-fluid hover:text-iris-strong">
-              Full deployment guide, including Coolify
-              <Icon name="arrow-right" size={16} />
-            </a>
-          </li>
-        </ol>
-        <div class="overflow-hidden rounded-xl bg-[#181818] text-neutral-200 shadow-panel" data-reveal data-terminal>
-          <div class="flex items-center justify-between border-b border-white/10 px-4 py-2">
-            <span class="font-mono text-xs text-neutral-500">Terminal</span>
-            <button
-              type="button"
-              class="inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold text-neutral-300 transition-[background-color,color,scale] duration-300 ease-fluid hover:bg-white/10 hover:text-white active:scale-[0.98]"
-              data-copy
-            >
+      <div class="grid-12 mt-14 gap-y-12 md:mt-20">
+        <div class="col-span-12 lg:col-span-5">
+          <ol class="flex flex-col" data-draw>
+            {steps.map((s, i) => (
+              <li class="flex flex-col">
+                <div class="relative px-7 py-6">
+                  <svg viewBox="0 0 500 140" preserveAspectRatio="none" class="absolute inset-0 h-full w-full overflow-visible" aria-hidden="true">
+                    <Sketch parts={stepBox(i)} />
+                  </svg>
+                  <div class="relative">
+                    <h3 class="text-xl font-semibold tracking-tight"><span class="hand mr-2 text-pen">{i + 1}.</span>{s.title}</h3>
+                    <p class="mt-1.5 text-[0.9375rem] text-[#3d3d45]">{s.body}</p>
+                  </div>
+                </div>
+                {i < steps.length - 1 && (
+                  <svg viewBox="0 0 40 52" class="ml-12 h-13 w-10 overflow-visible" aria-hidden="true">
+                    <Sketch parts={stepArrow(i)} />
+                  </svg>
+                )}
+              </li>
+            ))}
+          </ol>
+          <a href={`${repo}#deploy`} class="group link mt-10 inline-flex items-center gap-2 font-semibold">
+            Full deployment guide, including Coolify
+            <Icon name="arrow-right" size={16} class="transition-transform duration-300 group-hover:translate-x-1" />
+          </a>
+        </div>
+        <div class="col-span-12 self-start rounded-xl bg-ink text-neutral-200 lg:sticky lg:top-24 lg:col-span-7" data-terminal>
+          <div class="flex items-center justify-between border-b border-white/10 py-2 pr-2 pl-5">
+            <span class="font-mono text-xs text-neutral-400">Terminal</span>
+            <button type="button" class="btn selectable !min-h-10 !px-3 text-sm text-neutral-200 hover:bg-white/10" data-copy>
               <Icon name="copy" size={16} />
               <span data-copy-label>Copy</span>
+              <Selection />
             </button>
           </div>
-          <pre class="overflow-x-auto p-4 font-mono text-xs leading-relaxed md:text-sm"><code>{compose.map((line) => line.startsWith("#") ? <span class="block whitespace-pre-wrap break-all text-neutral-500">{line}</span> : <span class="block whitespace-pre-wrap break-all"><span class="text-iris select-none">$ </span>{line}</span>)}</code></pre>
+          <pre class="p-5 font-mono text-xs leading-relaxed md:p-6 md:text-sm"><code>{compose.map((line) => line.startsWith("#") ? <span class="block whitespace-pre-wrap pl-[2ch] -indent-[2ch] [overflow-wrap:anywhere] text-neutral-400">{line}</span> : <span class="block whitespace-pre-wrap pl-[2ch] -indent-[2ch] [overflow-wrap:anywhere]"><span class="select-none text-[#a39dea]">$ </span>{line}</span>)}</code></pre>
         </div>
-        <script>
-          for (const el of document.querySelectorAll<HTMLElement>("[data-terminal]")) {
-            const button = el.querySelector<HTMLButtonElement>("[data-copy]")!
-            const label = el.querySelector<HTMLElement>("[data-copy-label]")!
-            const text = [...el.querySelectorAll("code > span")].map((l) => l.textContent?.replace(/^\$ /, "") ?? "").join("\n")
-            button.addEventListener("click", async () => {
-              try {
-                await navigator.clipboard.writeText(text)
-                label.textContent = "Copied"
-              } catch {
-                label.textContent = "Select and copy"
-              }
-              setTimeout(() => (label.textContent = "Copy"), 2000)
-            })
-          }
-        </script>
       </div>
     </section>
 
-    <section id="faq" class="mx-auto max-w-6xl scroll-mt-24 px-6 py-20">
-      <div class="grid gap-10 lg:grid-cols-[1fr_1.6fr]">
-        <div>
-          <h2 class="text-3xl font-semibold tracking-tight md:text-4xl">Questions before you deploy</h2>
-          <p class="mt-3 text-muted-foreground">
-            Anything missing? <a href={`${repo}/issues`} class="font-medium text-iris transition-colors duration-300 ease-fluid hover:text-iris-strong">Open an issue</a> and it gets answered there.
+    <!-- FAQ -->
+    <section id="faq" class="page scroll-mt-20 py-16 md:py-20">
+      <div class="grid-12 gap-y-10">
+        <div class="col-span-12 lg:col-span-4">
+          <h2 class="text-head leading-[1.02] font-semibold tracking-[-0.035em]">Questions before you deploy</h2>
+          <p class="mt-4 text-muted">
+            Anything missing? <a href={`${repo}/issues`} class="link font-medium text-ink">Open an issue</a> and it gets answered there.
           </p>
         </div>
-        <div class="card divide-y divide-hairline" data-reveal>
+        <div class="col-span-12 border-t border-line lg:col-span-7 lg:col-start-6">
           {faq.map((f) => (
-            <details class="group px-6">
-              <summary class="flex cursor-pointer items-center justify-between gap-4 py-4 font-semibold">
+            <details class="border-b border-line">
+              <summary class="flex cursor-pointer items-center justify-between gap-6 py-5 text-lg font-medium transition-colors duration-300 hover:text-pen">
                 {f.q}
-                <Icon name="caret-down" size={16} class="faq-caret shrink-0 text-muted-foreground" />
+                <Icon name="plus" size={18} class="caret shrink-0 text-muted" />
               </summary>
-              <p class="pb-4 text-sm text-muted-foreground">{f.a}</p>
+              <p class="max-w-[60ch] pb-6 text-muted">
+                {f.a}
+                {f.more && <>{" "}<a href={f.more.href} class="link font-medium text-ink">{f.more.label}</a></>}
+              </p>
             </details>
           ))}
         </div>
       </div>
     </section>
 
-    <section class="mx-auto max-w-6xl px-6 py-20">
-      <div class="card flex flex-col items-center gap-6 px-6 py-12 text-center" data-reveal>
-        <img src={`${import.meta.env.BASE_URL}favicon.svg`} alt="" width="40" height="40" class="rounded-lg" />
-        <h2 class="max-w-[680px] text-3xl font-semibold tracking-tight md:text-4xl">Nothing to sign up for. Nothing to export later.</h2>
-        <p class="max-w-md text-muted-foreground">
-          No third party accounts, no telemetry, no lock in. Stop the container and your drawings are still in your Postgres.
-        </p>
-        <a href="#deploy" class="button-primary">Deploy in five minutes</a>
+    <!-- Sponsors -->
+    <section id="sponsors" aria-labelledby="sponsors-title" class="page scroll-mt-20 py-16 md:py-24">
+      <div class="grid-12 items-center gap-y-12">
+        <div class="col-span-12 lg:col-span-5">
+          <h2 id="sponsors-title" class="text-head leading-[1.02] font-semibold tracking-[-0.035em]">Help keep it free</h2>
+          <p class="mt-4 max-w-[34rem] text-muted">
+            Excaliself is MIT licensed and has no paid plan. Sponsorships on GitHub pay for the hours that go into fixes,
+            updates, and new features like the Team space.
+          </p>
+          <a href="https://github.com/sponsors/maciekzygmunt" class="btn btn-ink selectable mt-7 max-sm:w-full">
+            <Icon name="heart" size={18} />Sponsor on GitHub<Selection />
+          </a>
+        </div>
+        <figure class="col-span-12 lg:col-span-6 lg:col-start-7" data-draw>
+          <svg viewBox="0 0 560 250" class="w-full overflow-visible" role="img" aria-labelledby="slots-title">
+            <title id="slots-title">Four empty sponsor logo slots</title>
+            <g stroke-dasharray="9 8">{slots.map((s) => <Sketch parts={s.parts.map((p) => ({ ...p, draw: false }))} />)}</g>
+            <g font-family="Excalifont, cursive" font-size="22" fill="#8a8a93" text-anchor="middle">
+              {slots.map((s) => <text class="sk-t" x={s.x + 130} y={s.y + 57}>your logo</text>)}
+            </g>
+          </svg>
+          <figcaption class="hand mt-4 text-center text-xl text-pen">these spots are waiting for the first sponsors</figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <!-- Closing call to action -->
+    <section aria-labelledby="cta-title" class="page pt-16 md:pt-24">
+      <div class="grid-12 gap-y-8">
+        <h2 id="cta-title" class="heading col-span-12 lg:col-span-8">Nothing to sign up for. Nothing to export later.</h2>
+        <div class="col-span-12 flex flex-col gap-7 lg:col-span-4 lg:self-end">
+          <p class="text-muted">No third party accounts, no telemetry, no lock in. Stop the container and your drawings are still in your Postgres.</p>
+          <div class="flex flex-wrap gap-4">
+            <a href="#deploy" class="btn btn-ink selectable max-sm:w-full">Deploy in five minutes<Selection /></a>
+            <a href={repo} class="btn btn-line selectable max-sm:w-full"><Icon name="github-logo" size={18} />GitHub<Selection /></a>
+          </div>
+        </div>
       </div>
     </section>
   </main>
 </Layout>
+
+<style>
+  /* Sticky stage on large screens: the hero owns extra scroll so the drawings can travel. */
+  @media (min-width: 1024px) and (min-height: 640px) {
+    .hero {
+      height: 175svh;
+    }
+    .hero-stage {
+      position: sticky;
+      top: 4rem;
+      height: calc(100svh - 4rem);
+    }
+    .hero-diagram {
+      flex: 1;
+      min-height: 0;
+    }
+  }
+</style>

@@ -2,6 +2,7 @@
 import "../styles/global.css"
 import Nav from "../components/Nav.astro"
 import Footer from "../components/Footer.astro"
+import handFont from "../assets/fonts/excalifont-latin.woff2?url"
 
 interface Props {
   title: string
@@ -27,7 +28,8 @@ const canonical = new URL(Astro.url.pathname, Astro.site)
     <link rel="icon" href={`${base}favicon.svg`} type="image/svg+xml" />
     <link rel="apple-touch-icon" href={`${base}apple-touch-icon.png`} />
     <link rel="sitemap" href={`${base}sitemap-index.xml`} />
-    <meta name="theme-color" content="#ebebee" />
+    <link rel="preload" href={handFont} as="font" type="font/woff2" crossorigin />
+    <meta name="theme-color" content="#ffffff" />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Excaliself" />
     <meta property="og:url" content={canonical} />
@@ -39,7 +41,11 @@ const canonical = new URL(Astro.url.pathname, Astro.site)
     <meta property="og:image:alt" content={ogImageAlt} />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:image:alt" content={ogImageAlt} />
-    <script is:inline>document.documentElement.classList.add("js")</script>
+    <!-- Before first paint: flag JS and motion so undrawn states never flash. -->
+    <script is:inline>
+      document.documentElement.classList.add("js")
+      if (!matchMedia("(prefers-reduced-motion: reduce)").matches) document.documentElement.classList.add("motion")
+    </script>
     <!-- Self-hosted OpenPanel analytics. The client ID is public. -->
     <script is:inline>
       window.op = window.op || function (...args) { (window.op.q = window.op.q || []).push(args) }
@@ -57,7 +63,7 @@ const canonical = new URL(Astro.url.pathname, Astro.site)
   <body class="min-h-dvh">
     <a
       href="#main"
-      class="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-[60] focus:rounded-md focus:bg-panel focus:px-3 focus:py-2 focus:text-sm"
+      class="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-[60] focus:rounded-md focus:bg-ink focus:px-4 focus:py-3 focus:text-sm focus:font-semibold focus:text-white"
     >
       Skip to content
     </a>
@@ -65,18 +71,7 @@ const canonical = new URL(Astro.url.pathname, Astro.site)
     <slot />
     <Footer />
     <script>
-      const io = new IntersectionObserver(
-        (entries) => {
-          for (const e of entries) {
-            if (e.isIntersecting) {
-              e.target.classList.add("is-visible")
-              io.unobserve(e.target)
-            }
-          }
-        },
-        { rootMargin: "0px 0px -10% 0px" },
-      )
-      for (const el of document.querySelectorAll("[data-reveal]")) io.observe(el)
+      import "../scripts/motion"
     </script>
   </body>
 </html>

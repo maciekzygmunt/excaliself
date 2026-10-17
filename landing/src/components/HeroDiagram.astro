@@ -1,0 +1,82 @@
+---
+// The signature: a hand-drawn sketch of a team sharing one server. The page script draws it in,
+// sends each teammate's drawing along the arrows into the database on scroll, and runs the
+// autosave sheet while the page is still.
+import Sketch from "./Sketch.astro"
+import { heroDiagram } from "../lib/hero-diagram"
+
+interface Props {
+  layout: "wide" | "tall"
+  class?: string
+}
+const { layout, class: className } = Astro.props
+const d = heroDiagram(layout)
+const id = `hd-${layout}`
+const textCenter = (b: { x: number; y: number; w: number; h: number }) => b.x + b.w / 2
+---
+
+<svg
+  viewBox={`0 0 ${d.size[0]} ${d.size[1]}`}
+  class={className}
+  role="img"
+  aria-labelledby={`${id}-title`}
+  data-diagram={layout}
+  data-routes={JSON.stringify(d.routes)}
+  data-draw
+>
+  <title id={`${id}-title`}>
+    Sketch: Mira, Tomasz and Priya each send a drawing through Excaliself into one database labeled your data. Excaliself
+    and the database sit together inside a boundary labeled your server.
+  </title>
+
+  <g font-family="Excalifont, cursive">
+    <!-- your server boundary (dashed, fades in) -->
+    <g stroke-dasharray="10 9">
+      <Sketch parts={d.server.parts.map((p) => ({ ...p, draw: false }))} />
+    </g>
+    <text class="sk-t" x={d.server.label[0]} y={d.server.label[1]} font-size="26" fill={d.pen}>your server</text>
+
+    <!-- the team -->
+    <text class="sk-t" x={d.teamLabel[0]} y={d.teamLabel[1]} font-size="24" fill={d.pen} text-anchor="middle">your team</text>
+    {d.figures.map((parts, i) => (
+      <>
+        <Sketch parts={parts} />
+        <text class="sk-t" x={d.people[i][0]} y={d.people[i][1] + d.nameBelow} font-size="18" fill={d.ink} text-anchor="middle">{d.names[i]}</text>
+      </>
+    ))}
+
+    <!-- arrows and the autosave note -->
+    {d.arrows.map((a) => <Sketch parts={a} />)}
+    <text class="sk-t" x={d.note.at[0]} y={d.note.at[1]} font-size="19" fill={d.pen} text-anchor={d.note.anchor}>
+      {d.note.lines.map((l, i) => <tspan x={d.note.at[0]} dy={i ? 22 : 0}>{l}</tspan>)}
+    </text>
+
+    <!-- Excaliself -->
+    <Sketch parts={d.app.parts} />
+    <text class="sk-t" x={textCenter(d.app)} y={d.app.y + d.app.h / 2 - 2} font-size="34" fill={d.ink} text-anchor="middle">Excaliself</text>
+    <text class="sk-t" x={textCenter(d.app)} y={d.app.y + d.app.h / 2 + 30} font-size="17" fill="#3d3d45" text-anchor="middle">accounts, folders, search</text>
+
+    <!-- the database: stored drawings fill slots from the bottom, with room to spare -->
+    <Sketch parts={d.db.parts} />
+    <text class="sk-t" x={d.db.cx} y={d.db.label} font-size="28" fill={d.ink} text-anchor="middle">your data</text>
+    {d.cells.map((c) => (
+      <g class="hd-slot" opacity={c.filled ? undefined : "0"}>
+        <Sketch parts={c.parts} />
+      </g>
+    ))}
+
+    <!-- each teammate's drawing -->
+    {d.cards.map((parts, i) => {
+      const [x, y, r] = d.cardAt[i]
+      return (
+        <g class="hd-card" transform={`translate(${x} ${y}) rotate(${r}) scale(${d.cardScale})`}>
+          <Sketch parts={parts} />
+          <text class="sk-t" x="-62" y="-22" font-size="20" fill={d.ink}>{d.titles[i]}</text>
+        </g>
+      )
+    })}
+
+    <!-- autosave packet (idle) -->
+    <g opacity="0" data-packet><Sketch parts={d.packet} /></g>
+  </g>
+</svg>
