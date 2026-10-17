@@ -113,6 +113,12 @@ pnpm dev                                           # http://localhost:3000
 `pnpm db:generate` creates a migration after a schema change.
 Releases are cut from git tags; see [docs/releasing.md](./docs/releasing.md).
 
+## Sponsors
+
+Excaliself is free and MIT. If your team uses it,
+[sponsoring](https://github.com/sponsors/maciekzygmunt) pays for the time that
+goes into fixes and releases.
+
 ## License
 
 [MIT](./LICENSE). There is no promise of support or reviews for contributions,
