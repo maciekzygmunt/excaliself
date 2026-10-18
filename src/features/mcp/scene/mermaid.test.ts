@@ -1,6 +1,6 @@
 import { expect, test } from "vitest"
-import { SceneInputError } from "./build"
 import { parseMermaid } from "./mermaid"
+import { SceneInputError } from "./skeleton"
 
 test("reads nodes, their shapes and labels, and labeled edges", () => {
   const graph = parseMermaid(`
@@ -134,4 +134,23 @@ test("other diagram types and unreadable lines are refused", () => {
   expect(() => parseMermaid("graph TD\n  a --> b\n  end")).toThrow(
     '"end" without a subgraph',
   )
+})
+
+test("hostile input is read in linear time", () => {
+  const spaces = " ".repeat(20_000)
+  const inputs = [
+    `flowchart TD\nA --${spaces}x`,
+    `flowchart TD\nsubgraph a[${spaces}x\nend`,
+    `flowchart TD\nA["${"<".repeat(20_000)}"]`,
+    `flowchart TD\nA["${"**a".repeat(7_000)}"]`,
+  ]
+  for (const input of inputs) {
+    const started = performance.now()
+    try {
+      parseMermaid(input)
+    } catch {
+      // Refusing is fine; hanging is not.
+    }
+    expect(performance.now() - started).toBeLessThan(500)
+  }
 })

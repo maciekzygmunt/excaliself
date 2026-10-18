@@ -6,16 +6,15 @@
 import { randomBytes, randomInt } from "node:crypto"
 import type { ExcalidrawElement } from "@excalidraw/excalidraw/element/types"
 import { type Box, layoutGraph, type Point, union } from "./layout"
-import type {
-  ConnectorSkeleton,
-  SceneGraph,
-  ShapeSkeleton,
-  TextSkeleton,
+import {
+  type ConnectorSkeleton,
+  MAX_ELEMENTS,
+  type SceneGraph,
+  SceneInputError,
+  type ShapeSkeleton,
+  type TextSkeleton,
 } from "./skeleton"
 import { FONT_SIZE, LINE_HEIGHT, measureText, wrapText } from "./text"
-
-/** The input can't be drawn; the message says why, for the client to fix. */
-export class SceneInputError extends Error {}
 
 type ShapeType = ShapeSkeleton["type"]
 
@@ -93,6 +92,13 @@ type FreeText = {
 
 /** Builds a scene's elements. Throws SceneInputError listing every problem in the input. */
 export function buildScene(graph: SceneGraph): ExcalidrawElement[] {
+  // Checked first: layout time grows fast with the number of edges.
+  const count = graph.elements.length + graph.clusters.length
+  if (count > MAX_ELEMENTS) {
+    throw new SceneInputError(
+      `This scene has ${count} elements; the limit is ${MAX_ELEMENTS}.`,
+    )
+  }
   const errors: string[] = []
   const shapes = new Map<string, Shape>()
   const refs = new Set<string>()
@@ -131,11 +137,14 @@ export function buildScene(graph: SceneGraph): ExcalidrawElement[] {
     switch (element.type) {
       case "rectangle":
       case "ellipse":
-      case "diamond":
+      case "diamond": {
         checkPosition(element)
-        shapes.set(element.id ?? `#${index}`, {
+        const id = newId()
+        // Without an id of its own, keyed by its random element id, which
+        // no client id can collide with.
+        shapes.set(element.id ?? id, {
           ...sizeShape(element),
-          id: newId(),
+          id,
           type: element.type,
           style: {
             ...DEFAULT_STYLE,
@@ -148,6 +157,7 @@ export function buildScene(graph: SceneGraph): ExcalidrawElement[] {
           parent: (element.id && clusterOf.get(element.id)) || null,
         })
         break
+      }
       case "text": {
         checkPosition(element)
         const { x, y } = element
