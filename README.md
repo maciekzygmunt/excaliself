@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <a href="https://preview.zygmunt.xyz/excaliself/"><b>Website</b></a>
+  <a href="https://excaliself.com"><b>Website</b></a>
 </p>
 
 <p align="center">
