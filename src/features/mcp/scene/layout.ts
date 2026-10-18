@@ -2,7 +2,7 @@
 // layout (dagre), the same kind Mermaid uses for flowcharts.
 
 import dagre from "@dagrejs/dagre"
-import type { Direction } from "./skeleton"
+import { type Direction, SceneInputError } from "./skeleton"
 
 export type Point = [number, number]
 export type Box = { x: number; y: number; width: number; height: number }
@@ -65,7 +65,14 @@ export function layoutGraph(input: LayoutInput): LayoutResult {
   for (const item of [...input.clusters, ...input.nodes]) {
     if (item.parent) graph.setParent(item.id, item.parent)
   }
-  input.edges.forEach((edge, index) => {
+  // One dagre edge per pair: dagre can fail on repeated edges, and the
+  // repeats share the first one's route.
+  const pairName = new Map<string, string>()
+  const edgeNames = input.edges.map((edge, index) => {
+    const pair = `${edge.from}\0${edge.to}`
+    const existing = pairName.get(pair)
+    if (existing) return existing
+    pairName.set(pair, `e${index}`)
     graph.setEdge(
       edge.from,
       edge.to,
@@ -76,9 +83,16 @@ export function layoutGraph(input: LayoutInput): LayoutResult {
       },
       `e${index}`,
     )
+    return `e${index}`
   })
 
-  dagre.layout(graph)
+  try {
+    dagre.layout(graph)
+  } catch {
+    throw new SceneInputError(
+      "The automatic layout failed for this graph. Give the shapes x and y, or simplify the graph.",
+    )
+  }
 
   const centered = (id: string): Box => {
     const { x, y, width, height } = graph.node(id)
@@ -88,7 +102,7 @@ export function layoutGraph(input: LayoutInput): LayoutResult {
   const clusters = clusterBoxes(input, centered, nodes)
   const edges: Point[][] = input.edges.map((edge, index) =>
     graph
-      .edge({ v: edge.from, w: edge.to, name: `e${index}` })
+      .edge({ v: edge.from, w: edge.to, name: edgeNames[index] })
       .points.map(({ x, y }: { x: number; y: number }): Point => [x, y]),
   )
 

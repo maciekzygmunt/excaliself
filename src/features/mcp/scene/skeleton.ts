@@ -75,6 +75,12 @@ export type TextSkeleton = z.infer<typeof textSkeleton>
 export type ConnectorSkeleton = z.infer<typeof connectorSkeleton>
 export type ElementSkeleton = z.infer<typeof elementSkeleton>
 
+/** Most elements one scene may have, Mermaid nodes and edges included. */
+export const MAX_ELEMENTS = 500
+
+/** The input can't be drawn; the message says why, for the client to fix. */
+export class SceneInputError extends Error {}
+
 export const directions = ["TB", "BT", "LR", "RL"] as const
 export type Direction = (typeof directions)[number]
 

@@ -1,7 +1,12 @@
 import { expect, test } from "vitest"
-import { buildScene, SceneInputError } from "./build"
+import { buildScene } from "./build"
 import { parseMermaid } from "./mermaid"
-import type { Cluster, ElementSkeleton, SceneGraph } from "./skeleton"
+import {
+  type Cluster,
+  type ElementSkeleton,
+  type SceneGraph,
+  SceneInputError,
+} from "./skeleton"
 
 type Built = Record<string, unknown> & {
   id: string
@@ -319,6 +324,36 @@ test.each(["LR", "TB"] as const)(
     }
   },
 )
+
+test("repeated and looping edges lay out, each still drawn", () => {
+  const elements = buildScene(
+    parseMermaid(`flowchart TD\n${"A-->C\nA-->B\nB-->C\nB-->B\n".repeat(3)}`),
+  ) as unknown as Built[]
+
+  expect(elements.filter((element) => element.type === "arrow")).toHaveLength(
+    12,
+  )
+})
+
+test("a shape without an id never replaces one with an id", () => {
+  const elements = build([
+    { type: "rectangle", id: "#1", x: 0, y: 0 },
+    { type: "rectangle", x: 200, y: 0 },
+  ])
+
+  expect(elements).toHaveLength(2)
+})
+
+test("a scene past the element limit is refused before any work", () => {
+  // `a & b & … --> c & d & …` makes one arrow per pair.
+  const group = (prefix: string) =>
+    Array.from({ length: 40 }, (_, index) => `${prefix}${index}`).join(" & ")
+  const graph = parseMermaid(`flowchart LR\n${group("a")} --> ${group("b")}`)
+
+  expect(() => buildScene(graph)).toThrow(
+    "This scene has 1680 elements; the limit is 500.",
+  )
+})
 
 test("every problem in the input is reported at once", () => {
   const attempt = () =>

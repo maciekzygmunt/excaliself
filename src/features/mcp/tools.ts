@@ -15,9 +15,15 @@ import { insertDrawing } from "@/features/drawings/create"
 import { listDrawings } from "@/features/drawings/list"
 import { findInScene, parseSceneElements } from "@/features/drawings/search"
 import { accessibleTo } from "@/features/spaces/access"
-import { buildScene, SceneInputError } from "./scene/build"
+import { buildScene } from "./scene/build"
 import { parseMermaid } from "./scene/mermaid"
-import { directions, elementSkeleton, type SceneGraph } from "./scene/skeleton"
+import {
+  directions,
+  elementSkeleton,
+  MAX_ELEMENTS,
+  type SceneGraph,
+  SceneInputError,
+} from "./scene/skeleton"
 import { summarizeScene } from "./summary"
 
 type Db = NodePgDatabase<typeof schema>
@@ -238,10 +244,14 @@ export function createMcpServer(db: Db, member: Member, origin: string) {
           "No drawing has that id. Find one with list_drawings or search_drawings.",
         )
       }
-      // A live Room holds newer edits than the stored scene.
+      // A live Room holds newer edits than the stored scene. One that
+      // failed to load is dropped from the registry; read the store then.
       const room = rooms.rooms.get(id)
       if (room) await room.loaded
-      const elements = room ? room.elements : parseSceneElements(drawing.data)
+      const elements =
+        room && rooms.rooms.get(id) === room
+          ? room.elements
+          : parseSceneElements(drawing.data)
       if (!elements)
         return failure("This drawing's data is damaged and can't be read.")
 
@@ -269,7 +279,7 @@ export function createMcpServer(db: Db, member: Member, origin: string) {
 
 Elements: shapes ("rectangle", "ellipse", "diamond") with an optional label; "text"; and "arrow" or "line" connectors that join shapes by id ("from", "to") or run between points ("start", "end"). Shapes and text without x/y are laid out automatically, in "direction", with arrows routed between them; labels wrap and shapes grow to fit. Auto-layout gives the cleanest diagrams: give x/y (top-left, pixels, y grows down) only for layouts a graph can't express, such as grids or timelines. Keep arrow labels to a few words; put detail in shape labels or a text note.
 
-Mermaid: a "flowchart"/"graph" diagram, with node shapes, edge labels, dotted and thick edges, and subgraphs (drawn as titled boxes). Other Mermaid diagram types are not supported. Both can be sent at once: they are laid out together, and arrows may join flowchart nodes by their Mermaid ids.
+Mermaid: a "flowchart"/"graph" diagram, with node shapes, edge labels, dotted and thick edges, and subgraphs (drawn as titled boxes). Other Mermaid diagram types are not supported. Both can be sent at once: they are laid out together, and arrows may join flowchart nodes by their Mermaid ids. Up to ${MAX_ELEMENTS} elements in all, Mermaid nodes and edges included.
 
 Colors: Excalidraw's palette reads best, e.g. backgrounds "#a5d8ff" (blue), "#b2f2bb" (green), "#ffec99" (yellow), "#ffc9c9" (red), "#d0bfff" (violet), "#e9ecef" (gray).`,
       inputSchema: z.object({
@@ -283,7 +293,7 @@ Colors: Excalidraw's palette reads best, e.g. backgrounds "#a5d8ff" (blue), "#b2
           .string()
           .optional()
           .describe("Put it in this folder (see list_folders)."),
-        elements: z.array(elementSkeleton).max(1000).optional(),
+        elements: z.array(elementSkeleton).max(MAX_ELEMENTS).optional(),
         mermaid: z
           .string()
           .max(50_000)

@@ -3,13 +3,13 @@
 // shapes, edges and their labels and styles, and subgraphs. Styling lines
 // (classDef, style, click, ...) are skipped.
 
-import { SceneInputError } from "./build"
-import type {
-  Cluster,
-  ConnectorSkeleton,
-  Direction,
-  SceneGraph,
-  ShapeSkeleton,
+import {
+  type Cluster,
+  type ConnectorSkeleton,
+  type Direction,
+  type SceneGraph,
+  SceneInputError,
+  type ShapeSkeleton,
 } from "./skeleton"
 
 type Shape = ShapeSkeleton["type"]
@@ -35,9 +35,11 @@ const NODE_SHAPES: [open: string, close: string, shape: Shape][] = [
 const SKIPPED =
   /^(classDef|class|style|linkStyle|click|accTitle|accDescr|direction)\b/
 const NODE_ID = /^[\p{L}\p{N}_]+(?:[-.][\p{L}\p{N}_]+)*/u
-// `-- text -->`, `-. text .->`, `== text ==>`
-const INLINE_LABEL_EDGE =
-  /^(<)?(--|-\.|==)\s+(.+?)\s+(-{2,}>|-{3,}|\.-+>|\.-+|={2,}>|={3,})/
+// `-- text -->`, `-. text .->`, `== text ==>`: an opener, then a closer
+// after the label. Two steps, as one regex backtracks for ages on a long
+// run of spaces.
+const INLINE_OPENER = /^(<)?(--|-\.|==)(?=\s)/
+const INLINE_CLOSER = /\s(-{2,}>|-{3,}|\.-+>|\.-+|={2,}>|={3,})/
 // `-->`, `---`, `-.->`, `==>`, `===`, `--o`, `--x`, `<-->`, `~~~`
 const EDGE = /^(<)?(-{2,}|-\.+-|={2,}|~{3,})(>|o(?=[\s|])|x(?=[\s|]))?/
 
@@ -184,8 +186,11 @@ function splitStatements(source: string): string[] {
 
 function parseSubgraphTitle(title: string): { id: string; label: string } {
   // `id [Title]` or `id["Title"]`
-  const bracketed = title.match(/^([^\s[]+)\s*\[\s*"?(.*?)"?\s*\]$/)
-  if (bracketed) return { id: bracketed[1], label: cleanLabel(bracketed[2]) }
+  const open = title.indexOf("[")
+  const id = title.slice(0, open).trim()
+  if (open > 0 && title.endsWith("]") && !/\s/.test(id)) {
+    return { id, label: cleanLabel(title.slice(open + 1, -1)) }
+  }
   const quoted = title.match(/^"(.*)"$/)
   if (quoted) return { id: quoted[1], label: cleanLabel(quoted[1]) }
   return { id: title, label: cleanLabel(title) }
@@ -197,13 +202,13 @@ function cleanLabel(label: string): string {
     .trim()
     .replace(/^"([\s\S]*)"$/, "$1")
     .replace(/<br\s*\/?>/gi, "\n")
-    .replace(/<[^>]+>/g, "")
+    .replace(/<[^<>]+>/g, "")
     .replace(/#quot;/g, '"')
     .replace(/#amp;/g, "&")
     .replace(/#lt;/g, "<")
     .replace(/#gt;/g, ">")
     .replace(/^`|`$/g, "")
-    .replace(/\*\*(.+?)\*\*/g, "$1")
+    .replace(/\*\*([^*]+)\*\*/g, "$1")
     .trim()
 }
 
@@ -250,16 +255,32 @@ function parseChain(
     return null
   }
 
+  const readInlineLabel = () => {
+    const opener = rest.match(INLINE_OPENER)
+    if (!opener) return null
+    const after = rest.slice(opener[0].length)
+    const closer = after.match(INLINE_CLOSER)
+    const label = closer && cleanLabel(after.slice(0, closer.index))
+    if (!closer || !label) return null
+    rest = after.slice((closer.index ?? 0) + closer[0].length)
+    return {
+      startHead: opener[1],
+      body: `${opener[2]}${closer[1]}`,
+      closer: closer[1],
+      label,
+    }
+  }
+
   const readEdge = (): Edge | null => {
     rest = rest.trimStart()
-    const inline = rest.match(INLINE_LABEL_EDGE)
+    const inline = readInlineLabel()
     const plain = inline ? null : rest.match(EDGE)
-    const match = inline ?? plain
-    if (!match) return null
-    rest = rest.slice(match[0].length)
-    const body = inline ? `${inline[2]}${inline[4]}` : (plain?.[2] ?? "")
-    const head = inline ? inline[4].at(-1) : plain?.[3]
-    let label = inline ? cleanLabel(inline[3]) : undefined
+    if (!inline && !plain) return null
+    if (plain) rest = rest.slice(plain[0].length)
+    const startHead = inline ? inline.startHead : plain?.[1]
+    const body = inline ? inline.body : (plain?.[2] ?? "")
+    const head = inline ? inline.closer.at(-1) : plain?.[3]
+    let label = inline?.label
     const piped = rest.match(/^\s*\|([^|]*)\|/)
     if (piped) {
       label = cleanLabel(piped[1])
@@ -277,7 +298,7 @@ function parseChain(
       label: label || undefined,
       strokeStyle: body.includes(".") ? "dashed" : "solid",
       strokeWidth: body.includes("=") ? 4 : 2,
-      startArrowhead: arrowhead(match[1]),
+      startArrowhead: arrowhead(startHead),
       endArrowhead: arrowhead(head),
       invisible: body.startsWith("~"),
     }
