@@ -1,38 +1,37 @@
 # Collab websocket smoke test
 
 The live-collaboration transport is an in-process nitro websocket sharing the
-app's port (canvas sharing spec §2.1). It rides on a pinned nitro beta, and
+app's port. It rides on a pinned nitro beta, and
 nitro's dev server and its built output wire the HTTP upgrade through
 different code paths — so websockets can break in one and not the other.
 
 **Run this after any change to `nitro`, `@tanstack/react-start`, or
 `vite.config.ts`'s nitro options, in both `pnpm dev` and the built container.**
-That is rollout note 4 of the spec, and the reason this script exists.
 
 ## What it checks
 
 `scripts/ws-smoke-test.ts` drives two real websockets against a running
 instance:
 
-1. A token that does not exist is closed with the dead-link code (spec §5.3) —
+1. A token that does not exist is closed with the dead-link code —
    the socket opens and is told why, rather than being refused into an opaque
    1006 a reconnecting client would retry against forever.
 2. A `PING` is answered with a `PONG` — the heartbeat that keeps a quiet
-   session alive past a proxy's idle timeout (spec §5.3, rollout note 2).
-3. A frame past the 4 MB cap closes the socket with 1009 (spec §5.4).
+   session alive past a proxy's idle timeout.
+3. A frame past the 4 MB cap closes the socket with 1009.
 4. A valid token joins, and the server hands back a connection id and the roster.
 5. Two peers see each other join, a name sent on `JOIN` reaches the other peer,
    a cursor is relayed to the other peer (and never echoed back to its sender),
    and closing one socket updates the other's roster.
 6. The guest socket past the room's participant cap (one seat is kept for the
-   owner) is closed with the room-full code (spec §4.5), and a departure
+   owner) is closed with the room-full code, and a departure
    reopens the slot.
 7. A joiner is handed the room's scene as `SCENE_INIT`.
 8. An edit by one peer reaches the other, is never echoed back to its sender,
    and is what a third peer joining afterwards is initialized from.
 9. An edit that loses reconciliation is refused, and the room hands its sender
    the version that won.
-10. The last socket out flushes the room's scene to `drawings.data` (spec §2.3),
+10. The last socket out flushes the room's scene to `drawings.data`,
     and the flush is elements-only — `appState` comes through untouched. This
     one reads Postgres directly, so it is skipped when `DATABASE_URL` is unset.
 
@@ -88,7 +87,7 @@ port, so it exercises the same path a browser takes.
   crossws namespaces. The upgrade hook pins the namespace to the drawing id;
   see `namespaceFor` in the route.
 - **Checks fail with "connection refused"** — the host has spent the 60/min
-  per-IP budget of failed token lookups (spec §4.5). A run spends only one, so
+  per-IP budget of failed token lookups. A run spends only one, so
   something else on the host is hitting dead links. Wait out the minute.
 - **Presence works but no `SCENE_INIT` arrives** — the Room could not read its
   drawing. It stays open on an empty scene by design; the reason is logged as
