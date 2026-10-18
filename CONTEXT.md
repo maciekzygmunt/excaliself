@@ -70,3 +70,6 @@ What a member sees on a Drawing they can see that has a Room with someone *else*
 
 ### Scene image
 An image on a Drawing's canvas, stored as bytes under a content-addressed file id that the image element on the scene points at. Bytes and elements travel separately in a Room: the element syncs like any other element, while the bytes go over a room-scoped HTTP endpoint the same Share link opens. An image is *saved* once its bytes are stored — which is the signal other Participants use to fetch them — *pending* until then, and *errored* when the store refused it (too large, or too many uploads), in which case nobody fetches it and everyone sees a placeholder.
+
+### Access token
+A secret a member makes under Settings so their own AI client can use the instance over MCP (`/api/mcp`). It acts as that member under the same Space rule: it can find, read, and create Drawings, but never change or delete one, since a shared or Team Drawing has its Room as the only writer (Handoff). Shown once, when made. Revoking it, or deleting its member, ends it at once. Not a Share link: it opens no Room and has no Audience.
