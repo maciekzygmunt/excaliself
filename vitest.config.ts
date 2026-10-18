@@ -13,5 +13,8 @@ export default defineConfig({
     environment: "jsdom",
     include: ["src/**/*.test.{ts,tsx}"],
     setupFiles: ["./src/test-setup.ts"],
+    // Transformed by Vite, whose resolver handles its extensionless ESM
+    // imports, so a test can load the real package where it must.
+    server: { deps: { inline: ["@excalidraw/excalidraw"] } },
   },
 })
