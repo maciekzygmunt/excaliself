@@ -20,6 +20,7 @@ import { Route as AppDrawingsRouteImport } from './routes/_app/drawings'
 import { Route as AppSettingsRouteRouteImport } from './routes/_app/settings/route'
 import { Route as AppTrashRouteImport } from './routes/_app/trash'
 import { Route as ApiHealthRouteImport } from './routes/api/health'
+import { Route as ApiMcpRouteImport } from './routes/api/mcp'
 import { Route as PreviewLoginRouteImport } from './routes/preview/login'
 import { Route as ShareTokenRouteImport } from './routes/share/$token'
 import { Route as AppDrawIndexRouteImport } from './routes/_app/draw/index'
@@ -86,6 +87,11 @@ const AppTrashRoute = AppTrashRouteImport.update({
 const ApiHealthRoute = ApiHealthRouteImport.update({
   id: '/api/health',
   path: '/api/health',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiMcpRoute = ApiMcpRouteImport.update({
+  id: '/api/mcp',
+  path: '/api/mcp',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PreviewLoginRoute = PreviewLoginRouteImport.update({
@@ -167,6 +173,7 @@ export interface FileRoutesByFullPath {
   '/drawings': typeof AppDrawingsRoute
   '/trash': typeof AppTrashRoute
   '/api/health': typeof ApiHealthRoute
+  '/api/mcp': typeof ApiMcpRoute
   '/preview/login': typeof PreviewLoginRoute
   '/share/$token': typeof ShareTokenRoute
   '/draw/$id': typeof AppDrawIdRoute
@@ -191,6 +198,7 @@ export interface FileRoutesByTo {
   '/drawings': typeof AppDrawingsRoute
   '/trash': typeof AppTrashRoute
   '/api/health': typeof ApiHealthRoute
+  '/api/mcp': typeof ApiMcpRoute
   '/preview/login': typeof PreviewLoginRoute
   '/share/$token': typeof ShareTokenRoute
   '/draw/$id': typeof AppDrawIdRoute
@@ -218,6 +226,7 @@ export interface FileRoutesById {
   '/_app/drawings': typeof AppDrawingsRoute
   '/_app/trash': typeof AppTrashRoute
   '/api/health': typeof ApiHealthRoute
+  '/api/mcp': typeof ApiMcpRoute
   '/preview/login': typeof PreviewLoginRoute
   '/share/$token': typeof ShareTokenRoute
   '/_app/draw/$id': typeof AppDrawIdRoute
@@ -245,6 +254,7 @@ export interface FileRouteTypes {
     | '/drawings'
     | '/trash'
     | '/api/health'
+    | '/api/mcp'
     | '/preview/login'
     | '/share/$token'
     | '/draw/$id'
@@ -269,6 +279,7 @@ export interface FileRouteTypes {
     | '/drawings'
     | '/trash'
     | '/api/health'
+    | '/api/mcp'
     | '/preview/login'
     | '/share/$token'
     | '/draw/$id'
@@ -295,6 +306,7 @@ export interface FileRouteTypes {
     | '/_app/drawings'
     | '/_app/trash'
     | '/api/health'
+    | '/api/mcp'
     | '/preview/login'
     | '/share/$token'
     | '/_app/draw/$id'
@@ -319,6 +331,7 @@ export interface RootRouteChildren {
   ResetPasswordRoute: typeof ResetPasswordRoute
   SetupRoute: typeof SetupRoute
   ApiHealthRoute: typeof ApiHealthRoute
+  ApiMcpRoute: typeof ApiMcpRoute
   PreviewLoginRoute: typeof PreviewLoginRoute
   ShareTokenRoute: typeof ShareTokenRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
@@ -403,6 +416,13 @@ declare module '@tanstack/react-router' {
       path: '/api/health'
       fullPath: '/api/health'
       preLoaderRoute: typeof ApiHealthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/mcp': {
+      id: '/api/mcp'
+      path: '/api/mcp'
+      fullPath: '/api/mcp'
+      preLoaderRoute: typeof ApiMcpRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/preview/login': {
@@ -549,6 +569,7 @@ const rootRouteChildren: RootRouteChildren = {
   ResetPasswordRoute: ResetPasswordRoute,
   SetupRoute: SetupRoute,
   ApiHealthRoute: ApiHealthRoute,
+  ApiMcpRoute: ApiMcpRoute,
   PreviewLoginRoute: PreviewLoginRoute,
   ShareTokenRoute: ShareTokenRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
