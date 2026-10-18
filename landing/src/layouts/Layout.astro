@@ -12,7 +12,8 @@ interface Props {
 const { title, description, noindex = false } = Astro.props
 const base = import.meta.env.BASE_URL
 const ogImage = new URL(`${base}og.png`, Astro.site)
-const ogImageAlt = "Self-hosted Excalidraw for your team, next to the Excaliself home screen"
+const ogImageAlt =
+  "Your team's whiteboard, on your server. A hand-drawn sketch: Mira, Tomasz and Priya send drawings through Excaliself into your data, inside your server."
 const canonical = new URL(Astro.url.pathname, Astro.site)
 ---
 
