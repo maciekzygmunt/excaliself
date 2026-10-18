@@ -2,8 +2,7 @@
 
 import { randomBytes, randomUUID } from "node:crypto"
 import { and, eq, isNull } from "drizzle-orm"
-import type { NodePgDatabase } from "drizzle-orm/node-postgres"
-import type * as schema from "@/db/schema"
+import type { Db } from "@/db"
 import {
   drawingFiles,
   drawings,
@@ -14,8 +13,6 @@ import {
 import { bytesToDataUrl } from "@/features/drawings/file-bytes"
 import { accessibleTo } from "@/features/spaces/access"
 import { resolveShareAccess, type ShareAudience } from "./access"
-
-type Db = NodePgDatabase<typeof schema>
 
 /** 256-bit hex token. */
 export function mintShareToken() {

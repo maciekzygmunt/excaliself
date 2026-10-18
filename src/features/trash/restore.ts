@@ -3,14 +3,11 @@
 // with a fake db, like destroy.ts.
 
 import { and, eq, isNotNull } from "drizzle-orm"
-import type { NodePgDatabase } from "drizzle-orm/node-postgres"
-import type * as schema from "@/db/schema"
+import type { Db } from "@/db"
 import { drawings, folders, type Space } from "@/db/schema"
 import { findNearestLiveAncestorId } from "@/features/folders/subtree"
 import { lockFolderTree, type Tx } from "@/features/folders/tree-lock"
 import { accessibleTo } from "@/features/spaces/access"
-
-type Db = NodePgDatabase<typeof schema>
 
 // Clears every trash mark a row gets when it is trashed as or within a unit.
 const UNTRASHED = { deletedAt: null, trashRootId: null, deletedBy: null }

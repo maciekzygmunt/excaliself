@@ -2,6 +2,7 @@
 
 import { randomBytes, randomUUID } from "node:crypto"
 import { createServerFn } from "@tanstack/react-start"
+import { getRequestHeaders } from "@tanstack/react-start/server"
 import { and, eq, gt, isNull } from "drizzle-orm"
 import z from "zod"
 import { db } from "@/db"
@@ -60,6 +61,8 @@ export const registerWithInvite = createServerFn({ method: "POST" })
     // set-cookie onto this server function's response, so the browser is
     // authenticated when this call returns.
     const result = await auth.api.signUpEmail({
+      // Preview derives its base URL from the request.
+      headers: getRequestHeaders(),
       body: {
         email: data.email,
         password: data.password,

@@ -4,12 +4,9 @@
 // with a fake db, mirroring trash/destroy.ts.
 
 import { and, count, eq, or } from "drizzle-orm"
-import type { NodePgDatabase } from "drizzle-orm/node-postgres"
-import type * as schema from "@/db/schema"
+import type { Db } from "@/db"
 import { drawings, folders, shares, users, verifications } from "@/db/schema"
 import { inPrivateSpaceOf } from "@/features/spaces/access"
-
-type Db = NodePgDatabase<typeof schema>
 
 /** What both delete confirms state: the Private rows destroyed, the Team drawings kept. */
 export type OwnedContentCounts = {

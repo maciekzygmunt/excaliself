@@ -3,14 +3,11 @@
 // live db, so tests can drive it with a fake db.
 
 import { and, eq, inArray, isNull } from "drizzle-orm"
-import type { NodePgDatabase } from "drizzle-orm/node-postgres"
-import type * as schema from "@/db/schema"
+import type { Db } from "@/db"
 import { drawings, folders, shareRedirects, shares } from "@/db/schema"
 import { collectFolderSubtreeIds } from "@/features/folders/subtree"
 import { lockFolderTree } from "@/features/folders/tree-lock"
 import { accessibleTo, inPrivateSpaceOf } from "./access"
-
-type Db = NodePgDatabase<typeof schema>
 
 export type MoveItem = { type: "drawing" | "folder"; id: string }
 

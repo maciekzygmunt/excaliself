@@ -1,11 +1,10 @@
 import { sql } from "drizzle-orm"
-import type { NodePgDatabase } from "drizzle-orm/node-postgres"
-import type * as schema from "@/db/schema"
+import type { Db } from "@/db"
 
-// Any fixed number; no other advisory lock in the app.
+// Any fixed number; no other advisory lock in the app. PGlite (preview) runs
+// one transaction at a time, so there the lock is always free.
 const FOLDER_TREE_KEY = 7340211
 
-type Db = NodePgDatabase<typeof schema>
 /** A transaction, never the plain db: the lock lasts until it commits. */
 export type Tx = Parameters<Parameters<Db["transaction"]>[0]>[0]
 

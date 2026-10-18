@@ -25,6 +25,9 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER:-excaliself}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-excaliself}
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?Set BETTER_AUTH_SECRET in .env}
       BASE_URL: ${BASE_URL:-http://localhost:3000}
+      # Set only for Coolify PR previews, see docs/pr-previews.md.
+      PREVIEW_MODE: ${PREVIEW_MODE:-false}
+      PREVIEW_HOSTS: ${PREVIEW_HOSTS:-}
     depends_on:
       db:
         condition: service_healthy

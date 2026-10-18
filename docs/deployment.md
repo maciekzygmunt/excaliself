@@ -97,6 +97,9 @@ environment variables (see the table above). The build needs ~4 GB of RAM.
 The file publishes no host port, so it does not conflict with other apps on
 port 3000.
 
+To also deploy each pull request to its own throwaway instance, see
+[PR previews](./pr-previews.md).
+
 ## Backup and restore
 
 Everything is in the one Postgres database: accounts, drawings, images, and

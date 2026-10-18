@@ -24,6 +24,9 @@ ENV HOST=0.0.0.0
 
 COPY --from=builder /app/.output ./.output
 COPY --from=builder /app/drizzle ./drizzle
+# Preview mode loads PGlite and its wasm from node_modules at runtime
+# (src/db/preview.ts). It has no dependencies of its own.
+COPY --from=builder /app/node_modules/@electric-sql/pglite ./node_modules/@electric-sql/pglite
 
 USER node
 

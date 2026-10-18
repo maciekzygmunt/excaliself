@@ -255,8 +255,13 @@ export const shareRedirects = pgTable("share_redirects", {
     .references(() => drawings.id, { onDelete: "cascade" }),
 })
 
-// node-postgres reads and writes bytea as a Buffer.
-const bytea = customType<{ data: Buffer }>({ dataType: () => "bytea" })
+// node-postgres reads bytea as a Buffer, PGlite as a plain Uint8Array; wrap
+// the latter (no copy) so callers always get a Buffer.
+const bytea = customType<{ data: Buffer; driverData: Uint8Array }>({
+  dataType: () => "bytea",
+  fromDriver: (value) =>
+    Buffer.from(value.buffer, value.byteOffset, value.byteLength),
+})
 
 export const drawingFiles = pgTable("drawing_files", {
   id: text("id").primaryKey(),

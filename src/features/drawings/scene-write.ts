@@ -2,8 +2,7 @@
 
 import { randomUUID } from "node:crypto"
 import { and, eq, inArray, isNull, notExists, sql } from "drizzle-orm"
-import type { NodePgDatabase } from "drizzle-orm/node-postgres"
-import type * as schema from "@/db/schema"
+import type { Db } from "@/db"
 import { drawingFiles, drawings, shares } from "@/db/schema"
 import { storedImageBytes } from "@/features/collab/room-file-store"
 import {
@@ -14,8 +13,6 @@ import {
 import { accessibleTo } from "@/features/spaces/access"
 import { dataUrlToBytes } from "./file-bytes"
 import { parseSceneElements, sceneText } from "./search"
-
-type Db = NodePgDatabase<typeof schema>
 
 export type SceneWriteResult =
   /**

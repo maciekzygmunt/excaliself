@@ -3,17 +3,14 @@
 // with a fake db.
 
 import { count, eq } from "drizzle-orm"
-import type { NodePgDatabase } from "drizzle-orm/node-postgres"
-import type * as schema from "@/db/schema"
+import type { Db } from "@/db"
 import { drawings, folders, users } from "@/db/schema"
-
-type Db = Pick<NodePgDatabase<typeof schema>, "select">
 
 /**
  * True once the instance has a second member, or Team holds anything,
  * trashed rows included, so a last remaining member can still reach it.
  */
-export async function isTeamEnabled(db: Db): Promise<boolean> {
+export async function isTeamEnabled(db: Pick<Db, "select">): Promise<boolean> {
   const [[members], teamDrawings, teamFolders] = await Promise.all([
     db.select({ count: count() }).from(users),
     db
