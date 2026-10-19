@@ -2,8 +2,7 @@
 
 import { randomUUID } from "node:crypto"
 import { and, eq, sql } from "drizzle-orm"
-import type { NodePgDatabase } from "drizzle-orm/node-postgres"
-import type * as schema from "@/db/schema"
+import type { Db } from "@/db"
 import { drawingFiles } from "@/db/schema"
 import { bytesToDataUrl, dataUrlToBytes } from "@/features/drawings/file-bytes"
 import {
@@ -11,8 +10,6 @@ import {
   type RoomFile,
   type RoomFilePayload,
 } from "./room-files"
-
-type Db = NodePgDatabase<typeof schema>
 
 /** Image bytes the drawing stores now. Also runs inside a transaction. */
 export async function storedImageBytes(

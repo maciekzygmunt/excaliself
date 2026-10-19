@@ -1,8 +1,7 @@
 // Drawing id → room: how members reach a Team Drawing's Room, with no link.
 
 import { eq } from "drizzle-orm"
-import type { NodePgDatabase } from "drizzle-orm/node-postgres"
-import type * as schema from "@/db/schema"
+import type { Db } from "@/db"
 import { drawings } from "@/db/schema"
 import { canAccess } from "@/features/spaces/access"
 import { auth } from "@/lib/auth"
@@ -14,7 +13,7 @@ import type { RoomJoin } from "./room-token"
  * Drawing's Room is reached only through its Share link.
  */
 export async function resolveRoomForDrawing(
-  db: NodePgDatabase<typeof schema>,
+  db: Db,
   drawingId: string,
   headers: Headers,
 ): Promise<RoomJoin> {

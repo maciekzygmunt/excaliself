@@ -2,6 +2,7 @@
 
 import { randomBytes, randomUUID } from "node:crypto"
 import { createServerFn } from "@tanstack/react-start"
+import { getRequestHeaders } from "@tanstack/react-start/server"
 import { and, eq, gt, isNull } from "drizzle-orm"
 import z from "zod"
 import { db } from "@/db"
@@ -157,6 +158,8 @@ export const resetPasswordWithToken = createServerFn({ method: "POST" })
     // tanstackStartCookies copies its cookie onto this server function's
     // response, so the browser lands in the app already authenticated.
     await auth.api.signInEmail({
+      // Preview derives its base URL from the request.
+      headers: getRequestHeaders(),
       body: { email, password: data.password },
     })
   })

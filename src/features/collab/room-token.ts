@@ -1,7 +1,6 @@
 // Token → room, with the same access checks as the share page.
 
-import type { NodePgDatabase } from "drizzle-orm/node-postgres"
-import type * as schema from "@/db/schema"
+import type { Db } from "@/db"
 import { resolveShareAccess } from "@/features/shares/access"
 import { resolveShareForRoom } from "@/features/shares/store"
 import { auth } from "@/lib/auth"
@@ -14,7 +13,7 @@ export type RoomJoin =
   | { status: "refused" }
 
 export async function resolveRoomForToken(
-  db: NodePgDatabase<typeof schema>,
+  db: Db,
   token: string,
   headers: Headers,
 ): Promise<RoomJoin> {

@@ -14,7 +14,9 @@ vi.mock("better-auth/adapters/drizzle", () => ({
   drizzleAdapter: () => memoryAdapter(store),
 }))
 vi.mock("@/db", () => ({ db: {} }))
-vi.mock("@/env", () => ({ env: { BASE_URL: "http://127.0.0.1:3000" } }))
+vi.mock("@/env", () => ({
+  env: { BASE_URL: "http://127.0.0.1:3000", PREVIEW_HOSTS: [] },
+}))
 vi.stubEnv("BETTER_AUTH_SECRET", "test-secret-test-secret-test-secret-00")
 
 const { auth } = await import("./auth")

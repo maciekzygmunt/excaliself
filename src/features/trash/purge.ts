@@ -5,14 +5,11 @@
 // over from downtime are caught on the next boot.
 
 import { and, inArray, lte } from "drizzle-orm"
-import type { NodePgDatabase } from "drizzle-orm/node-postgres"
-import type * as schema from "@/db/schema"
+import type { Db } from "@/db"
 import { drawings, folders } from "@/db/schema"
 import { purgeCutoff } from "./retention"
 
 export const TRASH_PURGE_INTERVAL_MS = 60 * 60 * 1000 // hourly
-
-type Db = NodePgDatabase<typeof schema>
 
 export type PurgeCounts = { purgedDrawings: number; purgedFolders: number }
 

@@ -3,12 +3,9 @@
 // a fake db, mirroring purge.ts.
 
 import { and, eq, inArray, isNotNull, not } from "drizzle-orm"
-import type { NodePgDatabase } from "drizzle-orm/node-postgres"
-import type * as schema from "@/db/schema"
+import type { Db } from "@/db"
 import { drawings, folders } from "@/db/schema"
 import { accessibleTo } from "@/features/spaces/access"
-
-type Db = NodePgDatabase<typeof schema>
 
 /**
  * Hard-deletes one trash unit: every row swept into it (matched by

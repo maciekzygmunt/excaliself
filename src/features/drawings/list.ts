@@ -3,14 +3,11 @@
 // drive it with a fake db.
 
 import { and, desc, eq, isNull } from "drizzle-orm"
-import type { NodePgDatabase } from "drizzle-orm/node-postgres"
-import type * as schema from "@/db/schema"
+import type { Db } from "@/db"
 import { drawings, stars, users } from "@/db/schema"
 import { userDisplayName, userInitials } from "@/features/account/display-name"
 import { accessibleTo } from "@/features/spaces/access"
 import { drawingListColumns, starOf } from "./list-columns"
-
-type Db = NodePgDatabase<typeof schema>
 
 /** Every untrashed drawing `userId` can see, in both spaces, newest edit first. */
 export async function listDrawings(db: Db, userId: string) {

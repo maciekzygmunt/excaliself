@@ -1,16 +1,13 @@
 // What a Room loads on spin-up and writes back.
 
 import { and, eq, lt, notInArray } from "drizzle-orm"
-import type { NodePgDatabase } from "drizzle-orm/node-postgres"
-import type * as schema from "@/db/schema"
+import type { Db } from "@/db"
 import { drawingFiles, drawings } from "@/db/schema"
 import { referencedFileIds } from "@/features/drawings/scene-write"
 import { sceneText } from "@/features/drawings/search"
 import type { AccessRow } from "@/features/spaces/access"
 import type { SceneElement } from "./protocol"
 import { DELETED_ELEMENT_TIMEOUT_MS } from "./scene-sync"
-
-type Db = NodePgDatabase<typeof schema>
 
 /** The stored scene plus what the live badge's access check needs. */
 export type StoredScene = {
