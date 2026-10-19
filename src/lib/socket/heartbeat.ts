@@ -1,4 +1,4 @@
-// App-level PING, since browsers can't send ws pings. Keeps idle rooms past a
+// App-level PING, since browsers can't send ws pings. Keeps idle sockets past a
 // proxy's 60 s timeout; a missing PONG finds sockets that died without a FIN.
 
 export const HEARTBEAT_INTERVAL_MS = 25_000

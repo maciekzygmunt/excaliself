@@ -2,6 +2,7 @@
 
 import { db } from "@/db"
 import { processSingleton } from "@/lib/process-singleton"
+import { registerShutdownFlush } from "@/lib/socket/shutdown"
 import {
   closeAllRooms,
   createRoomRegistry,
@@ -12,7 +13,6 @@ import {
   trashRoom,
 } from "./room-session"
 import { loadRoomScene, saveRoomScene } from "./scene-store"
-import { registerShutdownFlush } from "./shutdown"
 
 /** One per process, so SIGTERM gets one shutdown handler, not one per bundle. */
 export const rooms: RoomRegistry = processSingleton("collab-rooms", () => {

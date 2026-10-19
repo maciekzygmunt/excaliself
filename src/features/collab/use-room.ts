@@ -14,9 +14,9 @@ import type {
   ExcalidrawImperativeAPI,
 } from "@excalidraw/excalidraw/types"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { createReconnectBackoff } from "./backoff"
+import { createReconnectBackoff } from "@/lib/socket/backoff"
+import { createHeartbeat, type Heartbeat } from "@/lib/socket/heartbeat"
 import { toCollaborators } from "./collaborators"
-import { createHeartbeat, type Heartbeat } from "./heartbeat"
 import type {
   ClientMessage,
   Participant,

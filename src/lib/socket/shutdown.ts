@@ -1,5 +1,11 @@
-// Flush and close every Room on SIGTERM. Never exit here: srvx has its own handler
-// that drains in-flight requests, and exiting would cut that short.
+// Close a socket route's peers on SIGTERM: srvx's drain skips upgraded sockets,
+// so open ones would keep the old process alive. Never exit here: srvx has its
+// own handler that drains in-flight requests, and exiting would cut that short.
+
+/** Standard "Service Restart". Clients retry it like any outage. */
+export const SERVER_RESTART_CLOSE_CODE = 1012
+
+export const SERVER_RESTART_CLOSE_REASON = "Server restarting"
 
 /** The slice of `process` this needs. */
 export type ShutdownHost = {
@@ -16,7 +22,7 @@ export function registerShutdownFlush(
   const host = options.host ?? process
   for (const signal of SIGNALS) {
     host.once(signal, () => {
-      // The Room already logs failures; this only avoids an unhandled rejection.
+      // Callers log their own failures; this only avoids an unhandled rejection.
       void flush().catch(() => {})
     })
   }

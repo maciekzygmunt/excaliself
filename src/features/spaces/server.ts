@@ -8,6 +8,7 @@ import { drawings } from "@/db/schema"
 import { rooms } from "@/features/collab/room-registry"
 import { moveRoomToTeam } from "@/features/collab/room-session"
 import { authMiddleware } from "@/middleware/auth"
+import { listsChangedMiddleware } from "@/middleware/lists-changed"
 import { accessibleTo } from "./access"
 import { moveToTeam as moveToTeamEngine } from "./move-to-team"
 
@@ -16,7 +17,7 @@ import { moveToTeam as moveToTeamEngine } from "./move-to-team"
  * first; afterwards every tab of a moved drawing joins its Room by id.
  */
 export const moveToTeam = createServerFn({ method: "POST" })
-  .middleware([authMiddleware])
+  .middleware([authMiddleware, listsChangedMiddleware])
   .validator(
     z.object({
       item: z.object({ type: z.enum(["drawing", "folder"]), id: z.string() }),

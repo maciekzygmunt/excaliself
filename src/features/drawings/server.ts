@@ -13,6 +13,7 @@ import { lockFolderTree } from "@/features/folders/tree-lock"
 import { accessibleTo } from "@/features/spaces/access"
 import { restoreDrawingUnit } from "@/features/trash/restore"
 import { authMiddleware } from "@/middleware/auth"
+import { listsChangedMiddleware } from "@/middleware/lists-changed"
 import { bytesToDataUrl } from "./file-bytes"
 import { listDrawings } from "./list"
 import { writeDrawingScene } from "./scene-write"
@@ -72,7 +73,7 @@ export const getDrawingWithFiles = createServerFn({ method: "GET" })
   })
 
 export const createDrawing = createServerFn({ method: "POST" })
-  .middleware([authMiddleware])
+  .middleware([authMiddleware, listsChangedMiddleware])
   .validator(
     z.object({
       name: z.string().min(1).optional(),
@@ -107,7 +108,7 @@ export const createDrawing = createServerFn({ method: "POST" })
   })
 
 export const updateDrawing = createServerFn({ method: "POST" })
-  .middleware([authMiddleware])
+  .middleware([authMiddleware, listsChangedMiddleware])
   .validator(
     z.object({
       id: z.string(),
@@ -145,7 +146,7 @@ export const updateDrawing = createServerFn({ method: "POST" })
   })
 
 export const setDrawingStarred = createServerFn({ method: "POST" })
-  .middleware([authMiddleware])
+  .middleware([authMiddleware, listsChangedMiddleware])
   .validator(
     z.object({
       id: z.string(),
@@ -198,7 +199,7 @@ export const saveDrawingScene = createServerFn({ method: "POST" })
   )
 
 export const trashDrawing = createServerFn({ method: "POST" })
-  .middleware([authMiddleware])
+  .middleware([authMiddleware, listsChangedMiddleware])
   .validator(z.string())
   .handler(async ({ data: id, context }) => {
     const userId = context.session.user.id
@@ -228,7 +229,7 @@ export const trashDrawing = createServerFn({ method: "POST" })
 
 /** Restores a trashed drawing; see restoreDrawingUnit for the landing rules. */
 export const restoreDrawing = createServerFn({ method: "POST" })
-  .middleware([authMiddleware])
+  .middleware([authMiddleware, listsChangedMiddleware])
   .validator(z.string())
   .handler(async ({ data: id, context }) =>
     restoreDrawingUnit(db, context.session.user.id, id),

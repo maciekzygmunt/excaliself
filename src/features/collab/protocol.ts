@@ -17,11 +17,6 @@ export const LINK_DEAD_CLOSE_REASON = "Link no longer active"
  */
 export const DRAWING_TRASHED_CLOSE_CODE = 4011
 
-/** Standard "Service Restart". The client retries it like any outage. */
-export const SERVER_RESTART_CLOSE_CODE = 1012
-
-export const SERVER_RESTART_CLOSE_REASON = "Server restarting"
-
 /** The stored scene can't be parsed, so a Room could never save. Also final. */
 export const SCENE_UNREADABLE_CLOSE_CODE = 4022
 
