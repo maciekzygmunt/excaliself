@@ -1,12 +1,16 @@
 "use server"
 
 import { createServerFn } from "@tanstack/react-start"
-import { and, eq, getTableColumns, isNotNull } from "drizzle-orm"
+import { and, eq, isNotNull } from "drizzle-orm"
 import { z } from "zod"
 import { db } from "@/db"
 import { drawings, folders, type Space, stars, users } from "@/db/schema"
 import { userDisplayName } from "@/features/account/display-name"
-import { drawingListColumns, starOf } from "@/features/drawings/list-columns"
+import {
+  drawingListColumns,
+  folderColumns,
+  starOf,
+} from "@/features/drawings/list-columns"
 import { accessibleTo, inPrivateSpaceOf } from "@/features/spaces/access"
 import { authMiddleware } from "@/middleware/auth"
 import { listsChangedMiddleware } from "@/middleware/lists-changed"
@@ -52,7 +56,7 @@ export const getTrashItems = createServerFn({ method: "GET" })
             ),
           ),
         db
-          .select({ ...getTableColumns(folders), trasher: trasherColumns })
+          .select({ ...folderColumns, trasher: trasherColumns })
           .from(folders)
           .leftJoin(users, eq(users.id, folders.deletedBy))
           .where(

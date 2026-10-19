@@ -8,6 +8,7 @@ import { db } from "@/db"
 import { drawings, folders, spaces } from "@/db/schema"
 import { userDisplayName } from "@/features/account/display-name"
 import { endTrashedRooms } from "@/features/collab/room-registry"
+import { folderColumns } from "@/features/drawings/list-columns"
 import { accessibleTo } from "@/features/spaces/access"
 import { restoreFolderUnit } from "@/features/trash/restore"
 import { authMiddleware } from "@/middleware/auth"
@@ -21,7 +22,7 @@ export const getFolders = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const userId = context.session.user.id
     return db
-      .select()
+      .select(folderColumns)
       .from(folders)
       .where(and(accessibleTo(folders, userId), isNull(folders.deletedAt)))
       .orderBy(asc(folders.name))
@@ -59,7 +60,7 @@ export const createFolder = createServerFn({ method: "POST" })
           createdAt: now,
           updatedAt: now,
         })
-        .returning()
+        .returning(folderColumns)
       return folder
     })
   })

@@ -111,8 +111,15 @@ export type UploadParse =
   /** 413 */
   | { status: "too-large" }
 
-/** The mime type comes from the data URL itself, so it can't disagree with the bytes. */
-export function parseFileUpload(fileId: string, body: unknown): UploadParse {
+/**
+ * The mime type comes from the data URL itself, so it can't disagree with the
+ * bytes. `maxBytes` is raised only by the Excalidraw+ import.
+ */
+export function parseFileUpload(
+  fileId: string,
+  body: unknown,
+  maxBytes = MAX_IMAGE_BYTES,
+): UploadParse {
   if (!FILE_ID.test(fileId)) return { status: "invalid" }
   if (typeof body !== "object" || body === null) return { status: "invalid" }
 
@@ -131,7 +138,7 @@ export function parseFileUpload(fileId: string, body: unknown): UploadParse {
   if (byteLength === 0) return { status: "invalid" }
 
   // Size is judged last so a malformed body reads as a 400, never a 413.
-  if (byteLength > MAX_IMAGE_BYTES) return { status: "too-large" }
+  if (byteLength > maxBytes) return { status: "too-large" }
 
   return {
     status: "ok",
