@@ -36,7 +36,6 @@ export function useListUpdates() {
     const backoff = createReconnectBackoff()
     let socket: WebSocket | null = null
     let retryTimer: ReturnType<typeof setTimeout> | null = null
-    let everOpened = false
     // Set while a refetch waits for this tab's own mutations to settle.
     let stopWaiting: (() => void) | null = null
 
@@ -64,9 +63,8 @@ export function useListUpdates() {
       current.addEventListener("open", () => {
         beat.start()
         backoff.reset()
-        // Changes made while this tab was offline sent it nothing.
-        if (everOpened) refetchLists()
-        everOpened = true
+        // Changes before this open (after the loader's fetch, or in an outage) sent it nothing.
+        refetchLists()
       })
 
       current.addEventListener("message", (event) => {

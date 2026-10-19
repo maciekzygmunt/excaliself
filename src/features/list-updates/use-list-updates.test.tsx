@@ -68,9 +68,9 @@ afterEach(() => {
 })
 
 test("a change refetches the drawing, folder, and trash lists", () => {
-  const { invalidatedKeys } = renderListUpdates()
+  const { invalidate, invalidatedKeys } = renderListUpdates()
   act(() => sockets[0].open())
-  expect(invalidatedKeys()).toEqual([])
+  invalidate.mockClear()
 
   act(() => sockets[0].receive(LISTS_CHANGED))
   expect(invalidatedKeys()).toEqual([["drawings"], ["folders"], ["trash"]])
@@ -79,8 +79,9 @@ test("a change refetches the drawing, folder, and trash lists", () => {
 test("a change during this tab's own mutation waits for it to settle", async () => {
   // Query's notify batching runs on timers.
   vi.useRealTimers()
-  const { queryClient, invalidatedKeys } = renderListUpdates()
+  const { queryClient, invalidate, invalidatedKeys } = renderListUpdates()
   act(() => sockets[0].open())
+  invalidate.mockClear()
   // Made up front: execute() calls mutationFn only after a few ticks.
   let finish = () => {}
   const promise = new Promise<void>((resolve) => {
@@ -103,15 +104,16 @@ test("a change during this tab's own mutation waits for it to settle", async () 
   expect(invalidatedKeys()).toEqual([["drawings"], ["folders"], ["trash"]])
 })
 
-test("a dropped socket dials again and catches up on what it missed", () => {
+test("each open catches up on changes the tab missed", () => {
   const { invalidate } = renderListUpdates()
   act(() => sockets[0].open())
+  expect(invalidate).toHaveBeenCalledTimes(3)
   act(() => sockets[0].close(1006))
 
   waitOutBackoff()
   expect(sockets).toHaveLength(2)
   act(() => sockets[1].open())
-  expect(invalidate).toHaveBeenCalledTimes(3)
+  expect(invalidate).toHaveBeenCalledTimes(6)
 })
 
 test("a signed-out close stops dialing", () => {

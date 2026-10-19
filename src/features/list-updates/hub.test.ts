@@ -15,3 +15,13 @@ test("a change reaches every open tab, and a closed one hears nothing", () => {
   expect(ada).toHaveBeenCalledOnce()
   expect(bob).toHaveBeenCalledTimes(2)
 })
+
+test("a tab that joins after closeAll is hung up at once", () => {
+  const hub = createListUpdateHub()
+  hub.closeAll()
+  const close = vi.fn()
+
+  hub.add({ notify: vi.fn(), close })
+
+  expect(close).toHaveBeenCalledOnce()
+})

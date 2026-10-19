@@ -8,10 +8,13 @@ type Listener = { notify: () => void; close: () => void }
 
 export function createListUpdateHub() {
   const listeners = new Set<Listener>()
+  let closing = false
   return {
     /** Returns the unsubscribe. */
     add(listener: Listener): () => void {
       listeners.add(listener)
+      // An upgrade still awaiting its session can open after closeAll.
+      if (closing) listener.close()
       return () => listeners.delete(listener)
     },
 
@@ -25,6 +28,7 @@ export function createListUpdateHub() {
 
     /** Hangs up every tab, so open sockets don't hold a stopping server alive. */
     closeAll() {
+      closing = true
       for (const listener of listeners) listener.close()
     },
   }
