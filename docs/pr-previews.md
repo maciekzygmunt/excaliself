@@ -42,6 +42,9 @@ apps.
 
    `BASE_URL` and `DATABASE_URL` can keep the copied values. Preview mode
    ignores them.
+
+   Turn on **Runtime** for each preview variable. Coolify can copy them with
+   Runtime off, and then it uses the production value in the preview.
 5. Open a PR. Then open `https://<pr number>.draw.example.com/preview/login`.
 
 When the PR closes, Coolify removes its containers and volumes.
