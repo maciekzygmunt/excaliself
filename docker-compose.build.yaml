@@ -23,11 +23,12 @@ services:
     build: .
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-excaliself}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-excaliself}
-      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?Set BETTER_AUTH_SECRET in .env}
+      # No default here: Coolify writes the production value of a defaulted
+      # variable into previews too. The app checks the secret at boot.
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
       BASE_URL: ${BASE_URL:-http://localhost:3000}
-      # Set only for Coolify PR previews, see docs/pr-previews.md.
-      PREVIEW_MODE: ${PREVIEW_MODE:-false}
-      PREVIEW_HOSTS: ${PREVIEW_HOSTS:-}
+      # PREVIEW_MODE and PREVIEW_HOSTS come from Coolify's .env, which it adds
+      # to every service. See docs/pr-previews.md.
     depends_on:
       db:
         condition: service_healthy
