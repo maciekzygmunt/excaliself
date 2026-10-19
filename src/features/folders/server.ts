@@ -11,6 +11,7 @@ import { endTrashedRooms } from "@/features/collab/room-registry"
 import { accessibleTo } from "@/features/spaces/access"
 import { restoreFolderUnit } from "@/features/trash/restore"
 import { authMiddleware } from "@/middleware/auth"
+import { listsChangedMiddleware } from "@/middleware/lists-changed"
 import { assertFolderTarget } from "./ownership"
 import { collectFolderSubtreeIds } from "./subtree"
 import { lockFolderTree } from "./tree-lock"
@@ -27,7 +28,7 @@ export const getFolders = createServerFn({ method: "GET" })
   })
 
 export const createFolder = createServerFn({ method: "POST" })
-  .middleware([authMiddleware])
+  .middleware([authMiddleware, listsChangedMiddleware])
   .validator(
     z.object({
       name: z.string().min(1),
@@ -64,7 +65,7 @@ export const createFolder = createServerFn({ method: "POST" })
   })
 
 export const updateFolder = createServerFn({ method: "POST" })
-  .middleware([authMiddleware])
+  .middleware([authMiddleware, listsChangedMiddleware])
   .validator(
     z.object({
       id: z.string(),
@@ -113,7 +114,7 @@ export const updateFolder = createServerFn({ method: "POST" })
  * things trashed separately before it.
  */
 export const trashFolder = createServerFn({ method: "POST" })
-  .middleware([authMiddleware])
+  .middleware([authMiddleware, listsChangedMiddleware])
   .validator(z.string())
   .handler(async ({ data: id, context }) => {
     const userId = context.session.user.id
@@ -163,7 +164,7 @@ export const trashFolder = createServerFn({ method: "POST" })
 
 /** Restores a folder trash unit; see restoreFolderUnit for the landing rules. */
 export const restoreFolder = createServerFn({ method: "POST" })
-  .middleware([authMiddleware])
+  .middleware([authMiddleware, listsChangedMiddleware])
   .validator(z.string())
   .handler(async ({ data: id, context }) =>
     restoreFolderUnit(db, context.session.user.id, id),

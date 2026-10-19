@@ -8,8 +8,11 @@
 
 import { act, cleanup, render } from "@testing-library/react"
 import { afterEach, beforeEach, expect, test, vi } from "vitest"
-import { RECONNECT_MAX_DELAY_MS } from "./backoff"
-import { HEARTBEAT_INTERVAL_MS, HEARTBEAT_TIMEOUT_MS } from "./heartbeat"
+import { RECONNECT_MAX_DELAY_MS } from "@/lib/socket/backoff"
+import {
+  HEARTBEAT_INTERVAL_MS,
+  HEARTBEAT_TIMEOUT_MS,
+} from "@/lib/socket/heartbeat"
 import type { SceneElement, ServerMessage } from "./protocol"
 import {
   DRAWING_TRASHED_CLOSE_CODE,

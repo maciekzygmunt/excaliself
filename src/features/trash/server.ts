@@ -9,6 +9,7 @@ import { userDisplayName } from "@/features/account/display-name"
 import { drawingListColumns, starOf } from "@/features/drawings/list-columns"
 import { accessibleTo, inPrivateSpaceOf } from "@/features/spaces/access"
 import { authMiddleware } from "@/middleware/auth"
+import { listsChangedMiddleware } from "@/middleware/lists-changed"
 import { destroyTrashUnit } from "./destroy"
 
 // The member who trashed a unit, joined on deletedBy. Null once deleted.
@@ -126,7 +127,7 @@ export const getTrashItems = createServerFn({ method: "GET" })
  * take them down with it.
  */
 export const deleteTrashUnitForever = createServerFn({ method: "POST" })
-  .middleware([authMiddleware])
+  .middleware([authMiddleware, listsChangedMiddleware])
   .validator(z.string())
   .handler(async ({ data: id, context }) => {
     await destroyTrashUnit(db, context.session.user.id, id)
@@ -139,7 +140,7 @@ export const deleteTrashUnitForever = createServerFn({ method: "POST" })
  * trash is a no-op, not an error (the UI hides the action anyway).
  */
 export const emptyTrash = createServerFn({ method: "POST" })
-  .middleware([authMiddleware])
+  .middleware([authMiddleware, listsChangedMiddleware])
   .handler(async ({ context }) => {
     const userId = context.session.user.id
 

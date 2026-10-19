@@ -10,8 +10,6 @@ import {
   LINK_DEAD_CLOSE_CODE,
   LINK_DEAD_CLOSE_REASON,
   ROOM_FULL_CLOSE_CODE,
-  SERVER_RESTART_CLOSE_CODE,
-  SERVER_RESTART_CLOSE_REASON,
 } from "@/features/collab/protocol"
 import { rooms } from "@/features/collab/room-registry"
 import type { ParticipantIdentity } from "@/features/collab/room-session"
@@ -26,6 +24,10 @@ import {
   tokenLookupsBlocked,
 } from "@/features/shares/token-rate-limit"
 import { socketIpOf } from "@/lib/client-ip"
+import {
+  SERVER_RESTART_CLOSE_CODE,
+  SERVER_RESTART_CLOSE_REASON,
+} from "@/lib/socket/shutdown"
 
 /** Keyed by drawing, not crossws's default pathname, so a new token keeps the room. */
 const namespaceFor = (roomId: string) => `room:${roomId}`

@@ -1,0 +1,18 @@
+// The lists socket's wire: plain strings, since nothing rides along. The
+// server says the lists changed and the tab refetches them.
+
+export const LISTS_CHANGED = "changed"
+export const PING = "ping"
+export const PONG = "pong"
+
+/** Sent to a socket with no session. Final: the tab stops dialing. */
+export const SIGNED_OUT_CLOSE_CODE = 4401
+
+/** Matches `server/routes/ws/lists.ts`. */
+export function listUpdatesUrl(location: {
+  protocol: string
+  host: string
+}): string {
+  const scheme = location.protocol === "https:" ? "wss:" : "ws:"
+  return `${scheme}//${location.host}/ws/lists`
+}

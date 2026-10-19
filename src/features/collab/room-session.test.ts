@@ -1,5 +1,6 @@
 import { expect, test, vi } from "vitest"
 import type { AccessRow } from "@/features/spaces/access"
+import { SERVER_RESTART_CLOSE_CODE } from "@/lib/socket/shutdown"
 import { guestNameForConnection } from "./identity"
 import type { SceneElement, ServerMessage } from "./protocol"
 import {
@@ -8,7 +9,6 @@ import {
   ROOM_TOPIC,
   SCENE_UNREADABLE_CLOSE_CODE,
   SCENE_UNREADABLE_CLOSE_REASON,
-  SERVER_RESTART_CLOSE_CODE,
 } from "./protocol"
 import {
   closeAllRooms,

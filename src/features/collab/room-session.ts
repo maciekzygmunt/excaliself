@@ -2,6 +2,10 @@
 // merge here first; peers hear the Room's ruling, not the sender's claim.
 
 import { type AccessRow, canAccess } from "@/features/spaces/access"
+import {
+  SERVER_RESTART_CLOSE_CODE,
+  SERVER_RESTART_CLOSE_REASON,
+} from "@/lib/socket/shutdown"
 import { guestNameForConnection, pickParticipantColor } from "./identity"
 import type { Participant, SceneElement, ServerMessage } from "./protocol"
 import {
@@ -12,8 +16,6 @@ import {
   ROOM_TOPIC,
   SCENE_UNREADABLE_CLOSE_CODE,
   SCENE_UNREADABLE_CLOSE_REASON,
-  SERVER_RESTART_CLOSE_CODE,
-  SERVER_RESTART_CLOSE_REASON,
 } from "./protocol"
 import { reconcileElements } from "./reconcile"
 import type { StoredScene } from "./scene-store"
