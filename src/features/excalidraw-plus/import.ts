@@ -4,7 +4,14 @@
 import { randomUUID } from "node:crypto"
 import { and, eq, isNull } from "drizzle-orm"
 import type { Db } from "@/db"
-import { drawingFiles, drawings, folders, type Space, stars } from "@/db/schema"
+import {
+  drawingFiles,
+  drawings,
+  folders,
+  type Space,
+  stars,
+  users,
+} from "@/db/schema"
 import {
   MAX_DRAWING_IMAGE_BYTES,
   parseFileUpload,
@@ -89,19 +96,36 @@ export function prepareScene(content: PlusSceneContent): PreparedScene {
 }
 
 /**
+ * Shared collections land in Team for everyone, so only admins import them;
+ * members bring their private scenes. The role is read fresh, as
+ * adminMiddleware does.
+ */
+export async function canImportShared(
+  db: Pick<Db, "select">,
+  userId: string,
+): Promise<boolean> {
+  const [user] = await db
+    .select({ role: users.role })
+    .from(users)
+    .where(eq(users.id, userId))
+  return user?.role === "admin"
+}
+
+/**
  * Imports one scene into the folder made for its collection, creating that
- * folder on first use. The private collection lands in Private; every other
- * one in `sharedSpace`. Skips a scene the member can already see a copy of.
+ * folder on first use. The private collection lands in Private, every other
+ * one in Team. Skips a scene the member can already see a copy of.
  */
 export async function importScene(
   db: Db,
   userId: string,
-  input: { scene: ImportScene; content: PlusSceneContent; sharedSpace: Space },
+  input: { scene: ImportScene; content: PlusSceneContent },
 ): Promise<ImportResult> {
-  const { scene, sharedSpace } = input
+  const { scene } = input
+  const space = scene.collection.id === PRIVATE_COLLECTION ? "private" : "team"
+  if (space === "team" && !(await canImportShared(db, userId)))
+    throw new Error("Only admins can import shared collections")
   const prepared = prepareScene(input.content)
-  const space =
-    scene.collection.id === PRIVATE_COLLECTION ? "private" : sharedSpace
 
   return db.transaction(async (tx) => {
     await lockFolderTree(tx, "place")

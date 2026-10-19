@@ -46,7 +46,7 @@ async function scanAndImport(scenes: ReturnType<typeof scene>[]) {
   })
   const queryClient = new QueryClient()
   queryClient.setQueryData(currentUserQueryOptions().queryKey, {
-    teamEnabled: true,
+    role: "admin",
   } as never)
   render(
     <QueryClientProvider client={queryClient}>
