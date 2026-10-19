@@ -21,9 +21,11 @@ vi.mock("sonner", () => ({
   toast: Object.assign(vi.fn(), { error: vi.fn(), dismiss: vi.fn() }),
 }))
 
-let demo = false
-vi.mock("@/features/account/server", () => ({
-  getCurrentUser: async () => ({ demo }),
+let instanceMode = "standard"
+vi.mock("@tanstack/react-router", () => ({
+  // The root route's data.
+  useLoaderData: ({ select }: { select: (site: object) => unknown }) =>
+    select({ instanceMode }),
 }))
 
 vi.mock("@/features/shares/server", () => ({
@@ -73,7 +75,7 @@ function renderDialog(
 
 beforeEach(() => {
   vi.clearAllMocks()
-  demo = false
+  instanceMode = "standard"
 })
 
 // Auto-cleanup needs vitest globals, which this repo leaves off; without it
@@ -101,14 +103,12 @@ test("unshared: audience cards are pickable before the link exists and seed the 
 })
 
 test("in the demo, the anyone card can't be picked, as the server refuses it", async () => {
-  demo = true
+  instanceMode = "demo"
   renderDialog(null)
 
-  await waitFor(() =>
-    expect(
-      screen.getByRole("radio", { name: /anyone with the link/i }),
-    ).toHaveProperty("disabled", true),
-  )
+  expect(
+    screen.getByRole("radio", { name: /anyone with the link/i }),
+  ).toHaveProperty("disabled", true)
   expect(screen.getByText("Not available in the demo.")).toBeDefined()
 })
 

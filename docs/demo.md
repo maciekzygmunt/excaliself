@@ -13,6 +13,8 @@ stricter variant of [preview mode](./pr-previews.md):
   after sign-up (default 6). A nightly restart (below) clears everything.
 - The instance has an admin that nobody can sign in as, so `/setup` stays
   closed. `/preview/login` returns 404.
+- `DEMO_MODE` and `PREVIEW_MODE` cannot be set together: the app does not
+  start.
 
 All visitors are members of one instance, so the demo refuses what would let
 them reach each other's work, or what would make no sense on a throwaway
@@ -22,10 +24,12 @@ account. The server enforces each rule; the UI only hides what it refuses.
 |---|---|
 | Team space | The database refuses Team rows. The UI hides Team |
 | "Anyone" Share links | The database refuses them. Members links work, so two visitors can still draw together |
-| Admin pages, invites and password resets | The admin middleware refuses everyone |
-| Changing email or password, deleting the account | The server functions and the better-auth endpoints refuse them |
+| Admin pages, invites and password resets | Nobody can sign in as the admin |
+| Changing email or password | Visitors never learn their password, which both need |
+| Deleting the account | The server refuses it. The cleanup job deletes it |
 | More than 50 drawings or 50 folders per account | Checked when one is made |
-| Scenes over 1 MB, images over 4 MB per drawing | Checked on save and upload |
+| Scenes over 1 MB | Checked on each save, and on each Room update for shared drawings. A Room tells the sender why it refused |
+| Images over 4 MB per drawing | Checked on each save and upload |
 | More than 10 new accounts per IP address per hour | `/demo` returns 429 |
 
 ## Coolify setup

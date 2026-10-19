@@ -30,6 +30,10 @@ vi.mock("@tanstack/react-router", () => ({
     useParams: () => ({ token: TOKEN }),
   }),
   useRouter: () => ({ invalidate }),
+  // The sign-in gate reads the root route's data and the path.
+  useLoaderData: ({ select }: { select: (site: object) => unknown }) =>
+    select({ instanceMode: "standard" }),
+  useLocation: () => `/share/${TOKEN}`,
   useNavigate: () => navigate,
   Link: ({ to, children, ...rest }: { to: string; children?: ReactNode }) => (
     <a href={to} {...rest}>
@@ -39,7 +43,6 @@ vi.mock("@tanstack/react-router", () => ({
 }))
 
 vi.mock("@/features/shares/server", () => ({ resolveShareToken: vi.fn() }))
-vi.mock("@/features/demo/server", () => ({ getDemoMode: async () => false }))
 vi.mock("@/features/spaces/server", () => ({ isOpenAsTeam: vi.fn() }))
 
 // The real one drags Excalidraw into jsdom; this slice is about the states

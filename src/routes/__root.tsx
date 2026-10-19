@@ -12,6 +12,7 @@ import { getRequest } from "@tanstack/react-start/server"
 import { Toaster } from "@/components/ui/sonner"
 import { env } from "@/env"
 import { PRODUCT_NAME, TAGLINE } from "@/lib/document-title"
+import { instanceMode } from "@/lib/mode"
 import { resolveOrigin } from "@/lib/site-origin"
 import { THEME_COLORS, themeBootstrapScript } from "@/lib/theme"
 import appCss from "../styles.css?url"
@@ -23,24 +24,25 @@ interface MyRouterContext {
   queryClient: QueryClient
 }
 
-const getSiteOrigin = createServerFn({ method: "GET" }).handler(async () => {
+// Per-process facts every page may need: the public origin for og tags, and
+// the instance mode, which changes what the login and share pages offer.
+const getSiteInfo = createServerFn({ method: "GET" }).handler(async () => {
   const request = getRequest()
-  return resolveOrigin({
-    baseUrl: env.BASE_URL,
-    headers: request.headers,
-    requestUrl: request.url,
-  })
+  return {
+    origin: resolveOrigin({
+      baseUrl: env.BASE_URL,
+      headers: request.headers,
+      requestUrl: request.url,
+    }),
+    instanceMode,
+  }
 })
 
 export const Route = createRootRouteWithContext<MyRouterContext>()({
-  // Crawlers only see the SSR pass, where the origin comes from the request;
-  // on the client the loader stays local so navigations never RPC for it.
-  loader: async () => {
-    if (typeof window !== "undefined") {
-      return { origin: window.location.origin }
-    }
-    return { origin: await getSiteOrigin() }
-  },
+  // Loaded once in the SSR pass; never stale, so navigations do not ask
+  // again.
+  loader: () => getSiteInfo(),
+  staleTime: Number.POSITIVE_INFINITY,
   head: ({ loaderData }) => {
     // og:image must be absolute to resolve in link previews (spec §1).
     const ogImage = `${loaderData?.origin ?? ""}/og.png`

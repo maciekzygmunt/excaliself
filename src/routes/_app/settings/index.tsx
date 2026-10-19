@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query"
-import { createFileRoute } from "@tanstack/react-router"
+import { createFileRoute, useLoaderData } from "@tanstack/react-router"
 import { Separator } from "@/components/ui/separator"
 import { Skeleton } from "@/components/ui/skeleton"
 import { currentUserQueryOptions } from "@/features/account/queries"
@@ -21,6 +21,10 @@ export const Route = createFileRoute("/_app/settings/")({
 // skeleton (spec §4.3) covers cold loads without flashing on cache hits.
 function AccountPage() {
   const { data: user, isPending } = useQuery(currentUserQueryOptions())
+  const demo = useLoaderData({
+    from: "__root__",
+    select: (site) => site.instanceMode === "demo",
+  })
   useDocumentTitle("Settings", { chrome: true })
   const showSkeleton = useDelayedVisible(isPending)
 
@@ -31,7 +35,7 @@ function AccountPage() {
     <div className="flex flex-col gap-8 animate-in fade-in-0 duration-200 motion-reduce:animate-none">
       <ProfileSection user={user} />
       <Separator />
-      {user.demo ? (
+      {demo ? (
         <DemoAccountSection />
       ) : (
         <>
@@ -44,7 +48,7 @@ function AccountPage() {
       <SessionsSection />
       <Separator />
       <AppearanceSection />
-      {!user.demo && (
+      {!demo && (
         <>
           <Separator />
           <DangerZoneSection user={user} />
@@ -54,7 +58,8 @@ function AccountPage() {
   )
 }
 
-// The demo server refuses email, password and account deletion.
+// Demo visitors never learn their password, and the server refuses
+// account deletion.
 function DemoAccountSection() {
   return (
     <section>

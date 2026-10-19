@@ -1,7 +1,6 @@
 import type { PGlite } from "@electric-sql/pglite"
 import { drizzle } from "drizzle-orm/pglite"
 import { migrate } from "drizzle-orm/pglite/migrator"
-import { setUpDemoInstance } from "@/features/demo/instance"
 import { instanceMode } from "@/lib/mode"
 import type { Db } from "./index.ts"
 import { seedDemoContent } from "./preview-seed.ts"
@@ -17,7 +16,14 @@ export async function createPreviewDb(): Promise<Db> {
   console.warn(`[${instanceMode}] in-process PGlite, no DATABASE_URL`)
   const db = drizzle({ client: await loadPGlite(), schema })
   await migrate(db, { migrationsFolder: "./drizzle" })
-  await (instanceMode === "demo" ? setUpDemoInstance(db) : seedDemoContent(db))
+  if (instanceMode === "demo") {
+    // Loaded on demand: the demo's setup reads env.ts, which PR previews
+    // and their tests do not need.
+    const { setUpDemoInstance } = await import("@/features/demo/instance")
+    await setUpDemoInstance(db)
+  } else {
+    await seedDemoContent(db)
+  }
   console.warn(`[${instanceMode}] PGlite ready in ${Date.now() - startedAt} ms`)
   return db
 }

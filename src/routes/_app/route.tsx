@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query"
-import { createFileRoute, Outlet } from "@tanstack/react-router"
+import { createFileRoute, Outlet, useLoaderData } from "@tanstack/react-router"
 import { createServerFn } from "@tanstack/react-start"
 import type React from "react"
 import { DemoBanner } from "@/components/demo-banner"
@@ -43,6 +43,7 @@ export const Route = createFileRoute("/_app")({
 
 function AppShellLayout() {
   const { session, isAdmin } = Route.useLoaderData()
+  const { instanceMode } = useLoaderData({ from: "__root__" })
   // The user card subscribes to the currentUser cache so an optimistic
   // profile save on /settings shows up in the sidebar in the same frame.
   const { data: currentUser } = useQuery(currentUserQueryOptions())
@@ -73,7 +74,7 @@ function AppShellLayout() {
                 <SidebarReopenButton />
                 <Outlet />
               </SidebarInset>
-              {currentUser?.demo && <DemoBanner />}
+              {instanceMode === "demo" && <DemoBanner />}
             </CommandPaletteProvider>
           </MoveToTeamProvider>
         </CreateDialogProvider>

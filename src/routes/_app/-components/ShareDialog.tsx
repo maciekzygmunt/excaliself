@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query"
+import { useLoaderData } from "@tanstack/react-router"
 import { Check, Copy, Link2, RefreshCw, Users } from "lucide-react"
 import { useEffect, useState } from "react"
 import { toast } from "sonner"
@@ -9,7 +10,6 @@ import {
   DialogDescription,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { currentUserQueryOptions } from "@/features/account/queries"
 import type { ShareAudience } from "@/features/shares/access"
 import {
   useCreateShare,
@@ -132,63 +132,59 @@ function AudienceCards({
   value,
   onChange,
   disabled = false,
-  demo,
+  unavailable,
 }: {
   value: ShareAudience
   onChange: (audience: ShareAudience) => void
   disabled?: boolean
-  /** The demo server refuses "anyone": the instance is public. */
-  demo: boolean
+  /** An audience the server refuses here, and why, in place of its hint. */
+  unavailable?: { audience: ShareAudience; hint: string }
 }) {
   return (
     <div className="space-y-2">
-      {(["members", "anyone"] as const).map((audience) => {
-        const refused = demo && audience === "anyone"
-        return (
-          <label
-            key={audience}
+      {(["members", "anyone"] as const).map((audience) => (
+        <label
+          key={audience}
+          className={cn(
+            "flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors",
+            value === audience
+              ? "border-iris bg-iris-muted/50"
+              : "border-border/60 hover:border-border",
+            (disabled || unavailable?.audience === audience) &&
+              "cursor-default opacity-70",
+          )}
+        >
+          <input
+            type="radio"
+            name="share-audience"
+            checked={value === audience}
+            disabled={disabled || unavailable?.audience === audience}
+            onChange={() => onChange(audience)}
+            className="sr-only"
+          />
+          <span
+            aria-hidden
             className={cn(
-              "flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors",
-              value === audience
-                ? "border-iris bg-iris-muted/50"
-                : "border-border/60 hover:border-border",
-              (disabled || refused) && "cursor-default opacity-70",
+              "mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border",
+              value === audience ? "border-iris" : "border-muted-foreground/40",
             )}
           >
-            <input
-              type="radio"
-              name="share-audience"
-              checked={value === audience}
-              disabled={disabled || refused}
-              onChange={() => onChange(audience)}
-              className="sr-only"
-            />
-            <span
-              aria-hidden
-              className={cn(
-                "mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border",
-                value === audience
-                  ? "border-iris"
-                  : "border-muted-foreground/40",
-              )}
-            >
-              {value === audience && (
-                <span className="h-2 w-2 rounded-full bg-iris" />
-              )}
+            {value === audience && (
+              <span className="h-2 w-2 rounded-full bg-iris" />
+            )}
+          </span>
+          <span className="flex flex-col gap-0.5">
+            <span className="text-[13px] font-medium text-foreground">
+              {AUDIENCE_COPY[audience].label}
             </span>
-            <span className="flex flex-col gap-0.5">
-              <span className="text-[13px] font-medium text-foreground">
-                {AUDIENCE_COPY[audience].label}
-              </span>
-              <span className="text-xs text-muted-foreground">
-                {refused
-                  ? "Not available in the demo."
-                  : AUDIENCE_COPY[audience].hint}
-              </span>
+            <span className="text-xs text-muted-foreground">
+              {unavailable?.audience === audience
+                ? unavailable.hint
+                : AUDIENCE_COPY[audience].hint}
             </span>
-          </label>
-        )
-      })}
+          </span>
+        </label>
+      ))}
     </div>
   )
 }
@@ -217,9 +213,10 @@ export function ShareDialog({
   const stopMutation = useStopSharing(drawingId, { isTeam })
   const regenerateMutation = useRegenerateShare(drawingId)
   const audienceMutation = useSetShareAudience(drawingId)
-  const { data: demo = false } = useQuery({
-    ...currentUserQueryOptions(),
-    select: (user) => user.demo,
+  // The demo refuses "anyone" links: every visitor shares one instance.
+  const demo = useLoaderData({
+    from: "__root__",
+    select: (site) => site.instanceMode === "demo",
   })
 
   // One flag for all controls: the mutations race on the same cache entry.
@@ -264,7 +261,11 @@ export function ShareDialog({
             <AudienceCards
               value={shared ? share.audience : draftAudience}
               disabled={shared && busy}
-              demo={demo}
+              unavailable={
+                demo
+                  ? { audience: "anyone", hint: "Not available in the demo." }
+                  : undefined
+              }
               onChange={(audience) =>
                 shared
                   ? audienceMutation.mutate(audience)

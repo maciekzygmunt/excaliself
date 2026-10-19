@@ -7,13 +7,18 @@ import type { Db } from "@/db/index"
 import { createPreviewDb } from "@/db/preview"
 import { accounts, drawings, shares, stars, users } from "@/db/schema"
 import { listDrawings } from "@/features/drawings/list"
+import {
+  MAX_SCENE_BYTES,
+  writeDrawingScene,
+} from "@/features/drawings/scene-write"
 import { createShareLink } from "@/features/shares/store"
 import { moveToTeam } from "@/features/spaces/move-to-team"
 import { DEMO_LIMITS, demoRefusals } from "./policy"
 import { checkDemoQuota } from "./quota"
 import { createDemoVisitor, deleteExpiredVisitors } from "./visitors"
 
-vi.mock("@/lib/mode", () => ({ demoMode: true, previewMode: true }))
+vi.mock("@/lib/mode", () => ({ instanceMode: "demo" }))
+vi.mock("@/env", () => ({ env: { DEMO_RETENTION_HOURS: 6 } }))
 
 let db: Db
 beforeAll(async () => {
@@ -121,4 +126,18 @@ test("cleanup deletes old visitors with all they made, and keeps the rest", asyn
   expect(
     await db.select().from(users).where(eq(users.id, demoAdmin.id)),
   ).toHaveLength(1)
+})
+
+test("a solo save past the scene cap is refused", async () => {
+  const visitor = await createDemoVisitor(db)
+  const [drawing] = await drawingsOf(visitor.id)
+  const data = JSON.stringify({
+    elements: [],
+    padding: "x".repeat(DEMO_LIMITS.sceneBytes),
+  })
+
+  expect(MAX_SCENE_BYTES).toBe(DEMO_LIMITS.sceneBytes)
+  await expect(
+    writeDrawingScene(db, visitor.id, { id: drawing.id, data, files: [] }),
+  ).rejects.toThrow(demoRefusals.scene)
 })
