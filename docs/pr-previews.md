@@ -11,7 +11,7 @@ Each pull request can get its own throwaway instance on Coolify, for example
   `/setup`.
 - `/preview/login` signs in as the admin. `/preview/login?account=new` signs
   in as a new member, so testers do not share one account. Both return 404
-  outside preview mode.
+  outside preview mode. In preview, `/login` shows a link to each of them.
 
 Locally, `pnpm dev:preview` runs the same mode with no Postgres and no `.env`.
 

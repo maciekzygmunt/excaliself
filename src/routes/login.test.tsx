@@ -3,10 +3,12 @@ import { afterEach, beforeEach, expect, test, vi } from "vitest"
 
 const navigate = vi.fn()
 let search: { redirect?: string } = {}
+let previewMode = false
 
 vi.mock("@tanstack/react-router", () => ({
   createFileRoute: () => (options: { component: React.ComponentType }) => ({
     options,
+    useLoaderData: () => previewMode,
   }),
   useNavigate: () => navigate,
   useSearch: () => search,
@@ -24,6 +26,10 @@ vi.mock("@/middleware/setup", () => ({
   setupMiddleware: {},
 }))
 
+vi.mock("@/features/auth/server", () => ({
+  getPreviewMode: vi.fn(),
+}))
+
 // Auto-cleanup needs vitest globals, which this repo leaves off.
 afterEach(cleanup)
 
@@ -31,6 +37,7 @@ beforeEach(() => {
   navigate.mockClear()
   signInEmail.mockClear()
   search = {}
+  previewMode = false
 })
 
 async function renderLogin() {
@@ -94,4 +101,19 @@ test("a cross-origin ?redirect is ignored in favor of /draw", async () => {
   await renderLogin()
   await signIn()
   expect(navigate).toHaveBeenCalledWith({ href: "/draw" })
+})
+
+test("a PR preview offers one-click sign-in links", async () => {
+  previewMode = true
+  await renderLogin()
+  expect(
+    screen
+      .getByRole("link", { name: "Sign in as a new test account" })
+      .getAttribute("href"),
+  ).toBe("/preview/login?account=new")
+  expect(
+    screen
+      .getByRole("link", { name: "Sign in as admin@example.com" })
+      .getAttribute("href"),
+  ).toBe("/preview/login")
 })
