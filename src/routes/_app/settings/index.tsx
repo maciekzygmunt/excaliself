@@ -31,16 +31,39 @@ function AccountPage() {
     <div className="flex flex-col gap-8 animate-in fade-in-0 duration-200 motion-reduce:animate-none">
       <ProfileSection user={user} />
       <Separator />
-      <EmailSection user={user} />
-      <Separator />
-      <PasswordSection />
+      {user.demo ? (
+        <DemoAccountSection />
+      ) : (
+        <>
+          <EmailSection user={user} />
+          <Separator />
+          <PasswordSection />
+        </>
+      )}
       <Separator />
       <SessionsSection />
       <Separator />
       <AppearanceSection />
-      <Separator />
-      <DangerZoneSection user={user} />
+      {!user.demo && (
+        <>
+          <Separator />
+          <DangerZoneSection user={user} />
+        </>
+      )}
     </div>
+  )
+}
+
+// The demo server refuses email, password and account deletion.
+function DemoAccountSection() {
+  return (
+    <section>
+      <h2 className="text-sm font-medium text-foreground">Demo account</h2>
+      <p className="text-xs text-muted-foreground">
+        In the demo, you can't change your email or password, or delete your
+        account. We delete demo accounts and their drawings regularly.
+      </p>
+    </section>
   )
 }
 

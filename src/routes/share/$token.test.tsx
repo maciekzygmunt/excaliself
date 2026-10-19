@@ -39,6 +39,7 @@ vi.mock("@tanstack/react-router", () => ({
 }))
 
 vi.mock("@/features/shares/server", () => ({ resolveShareToken: vi.fn() }))
+vi.mock("@/features/demo/server", () => ({ getDemoMode: async () => false }))
 vi.mock("@/features/spaces/server", () => ({ isOpenAsTeam: vi.fn() }))
 
 // The real one drags Excalidraw into jsdom; this slice is about the states

@@ -7,6 +7,7 @@ import {
 import { createClientOnlyFn } from "@tanstack/react-start"
 import { lazy, Suspense, useState } from "react"
 import { Mark } from "@/components/identity"
+import { getDemoMode } from "@/features/demo/server"
 import { resolveShareToken } from "@/features/shares/server"
 import { isOpenAsTeam } from "@/features/spaces/server"
 import { useApplyTheme } from "@/hooks/use-theme"
@@ -47,6 +48,10 @@ export const Route = createFileRoute("/share/$token")({
         params: { id: visit.drawingId },
         replace: true,
       })
+    // The demo's gate offers a new account instead of a password form.
+    if (visit.status === "signin") {
+      return { ...visit, demo: await getDemoMode() }
+    }
     return visit
   },
   component: SharePage,
@@ -77,6 +82,7 @@ function SharePage() {
     return (
       <SignInGate
         drawingName={resolution.drawingName}
+        demoReturnPath={resolution.demo ? `/share/${token}` : undefined}
         onSignedIn={() => router.invalidate()}
       />
     )

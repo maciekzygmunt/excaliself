@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query"
 import { createFileRoute, Outlet } from "@tanstack/react-router"
 import { createServerFn } from "@tanstack/react-start"
 import type React from "react"
+import { DemoBanner } from "@/components/demo-banner"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { currentUserQueryOptions } from "@/features/account/queries"
 import { drawingsQueryOptions } from "@/features/drawings/queries"
@@ -72,6 +73,7 @@ function AppShellLayout() {
                 <SidebarReopenButton />
                 <Outlet />
               </SidebarInset>
+              {currentUser?.demo && <DemoBanner />}
             </CommandPaletteProvider>
           </MoveToTeamProvider>
         </CreateDialogProvider>

@@ -1,8 +1,13 @@
-import { createFileRoute, useNavigate, useSearch } from "@tanstack/react-router"
+import {
+  createFileRoute,
+  useLoaderData,
+  useNavigate,
+  useSearch,
+} from "@tanstack/react-router"
 import { AuthPage } from "@/components/auth-page"
+import { DemoStart } from "@/components/demo-start"
 import { SignInForm } from "@/components/sign-in-form"
 import { demoAdmin } from "@/db/demo-content"
-import { getPreviewMode } from "@/features/auth/server"
 import { resolveRedirect } from "@/lib/redirects"
 import { setupMiddleware } from "@/middleware/setup"
 
@@ -11,14 +16,24 @@ export const Route = createFileRoute("/login")({
     redirect: typeof search.redirect === "string" ? search.redirect : undefined,
   }),
   server: { middleware: [setupMiddleware] },
-  loader: () => getPreviewMode(),
   component: LoginPage,
 })
 
 function LoginPage() {
   const navigate = useNavigate()
   const { redirect } = useSearch({ from: "/login" })
-  const previewMode = Route.useLoaderData()
+  const { instanceMode } = useLoaderData({ from: "__root__" })
+
+  if (instanceMode === "demo") {
+    return (
+      <AuthPage
+        title="Try the Excaliself demo"
+        subtitle="No sign-up: you get your own account with example drawings"
+      >
+        <DemoStart redirect={redirect} />
+      </AuthPage>
+    )
+  }
 
   return (
     <AuthPage
@@ -33,7 +48,7 @@ function LoginPage() {
           <p>Forgot your password? Ask your admin to reset it.</p>
         </div>
       </SignInForm>
-      {previewMode && <PreviewShortcuts redirect={redirect} />}
+      {instanceMode === "preview" && <PreviewShortcuts redirect={redirect} />}
     </AuthPage>
   )
 }

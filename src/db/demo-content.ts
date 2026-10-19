@@ -1,6 +1,6 @@
 // Example content for instances that start with nothing: PR previews seed it
-// into PGlite. Plain data with no server imports, so a browser-only demo can
-// reuse it.
+// into PGlite, and each demo visitor gets a copy. Plain data with no server
+// imports, so a browser-only demo can reuse it.
 
 import type { Space } from "./schema.ts"
 
@@ -139,7 +139,7 @@ export const demoDrawings: DemoDrawing[] = [
       text(
         "welcome-body",
         [0, 70],
-        "This is a preview instance with example content.\nChanges are kept until the next deploy.",
+        "This is example content to try things out.\nEdit it, move it, or delete it.",
       ),
       shape("ellipse", "welcome-sun", [520, -20, 90, 90], "#ffec99"),
     ],
@@ -196,7 +196,7 @@ export const demoDrawings: DemoDrawing[] = [
       shape("rectangle", "plan-note-2", [210, 20, 180, 140], "#d0bfff"),
       text("plan-note-2-text", [226, 36], "Write the\nrelease notes"),
       shape("rectangle", "plan-note-3", [420, 0, 180, 140], "#b2f2bb"),
-      text("plan-note-3-text", [436, 16], "Try the new\nteam space"),
+      text("plan-note-3-text", [436, 16], "Share the\nroadmap"),
     ],
   },
   {

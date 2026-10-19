@@ -88,6 +88,8 @@ export type ServerMessage =
     }
   /** Keeps traffic flowing both ways for one-way idle timeouts. */
   | { type: "PONG"; payload: Record<string, never> }
+  /** The Room did not take the sender's update: the scene would pass the cap. */
+  | { type: "SCENE_REFUSED"; payload: { maxBytes: number } }
 
 /** In code points. */
 export const MAX_NAME_LENGTH = 40

@@ -1,22 +1,24 @@
 import type { PGlite } from "@electric-sql/pglite"
 import { drizzle } from "drizzle-orm/pglite"
 import { migrate } from "drizzle-orm/pglite/migrator"
+import { setUpDemoInstance } from "@/features/demo/instance"
+import { instanceMode } from "@/lib/mode"
 import type { Db } from "./index.ts"
 import { seedDemoContent } from "./preview-seed.ts"
 import * as schema from "./schema.ts"
 
 /**
- * PR previews have no Postgres server. An in-memory PGlite runs the real
- * migrations and the real queries, then gets example content. State lives
- * for one process, which is enough to click through a PR.
+ * PR previews and the demo have no Postgres server. An in-memory PGlite runs
+ * the real migrations and the real queries, then gets example content. State
+ * lives for one process, which is enough to click through a PR.
  */
 export async function createPreviewDb(): Promise<Db> {
   const startedAt = Date.now()
-  console.warn("[preview] PREVIEW_MODE: in-process PGlite, no DATABASE_URL")
+  console.warn(`[${instanceMode}] in-process PGlite, no DATABASE_URL`)
   const db = drizzle({ client: await loadPGlite(), schema })
   await migrate(db, { migrationsFolder: "./drizzle" })
-  await seedDemoContent(db)
-  console.warn(`[preview] PGlite ready in ${Date.now() - startedAt} ms`)
+  await (instanceMode === "demo" ? setUpDemoInstance(db) : seedDemoContent(db))
+  console.warn(`[${instanceMode}] PGlite ready in ${Date.now() - startedAt} ms`)
   return db
 }
 

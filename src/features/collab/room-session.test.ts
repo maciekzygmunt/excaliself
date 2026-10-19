@@ -845,7 +845,7 @@ function clockedRegistry() {
   const registry = createRoomRegistry(
     async () => ({ elements: [], access: null, readable: true }),
     async () => {},
-    () => clock,
+    { now: () => clock },
   )
   return {
     registry,
@@ -961,7 +961,7 @@ test("a sweep that empties the room writes the scene and takes the room with it"
     async (_, elements) => {
       writes.push(elements.map((el) => el.id))
     },
-    () => clock,
+    { now: () => clock },
   )
   const ghost = fakePeer("peer-ghost")
   await joinRoom(registry, ROOM, ghost, guest)

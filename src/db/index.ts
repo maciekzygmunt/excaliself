@@ -4,6 +4,7 @@ import type { PgDatabase, PgQueryResultHKT } from "drizzle-orm/pg-core"
 
 import { env } from "@/env"
 import { purgeExpiredTrash, startTrashPurgeJob } from "@/features/trash/purge"
+import { instanceMode } from "@/lib/mode"
 import { processSingleton } from "@/lib/process-singleton"
 import * as schema from "./schema.ts"
 
@@ -36,9 +37,10 @@ async function connect() {
   // Preview never touches DATABASE_URL: Coolify may hand it the production
   // one, and a PR's migrations must not reach production. Imported on
   // demand, so production never loads PGlite.
-  const db = env.PREVIEW_MODE
-    ? await (await import("./preview.ts")).createPreviewDb()
-    : await connectPostgres()
+  const db =
+    instanceMode !== "standard"
+      ? await (await import("./preview.ts")).createPreviewDb()
+      : await connectPostgres()
 
   // First background job: 30-day trash auto-purge. Runs once now (catching
   // anything that went purge-overdue while the server was down) and then

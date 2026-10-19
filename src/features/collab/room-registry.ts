@@ -1,6 +1,7 @@
 // This process's live Rooms. In-memory, so the app stays single-replica.
 
 import { db } from "@/db"
+import { MAX_SCENE_BYTES } from "@/features/drawings/scene-write"
 import { processSingleton } from "@/lib/process-singleton"
 import { registerShutdownFlush } from "@/lib/socket/shutdown"
 import {
@@ -19,6 +20,7 @@ export const rooms: RoomRegistry = processSingleton("collab-rooms", () => {
   const registry = createRoomRegistry(
     (roomId) => loadRoomScene(db, roomId),
     (roomId, elements) => saveRoomScene(db, roomId, elements),
+    { maxSceneBytes: MAX_SCENE_BYTES },
   )
   registerShutdownFlush(() => closeAllRooms(registry))
   // Unref'd, so it never holds the process open.

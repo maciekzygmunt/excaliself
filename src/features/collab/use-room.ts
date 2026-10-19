@@ -14,6 +14,8 @@ import type {
   ExcalidrawImperativeAPI,
 } from "@excalidraw/excalidraw/types"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { toast } from "sonner"
+import { sceneTooLarge } from "@/features/demo/policy"
 import { createReconnectBackoff } from "@/lib/socket/backoff"
 import { createHeartbeat, type Heartbeat } from "@/lib/socket/heartbeat"
 import { toCollaborators } from "./collaborators"
@@ -268,6 +270,12 @@ export function useRoom(options: {
         switch (message.type) {
           case "PONG":
             ownBeat.acknowledge()
+            return
+
+          case "SCENE_REFUSED":
+            toast.error(sceneTooLarge(message.payload.maxBytes), {
+              id: "scene-refused",
+            })
             return
 
           case "ROOM_JOINED":

@@ -3,15 +3,16 @@ import { afterEach, beforeEach, expect, test, vi } from "vitest"
 
 const navigate = vi.fn()
 let search: { redirect?: string } = {}
-let previewMode = false
+let instanceMode = "standard"
 
 vi.mock("@tanstack/react-router", () => ({
   createFileRoute: () => (options: { component: React.ComponentType }) => ({
     options,
-    useLoaderData: () => previewMode,
   }),
   useNavigate: () => navigate,
   useSearch: () => search,
+  // The root route's data.
+  useLoaderData: () => ({ instanceMode }),
 }))
 
 const signInEmail = vi.fn()
@@ -26,10 +27,6 @@ vi.mock("@/middleware/setup", () => ({
   setupMiddleware: {},
 }))
 
-vi.mock("@/features/auth/server", () => ({
-  getPreviewMode: vi.fn(),
-}))
-
 // Auto-cleanup needs vitest globals, which this repo leaves off.
 afterEach(cleanup)
 
@@ -37,7 +34,7 @@ beforeEach(() => {
   navigate.mockClear()
   signInEmail.mockClear()
   search = {}
-  previewMode = false
+  instanceMode = "standard"
 })
 
 async function renderLogin() {
@@ -104,7 +101,7 @@ test("a cross-origin ?redirect is ignored in favor of /draw", async () => {
 })
 
 test("a PR preview offers one-click sign-in links", async () => {
-  previewMode = true
+  instanceMode = "preview"
   await renderLogin()
   expect(
     screen
@@ -119,7 +116,7 @@ test("a PR preview offers one-click sign-in links", async () => {
 })
 
 test("the preview links keep the ?redirect param", async () => {
-  previewMode = true
+  instanceMode = "preview"
   search = { redirect: "/draw/abc123" }
   await renderLogin()
   expect(
@@ -127,4 +124,15 @@ test("the preview links keep the ?redirect param", async () => {
       .getByRole("link", { name: "Sign in as a new test account" })
       .getAttribute("href"),
   ).toBe("/preview/login?account=new&redirect=%2Fdraw%2Fabc123")
+})
+
+test("in the demo, a link starts a new account and keeps the redirect", async () => {
+  instanceMode = "demo"
+  search = { redirect: "/share/abc" }
+  await renderLogin()
+
+  expect(screen.queryByLabelText(/password/i)).toBeNull()
+  expect(
+    screen.getByRole("link", { name: "Start the demo" }).getAttribute("href"),
+  ).toBe("/demo?redirect=%2Fshare%2Fabc")
 })
