@@ -16,6 +16,7 @@ import { authMiddleware } from "@/middleware/auth"
 import { listsChangedMiddleware } from "@/middleware/lists-changed"
 import { bytesToDataUrl } from "./file-bytes"
 import { listDrawings } from "./list"
+import { drawingColumns } from "./list-columns"
 import { writeDrawingScene } from "./scene-write"
 
 export const getDrawings = createServerFn({ method: "GET" })
@@ -48,7 +49,7 @@ export const getDrawingWithFiles = createServerFn({ method: "GET" })
     // read-only trashed view (spec §5.11) instead of a dead end. Writes stay
     // blocked server-side in saveDrawingScene regardless.
     const [drawing] = await db
-      .select()
+      .select(drawingColumns)
       .from(drawings)
       .where(and(eq(drawings.id, id), accessibleTo(drawings, userId)))
     if (!drawing) return null

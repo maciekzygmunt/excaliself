@@ -1,0 +1,149 @@
+// @vitest-environment node
+import { eq, isNotNull } from "drizzle-orm"
+import { beforeAll, expect, test } from "vitest"
+import { demoAdmin } from "@/db/demo-content"
+import type { Db } from "@/db/index"
+import { createPreviewDb } from "@/db/preview"
+import { drawingFiles, drawings, folders, stars } from "@/db/schema"
+import { MAX_DRAWING_IMAGE_BYTES } from "@/features/collab/room-files"
+import type { PlusSceneContent } from "./api"
+import { type ImportScene, importScene, prepareScene } from "./import"
+
+const PNG = `data:image/png;base64,${Buffer.from("png-bytes").toString("base64")}`
+
+const image = (fileId: string, extra: Record<string, unknown> = {}) => ({
+  type: "image",
+  id: `el-${fileId}`,
+  fileId,
+  status: "saved",
+  ...extra,
+})
+
+const content = (
+  elements: Record<string, unknown>[],
+  files: Record<string, unknown> = {},
+  filesFailedToEmbed: string[] = [],
+): PlusSceneContent => ({
+  elements,
+  appState: { viewBackgroundColor: "#fff" },
+  files,
+  filesFailedToEmbed,
+})
+
+const scene = (id: string, collection: ImportScene["collection"]) => ({
+  id,
+  name: `Scene ${id}`,
+  created: new Date("2024-01-02T00:00:00Z"),
+  updated: new Date("2024-03-04T00:00:00Z"),
+  pinned: false,
+  collection,
+})
+
+test("stores only live images within the budget and marks the rest as errors", () => {
+  const big = `data:image/png;base64,${Buffer.alloc(MAX_DRAWING_IMAGE_BYTES).toString("base64")}`
+  const prepared = prepareScene(
+    content(
+      [
+        image("kept"),
+        image("deleted", { isDeleted: true }),
+        image("missing"),
+        image("failed"),
+        image("too-big"),
+        { type: "text", originalText: "hello  world" },
+      ],
+      {
+        kept: { mimeType: "image/png", dataURL: PNG },
+        deleted: { mimeType: "image/png", dataURL: PNG },
+        failed: { mimeType: "image/png", dataURL: PNG },
+        "too-big": { mimeType: "image/png", dataURL: big },
+      },
+      ["failed"],
+    ),
+  )
+
+  expect(prepared.files.map((file) => file.fileId)).toEqual(["kept"])
+  expect(prepared.skippedImages).toBe(3)
+  expect(prepared.searchText).toBe("hello world")
+  const statuses = Object.fromEntries(
+    JSON.parse(prepared.data).elements.map(
+      (el: { fileId?: string; status?: string }) => [el.fileId, el.status],
+    ),
+  )
+  expect(statuses).toMatchObject({
+    kept: "saved",
+    missing: "error",
+    failed: "error",
+    "too-big": "error",
+  })
+})
+
+let db: Db
+beforeAll(async () => {
+  db = await createPreviewDb()
+}, 30_000)
+
+test("imports into one folder per collection and skips what is already here", async () => {
+  const userId = demoAdmin.id
+  const docs = { id: "col-docs", name: "Docs" }
+  const run = (id: string, collection: ImportScene["collection"]) =>
+    importScene(db, userId, {
+      scene: { ...scene(id, collection), pinned: id === "s1" },
+      content: content([image("img")], {
+        img: { mimeType: "image/png", dataURL: PNG },
+      }),
+      sharedSpace: "team",
+    })
+
+  expect(await run("s1", docs)).toEqual({
+    status: "imported",
+    space: "team",
+    skippedImages: 0,
+  })
+  await run("s2", docs)
+  await run("s3", { id: "private", name: "Private" })
+  expect(await run("s1", docs)).toEqual({ status: "exists" })
+
+  const imported = await db
+    .select({
+      id: drawings.id,
+      name: drawings.name,
+      space: drawings.space,
+      folder: folders.name,
+      updatedAt: drawings.updatedAt,
+    })
+    .from(drawings)
+    .innerJoin(folders, eq(folders.id, drawings.folderId))
+    .where(isNotNull(drawings.excalidrawPlusId))
+  const bySource = (name: string) => imported.filter((row) => row.name === name)
+  expect(imported).toHaveLength(3)
+  expect(bySource("Scene s1")[0]).toMatchObject({
+    space: "team",
+    folder: "Docs",
+    updatedAt: new Date("2024-03-04T00:00:00Z"),
+  })
+  expect(bySource("Scene s3")[0]).toMatchObject({
+    space: "private",
+    folder: "Private",
+  })
+  // s1 and s2 share the Docs folder.
+  expect(
+    new Set(
+      imported.filter((row) => row.space === "team").map((row) => row.folder),
+    ).size,
+  ).toBe(1)
+
+  const [file] = await db
+    .select()
+    .from(drawingFiles)
+    .where(eq(drawingFiles.drawingId, bySource("Scene s1")[0].id))
+  expect(file.mimeType).toBe("image/png")
+  expect(Buffer.from(file.bytes).toString()).toBe("png-bytes")
+
+  const starred = await db
+    .select({ drawingId: stars.drawingId })
+    .from(stars)
+    .where(eq(stars.userId, userId))
+  expect(starred.map((row) => row.drawingId)).toContain(
+    bySource("Scene s1")[0].id,
+  )
+})
