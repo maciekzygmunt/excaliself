@@ -4,17 +4,8 @@ import { useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import type { Space } from "@/db/schema"
 import { currentUserQueryOptions } from "@/features/account/queries"
 import { drawingsQueryOptions } from "@/features/drawings/queries"
-import { PRIVATE_COLLECTION } from "@/features/excalidraw-plus/api"
 import {
   importExcalidrawPlusScene,
   type ScannedScene,
@@ -23,8 +14,6 @@ import {
 import { foldersQueryOptions } from "@/features/folders/queries"
 
 const KEY_DOCS_URL = "https://plus.excalidraw.com/docs/api/authentication"
-
-const SPACE_LABELS: Record<Space, string> = { team: "Team", private: "Private" }
 
 type Scan = Awaited<ReturnType<typeof scanExcalidrawPlus>>
 
@@ -42,9 +31,10 @@ type Run = {
 const errorMessage = (error: unknown) =>
   error instanceof Error ? error.message : "Something went wrong"
 
-// Brings a member's Excalidraw+ scenes over: scan with an API key, then import
-// one scene per request so progress shows and one bad scene can't sink the
-// rest. The key lives only in this component's state.
+// Brings Excalidraw+ scenes over: scan with an API key, then import one scene
+// per request so progress shows and one bad scene can't sink the rest. Admins
+// bring the shared collections to Team; every member brings their private
+// scenes. The key lives only in this component's state.
 export function ImportSection() {
   const queryClient = useQueryClient()
   const { data: user } = useQuery(currentUserQueryOptions())
@@ -52,11 +42,10 @@ export function ImportSection() {
   const [scan, setScan] = useState<Scan>()
   const [scanError, setScanError] = useState<string>()
   const [scanning, setScanning] = useState(false)
-  const [sharedSpace, setSharedSpace] = useState<Space>("team")
   const [run, setRun] = useState<Run>()
   const stopRequested = useRef(false)
 
-  const teamEnabled = user?.teamEnabled ?? false
+  const isAdmin = user?.role === "admin"
   const toImport = scan?.scenes.filter((scene) => !scene.imported) ?? []
   const running = run !== undefined && !run.finished
 
@@ -110,7 +99,6 @@ export function ImportSection() {
               pinned: scene.pinned,
               collection: scene.collection,
             },
-            sharedSpace: teamEnabled ? sharedSpace : "private",
           },
         })
         if (result.status === "imported")
@@ -159,8 +147,9 @@ export function ImportSection() {
           Import from Excalidraw+
         </h2>
         <p className="text-xs text-muted-foreground">
-          Bring your scenes, collections, and images over. Each collection
-          becomes a folder.
+          {isAdmin
+            ? "Bring scenes and images over. Shared collections become folders in Team, and your private scenes go to Private."
+            : "Bring your private scenes and images over. They go to Private. An admin imports the shared collections."}
         </p>
       </div>
 
@@ -197,9 +186,12 @@ export function ImportSection() {
               >
                 how
               </a>
-              ). A personal key (starts with <code>uk-</code>) also brings your
-              private scenes. Read access is enough. The key is used for this
-              import only and is not saved.
+              ).{" "}
+              {isAdmin
+                ? "A personal key (starts with uk-) also brings your private scenes."
+                : "Use a personal key (starts with uk-)."}{" "}
+              Read access is enough. The key is used for this import only and is
+              not saved.
             </FieldDescription>
             {scanError && (
               <p role="alert" className="text-xs text-destructive">
@@ -222,9 +214,6 @@ export function ImportSection() {
         <ScanSummary
           scan={scan}
           toImport={toImport}
-          teamEnabled={teamEnabled}
-          sharedSpace={sharedSpace}
-          onSharedSpaceChange={setSharedSpace}
           onImport={() => importAll(toImport)}
           onCancel={reset}
         />
@@ -247,25 +236,16 @@ export function ImportSection() {
 function ScanSummary({
   scan,
   toImport,
-  teamEnabled,
-  sharedSpace,
-  onSharedSpaceChange,
   onImport,
   onCancel,
 }: {
   scan: Scan
   toImport: ScannedScene[]
-  teamEnabled: boolean
-  sharedSpace: Space
-  onSharedSpaceChange: (space: Space) => void
   onImport: () => void
   onCancel: () => void
 }) {
   const collections = new Set(scan.scenes.map((scene) => scene.collection.id))
   const alreadyHere = scan.scenes.length - toImport.length
-  const isPrivate = (scene: ScannedScene) =>
-    scene.collection.id === PRIVATE_COLLECTION
-  const hasShared = toImport.some((scene) => !isPrivate(scene))
 
   return (
     <div className="flex max-w-md flex-col gap-5">
@@ -282,32 +262,6 @@ function ScanSummary({
           </p>
         )}
       </div>
-
-      {teamEnabled && hasShared && (
-        <Field>
-          <FieldLabel className="text-sm text-muted-foreground">
-            Put shared collections in
-          </FieldLabel>
-          <Select
-            value={sharedSpace}
-            items={SPACE_LABELS}
-            onValueChange={(space) => onSharedSpaceChange(space as Space)}
-          >
-            <SelectTrigger size="sm" className="w-32">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="team">{SPACE_LABELS.team}</SelectItem>
-              <SelectItem value="private">{SPACE_LABELS.private}</SelectItem>
-            </SelectContent>
-          </Select>
-          {toImport.some(isPrivate) && (
-            <FieldDescription className="text-xs">
-              Your private scenes always go to Private.
-            </FieldDescription>
-          )}
-        </Field>
-      )}
 
       <div className="flex gap-2">
         <Button size="sm" disabled={toImport.length === 0} onClick={onImport}>

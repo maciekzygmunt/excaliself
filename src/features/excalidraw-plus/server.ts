@@ -8,28 +8,39 @@ import { createServerFn } from "@tanstack/react-start"
 import { and, inArray } from "drizzle-orm"
 import { z } from "zod"
 import { db } from "@/db"
-import { drawings, spaces } from "@/db/schema"
+import { drawings } from "@/db/schema"
 import { env } from "@/env"
 import { accessibleTo } from "@/features/spaces/access"
 import { authMiddleware } from "@/middleware/auth"
 import { listsChangedMiddleware } from "@/middleware/lists-changed"
 import { excalidrawPlusApi, PRIVATE_COLLECTION } from "./api"
-import { type ImportScene, importScene } from "./import"
+import { canImportShared, type ImportScene, importScene } from "./import"
 
 const apiKey = z.string().trim().min(1).max(1000)
 
 export type ScannedScene = ImportScene & { imported: boolean }
 
-/** Every scene the key can read, each flagged when the member already has it. */
+/**
+ * Every scene this member may import with the key, each flagged when they
+ * already have it. Members get only their private collection.
+ */
 export const scanExcalidrawPlus = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
   .validator(z.object({ apiKey }))
   .handler(async ({ data, context }) =>
     readableErrors(async () => {
+      const userId = context.session.user.id
       const api = excalidrawPlusApi(env.EXCALIDRAW_PLUS_API_URL, data.apiKey)
-      const collections = (await api.collections()).filter(
-        (collection) => collection.id !== PRIVATE_COLLECTION,
-      )
+      const shared = await canImportShared(db, userId)
+      if (!shared && api.keyType === "workspace")
+        throw new Error(
+          "A workspace key can't read your private scenes. Use a personal key (uk-…).",
+        )
+      const collections = shared
+        ? (await api.collections()).filter(
+            (collection) => collection.id !== PRIVATE_COLLECTION,
+          )
+        : []
       if (api.keyType === "personal")
         collections.push({ id: PRIVATE_COLLECTION, name: "Private" })
 
@@ -49,7 +60,7 @@ export const scanExcalidrawPlus = createServerFn({ method: "POST" })
           .where(
             and(
               inArray(drawings.excalidrawPlusId, [...scenes.keys()]),
-              accessibleTo(drawings, context.session.user.id),
+              accessibleTo(drawings, userId),
             ),
           )
         for (const row of rows) if (row.id) imported.add(row.id)
@@ -83,7 +94,6 @@ export const importExcalidrawPlusScene = createServerFn({ method: "POST" })
           name: z.string().max(1000),
         }),
       }),
-      sharedSpace: z.enum(spaces),
     }),
   )
   .handler(async ({ data, context }) =>
@@ -95,7 +105,6 @@ export const importExcalidrawPlusScene = createServerFn({ method: "POST" })
       return importScene(db, context.session.user.id, {
         scene: data.scene,
         content,
-        sharedSpace: data.sharedSpace,
       })
     }),
   )

@@ -4,7 +4,7 @@ import { beforeAll, expect, test } from "vitest"
 import { demoAdmin } from "@/db/demo-content"
 import type { Db } from "@/db/index"
 import { createPreviewDb } from "@/db/preview"
-import { drawingFiles, drawings, folders, stars } from "@/db/schema"
+import { drawingFiles, drawings, folders, stars, users } from "@/db/schema"
 import { MAX_DRAWING_IMAGE_BYTES } from "@/features/collab/room-files"
 import type { PlusSceneContent } from "./api"
 import { type ImportScene, importScene, prepareScene } from "./import"
@@ -91,7 +91,6 @@ test("imports into one folder per collection and skips what is already here", as
       content: content([image("img")], {
         img: { mimeType: "image/png", dataURL: PNG },
       }),
-      sharedSpace: "team",
     })
 
   expect(await run("s1", docs)).toEqual({
@@ -146,4 +145,23 @@ test("imports into one folder per collection and skips what is already here", as
   expect(starred.map((row) => row.drawingId)).toContain(
     bySource("Scene s1")[0].id,
   )
+})
+
+test("lets a member import only their private scenes", async () => {
+  await db
+    .insert(users)
+    .values({ id: "member", email: "member@example.com", name: "Member" })
+  const run = (id: string, collection: ImportScene["collection"]) =>
+    importScene(db, "member", {
+      scene: scene(id, collection),
+      content: content([]),
+    })
+
+  await expect(run("m1", { id: "col-docs", name: "Docs" })).rejects.toThrow(
+    "Only admins can import shared collections",
+  )
+  expect(await run("m2", { id: "private", name: "Private" })).toMatchObject({
+    status: "imported",
+    space: "private",
+  })
 })
