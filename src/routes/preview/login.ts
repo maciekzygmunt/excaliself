@@ -6,15 +6,17 @@ import { demoAdmin } from "@/db/demo-content"
 import { insertPreviewUser } from "@/db/preview-seed"
 import { env } from "@/env"
 import { auth } from "@/lib/auth"
+import { resolveRedirect } from "@/lib/redirects"
 
 // One-click sign-in for PR previews: as the seeded admin, or with
 // ?account=new as a member made for this click, so testers do not share one
 // account's state. Goes through better-auth's own sign-in, so the session is
-// a real one. 404 outside preview.
+// a real one. Lands on ?redirect= like /login does. 404 outside preview.
 async function signInToPreview(request: Request) {
   if (!env.PREVIEW_MODE) return new Response("Not found", { status: 404 })
 
-  const isNew = new URL(request.url).searchParams.get("account") === "new"
+  const params = new URL(request.url).searchParams
+  const isNew = params.get("account") === "new"
   const { email, password } = isNew ? await createMember() : demoAdmin
   try {
     const { headers } = await auth.api.signInEmail({
@@ -22,7 +24,9 @@ async function signInToPreview(request: Request) {
       headers: request.headers,
       returnHeaders: true,
     })
-    const redirect = new Headers({ location: "/draw" })
+    const redirect = new Headers({
+      location: resolveRedirect(params.get("redirect") ?? undefined),
+    })
     for (const cookie of headers.getSetCookie()) {
       redirect.append("set-cookie", cookie)
     }

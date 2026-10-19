@@ -117,3 +117,14 @@ test("a PR preview offers one-click sign-in links", async () => {
       .getAttribute("href"),
   ).toBe("/preview/login")
 })
+
+test("the preview links keep the ?redirect param", async () => {
+  previewMode = true
+  search = { redirect: "/draw/abc123" }
+  await renderLogin()
+  expect(
+    screen
+      .getByRole("link", { name: "Sign in as a new test account" })
+      .getAttribute("href"),
+  ).toBe("/preview/login?account=new&redirect=%2Fdraw%2Fabc123")
+})

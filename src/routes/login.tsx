@@ -33,20 +33,28 @@ function LoginPage() {
           <p>Forgot your password? Ask your admin to reset it.</p>
         </div>
       </SignInForm>
-      {previewMode && <PreviewShortcuts />}
+      {previewMode && <PreviewShortcuts redirect={redirect} />}
     </AuthPage>
   )
 }
 
-// PR previews only. Plain links: /preview/login is a server route.
-function PreviewShortcuts() {
+// PR previews only. Plain links: /preview/login is a server route. It
+// checks the redirect itself.
+function PreviewShortcuts({ redirect }: { redirect?: string }) {
+  const href = (params: Record<string, string>) => {
+    const query = new URLSearchParams({
+      ...params,
+      ...(redirect && { redirect }),
+    }).toString()
+    return query ? `/preview/login?${query}` : "/preview/login"
+  }
   return (
     <div className="mt-8 space-y-2 rounded-lg border border-dashed border-muted-foreground/40 p-4 text-sm">
       <p className="font-medium text-foreground">Preview</p>
-      <a href="/preview/login?account=new" className="block underline">
+      <a href={href({ account: "new" })} className="block underline">
         Sign in as a new test account
       </a>
-      <a href="/preview/login" className="block underline">
+      <a href={href({})} className="block underline">
         Sign in as {demoAdmin.email}
       </a>
     </div>
