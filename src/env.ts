@@ -33,6 +33,9 @@ export const env = createEnv({
           .filter(Boolean),
       )
       .default([]),
+    // Where the Excalidraw+ import calls the public API. Override it only to
+    // test against a fake server.
+    EXCALIDRAW_PLUS_API_URL: z.url().default("https://api.excalidraw.com"),
   },
   clientPrefix: "VITE_",
   client: {

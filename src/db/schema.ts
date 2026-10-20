@@ -141,6 +141,9 @@ export const folders = pgTable(
       onDelete: "set null",
     }),
     parentId: text("parentId"),
+    // The Excalidraw+ collection this folder was imported from, so a second
+    // import reuses it.
+    excalidrawPlusId: text("excalidrawPlusId"),
     // Soft delete: set means "in trash". trashRootId records the trash unit —
     // the id of the folder/drawing whose trashing swept this row along — so a
     // whole subtree can be restored as one unit while each row's trashed
@@ -181,6 +184,9 @@ export const drawings = pgTable(
     folderId: text("folderId").references(() => folders.id, {
       onDelete: "cascade",
     }),
+    // The Excalidraw+ scene this drawing was imported from, so a second
+    // import skips it.
+    excalidrawPlusId: text("excalidrawPlusId"),
     space: text("space", { enum: spaces }).notNull().default("private"),
     // See folders.createdBy.
     createdBy: text("createdBy").references(() => users.id, {
