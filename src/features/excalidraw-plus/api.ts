@@ -3,6 +3,7 @@
 // and the API does not allow browser calls.
 
 import { z } from "zod"
+import { sceneContentSchema } from "@/features/drawings/scene-import"
 
 /** Personal keys act as one user and can read their private scenes. */
 const PERSONAL_KEY_PREFIX = "uk-"
@@ -36,20 +37,8 @@ const sceneSchema = z.object({
   }),
 })
 
-const contentSchema = z.object({
-  type: z.string().optional(),
-  version: z.number().optional(),
-  source: z.string().optional(),
-  elements: z.array(z.record(z.string(), z.unknown())),
-  appState: z.record(z.string(), z.unknown()).catch({}),
-  // Entries are checked one by one on import, so one bad file drops only itself.
-  files: z.record(z.string(), z.unknown()).catch({}),
-  filesFailedToEmbed: z.array(z.string()).catch([]),
-})
-
 export type PlusCollection = z.infer<typeof collectionSchema>
 export type PlusScene = z.infer<typeof sceneSchema>["metadata"]
-export type PlusSceneContent = z.infer<typeof contentSchema>
 
 const pageSchema = <T extends z.ZodType>(item: T) =>
   z.object({ data: z.array(item), hasNextPage: z.boolean() })
@@ -114,7 +103,7 @@ export function excalidrawPlusApi(apiUrl: string, apiKey: string) {
         )
       ).map((scene) => scene.metadata),
     sceneContent: async (sceneId: string) =>
-      contentSchema.parse(
+      sceneContentSchema.parse(
         await get(`/scenes/${encodeURIComponent(sceneId)}/content`),
       ),
   }

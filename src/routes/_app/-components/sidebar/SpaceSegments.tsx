@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils"
 import { useActiveSpace } from "../ActiveSpace"
 import { useSpringLoad } from "./space-gestures"
 import type { DropTarget } from "./tree"
-import { useSidebarDnD } from "./use-sidebar-dnd"
+import { isFileDrag, useSidebarDnD } from "./use-sidebar-dnd"
 
 export function SpaceSegments({ activeSpace }: { activeSpace: Space }) {
   const { data: teamLive = 0 } = useQuery({
@@ -58,8 +58,8 @@ function Segment({
   const spring = useSpringLoad(() => setActiveSpace(space))
   const droppable = dragItem !== null && canDrop(dragItem, target)
   const invited = droppable && dragItem.space !== space
-  const over =
-    droppable && dropTarget?.type === "root" && dropTarget.space === space
+  // The drop target is set only for a drop the segment takes.
+  const over = dropTarget?.type === "root" && dropTarget.space === space
   const { label, icon: Icon } = SPACES[space]
 
   return (
@@ -69,7 +69,7 @@ function Segment({
       aria-pressed={active}
       onDragOver={(e) => {
         onDragOver(target)(e)
-        if (droppable && !active) spring.arm()
+        if ((droppable || (!dragItem && isFileDrag(e))) && !active) spring.arm()
       }}
       onDragLeave={() => {
         onDragLeave()
