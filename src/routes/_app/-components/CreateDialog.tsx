@@ -13,6 +13,7 @@ import { toast } from "sonner"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { Kbd } from "@/components/ui/kbd"
 import type { Space } from "@/db/schema"
+import { isDemoRefusal } from "@/features/demo/policy"
 import { useCreateDrawing } from "@/features/drawings/mutations"
 import { useCreateFolder } from "@/features/folders/mutations"
 import { useBrowsedSpace } from "@/features/spaces/browse"
@@ -74,12 +75,14 @@ export function CreateDialog({
         })
         onOpenChange(false)
       }
-    } catch {
+    } catch (error) {
       // Keep the dialog open so the typed name isn't lost
       toast.error(
-        target.kind === "drawing"
-          ? "Failed to create drawing"
-          : "Failed to create folder",
+        isDemoRefusal(error)
+          ? error.message
+          : target.kind === "drawing"
+            ? "Failed to create drawing"
+            : "Failed to create folder",
       )
     } finally {
       submittedRef.current = false

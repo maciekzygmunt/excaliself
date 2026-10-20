@@ -618,6 +618,31 @@ test("an accepted edit needs no correction back to its sender", async () => {
   expect(framesOf(ada, "SCENE_UPDATE")).toHaveLength(0)
 })
 
+test("a capped Room refuses an edit that takes the scene past the cap, and tells only the sender", async () => {
+  const registry = createRoomRegistry(
+    async () => ({ elements: [], access: null, readable: true }),
+    async () => {},
+    { maxSceneBytes: 200 },
+  )
+  const ada = fakePeer("peer-ada")
+  await joinRoom(registry, ROOM, ada, member("Ada"))
+  await receiveFromPeer(registry, ROOM, ada, sceneUpdate([element("small", 1)]))
+  ada.published.length = 0
+
+  await receiveFromPeer(
+    registry,
+    ROOM,
+    ada,
+    sceneUpdate([element("big", 1, { text: "x".repeat(200) })]),
+  )
+
+  expect(registry.rooms.get(ROOM)?.elements).toEqual([element("small", 1)])
+  expect(framesOf(ada, "SCENE_REFUSED")).toEqual([
+    { type: "SCENE_REFUSED", payload: { maxBytes: 200 } },
+  ])
+  expect(ada.published).toEqual([])
+})
+
 test("an edit that arrives before the scene has loaded still merges into it", async () => {
   let release = () => {}
   const opened = new Promise<void>((resolve) => {
@@ -845,7 +870,7 @@ function clockedRegistry() {
   const registry = createRoomRegistry(
     async () => ({ elements: [], access: null, readable: true }),
     async () => {},
-    () => clock,
+    { now: () => clock },
   )
   return {
     registry,
@@ -961,7 +986,7 @@ test("a sweep that empties the room writes the scene and takes the room with it"
     async (_, elements) => {
       writes.push(elements.map((el) => el.id))
     },
-    () => clock,
+    { now: () => clock },
   )
   const ghost = fakePeer("peer-ghost")
   await joinRoom(registry, ROOM, ghost, guest)

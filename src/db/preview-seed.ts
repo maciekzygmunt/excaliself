@@ -1,6 +1,12 @@
 import { hashPassword } from "better-auth/crypto"
 import { extractSceneText } from "@/features/drawings/search"
-import { demoAdmin, demoDrawings, demoFolders } from "./demo-content.ts"
+import {
+  type DemoDrawing,
+  type DemoFolder,
+  demoAdmin,
+  demoDrawings,
+  demoFolders,
+} from "./demo-content.ts"
 import type { Db } from "./index.ts"
 import * as schema from "./schema.ts"
 
@@ -28,27 +34,44 @@ export async function insertPreviewUser(db: Db, user: PreviewUser) {
 /** An admin, so the instance is past /setup, and drawings to fill Home. */
 export async function seedDemoContent(db: Db) {
   await insertPreviewUser(db, { ...demoAdmin, role: "admin" })
+  await insertDemoContent(db, demoAdmin.id, {
+    folders: demoFolders,
+    drawings: demoDrawings,
+  })
+}
+
+/** Gives `ownerId` the example folders and drawings, or a copy of them. */
+export async function insertDemoContent(
+  db: Db,
+  ownerId: string,
+  content: { folders: DemoFolder[]; drawings: DemoDrawing[] },
+) {
   // Parents come first in demoFolders, so one insert satisfies the self-FK.
   await db
     .insert(schema.folders)
     .values(
-      demoFolders.map((folder) => ({ ...folder, createdBy: demoAdmin.id })),
+      content.folders.map((folder) => ({ ...folder, createdBy: ownerId })),
     )
-  for (const { elements, minutesAgo, starred, ...drawing } of demoDrawings) {
+  for (const {
+    elements,
+    minutesAgo,
+    starred,
+    ...drawing
+  } of content.drawings) {
     const data = JSON.stringify({ elements, appState: {} })
     const editedAt = new Date(Date.now() - minutesAgo * 60_000)
     await db.insert(schema.drawings).values({
       ...drawing,
       data,
       searchText: extractSceneText(data),
-      createdBy: demoAdmin.id,
+      createdBy: ownerId,
       createdAt: editedAt,
       updatedAt: editedAt,
     })
     if (starred) {
       await db
         .insert(schema.stars)
-        .values({ userId: demoAdmin.id, drawingId: drawing.id })
+        .values({ userId: ownerId, drawingId: drawing.id })
     }
   }
 }

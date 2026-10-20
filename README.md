@@ -88,7 +88,9 @@ Docker Compose reads these from `.env`. Coolify sets them for you.
 | `EXCALISELF_PORT` | No | Host port for the app (default `3000`). `127.0.0.1:3000` keeps it local to a reverse proxy |
 | `POSTGRES_USER`, `POSTGRES_DB` | No | Bundled Postgres user and database (default `excaliself`) |
 | `PREVIEW_MODE` | No | `true` runs a throwaway instance for a pull request preview: an in-memory PGlite instead of Postgres, seeded with an admin and example drawings. It ignores `DATABASE_URL` and `BASE_URL` and makes `BETTER_AUTH_SECRET` optional. `/preview/login` signs in as the admin (`admin@example.com` / `preview-password`), `/preview/login?account=new` as a new member. Data is lost on restart. See [PR previews](./docs/pr-previews.md) |
-| `PREVIEW_HOSTS` | With `PREVIEW_MODE` behind a domain | Comma-separated hosts a preview answers on, e.g. `*.draw.example.com`. Auth refuses other hosts; localhost always works |
+| `PREVIEW_HOSTS` | With `PREVIEW_MODE` or `DEMO_MODE` behind a domain | Comma-separated hosts a preview answers on, e.g. `*.draw.example.com`. Auth refuses other hosts; localhost always works |
+| `DEMO_MODE` | No | `true` runs a public demo: preview mode with stricter rules. `/demo` signs each visitor in to a new account with its own example drawings. Team, "anyone" Share links, admin pages and account changes are off. `BETTER_AUTH_SECRET` is required. Do not set it together with `PREVIEW_MODE`. See [Public demo](./docs/demo.md) |
+| `DEMO_RETENTION_HOURS` | No | With `DEMO_MODE`: hours before a demo account and its drawings are deleted (default `6`) |
 
 `GET /api/health` returns `200` when the app is up and can reach Postgres.
 
@@ -114,7 +116,8 @@ pnpm dev                                           # http://localhost:3000
 ```
 
 `pnpm dev:preview` needs no Postgres and no `.env`: it runs in preview mode
-(see `PREVIEW_MODE` above). Open `/preview/login`.
+(see `PREVIEW_MODE` above). Open `/preview/login`. `pnpm dev:demo` runs the
+public demo the same way; open `/demo`.
 
 `pnpm test`, `pnpm typecheck`, and `pnpm lint` run the checks.
 `pnpm db:generate` creates a migration after a schema change.

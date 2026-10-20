@@ -18,7 +18,6 @@ import {
 } from "./file-sync"
 import { fetchRoomFile, uploadRoomFile } from "./file-transport"
 import type { SceneElement } from "./protocol"
-import { MAX_DRAWING_IMAGE_BYTES } from "./room-files"
 import type { RoomPath } from "./room-url"
 
 const MAX_FETCH_ATTEMPTS = 3
@@ -37,7 +36,9 @@ export function toastImageCapFull() {
   toast.error("This drawing can't hold more images", {
     // One toast for a batch of refusals.
     id: "image-cap-full",
-    description: `A drawing saves up to ${MAX_DRAWING_IMAGE_BYTES / 1024 / 1024} MB of images. Remove some to add more. While shared, removed images can take up to a day to free their space.`,
+    // No number: the demo has a smaller cap than other instances.
+    description:
+      "Remove some images to add more. While shared, removed images can take up to a day to free their space.",
   })
 }
 

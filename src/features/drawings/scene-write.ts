@@ -4,15 +4,26 @@ import { randomUUID } from "node:crypto"
 import { and, eq, inArray, isNull, notExists, sql } from "drizzle-orm"
 import type { Db } from "@/db"
 import { drawingFiles, drawings, shares } from "@/db/schema"
-import { storedImageBytes } from "@/features/collab/room-file-store"
 import {
   MAX_DRAWING_IMAGE_BYTES,
+  storedImageBytes,
+} from "@/features/collab/room-file-store"
+import {
   parseFileUpload,
   type RoomFileUpload,
 } from "@/features/collab/room-files"
+import { DEMO_LIMITS, demoRefusals } from "@/features/demo/policy"
 import { accessibleTo } from "@/features/spaces/access"
+import { instanceMode } from "@/lib/mode"
 import { dataUrlToBytes } from "./file-bytes"
 import { parseSceneElements, sceneText } from "./search"
+
+/**
+ * A scene's JSON size cap, or null for none. Only the demo has one: it keeps
+ * every scene in memory. Solo saves and Rooms both check it.
+ */
+export const MAX_SCENE_BYTES =
+  instanceMode === "demo" ? DEMO_LIMITS.sceneBytes : null
 
 export type SceneWriteResult =
   /**
@@ -46,6 +57,9 @@ export async function writeDrawingScene(
   input: { id: string; data: string; files: RoomFileUpload[] },
 ): Promise<SceneWriteResult> {
   const { id, data: sceneData } = input
+  if (MAX_SCENE_BYTES !== null && sceneData.length > MAX_SCENE_BYTES) {
+    throw new Error(demoRefusals.scene)
+  }
   const files = input.files.flatMap((upload) => {
     const parsed = parseFileUpload(upload.fileId, upload)
     return parsed.status === "ok" ? [parsed.file] : []

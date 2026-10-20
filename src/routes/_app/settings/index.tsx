@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query"
-import { createFileRoute } from "@tanstack/react-router"
+import { createFileRoute, useLoaderData } from "@tanstack/react-router"
 import { Separator } from "@/components/ui/separator"
 import { Skeleton } from "@/components/ui/skeleton"
 import { currentUserQueryOptions } from "@/features/account/queries"
@@ -21,6 +21,10 @@ export const Route = createFileRoute("/_app/settings/")({
 // skeleton (spec §4.3) covers cold loads without flashing on cache hits.
 function AccountPage() {
   const { data: user, isPending } = useQuery(currentUserQueryOptions())
+  const demo = useLoaderData({
+    from: "__root__",
+    select: (site) => site.instanceMode === "demo",
+  })
   useDocumentTitle("Settings", { chrome: true })
   const showSkeleton = useDelayedVisible(isPending)
 
@@ -31,16 +35,40 @@ function AccountPage() {
     <div className="flex flex-col gap-8 animate-in fade-in-0 duration-200 motion-reduce:animate-none">
       <ProfileSection user={user} />
       <Separator />
-      <EmailSection user={user} />
-      <Separator />
-      <PasswordSection />
+      {demo ? (
+        <DemoAccountSection />
+      ) : (
+        <>
+          <EmailSection user={user} />
+          <Separator />
+          <PasswordSection />
+        </>
+      )}
       <Separator />
       <SessionsSection />
       <Separator />
       <AppearanceSection />
-      <Separator />
-      <DangerZoneSection user={user} />
+      {!demo && (
+        <>
+          <Separator />
+          <DangerZoneSection user={user} />
+        </>
+      )}
     </div>
+  )
+}
+
+// Demo visitors never learn their password, and the server refuses
+// account deletion.
+function DemoAccountSection() {
+  return (
+    <section>
+      <h2 className="text-sm font-medium text-foreground">Demo account</h2>
+      <p className="text-xs text-muted-foreground">
+        In the demo, you can't change your email or password, or delete your
+        account. We delete demo accounts and their drawings regularly.
+      </p>
+    </section>
   )
 }
 

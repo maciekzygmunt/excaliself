@@ -82,12 +82,17 @@ export type RoomRegistry = {
   now: () => number
   /** Set on shutdown: joins are refused from then on. */
   closing: boolean
+  /** A scene's JSON size cap, or null for none. */
+  maxSceneBytes: number | null
 }
 
 export function createRoomRegistry(
   loadScene: SceneLoader,
   saveScene: SceneSaver,
-  now: () => number = () => Date.now(),
+  {
+    now = () => Date.now(),
+    maxSceneBytes = null,
+  }: { now?: () => number; maxSceneBytes?: number | null } = {},
 ): RoomRegistry {
   return {
     rooms: new Map(),
@@ -95,6 +100,7 @@ export function createRoomRegistry(
     saveScene,
     now,
     closing: false,
+    maxSceneBytes,
   }
 }
 
@@ -409,13 +415,21 @@ function setFollowTarget(
  * nonce tie-breaks.
  */
 function applySceneUpdate(
+  registry: RoomRegistry,
   room: Room,
   peer: RoomPeer,
   incoming: SceneElement[],
 ): boolean {
   const previous = room.elements
+  const next = reconcileElements(previous, incoming, {})
+  // Measured on the merged scene, so the Room never holds more than the cap.
+  const { maxSceneBytes } = registry
+  if (maxSceneBytes !== null && JSON.stringify(next).length > maxSceneBytes) {
+    peer.send({ type: "SCENE_REFUSED", payload: { maxBytes: maxSceneBytes } })
+    return false
+  }
   const previousById = new Map(previous.map((el) => [el.id, el]))
-  room.elements = reconcileElements(previous, incoming, {})
+  room.elements = next
   const changed =
     room.elements.length !== previous.length ||
     room.elements.some((el) => previousById.get(el.id) !== el)
@@ -502,7 +516,7 @@ export async function receiveFromPeer(
       // Wait for the stored scene, or the merge would drop it.
       await room.loaded
       if (!room.seats.has(peer.id)) return "evicted"
-      if (applySceneUpdate(room, peer, message.payload.elements))
+      if (applySceneUpdate(registry, room, peer, message.payload.elements))
         markDirty(registry, room)
       return "ok"
 

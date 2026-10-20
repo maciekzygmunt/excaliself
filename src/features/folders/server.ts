@@ -8,6 +8,7 @@ import { db } from "@/db"
 import { drawings, folders, spaces } from "@/db/schema"
 import { userDisplayName } from "@/features/account/display-name"
 import { endTrashedRooms } from "@/features/collab/room-registry"
+import { checkDemoQuota } from "@/features/demo/quota"
 import { accessibleTo } from "@/features/spaces/access"
 import { restoreFolderUnit } from "@/features/trash/restore"
 import { authMiddleware } from "@/middleware/auth"
@@ -45,6 +46,7 @@ export const createFolder = createServerFn({ method: "POST" })
 
     return db.transaction(async (tx) => {
       await lockFolderTree(tx, "place")
+      await checkDemoQuota(tx, "folders", userId)
       const space = parentId
         ? await assertFolderTarget(tx, userId, parentId)
         : data.space

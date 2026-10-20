@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite dev --port 3000",
     "dev:preview": "PREVIEW_MODE=true pnpm dev",
+    "dev:demo": "DEMO_MODE=true BETTER_AUTH_SECRET=demo-dev-secret-not-for-production-use pnpm dev",
     "build": "vite build",
     "preview": "vite preview",
     "test": "vitest run",

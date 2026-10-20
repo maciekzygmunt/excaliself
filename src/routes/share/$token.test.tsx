@@ -30,6 +30,10 @@ vi.mock("@tanstack/react-router", () => ({
     useParams: () => ({ token: TOKEN }),
   }),
   useRouter: () => ({ invalidate }),
+  // The sign-in gate reads the root route's data and the path.
+  useLoaderData: ({ select }: { select: (site: object) => unknown }) =>
+    select({ instanceMode: "standard" }),
+  useLocation: () => `/share/${TOKEN}`,
   useNavigate: () => navigate,
   Link: ({ to, children, ...rest }: { to: string; children?: ReactNode }) => (
     <a href={to} {...rest}>

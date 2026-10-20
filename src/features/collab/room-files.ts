@@ -7,12 +7,6 @@
 export const MAX_IMAGE_BYTES = 2 * 1024 * 1024
 
 /**
- * Stored image bytes per drawing (20 MB). A load sends them all as base64 in
- * one server fn response, which TanStack Start caps at 32 MiB; this is ~27.
- */
-export const MAX_DRAWING_IMAGE_BYTES = 10 * MAX_IMAGE_BYTES
-
-/**
  * Refused on `content-length` alone: max image as a percent-encoded data URL
  * (up to 3 chars per byte; base64 is 4/3), plus envelope.
  */

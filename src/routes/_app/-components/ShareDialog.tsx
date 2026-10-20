@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query"
+import { useLoaderData } from "@tanstack/react-router"
 import { Check, Copy, Link2, RefreshCw, Users } from "lucide-react"
 import { useEffect, useState } from "react"
 import { toast } from "sonner"
@@ -131,10 +132,13 @@ function AudienceCards({
   value,
   onChange,
   disabled = false,
+  unavailable,
 }: {
   value: ShareAudience
   onChange: (audience: ShareAudience) => void
   disabled?: boolean
+  /** An audience the server refuses here, and why, in place of its hint. */
+  unavailable?: { audience: ShareAudience; hint: string }
 }) {
   return (
     <div className="space-y-2">
@@ -146,14 +150,15 @@ function AudienceCards({
             value === audience
               ? "border-iris bg-iris-muted/50"
               : "border-border/60 hover:border-border",
-            disabled && "cursor-default opacity-70",
+            (disabled || unavailable?.audience === audience) &&
+              "cursor-default opacity-70",
           )}
         >
           <input
             type="radio"
             name="share-audience"
             checked={value === audience}
-            disabled={disabled}
+            disabled={disabled || unavailable?.audience === audience}
             onChange={() => onChange(audience)}
             className="sr-only"
           />
@@ -173,7 +178,9 @@ function AudienceCards({
               {AUDIENCE_COPY[audience].label}
             </span>
             <span className="text-xs text-muted-foreground">
-              {AUDIENCE_COPY[audience].hint}
+              {unavailable?.audience === audience
+                ? unavailable.hint
+                : AUDIENCE_COPY[audience].hint}
             </span>
           </span>
         </label>
@@ -206,6 +213,11 @@ export function ShareDialog({
   const stopMutation = useStopSharing(drawingId, { isTeam })
   const regenerateMutation = useRegenerateShare(drawingId)
   const audienceMutation = useSetShareAudience(drawingId)
+  // The demo refuses "anyone" links: every visitor shares one instance.
+  const demo = useLoaderData({
+    from: "__root__",
+    select: (site) => site.instanceMode === "demo",
+  })
 
   // One flag for all controls: the mutations race on the same cache entry.
   const busy =
@@ -249,6 +261,11 @@ export function ShareDialog({
             <AudienceCards
               value={shared ? share.audience : draftAudience}
               disabled={shared && busy}
+              unavailable={
+                demo
+                  ? { audience: "anyone", hint: "Not available in the demo." }
+                  : undefined
+              }
               onChange={(audience) =>
                 shared
                   ? audienceMutation.mutate(audience)

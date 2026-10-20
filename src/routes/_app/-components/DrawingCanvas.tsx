@@ -29,6 +29,7 @@ import {
   markImageStatus,
   toastImageCapFull,
 } from "@/features/collab/use-room-files"
+import { isDemoRefusal } from "@/features/demo/policy"
 import { useRenameDrawing } from "@/features/drawings/mutations"
 import {
   drawingQueryOptions,
@@ -251,8 +252,11 @@ export function DrawingCanvas({
     // While live the room saves; changes are still recorded for when it
     // stops. After it stops, the stored scene replaces them first.
     paused: autoSavePaused || readOnly || isLive || reloadingScene,
-    onError: () => {
-      toast.error("Failed to save drawing", { id: "drawing-save-error" })
+    onError: (error) => {
+      toast.error(
+        isDemoRefusal(error) ? error.message : "Failed to save drawing",
+        { id: "drawing-save-error" },
+      )
     },
   })
 

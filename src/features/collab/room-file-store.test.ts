@@ -1,8 +1,11 @@
 import type { SQL } from "drizzle-orm"
 import { PgDialect } from "drizzle-orm/pg-core"
 import { expect, test } from "vitest"
-import { loadRoomFile, saveRoomFile } from "./room-file-store"
-import { MAX_DRAWING_IMAGE_BYTES } from "./room-files"
+import {
+  loadRoomFile,
+  MAX_DRAWING_IMAGE_BYTES,
+  saveRoomFile,
+} from "./room-file-store"
 
 type Call =
   | { kind: "select"; where: SQL }

@@ -5,6 +5,7 @@ import { tanstackStartCookies } from "better-auth/tanstack-start"
 import { db } from "@/db"
 import * as schema from "@/db/schema"
 import { env } from "@/env"
+import { instanceMode } from "@/lib/mode"
 
 type DynamicBaseURL = Exclude<NonNullable<BetterAuthOptions["baseURL"]>, string>
 
@@ -26,7 +27,7 @@ const previewBaseURL: DynamicBaseURL = {
 export const auth = betterAuth({
   // Public origin when behind a reverse proxy; better-auth infers from the
   // request when unset.
-  baseURL: env.PREVIEW_MODE ? previewBaseURL : env.BASE_URL,
+  baseURL: instanceMode === "standard" ? env.BASE_URL : previewBaseURL,
   // Read from env.ts, which gives preview a default.
   secret: env.BETTER_AUTH_SECRET,
   database: drizzleAdapter(db, {
@@ -70,7 +71,7 @@ export const auth = betterAuth({
   advanced: {
     // Preview sits behind Coolify's proxy, whose x-forwarded-proto makes the
     // derived scheme https. allowedHosts bounds a forged x-forwarded-host.
-    trustedProxyHeaders: env.PREVIEW_MODE,
+    trustedProxyHeaders: instanceMode !== "standard",
   },
   plugins: [tanstackStartCookies()],
 })

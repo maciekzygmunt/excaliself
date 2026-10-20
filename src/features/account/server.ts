@@ -15,8 +15,10 @@ import {
 import { isLastAdmin } from "@/features/admin/roles"
 import { endRooms, rooms } from "@/features/collab/room-registry"
 import { evictUser } from "@/features/collab/room-session"
+import { demoRefusals } from "@/features/demo/policy"
 import { isTeamEnabled } from "@/features/spaces/team-enabled"
 import { auth } from "@/lib/auth"
+import { instanceMode } from "@/lib/mode"
 import { authMiddleware } from "@/middleware/auth"
 import { compareSessions } from "./sessions"
 
@@ -35,7 +37,8 @@ export const getCurrentUser = createServerFn({ method: "GET" })
         })
         .from(users)
         .where(eq(users.id, context.session.user.id)),
-      isTeamEnabled(db),
+      // The demo has no Team: all visitors are members of one instance.
+      instanceMode !== "demo" && isTeamEnabled(db),
     ])
     if (!user) throw new Error("User not found")
     return { ...user, teamEnabled }
@@ -199,6 +202,7 @@ export const getMyContentCounts = createServerFn({ method: "GET" })
 export const deleteMyAccount = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
   .handler(async ({ context }) => {
+    if (instanceMode === "demo") throw new Error(demoRefusals.account)
     const userId = context.session.user.id
     const shared = await sharedDrawingIds(db, userId)
     await hardDeleteUser(db, userId)

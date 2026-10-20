@@ -7,6 +7,7 @@
 import { and, inArray, lte } from "drizzle-orm"
 import type { Db } from "@/db"
 import { drawings, folders } from "@/db/schema"
+import { startIntervalJob } from "@/lib/interval-job"
 import { purgeCutoff } from "./retention"
 
 export const TRASH_PURGE_INTERVAL_MS = 60 * 60 * 1000 // hourly
@@ -134,30 +135,13 @@ export async function purgeExpiredTrash(
   })
 }
 
-/**
- * Runs a purge pass immediately and then on an interval. Failures are logged
- * and never break the schedule; every pass logs its counts for the
- * self-hosting admin. Returns a stop function (used by tests).
- */
+/** Runs a purge pass now and then hourly, logging its counts for the admin. */
 export function startTrashPurgeJob(
   runPass: () => Promise<PurgeCounts>,
   intervalMs: number = TRASH_PURGE_INTERVAL_MS,
 ): () => void {
-  const pass = async () => {
-    try {
-      const { purgedDrawings, purgedFolders } = await runPass()
-      console.log(
-        `[trash-purge] pass complete: purged ${purgedDrawings} drawing(s), ${purgedFolders} folder(s)`,
-      )
-    } catch (err) {
-      console.error("[trash-purge] pass failed", err)
-    }
-  }
-
-  void pass()
-  const timer = setInterval(pass, intervalMs)
-  // Typed by the DOM lib as a number, but at runtime this is a Node Timeout;
-  // unref it so the job never holds the process open (graceful shutdown).
-  ;(timer as unknown as { unref?: () => void }).unref?.()
-  return () => clearInterval(timer)
+  return startIntervalJob("trash-purge", intervalMs, async () => {
+    const { purgedDrawings, purgedFolders } = await runPass()
+    return `pass complete: purged ${purgedDrawings} drawing(s), ${purgedFolders} folder(s)`
+  })
 }

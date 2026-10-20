@@ -4,12 +4,24 @@ import { randomUUID } from "node:crypto"
 import { and, eq, sql } from "drizzle-orm"
 import type { Db } from "@/db"
 import { drawingFiles } from "@/db/schema"
+import { DEMO_LIMITS } from "@/features/demo/policy"
 import { bytesToDataUrl, dataUrlToBytes } from "@/features/drawings/file-bytes"
+import { instanceMode } from "@/lib/mode"
 import {
-  MAX_DRAWING_IMAGE_BYTES,
+  MAX_IMAGE_BYTES,
   type RoomFile,
   type RoomFilePayload,
 } from "./room-files"
+
+/**
+ * Stored image bytes per drawing (20 MB), smaller in the demo. A load sends
+ * them all as base64 in one server fn response, which TanStack Start caps at
+ * 32 MiB; 20 MB is ~27.
+ */
+export const MAX_DRAWING_IMAGE_BYTES =
+  instanceMode === "demo"
+    ? DEMO_LIMITS.imageBytesPerDrawing
+    : 10 * MAX_IMAGE_BYTES
 
 /** Image bytes the drawing stores now. Also runs inside a transaction. */
 export async function storedImageBytes(
