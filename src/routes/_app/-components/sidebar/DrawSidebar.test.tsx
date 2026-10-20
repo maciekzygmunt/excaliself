@@ -65,6 +65,10 @@ vi.mock("@/features/folders/server", () => ({
   restoreFolder: vi.fn(),
 }))
 vi.mock("@/features/spaces/server", () => ({ moveToTeam: vi.fn() }))
+const importFiles = vi.fn()
+vi.mock("@/features/drawings/import-files", () => ({
+  useImportDrawingFiles: () => importFiles,
+}))
 vi.mock("@/features/shares/server", () => ({ getDrawingShare: vi.fn() }))
 vi.mock("@/lib/auth-client", () => ({ authClient: { signOut: vi.fn() } }))
 vi.mock("../CommandPalette", () => ({
@@ -301,4 +305,22 @@ test("a Team drawing can't be dropped on Private, nor spring-load it", () => {
   fireEvent.drop(segment("Private"), { dataTransfer: dt })
   expect(screen.queryByRole("heading")).toBeNull()
   expect(updateDrawing).not.toHaveBeenCalled()
+})
+
+test("files dropped from the computer on a folder import into it", () => {
+  renderSidebar(true)
+  fireEvent.click(segment("Team"))
+  const file = new File(["{}"], "Plan.excalidraw")
+  const dt = { types: ["Files"], files: [file], dropEffect: "" }
+
+  // Cancelled: the browser shows a copy drop here.
+  expect(
+    fireEvent.dragOver(screen.getByText("Design"), { dataTransfer: dt }),
+  ).toBe(false)
+  fireEvent.drop(screen.getByText("Design"), { dataTransfer: dt })
+
+  expect(importFiles).toHaveBeenCalledWith([file], {
+    folderId: "t-design",
+    space: "team",
+  })
 })
