@@ -65,10 +65,9 @@ export function DrawingItem({ drawing }: DrawingItemProps) {
       ) : (
         <>
           <span className="truncate transition-colors">{drawing.name}</span>
-          {/* md:mr-4 clears the hover-revealed overflow trigger. */}
           <LiveCountChip
             live={live}
-            className="ml-auto animate-in fade-in-0 duration-200 md:mr-4"
+            className="ml-auto animate-in fade-in-0 duration-200"
           />
         </>
       )}
@@ -98,10 +97,11 @@ export function DrawingItem({ drawing }: DrawingItemProps) {
         }
         isActive={isActive}
         className={cn(
-          // Below md the row action is always shown, so reserve its slot.
-          "h-auto cursor-pointer gap-1.5 px-2 py-1.5 pr-2! text-[13px] max-md:pr-7! active:cursor-grabbing [&>svg]:size-auto",
+          // Always reserve the row action's slot so long names and the live
+          // chip never run under it when it's revealed.
+          "h-auto cursor-pointer gap-1.5 px-2 py-1.5 pr-7! text-[13px] active:cursor-grabbing [&>svg]:size-auto",
           "data-[active=true]:bg-iris-muted data-[active=true]:font-medium data-[active=true]:text-iris-strong data-[active=true]:shadow-row-active",
-          rename.isRenaming && "pr-3! max-md:pr-3!",
+          rename.isRenaming && "pr-3!",
         )}
       >
         {content}
