@@ -106,6 +106,7 @@ export function DrawSidebar({ user }: { user: SidebarUser }) {
         <div className="px-2 pt-1 pb-1.5">
           <button
             type="button"
+            data-tour="new-drawing"
             onClick={() => openCreateDrawingDialog()}
             className={cn(
               KEYCAP_CLASS,
@@ -123,6 +124,7 @@ export function DrawSidebar({ user }: { user: SidebarUser }) {
         <div className="px-2 pb-1">
           <button
             type="button"
+            data-tour="command-palette"
             onClick={openCommandPalette}
             className="flex w-full items-center gap-2 rounded-md bg-well px-2.5 py-2 text-[13px] text-muted-foreground/70 shadow-well transition-colors hover:bg-well-hover hover:text-muted-foreground focus-visible:bg-well-hover focus-visible:outline-none"
           >
@@ -243,7 +245,10 @@ function SpaceBody({
     <>
       <StarredSection drawings={drawings} />
 
-      <div className="flex items-center justify-between pt-2 pb-0.5 pr-3 pl-4">
+      <div
+        data-tour="folders"
+        className="flex items-center justify-between pt-2 pb-0.5 pr-3 pl-4"
+      >
         <span className="text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground/60">
           Drawings
         </span>
