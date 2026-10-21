@@ -44,6 +44,7 @@ export function Home({ isAdmin }: { isAdmin: boolean }) {
             )}
             <button
               type="button"
+              data-tour="share"
               onClick={() => openCreateDrawingDialog()}
               className={cn(
                 KEYCAP_CLASS,

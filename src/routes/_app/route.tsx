@@ -14,6 +14,7 @@ import { setupMiddleware } from "@/middleware/setup"
 import { ActiveSpaceProvider } from "./-components/ActiveSpace"
 import { CommandPaletteProvider } from "./-components/CommandPalette"
 import { CreateDialogProvider } from "./-components/CreateDialog"
+import { FirstVisitTour } from "./-components/FirstVisitTour"
 import { MoveToTeamProvider } from "./-components/MoveToTeamDialog"
 import { SidebarReopenButton } from "./-components/SidebarReopenButton"
 import { DrawSidebar } from "./-components/sidebar"
@@ -72,6 +73,7 @@ function AppShellLayout() {
                 <SidebarReopenButton />
                 <Outlet />
               </SidebarInset>
+              <FirstVisitTour userId={session.user.id} />
             </CommandPaletteProvider>
           </MoveToTeamProvider>
         </CreateDialogProvider>
