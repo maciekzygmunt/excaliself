@@ -20,7 +20,10 @@ export function SpaceSegments({ activeSpace }: { activeSpace: Space }) {
 
   return (
     <div className="px-2 pb-1">
-      <div className="relative grid grid-cols-2 rounded-md bg-well p-0.5 shadow-well">
+      <div
+        data-tour="spaces"
+        className="relative grid grid-cols-2 rounded-md bg-well p-0.5 shadow-well"
+      >
         <div
           aria-hidden="true"
           className={cn(
