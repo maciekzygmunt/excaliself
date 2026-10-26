@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest"
-import { extractSceneText, findInScene } from "./search"
+import { extractSceneText, findInScene, matchDrawing } from "./search"
 
 function scene(...elements: object[]) {
   return JSON.stringify({ type: "excalidraw", elements, appState: {} })
@@ -62,5 +62,26 @@ describe("findInScene", () => {
 
   test("an empty query never matches", () => {
     expect(findInScene({ searchText: "x" }, " ")).toBeNull()
+  })
+})
+
+describe("matchDrawing", () => {
+  const drawing = {
+    name: "Release process",
+    searchText: "Build the image, then deploy to staging",
+  }
+
+  test("every word must be found, in the name or the text, in any order", () => {
+    expect(matchDrawing(drawing, "staging release")).toEqual({
+      match: "text",
+      snippet: expect.stringContaining("deploy to staging"),
+    })
+    expect(matchDrawing(drawing, "release rollback")).toBeNull()
+  })
+
+  test("a query found whole in the name is a name match", () => {
+    expect(matchDrawing(drawing, "PROCESS release")).toMatchObject({
+      match: "name",
+    })
   })
 })

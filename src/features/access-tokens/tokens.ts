@@ -4,11 +4,8 @@
 
 import { createHash, randomBytes, randomUUID } from "node:crypto"
 import { and, desc, eq } from "drizzle-orm"
-import type { NodePgDatabase } from "drizzle-orm/node-postgres"
-import type * as schema from "@/db/schema"
+import type { Db } from "@/db"
 import { accessTokens, users } from "@/db/schema"
-
-type Db = NodePgDatabase<typeof schema>
 
 // Marks the string as an Excaliself token, for people and secret scanners.
 const PREFIX = "exs_"

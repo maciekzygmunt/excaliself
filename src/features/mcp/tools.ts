@@ -5,17 +5,19 @@
 
 import { McpServer } from "@modelcontextprotocol/server"
 import { and, eq, isNull } from "drizzle-orm"
-import type { NodePgDatabase } from "drizzle-orm/node-postgres"
 import { z } from "zod"
-import type * as schema from "@/db/schema"
-import { drawings, folders, spaces } from "@/db/schema"
+import type { Db } from "@/db"
+import { drawings, folders, type Space, spaces } from "@/db/schema"
 import { userDisplayName } from "@/features/account/display-name"
 import { rooms } from "@/features/collab/room-registry"
+import { roomElements } from "@/features/collab/room-session"
 import { insertDrawing } from "@/features/drawings/create"
 import { listDrawings } from "@/features/drawings/list"
-import { findInScene, parseSceneElements } from "@/features/drawings/search"
+import { matchDrawing, parseSceneElements } from "@/features/drawings/search"
+import { FolderNotFoundError } from "@/features/folders/ownership"
+import { listUpdates } from "@/features/list-updates/hub"
 import { accessibleTo } from "@/features/spaces/access"
-import { buildScene } from "./scene/build"
+import { type BuiltElement, buildScene } from "./scene/build"
 import { parseMermaid } from "./scene/mermaid"
 import {
   directions,
@@ -25,8 +27,6 @@ import {
   SceneInputError,
 } from "./scene/skeleton"
 import { summarizeScene } from "./summary"
-
-type Db = NodePgDatabase<typeof schema>
 
 export type Member = { id: string; name: string; email: string }
 
@@ -76,38 +76,40 @@ export function createMcpServer(db: Db, member: Member, origin: string) {
     )
   }
 
-  const drawingRows = async (filter: {
-    space?: schema.Space
+  type FolderPaths = Awaited<ReturnType<typeof folderPaths>>
+  type ListedDrawing = Awaited<ReturnType<typeof listDrawings>>[number]
+
+  /** The drawings the member can see, most recently edited first. */
+  const visibleDrawings = async (filter: {
+    space?: Space
     folderId?: string
   }) => {
-    const [list, paths] = await Promise.all([
+    const [all, paths] = await Promise.all([
       listDrawings(db, member.id),
       folderPaths(),
     ])
-    const rows = list
+    const list = all
       .filter((drawing) => !filter.space || drawing.space === filter.space)
       .filter(
         (drawing) => !filter.folderId || drawing.folderId === filter.folderId,
       )
-      .map((drawing) => ({
-        drawing,
-        row: {
-          id: drawing.id,
-          name: drawing.name,
-          space: drawing.space,
-          folder: drawing.folderId
-            ? (paths.get(drawing.folderId)?.path ?? null)
-            : null,
-          folderId: drawing.folderId,
-          lastEdited: drawing.updatedAt.toISOString(),
-          ...(drawing.space === "team"
-            ? { creator: drawing.creator?.name ?? "Former member" }
-            : {}),
-          url: drawingUrl(drawing.id),
-        },
-      }))
-    return rows
+    return { list, paths }
   }
+
+  const toRow = (drawing: ListedDrawing, paths: FolderPaths) => ({
+    id: drawing.id,
+    name: drawing.name,
+    space: drawing.space,
+    folder: drawing.folderId
+      ? (paths.get(drawing.folderId)?.path ?? null)
+      : null,
+    folderId: drawing.folderId,
+    lastEdited: drawing.updatedAt.toISOString(),
+    ...(drawing.space === "team"
+      ? { creator: drawing.creator?.name ?? "Former member" }
+      : {}),
+    url: drawingUrl(drawing.id),
+  })
 
   const limit = (fallback: number) =>
     z
@@ -135,10 +137,10 @@ export function createMcpServer(db: Db, member: Member, origin: string) {
       annotations: { readOnlyHint: true },
     },
     async ({ space, folderId, limit }) => {
-      const rows = await drawingRows({ space, folderId })
+      const { list, paths } = await visibleDrawings({ space, folderId })
       return json({
-        total: rows.length,
-        drawings: rows.slice(0, limit).map(({ row }) => row),
+        total: list.length,
+        drawings: list.slice(0, limit).map((drawing) => toRow(drawing, paths)),
       })
     },
   )
@@ -157,29 +159,15 @@ export function createMcpServer(db: Db, member: Member, origin: string) {
       annotations: { readOnlyHint: true },
     },
     async ({ query, space, limit }) => {
-      const words = query.toLowerCase().split(/\s+/)
-      const results = (await drawingRows({ space })).flatMap(
-        ({ drawing, row }) => {
-          const name = drawing.name.toLowerCase()
-          const content = drawing.searchText.toLowerCase()
-          if (
-            !words.every(
-              (word) => name.includes(word) || content.includes(word),
-            )
-          )
-            return []
-          const inName = words.every((word) => name.includes(word))
-          const sceneWord = words.find((word) => content.includes(word))
-          const snippet = sceneWord ? findInScene(drawing, sceneWord) : null
-          return [
-            {
-              ...row,
-              match: inName ? "name" : "text",
-              ...(snippet ? { snippet } : {}),
-            },
-          ]
-        },
-      )
+      const { list, paths } = await visibleDrawings({ space })
+      const results = list.flatMap((drawing) => {
+        const found = matchDrawing(drawing, query)
+        if (!found) return []
+        const { match, snippet } = found
+        return [
+          { ...toRow(drawing, paths), match, ...(snippet ? { snippet } : {}) },
+        ]
+      })
       // Stable sort: each group keeps the most recent first.
       results.sort(
         (a, b) => Number(b.match === "name") - Number(a.match === "name"),
@@ -244,14 +232,9 @@ export function createMcpServer(db: Db, member: Member, origin: string) {
           "No drawing has that id. Find one with list_drawings or search_drawings.",
         )
       }
-      // A live Room holds newer edits than the stored scene. One that
-      // failed to load is dropped from the registry; read the store then.
-      const room = rooms.rooms.get(id)
-      if (room) await room.loaded
+      // A live Room holds newer edits than the stored scene.
       const elements =
-        room && rooms.rooms.get(id) === room
-          ? room.elements
-          : parseSceneElements(drawing.data)
+        (await roomElements(rooms, id)) ?? parseSceneElements(drawing.data)
       if (!elements)
         return failure("This drawing's data is damaged and can't be read.")
 
@@ -265,7 +248,7 @@ export function createMcpServer(db: Db, member: Member, origin: string) {
       return text(
         [
           `${JSON.stringify(drawing.name)} (${where}), last edited ${drawing.updatedAt.toISOString()}. ${drawingUrl(id)}`,
-          summarizeScene(elements as Record<string, unknown>[]),
+          summarizeScene(elements),
         ].join("\n\n"),
       )
     },
@@ -313,7 +296,7 @@ Colors: Excalidraw's palette reads best, e.g. backgrounds "#a5d8ff" (blue), "#b2
       },
     },
     async (input) => {
-      let elements: ReturnType<typeof buildScene>
+      let elements: BuiltElement[]
       try {
         const flowchart: SceneGraph = input.mermaid
           ? parseMermaid(input.mermaid)
@@ -328,20 +311,21 @@ Colors: Excalidraw's palette reads best, e.g. backgrounds "#a5d8ff" (blue), "#b2
         throw error
       }
 
-      let created: { id: string; space: schema.Space }
+      let created: { id: string; space: Space }
       try {
         created = await insertDrawing(db, member.id, {
           name: input.name,
           folderId: input.folderId ?? null,
           space: input.space,
-          elements: elements as unknown as Record<string, unknown>[],
+          elements,
         })
       } catch (error) {
-        if (error instanceof Error && error.message === "Folder not found") {
+        if (error instanceof FolderNotFoundError) {
           return failure("No folder has that id. Find one with list_folders.")
         }
         throw error
       }
+      listUpdates.notify()
       const folder = input.folderId
         ? (await folderPaths()).get(input.folderId)?.path
         : undefined

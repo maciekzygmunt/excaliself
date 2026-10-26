@@ -2,14 +2,11 @@
 // server.ts so the MCP endpoint can share it.
 
 import { randomUUID } from "node:crypto"
-import type { NodePgDatabase } from "drizzle-orm/node-postgres"
-import type * as schema from "@/db/schema"
+import type { Db } from "@/db"
 import { drawings, type Space } from "@/db/schema"
 import { assertFolderTarget } from "@/features/folders/ownership"
 import { lockFolderTree } from "@/features/folders/tree-lock"
 import { sceneText } from "./search"
-
-type Db = NodePgDatabase<typeof schema>
 
 /**
  * Inside a folder the drawing takes the folder's space, and `space` is

@@ -16,7 +16,7 @@ export type LayoutInput = {
     to: string
     label?: { width: number; height: number }
   }[]
-  /** `titleHeight` is kept free above the cluster's members. */
+  /** Parents before children. `titleHeight` is kept free above the members. */
   clusters: { id: string; parent: string | null; titleHeight: number }[]
 }
 
@@ -130,15 +130,9 @@ function clusterBoxes(
   layoutBox: (id: string) => Box,
   nodes: Map<string, Box>,
 ): Map<string, Box> {
-  const depth = (id: string | null): number => {
-    const cluster = input.clusters.find((candidate) => candidate.id === id)
-    return cluster ? 1 + depth(cluster.parent) : 0
-  }
   const boxes = new Map<string, Box>()
-  const deepestFirst = [...input.clusters].sort(
-    (a, b) => depth(b.id) - depth(a.id),
-  )
-  for (const cluster of deepestFirst) {
+  // Parents come first, so in reverse every child is sized before its parent.
+  for (const cluster of [...input.clusters].reverse()) {
     const content = [
       ...input.nodes.flatMap((node) => {
         const box = node.parent === cluster.id && nodes.get(node.id)

@@ -69,3 +69,24 @@ export function findInScene(
     at <= SNIPPET_LEAD ? 0 : text.lastIndexOf(" ", at - SNIPPET_LEAD) + 1
   return `${start > 0 ? "…" : ""}${text.slice(start, start + SNIPPET_LENGTH)}`
 }
+
+/**
+ * Search for AI clients: every word of the query must be in the name or the
+ * text, in any order. The app's own search (`filterDrawings`) matches the
+ * query as one phrase. The snippet shows the first word found in the text.
+ */
+export function matchDrawing(
+  drawing: Pick<Drawing, "name" | "searchText">,
+  query: string,
+): { match: "name" | "text"; snippet: string | null } | null {
+  const words = query.toLowerCase().split(/\s+/).filter(Boolean)
+  const name = drawing.name.toLowerCase()
+  const text = drawing.searchText.toLowerCase()
+  const found = (word: string) => name.includes(word) || text.includes(word)
+  if (words.length === 0 || !words.every(found)) return null
+  const textWord = words.find((word) => text.includes(word))
+  return {
+    match: words.every((word) => name.includes(word)) ? "name" : "text",
+    snippet: textWord ? findInScene(drawing, textWord) : null,
+  }
+}

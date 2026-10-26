@@ -1,5 +1,5 @@
 import { expect, test } from "vitest"
-import { buildScene } from "./build"
+import { type BuiltElement, buildScene } from "./build"
 import { parseMermaid } from "./mermaid"
 import {
   type Cluster,
@@ -8,14 +8,7 @@ import {
   SceneInputError,
 } from "./skeleton"
 
-type Built = Record<string, unknown> & {
-  id: string
-  type: string
-  x: number
-  y: number
-  width: number
-  height: number
-}
+type Built = BuiltElement
 type Point = [number, number]
 
 function build(
@@ -27,7 +20,7 @@ function build(
     clusters: [],
     direction: "TB",
     ...options,
-  }) as unknown as Built[]
+  })
 }
 
 const labelOf = (elements: Built[], container: Built) =>
@@ -306,7 +299,7 @@ test.each(["LR", "TB"] as const)(
       ws -->|"flush scene"| db
       mcp --> db`),
       direction,
-    }) as unknown as Built[]
+    })
     const boxes = elements.filter(
       (element) => element.type !== "text" && element.type !== "arrow",
     )
@@ -328,7 +321,7 @@ test.each(["LR", "TB"] as const)(
 test("repeated and looping edges lay out, each still drawn", () => {
   const elements = buildScene(
     parseMermaid(`flowchart TD\n${"A-->C\nA-->B\nB-->C\nB-->B\n".repeat(3)}`),
-  ) as unknown as Built[]
+  )
 
   expect(elements.filter((element) => element.type === "arrow")).toHaveLength(
     12,

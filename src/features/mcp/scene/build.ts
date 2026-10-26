@@ -4,7 +4,7 @@
 // built scene opens as if it had been drawn by hand.
 
 import { randomBytes, randomInt } from "node:crypto"
-import type { ExcalidrawElement } from "@excalidraw/excalidraw/element/types"
+import type { SceneElement } from "@/features/collab/protocol"
 import { type Box, layoutGraph, type Point, union } from "./layout"
 import {
   type ConnectorSkeleton,
@@ -68,18 +68,29 @@ type Shape = {
   positioned: boolean
   label: Label | null
   style: Style
-  /** A cluster's box, titled top-left. */
-  isCluster: boolean
   /** Ref of the cluster this sits in. */
   parent: string | null
 }
+
+/** A subgraph's titled box. Always laid out, around its members. */
+type ClusterBox = {
+  id: string
+  box: Box
+  title: Label | null
+  /** Ref of the cluster this sits in. */
+  parent: string | null
+}
+
+/** What an arrow can join. A cluster binds like a rectangle. */
+type Target = Shape | ClusterBox
 
 type Connector = {
   id: string
   index: number
   skeleton: ConnectorSkeleton
-  from: Shape | null
-  to: Shape | null
+  label: Label | null
+  from: Target | null
+  to: Target | null
   /** Set when the auto-layout routed it. */
   route: Point[] | null
 }
@@ -87,11 +98,21 @@ type Connector = {
 type FreeText = {
   id: string
   skeleton: TextSkeleton
+  layout: ReturnType<typeof freeTextLayout>
   position: Point | null
 }
 
+/** A built element, with the fields every element has typed. */
+export type BuiltElement = SceneElement & {
+  type: string
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
 /** Builds a scene's elements. Throws SceneInputError listing every problem in the input. */
-export function buildScene(graph: SceneGraph): ExcalidrawElement[] {
+export function buildScene(graph: SceneGraph): BuiltElement[] {
   // Checked first: layout time grows fast with the number of edges.
   const count = graph.elements.length + graph.clusters.length
   if (count > MAX_ELEMENTS) {
@@ -100,6 +121,8 @@ export function buildScene(graph: SceneGraph): ExcalidrawElement[] {
     )
   }
   const errors: string[] = []
+  // Both keyed by ref. Clusters keep the input's parents-first order.
+  const clusters = new Map<string, ClusterBox>()
   const shapes = new Map<string, Shape>()
   const refs = new Set<string>()
   const connectors: Connector[] = []
@@ -115,14 +138,10 @@ export function buildScene(graph: SceneGraph): ExcalidrawElement[] {
   for (const cluster of graph.clusters) {
     claim(cluster.id, `subgraph ${cluster.id}`)
     for (const member of cluster.members) clusterOf.set(member, cluster.id)
-    shapes.set(cluster.id, {
+    clusters.set(cluster.id, {
       id: newId(),
-      type: "rectangle",
       box: { x: 0, y: 0, width: 0, height: 0 },
-      positioned: false,
-      label: cluster.label ? labelOf(cluster.label, CLUSTER_FONT_SIZE) : null,
-      style: { ...DEFAULT_STYLE, ...CLUSTER_STYLE },
-      isCluster: true,
+      title: labelOf(cluster.label, CLUSTER_FONT_SIZE),
       parent: cluster.parent,
     })
   }
@@ -153,7 +172,6 @@ export function buildScene(graph: SceneGraph): ExcalidrawElement[] {
               element.backgroundColor ?? DEFAULT_STYLE.backgroundColor,
             strokeStyle: element.strokeStyle ?? DEFAULT_STYLE.strokeStyle,
           },
-          isCluster: false,
           parent: (element.id && clusterOf.get(element.id)) || null,
         })
         break
@@ -164,6 +182,7 @@ export function buildScene(graph: SceneGraph): ExcalidrawElement[] {
         texts.push({
           id: newId(),
           skeleton: element,
+          layout: freeTextLayout(element),
           position: x !== undefined && y !== undefined ? [x, y] : null,
         })
         break
@@ -174,6 +193,9 @@ export function buildScene(graph: SceneGraph): ExcalidrawElement[] {
           id: newId(),
           index,
           skeleton: element,
+          label: element.label
+            ? labelOf(element.label, element.fontSize ?? FONT_SIZE)
+            : null,
           from: null,
           to: null,
           route: null,
@@ -187,15 +209,15 @@ export function buildScene(graph: SceneGraph): ExcalidrawElement[] {
     const { from, to, start, end } = connector.skeleton
     const resolve = (ref: string | undefined, field: string) => {
       if (ref === undefined) return null
-      const shape = shapes.get(ref)
-      if (!shape) {
+      const target = shapes.get(ref) ?? clusters.get(ref)
+      if (!target) {
         errors.push(
           refs.has(ref)
             ? `${where}.${field}: "${ref}" is not a shape.`
             : `${where}.${field}: no shape has id "${ref}".`,
         )
       }
-      return shape ?? null
+      return target ?? null
     }
     connector.from = resolve(from, "from")
     connector.to = resolve(to, "to")
@@ -207,12 +229,22 @@ export function buildScene(graph: SceneGraph): ExcalidrawElement[] {
 
   if (errors.length > 0) throw new SceneInputError(errors.join("\n"))
 
-  autoLayout(graph.direction, shapes, connectors, texts)
+  autoLayout(graph.direction, clusters, shapes, connectors, texts)
 
+  const boundTo = (target: Target) =>
+    connectors.flatMap(({ id, from, to }) =>
+      from === target || to === target ? [{ id, type: "arrow" as const }] : [],
+    )
+  // Outer clusters first, so each box sits behind what it holds.
   return withIndices([
-    ...emitShapes(shapes, connectors),
+    ...[...clusters.values()].flatMap((cluster) =>
+      emitCluster(cluster, boundTo(cluster)),
+    ),
+    ...[...shapes.values()].flatMap((shape) =>
+      emitShape(shape, boundTo(shape)),
+    ),
     ...connectors.flatMap(emitConnector),
-    ...texts.flatMap(emitFreeText),
+    ...texts.map(emitFreeText),
   ])
 }
 
@@ -220,8 +252,13 @@ function newId(): string {
   return randomBytes(15).toString("base64url")
 }
 
+function cleanText(text: string): string {
+  return text.replace(/\r\n?/g, "\n").replace(/\t/g, "    ").trim()
+}
+
+/** A label that doesn't wrap. */
 function labelOf(text: string, fontSize: number): Label | null {
-  const original = text.replace(/\r\n?/g, "\n").replace(/\t/g, "    ").trim()
+  const original = cleanText(text)
   return original ? { text: original, original, fontSize } : null
 }
 
@@ -258,13 +295,14 @@ function sizeShape(
   const { type } = skeleton
   const [minWidth, minHeight] = MIN_SIZE[type]
   const fontSize = skeleton.fontSize ?? FONT_SIZE
-  const label = skeleton.label ? labelOf(skeleton.label, fontSize) : null
+  const original = cleanText(skeleton.label ?? "")
+  let label: Label | null = null
   let width = skeleton.width
   let height = skeleton.height
-  if (label) {
+  if (original) {
     if (width === undefined) {
       const fit = measureText(
-        wrapText(label.original, fontSize, AUTO_WRAP_WIDTH[type]),
+        wrapText(original, fontSize, AUTO_WRAP_WIDTH[type]),
         fontSize,
       )
       width = Math.max(
@@ -272,8 +310,9 @@ function sizeShape(
         containerSize(type, fit.width + LABEL_MARGIN.x * 2),
       )
     }
-    label.text = wrapText(label.original, fontSize, maxTextWidth(type, width))
-    const textHeight = measureText(label.text, fontSize).height
+    const text = wrapText(original, fontSize, maxTextWidth(type, width))
+    label = { text, original, fontSize }
+    const textHeight = measureText(text, fontSize).height
     height =
       height === undefined
         ? Math.max(
@@ -295,18 +334,20 @@ function sizeShape(
 }
 
 /**
- * Lays out the shapes with no position (and every cluster) as one graph,
+ * Lays out the shapes with no position, and every cluster, as one graph
  * beside the hand-placed content, then stacks unplaced text above it all.
  */
 function autoLayout(
   direction: SceneGraph["direction"],
+  clustersByRef: Map<string, ClusterBox>,
   shapesByRef: Map<string, Shape>,
   connectors: Connector[],
   texts: FreeText[],
 ) {
+  const clusters = [...clustersByRef.values()]
   const shapes = [...shapesByRef.values()]
   const placed = shapes.filter((shape) => shape.positioned)
-  const floating = new Set(shapes.filter((shape) => !shape.positioned))
+  const floating = shapes.filter((shape) => !shape.positioned)
   const placedBounds = boundsOf([
     ...placed.map((shape) => shape.box),
     ...connectors.flatMap(({ skeleton }) =>
@@ -317,56 +358,55 @@ function autoLayout(
     ...texts.flatMap((text) => (text.position ? [textBox(text)] : [])),
   ])
 
-  if (floating.size > 0) {
+  if (floating.length > 0 || clusters.length > 0) {
     // Edges to a cluster can't be laid out; they are drawn straight.
+    const floatingIds = new Set(floating.map((shape) => shape.id))
     const routed = connectors.filter(
       (connector): connector is Connector & { from: Shape; to: Shape } =>
         connector.from !== null &&
         connector.to !== null &&
-        floating.has(connector.from) &&
-        floating.has(connector.to) &&
-        !connector.from.isCluster &&
-        !connector.to.isCluster,
+        floatingIds.has(connector.from.id) &&
+        floatingIds.has(connector.to.id),
     )
-    const parentId = (shape: Shape) =>
-      (shape.parent && shapesByRef.get(shape.parent)?.id) || null
+    const parentId = (item: Shape | ClusterBox) =>
+      (item.parent && clustersByRef.get(item.parent)?.id) || null
     const layout = layoutGraph({
       direction,
-      nodes: [...floating]
-        .filter((shape) => !shape.isCluster)
-        .map((shape) => ({
-          id: shape.id,
-          width: shape.box.width,
-          height: shape.box.height,
-          parent: parentId(shape),
-        })),
-      edges: routed.map(({ from, to, skeleton }) => {
-        const label = connectorLabel(skeleton)
-        return {
-          from: from.id,
-          to: to.id,
-          label: label ? measureText(label.text, label.fontSize) : undefined,
-        }
-      }),
-      clusters: [...floating]
-        .filter((shape) => shape.isCluster)
-        .map((shape) => ({
-          id: shape.id,
-          parent: parentId(shape),
-          titleHeight: shape.label
-            ? measureText(shape.label.text, shape.label.fontSize).height +
-              PADDING * 2
-            : 0,
-        })),
+      nodes: floating.map((shape) => ({
+        id: shape.id,
+        width: shape.box.width,
+        height: shape.box.height,
+        parent: parentId(shape),
+      })),
+      edges: routed.map(({ from, to, label }) => ({
+        from: from.id,
+        to: to.id,
+        label: label ? measureText(label.text, label.fontSize) : undefined,
+      })),
+      clusters: clusters.map((cluster) => ({
+        id: cluster.id,
+        parent: parentId(cluster),
+        titleHeight: cluster.title
+          ? measureText(cluster.title.text, cluster.title.fontSize).height +
+            PADDING * 2
+          : 0,
+      })),
     })
     const [left, top] = placedBounds
       ? [placedBounds.x + placedBounds.width + BLOCK_GAP, placedBounds.y]
       : [0, 0]
+    const shift = (box: Box): Box => ({
+      ...box,
+      x: box.x + left,
+      y: box.y + top,
+    })
     for (const shape of floating) {
-      const box = (shape.isCluster ? layout.clusters : layout.nodes).get(
-        shape.id,
-      )
-      if (box) shape.box = { ...box, x: box.x + left, y: box.y + top }
+      const box = layout.nodes.get(shape.id)
+      if (box) shape.box = shift(box)
+    }
+    for (const cluster of clusters) {
+      const box = layout.clusters.get(cluster.id)
+      if (box) cluster.box = shift(box)
     }
     routed.forEach((connector, index) => {
       connector.route = layout.edges[index].map(
@@ -376,18 +416,19 @@ function autoLayout(
   }
 
   // Cluster titles don't wrap: the box widens to fit them instead.
-  for (const shape of shapes) {
-    if (!shape.isCluster || !shape.label) continue
-    const { width } = measureText(shape.label.text, shape.label.fontSize)
-    shape.box.width = Math.max(shape.box.width, width + PADDING * 2 + 10)
+  for (const { box, title } of clusters) {
+    if (!title) continue
+    const { width } = measureText(title.text, title.fontSize)
+    box.width = Math.max(box.width, width + PADDING * 2 + 10)
   }
 
   const unplaced = texts.filter((text) => !text.position)
   const bounds = boundsOf([
+    ...clusters.map((cluster) => cluster.box),
     ...shapes.map((shape) => shape.box),
     ...(placedBounds ? [placedBounds] : []),
   ])
-  const heights = unplaced.map((text) => textBox(text).height)
+  const heights = unplaced.map((text) => text.layout.height)
   const stackHeight = heights.reduce((sum, height) => sum + height + 20, 0)
   let y = bounds ? bounds.y - 40 - stackHeight : 0
   for (const [index, text] of unplaced.entries()) {
@@ -403,7 +444,7 @@ function boundsOf(boxes: Box[]): Box | null {
 /** Free text wraps only past FREE_TEXT_MAX_WIDTH; then its width is fixed. */
 function freeTextLayout(skeleton: TextSkeleton) {
   const fontSize = skeleton.fontSize ?? FONT_SIZE
-  const original = labelOf(skeleton.text, fontSize)?.original ?? ""
+  const original = cleanText(skeleton.text)
   const natural = measureText(original, fontSize)
   if (natural.width <= FREE_TEXT_MAX_WIDTH) {
     return { fontSize, original, text: original, ...natural, autoResize: true }
@@ -419,16 +460,9 @@ function freeTextLayout(skeleton: TextSkeleton) {
   }
 }
 
-function textBox(text: FreeText): Box {
-  const { width, height } = freeTextLayout(text.skeleton)
-  const [x, y] = text.position ?? [0, 0]
-  return { x, y, width, height }
-}
-
-function connectorLabel(skeleton: ConnectorSkeleton): Label | null {
-  return skeleton.label
-    ? labelOf(skeleton.label, skeleton.fontSize ?? FONT_SIZE)
-    : null
+function textBox({ layout, position }: FreeText): Box {
+  const [x, y] = position ?? [0, 0]
+  return { x, y, width: layout.width, height: layout.height }
 }
 
 function base(id: string, type: string, box: Box, style: Style) {
@@ -492,39 +526,26 @@ function textElement(options: {
   }
 }
 
-/** Clusters outermost first, so they sit behind what they hold. */
-function emitShapes(shapesByRef: Map<string, Shape>, connectors: Connector[]) {
-  const depth = (shape: Shape | undefined): number =>
-    shape?.isCluster ? 1 + depth(shapesByRef.get(shape.parent ?? "")) : 0
-  return [...shapesByRef.values()]
-    .sort(
-      (a, b) =>
-        (a.isCluster ? depth(a) : Number.MAX_SAFE_INTEGER) -
-        (b.isCluster ? depth(b) : Number.MAX_SAFE_INTEGER),
-    )
-    .flatMap((shape) => {
-      const textId = shape.label ? newId() : null
-      const arrows = connectors.filter(
-        ({ from, to }) => from === shape || to === shape,
-      )
-      const element = {
-        ...base(shape.id, shape.type, shape.box, shape.style),
-        roundness:
-          shape.type === "ellipse"
-            ? null
-            : { type: shape.type === "rectangle" ? 3 : 2 },
-        boundElements: [
-          ...(textId ? [{ id: textId, type: "text" as const }] : []),
-          ...arrows.map(({ id }) => ({ id, type: "arrow" as const })),
-        ],
-      }
-      if (!shape.label || !textId) return [element]
-      return [element, boundText(shape, shape.label, textId)]
-    })
+type BoundElement = { id: string; type: "arrow" | "text" }
+
+function emitShape(shape: Shape, arrows: BoundElement[]) {
+  const textId = shape.label ? newId() : null
+  const element = {
+    ...base(shape.id, shape.type, shape.box, shape.style),
+    roundness:
+      shape.type === "ellipse"
+        ? null
+        : { type: shape.type === "rectangle" ? 3 : 2 },
+    boundElements: [
+      ...(textId ? [{ id: textId, type: "text" as const }] : []),
+      ...arrows,
+    ],
+  }
+  if (!shape.label || !textId) return [element]
+  return [element, boundText(shape, shape.label, textId)]
 }
 
-// Excalidraw's computeBoundTextPosition: centered in the container's text
-// box, or top-left for a cluster title.
+// Excalidraw's computeBoundTextPosition: centered in the container's text box.
 function boundText(shape: Shape, label: Label, id: string) {
   const { type, box } = shape
   const size = measureText(label.text, label.fontSize)
@@ -537,43 +558,75 @@ function boundText(shape: Shape, label: Label, id: string) {
     insetX += box.width / 4
     insetY += box.height / 4
   }
-  const title = shape.isCluster
-  const x = title
-    ? box.x + insetX
-    : box.x + insetX + (maxTextWidth(type, box.width) - size.width) / 2
-  const y = title
-    ? box.y + insetY
-    : box.y + insetY + (maxTextHeight(type, box.height) - size.height) / 2
   return textElement({
     id,
-    box: { x, y, ...size },
+    box: {
+      x: box.x + insetX + (maxTextWidth(type, box.width) - size.width) / 2,
+      y: box.y + insetY + (maxTextHeight(type, box.height) - size.height) / 2,
+      ...size,
+    },
     text: label.text,
     original: label.original,
     fontSize: label.fontSize,
-    strokeColor: title ? "#495057" : shape.style.strokeColor,
+    strokeColor: shape.style.strokeColor,
     containerId: shape.id,
-    textAlign: title ? "left" : "center",
-    verticalAlign: title ? "top" : "middle",
+    textAlign: "center",
+    verticalAlign: "middle",
     autoResize: true,
   })
 }
 
-function center({ box }: Shape): Point {
+/** A dashed gray box, its title bound top-left. */
+function emitCluster(cluster: ClusterBox, arrows: BoundElement[]) {
+  const { id, box, title } = cluster
+  const textId = title ? newId() : null
+  const element = {
+    ...base(id, "rectangle", box, { ...DEFAULT_STYLE, ...CLUSTER_STYLE }),
+    roundness: { type: 3 },
+    boundElements: [
+      ...(textId ? [{ id: textId, type: "text" as const }] : []),
+      ...arrows,
+    ],
+  }
+  if (!title || !textId) return [element]
+  return [
+    element,
+    textElement({
+      id: textId,
+      box: {
+        x: box.x + PADDING,
+        y: box.y + PADDING,
+        ...measureText(title.text, title.fontSize),
+      },
+      text: title.text,
+      original: title.original,
+      fontSize: title.fontSize,
+      strokeColor: "#495057",
+      containerId: id,
+      textAlign: "left",
+      verticalAlign: "top",
+      autoResize: true,
+    }),
+  ]
+}
+
+function center({ box }: Target): Point {
   return [box.x + box.width / 2, box.y + box.height / 2]
 }
 
-/** Where a ray from the shape's center toward `toward` leaves its outline, plus the binding gap. */
-function outlinePoint(shape: Shape, toward: Point): Point {
-  const [cx, cy] = center(shape)
+/** Where a ray from the target's center toward `toward` leaves its outline, plus the binding gap. */
+function outlinePoint(target: Target, toward: Point): Point {
+  const [cx, cy] = center(target)
   let dx = toward[0] - cx
   const dy = toward[1] - cy
   if (dx === 0 && dy === 0) dx = 1
-  const halfWidth = shape.box.width / 2
-  const halfHeight = shape.box.height / 2
+  const halfWidth = target.box.width / 2
+  const halfHeight = target.box.height / 2
+  const type = "type" in target ? target.type : "rectangle"
   const scale =
-    shape.type === "ellipse"
+    type === "ellipse"
       ? 1 / Math.hypot(dx / halfWidth, dy / halfHeight)
-      : shape.type === "diamond"
+      : type === "diamond"
         ? 1 / (Math.abs(dx) / halfWidth + Math.abs(dy) / halfHeight)
         : Math.min(halfWidth / Math.abs(dx), halfHeight / Math.abs(dy))
   const length = Math.hypot(dx, dy)
@@ -603,8 +656,8 @@ function simplify(points: Point[]): Point[] {
 
 function connectorPoints({ skeleton, from, to, route }: Connector): Point[] {
   // Validation guarantees a point wherever there is no shape.
-  const anchor = (shape: Shape | null, point: number[] | undefined): Point =>
-    shape ? center(shape) : [point?.[0] ?? 0, point?.[1] ?? 0]
+  const anchor = (target: Target | null, point: number[] | undefined): Point =>
+    target ? center(target) : [point?.[0] ?? 0, point?.[1] ?? 0]
   let points: Point[]
   if (route) {
     points = simplify(route)
@@ -650,10 +703,10 @@ function emitConnector(connector: Connector) {
   const isLine = skeleton.type === "line"
   // A line attached to shapes is an arrow without heads: lines can't bind.
   const type = isLine && !from && !to ? "line" : "arrow"
-  const label = type === "arrow" ? connectorLabel(skeleton) : null
+  const label = type === "arrow" ? connector.label : null
   const labelId = label ? newId() : null
-  const binding = (shape: Shape | null) =>
-    shape ? { elementId: shape.id, focus: 0, gap: BINDING_GAP } : null
+  const binding = (target: Target | null) =>
+    target ? { elementId: target.id, focus: 0, gap: BINDING_GAP } : null
 
   const element = {
     ...base(connector.id, type, box, {
@@ -703,22 +756,19 @@ function emitConnector(connector: Connector) {
 }
 
 function emitFreeText(text: FreeText) {
-  const layout = freeTextLayout(text.skeleton)
-  const [x, y] = text.position ?? [0, 0]
-  return [
-    textElement({
-      id: text.id,
-      box: { x, y, width: layout.width, height: layout.height },
-      text: layout.text,
-      original: layout.original,
-      fontSize: layout.fontSize,
-      strokeColor: text.skeleton.strokeColor ?? DEFAULT_STYLE.strokeColor,
-      containerId: null,
-      textAlign: "left",
-      verticalAlign: "top",
-      autoResize: layout.autoResize,
-    }),
-  ]
+  const { layout } = text
+  return textElement({
+    id: text.id,
+    box: textBox(text),
+    text: layout.text,
+    original: layout.original,
+    fontSize: layout.fontSize,
+    strokeColor: text.skeleton.strokeColor ?? DEFAULT_STYLE.strokeColor,
+    containerId: null,
+    textAlign: "left",
+    verticalAlign: "top",
+    autoResize: layout.autoResize,
+  })
 }
 
 const BASE_62 = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
@@ -729,13 +779,10 @@ const BASE_62 = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
  * the server bundle would load it from Excalidraw's chunk, and with it
  * Excalidraw, which needs a browser.
  */
-function withIndices(elements: object[]): ExcalidrawElement[] {
+function withIndices(elements: BuiltElement[]): BuiltElement[] {
   return elements.map((element, position) => {
     const digit = (place: number) =>
       BASE_62[Math.floor(position / 62 ** place) % 62]
-    return {
-      ...element,
-      index: `c${digit(2)}${digit(1)}${digit(0)}`,
-    } as unknown as ExcalidrawElement
+    return { ...element, index: `c${digit(2)}${digit(1)}${digit(0)}` }
   })
 }

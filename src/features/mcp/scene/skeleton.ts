@@ -84,7 +84,10 @@ export class SceneInputError extends Error {}
 export const directions = ["TB", "BT", "LR", "RL"] as const
 export type Direction = (typeof directions)[number]
 
-/** A titled box around shapes, from a Mermaid subgraph. */
+/**
+ * A titled box around shapes, from a Mermaid subgraph. In a SceneGraph a
+ * parent comes before its children, so outer boxes draw behind inner ones.
+ */
 export type Cluster = {
   id: string
   label: string

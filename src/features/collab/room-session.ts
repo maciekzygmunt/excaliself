@@ -621,6 +621,20 @@ export async function moveRoomToTeam(
   if (room.access) room.access = { ...room.access, space: "team" }
 }
 
+/**
+ * The live scene of a drawing's Room, newer than the stored one. Null when no
+ * Room is open, or when it failed to load: that drops it from the registry.
+ */
+export async function roomElements(
+  registry: RoomRegistry,
+  roomId: string,
+): Promise<SceneElement[] | null> {
+  const room = registry.rooms.get(roomId)
+  if (!room) return null
+  await room.loaded
+  return registry.rooms.get(roomId) === room ? room.elements : null
+}
+
 /** Freeze, write, then hang up each seat with `hangUp`. */
 async function endRoom(
   registry: RoomRegistry,
