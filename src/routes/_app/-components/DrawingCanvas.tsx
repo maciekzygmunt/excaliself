@@ -320,6 +320,7 @@ export function DrawingCanvas({
                 <>
                   <PresenceAvatars room={room} className={PRESENCE_CLASS} />
                   <Button
+                    data-tour="share"
                     onClick={() => setShareOpen(true)}
                     aria-label="Share"
                     title="Share"
