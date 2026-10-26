@@ -1,7 +1,6 @@
 import { useQuery } from "@tanstack/react-query"
 import { Check, Copy, Link2, RefreshCw, Users } from "lucide-react"
-import { useEffect, useState } from "react"
-import { toast } from "sonner"
+import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -17,6 +16,7 @@ import {
   useStopSharing,
 } from "@/features/shares/mutations"
 import { drawingShareQueryOptions } from "@/features/shares/queries"
+import { useCopy } from "@/hooks/use-copy"
 import { cn } from "@/lib/utils"
 
 const AUDIENCE_COPY: Record<ShareAudience, { label: string; hint: string }> = {
@@ -30,49 +30,8 @@ const AUDIENCE_COPY: Record<ShareAudience, { label: string; hint: string }> = {
   },
 }
 
-/** Clipboard fallback for insecure origins (self-hosted over plain HTTP). */
-function legacyCopy(text: string): boolean {
-  const textarea = document.createElement("textarea")
-  textarea.value = text
-  textarea.style.position = "fixed"
-  textarea.style.opacity = "0"
-  document.body.appendChild(textarea)
-  textarea.select()
-  try {
-    return document.execCommand("copy")
-  } catch {
-    return false
-  } finally {
-    textarea.remove()
-  }
-}
-
-function useCopy(url: string) {
-  const [copied, setCopied] = useState(false)
-  useEffect(() => {
-    if (!copied) return
-    const id = setTimeout(() => setCopied(false), 1500)
-    return () => clearTimeout(id)
-  }, [copied])
-  return {
-    copied,
-    copy: async () => {
-      let ok = false
-      if (navigator.clipboard) {
-        ok = await navigator.clipboard.writeText(url).then(
-          () => true,
-          () => false,
-        )
-      }
-      if (!ok) ok = legacyCopy(url)
-      if (ok) setCopied(true)
-      else toast.error("Couldn't copy the link — select and copy it manually")
-    },
-  }
-}
-
 function LinkRow({ url }: { url: string }) {
-  const { copied, copy } = useCopy(url)
+  const { copied, copy } = useCopy()
   return (
     <div className="flex items-center gap-1.5 rounded-lg bg-muted p-1 pl-3">
       <Link2 className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
@@ -82,7 +41,7 @@ function LinkRow({ url }: { url: string }) {
       <Button
         variant="secondary"
         size="sm"
-        onClick={copy}
+        onClick={() => copy(url)}
         className="h-7 shrink-0 gap-1.5 px-2 text-xs"
       >
         {copied ? (
@@ -98,7 +57,7 @@ function LinkRow({ url }: { url: string }) {
 
 /** Team drawings only: every member already has access, so this just copies. */
 function MemberLinkRow({ url }: { url: string }) {
-  const { copied, copy } = useCopy(url)
+  const { copied, copy } = useCopy()
   return (
     <div className="flex items-center gap-3 rounded-lg border border-border/60 p-3">
       <Users className="h-4 w-4 shrink-0 text-muted-foreground" />
@@ -113,7 +72,7 @@ function MemberLinkRow({ url }: { url: string }) {
       <Button
         variant="secondary"
         size="sm"
-        onClick={copy}
+        onClick={() => copy(url)}
         className="h-7 shrink-0 gap-1.5 px-2 text-xs"
       >
         {copied ? (

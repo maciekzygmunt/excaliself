@@ -34,7 +34,9 @@ const invites = ["aaaaaaaaaaaaaaaaaaaaaaaa", "bbbbbbbbbbbbbbbbbbbbbbbb"].map(
 
 beforeEach(() => {
   vi.useFakeTimers()
-  Object.assign(navigator, { clipboard: { writeText: vi.fn() } })
+  Object.assign(navigator, {
+    clipboard: { writeText: vi.fn().mockResolvedValue(undefined) },
+  })
 })
 
 // Auto-cleanup needs vitest globals, which this repo leaves off.
@@ -61,32 +63,34 @@ function row(token: string) {
   return rowElement
 }
 
-function clickCopy(token: string) {
-  fireEvent.click(within(row(token)).getByRole("button", { name: /copy/i }))
+async function clickCopy(token: string) {
+  await act(async () => {
+    fireEvent.click(within(row(token)).getByRole("button", { name: /copy/i }))
+  })
 }
 
-test("clicking copy swaps to a check that animates in", () => {
+test("clicking copy swaps to a check that animates in", async () => {
   renderSection()
-  clickCopy(invites[0].token)
+  await clickCopy(invites[0].token)
   const check = row(invites[0].token).querySelector(".lucide-check")
   expect(check).not.toBeNull()
   expect(check?.classList).toContain("animate-in")
   expect(check?.classList).toContain("zoom-in-50")
 })
 
-test("the check reverts to the copy icon after 2s", () => {
+test("the check reverts to the copy icon after 2s", async () => {
   renderSection()
-  clickCopy(invites[0].token)
+  await clickCopy(invites[0].token)
   act(() => vi.advanceTimersByTime(2000))
   expect(row(invites[0].token).querySelector(".lucide-check")).toBeNull()
   expect(row(invites[0].token).querySelector(".lucide-copy")).not.toBeNull()
 })
 
-test("copying a second invite moves the check and keeps it a full 2s", () => {
+test("copying a second invite moves the check and keeps it a full 2s", async () => {
   renderSection()
-  clickCopy(invites[0].token)
+  await clickCopy(invites[0].token)
   act(() => vi.advanceTimersByTime(1500))
-  clickCopy(invites[1].token)
+  await clickCopy(invites[1].token)
 
   // The check moves to the second row immediately.
   expect(row(invites[0].token).querySelector(".lucide-check")).toBeNull()

@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Check, Copy, Plus } from "lucide-react"
-import { useEffect, useRef, useState } from "react"
+import { useState } from "react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import {
@@ -19,6 +19,7 @@ import {
   accessTokensQueryOptions,
 } from "@/features/access-tokens/queries"
 import { createToken, revokeToken } from "@/features/access-tokens/server"
+import { useCopy } from "@/hooks/use-copy"
 import { useDelayedVisible } from "@/hooks/use-delayed-visible"
 import { formatAgo } from "@/lib/relative-time"
 
@@ -231,16 +232,7 @@ function NewTokenDialog({
 }
 
 function CopyBox({ label, value }: { label: string; value: string }) {
-  const [copied, setCopied] = useState(false)
-  const timeout = useRef<ReturnType<typeof setTimeout>>(undefined)
-  useEffect(() => () => clearTimeout(timeout.current), [])
-
-  const copy = () => {
-    navigator.clipboard.writeText(value)
-    setCopied(true)
-    clearTimeout(timeout.current)
-    timeout.current = setTimeout(() => setCopied(false), 2000)
-  }
+  const { copied, copy } = useCopy()
 
   return (
     <div className="grid gap-1.5">
@@ -251,7 +243,7 @@ function CopyBox({ label, value }: { label: string; value: string }) {
         </code>
         <button
           type="button"
-          onClick={copy}
+          onClick={() => copy(value)}
           className="flex shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
         >
           {copied ? (

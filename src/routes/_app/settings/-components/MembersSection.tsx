@@ -61,6 +61,7 @@ import {
   revokePasswordReset,
 } from "@/features/password-resets/server"
 import { describeContents } from "@/features/trash/destroy-copy"
+import { copyText } from "@/hooks/use-copy"
 import { useDelayedVisible } from "@/hooks/use-delayed-visible"
 
 // Members list with inline role management (issue #65), admin delete
@@ -220,13 +221,14 @@ function MemberRowActions({ user }: { user: AdminUser }) {
   const createResetLink = useMutation({
     mutationFn: () => createPasswordReset({ data: { userId: user.id } }),
     onSuccess: ({ token }) => {
-      navigator.clipboard
-        .writeText(`${window.location.origin}/reset-password?token=${token}`)
-        .then(
-          () =>
-            toast.success("Reset link copied — single-use, valid for 24 hours"),
-          () => toast.error("Couldn't copy the reset link — generate it again"),
-        )
+      copyText(`${window.location.origin}/reset-password?token=${token}`).then(
+        (ok) =>
+          ok
+            ? toast.success(
+                "Reset link copied — single-use, valid for 24 hours",
+              )
+            : toast.error("Couldn't copy the reset link — generate it again"),
+      )
     },
     onError: () => toast.error("Couldn't create reset link"),
     onSettled: () => {
