@@ -94,3 +94,12 @@ test("a dialog on top pauses the tour", async () => {
   dialog.remove()
   expect(await screen.findByText("1 of 4")).toBeDefined()
 })
+
+test("blocked storage means no tour, not a crash", async () => {
+  vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+    throw new DOMException("denied", "SecurityError")
+  })
+  render(tree())
+  await new Promise((resolve) => setTimeout(resolve, 50))
+  expect(screen.queryByText(/ of 4/)).toBeNull()
+})

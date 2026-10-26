@@ -57,6 +57,23 @@ type Progress = Step["id"] | "done"
 
 const storageKey = (userId: string) => `excaliself:tour:${userId}`
 
+// localStorage can throw (privacy modes). With no storage the tour would
+// restart on every load, so it does not show.
+function readProgress(userId: string): Progress {
+  try {
+    return (
+      (localStorage.getItem(storageKey(userId)) as Progress | null) ?? "spaces"
+    )
+  } catch {
+    return "done"
+  }
+}
+function writeProgress(userId: string, progress: Progress) {
+  try {
+    localStorage.setItem(storageKey(userId), progress)
+  } catch {}
+}
+
 /**
  * The first-visit tour: three steps on Home, then the Share button in the
  * first drawing the member opens. Progress is kept per account in this
@@ -70,10 +87,7 @@ export function FirstVisitTour({ userId }: { userId: string }) {
   const isApple = useIsApplePlatform()
   const primaryRef = useRef<HTMLButtonElement>(null)
 
-  useEffect(() => {
-    const saved = localStorage.getItem(storageKey(userId)) as Progress | null
-    setProgress(saved ?? "spaces")
-  }, [userId])
+  useEffect(() => setProgress(readProgress(userId)), [userId])
 
   // With Team hidden there is only one space to explain.
   const steps = activeSpace
@@ -91,7 +105,7 @@ export function FirstVisitTour({ userId }: { userId: string }) {
   const target = useTourTarget(visible ? `[data-tour="${step.id}"]` : null)
 
   const save = (next: Progress) => {
-    localStorage.setItem(storageKey(userId), next)
+    writeProgress(userId, next)
     setProgress(next)
   }
   const advance = () => save(steps[index + 1]?.id ?? "done")
