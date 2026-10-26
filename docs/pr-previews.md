@@ -45,6 +45,10 @@ apps.
 
    Turn on **Runtime** for each preview variable. Coolify can copy them with
    Runtime off, and then it uses the production value in the preview.
+
+   Also turn on **Build time** for `POSTGRES_PASSWORD`. Coolify reads the
+   compose file with only the build-time variables, and the file stops the
+   build if `POSTGRES_PASSWORD` has no value.
 5. Open a PR. Then open `https://<pr number>.draw.example.com/preview/login`.
 
 When the PR closes, Coolify removes its containers and volumes.
