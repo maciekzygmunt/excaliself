@@ -29,7 +29,8 @@ docker compose up -d
 ```
 
 Open `BASE_URL`. The first visit goes to `/setup`, where you create the admin
-account. After that, sign-up is invite-only.
+account. After that, people join by invite link or with
+[single sign-on](#single-sign-on).
 
 Postgres is not published on the host; only the app port is
 (`EXCALISELF_PORT`, default `3000`). On a public server, put a reverse proxy
@@ -99,6 +100,51 @@ port 3000.
 
 To also deploy each pull request to its own throwaway instance, see
 [PR previews](./pr-previews.md).
+
+## Single sign-on
+
+Members can sign in with Google Workspace, Microsoft Entra ID, or one OIDC
+provider (Okta, Authentik, Keycloak, Zitadel, Pocket ID and others). Each
+provider you configure adds a "Continue with …" button on the sign-in page.
+Email and password sign-in and invites keep working.
+
+Who gets in:
+
+- **Existing members** sign in with any provider whose email matches their
+  account. The first SSO sign-in links it, removes the account's password,
+  signs out its other sessions, and revokes its access tokens: nobody
+  verified the email behind that password. An admin can give the password
+  back with a reset link.
+- **New people** get an account on their first sign-in only if their email
+  domain is in `SSO_ALLOWED_DOMAINS`. Everyone else needs an invite link.
+  Without `SSO_ALLOWED_DOMAINS`, SSO only signs in existing members.
+
+Each provider limits who can claim a domain:
+
+- **Google:** only Workspace accounts of that domain. A personal Google
+  account that uses a work address does not count.
+- **Microsoft:** only accounts in the one tenant you set.
+- **OIDC:** every account your provider signs in. Limit access to the
+  application in your provider.
+
+Deleting a member does not stop them from signing in again with SSO: an
+allowed domain recreates the account. Remove them in your provider too.
+
+Set `BASE_URL` to the public URL. Register this redirect URI with the
+provider: `<BASE_URL>/api/auth/callback/<id>`, where `<id>` is `google`,
+`microsoft`, or `oidc`. Restart the app after a change. PR previews ignore
+these settings.
+
+| Variable | Description |
+|---|---|
+| `SSO_ALLOWED_DOMAINS` | Comma-separated email domains whose people join on their first sign-in, e.g. `acme.com,acme.de` |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | OAuth client of type **Web application** from Google Cloud Console (**APIs & Services → Credentials**) |
+| `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET`, `MICROSOFT_TENANT_ID` | App registration in Microsoft Entra admin center, with a **Web** redirect URI. The tenant ID is the **Directory (tenant) ID**. `common`, `organizations` and `consumers` are refused |
+| `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET` | Confidential client in your provider. The issuer is the URL that serves `/.well-known/openid-configuration` |
+| `OIDC_NAME` | Button label, e.g. `Okta` (default `SSO`) |
+
+A member who only uses SSO has no password. An admin can give them one with
+a password reset link.
 
 ## Backup and restore
 
