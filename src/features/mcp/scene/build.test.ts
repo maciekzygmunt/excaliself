@@ -338,13 +338,12 @@ test("a shape without an id never replaces one with an id", () => {
 })
 
 test("a scene past the element limit is refused before any work", () => {
-  // `a & b & … --> c & d & …` makes one arrow per pair.
-  const group = (prefix: string) =>
-    Array.from({ length: 40 }, (_, index) => `${prefix}${index}`).join(" & ")
-  const graph = parseMermaid(`flowchart LR\n${group("a")} --> ${group("b")}`)
-
-  expect(() => buildScene(graph)).toThrow(
-    "This scene has 1680 elements; the limit is 500.",
+  const shapes = Array.from(
+    { length: 501 },
+    (): ElementSkeleton => ({ type: "rectangle" }),
+  )
+  expect(() => build(shapes)).toThrow(
+    "This scene has 501 elements; the limit is 500.",
   )
 })
 

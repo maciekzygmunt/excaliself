@@ -7,6 +7,7 @@ import {
   type Cluster,
   type ConnectorSkeleton,
   type Direction,
+  MAX_ELEMENTS,
   type SceneGraph,
   SceneInputError,
   type ShapeSkeleton,
@@ -109,18 +110,17 @@ export function parseMermaid(source: string): SceneGraph {
       }
       continue
     }
-    parseChain(statement, addNode, (from, to, edge) => {
+    parseChain(statement, addNode, (from, to, { invisible, ...style }) => {
+      if (invisible) return
+      // `a & b --> c & d` makes an edge per pair: refuse before allocating.
+      if (connectors.length + from.length * to.length > MAX_ELEMENTS) {
+        throw new SceneInputError(
+          `Mermaid: more than ${MAX_ELEMENTS} edges; the limit is ${MAX_ELEMENTS} elements.`,
+        )
+      }
       for (const source of from)
         for (const target of to)
-          if (!edge.invisible) {
-            const { invisible: _, ...style } = edge
-            connectors.push({
-              type: "arrow",
-              from: source,
-              to: target,
-              ...style,
-            })
-          }
+          connectors.push({ type: "arrow", from: source, to: target, ...style })
     })
   }
 
