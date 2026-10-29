@@ -24,6 +24,7 @@
 - **The full Excalidraw editor**, with auto-save. Images pasted into a drawing are stored too.
 - **Live collaboration.** Share a drawing by link and edit it together in real time, with live cursors and follow mode. Links can be for members only or for anyone, including guests without an account.
 - **Team space.** A shared space every member can see and edit, next to each member's private space. Team drawings are always live.
+- **Team library.** One Library panel of shapes and icons for the whole team, saved on the server and updated live. Libraries from [libraries.excalidraw.com](https://libraries.excalidraw.com) install into it.
 - **Folders, stars, and recents.** Nest folders and drag drawings between them in the sidebar.
 - **Search** by title and by the text inside drawings, in the gallery and the command palette (<kbd>⌘K</kbd> / <kbd>Ctrl K</kbd>), which also runs actions.
 - **Import from Excalidraw+ (beta).** Bring your scenes, collections, and images over with an Excalidraw+ API key (Settings → Import).

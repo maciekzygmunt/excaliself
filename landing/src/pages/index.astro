@@ -12,6 +12,7 @@ import paletteShot from "../assets/shots/palette.png"
 import membersShot from "../assets/shots/members.png"
 import liveShot from "../assets/shots/live.png"
 import teamShot from "../assets/shots/team.png"
+import mcpShot from "../assets/shots/mcp.png"
 
 const repo = "https://github.com/maciekzygmunt/excaliself"
 
@@ -48,14 +49,24 @@ const features = [
     text: "lg:col-span-4 lg:col-start-9 lg:self-center",
   },
   {
+    title: "Let your AI client draw",
+    body: "Connect Claude Code, Claude Desktop, or any MCP client with a personal access token. It finds and reads your drawings, and draws new ones from a sentence or a Mermaid flowchart. Your client brings the model, so the server needs no AI key.",
+    note: "Claude Code drew this from one prompt",
+    image: mcpShot,
+    crop: "",
+    alt: "An Order pipeline flowchart in the Excaliself editor, with colored boxes from Web app through Stripe and a Paid? decision to Postgres, Queue, Worker, Email and Warehouse, made by Claude Code over MCP",
+    figure: "lg:col-span-7 lg:col-start-6 lg:row-start-1",
+    text: "lg:col-span-4 lg:col-start-1 lg:row-start-1 lg:self-center",
+  },
+  {
     title: "Press ⌘K and jump anywhere",
     body: "Fuzzy search over drawings, folders, and actions. Type a few letters, press enter, and keep your hands on the keyboard.",
     note: "one word matches folders and drawings",
     image: paletteShot,
     crop: "",
     alt: "The command palette filtering drawings and folders by the word retro",
-    figure: "lg:col-span-7 lg:col-start-6 lg:row-start-1",
-    text: "lg:col-span-4 lg:col-start-1 lg:row-start-1 lg:self-center",
+    figure: "lg:col-span-7 lg:col-start-1",
+    text: "lg:col-span-4 lg:col-start-9 lg:self-center",
   },
   {
     title: "Your team only",
@@ -64,8 +75,8 @@ const features = [
     image: membersShot,
     crop: "aspect-[2760/790]",
     alt: "The members list in Settings with admin and member roles",
-    figure: "lg:col-span-7 lg:col-start-1",
-    text: "lg:col-span-4 lg:col-start-9 lg:self-center",
+    figure: "lg:col-span-7 lg:col-start-6 lg:row-start-1",
+    text: "lg:col-span-4 lg:col-start-1 lg:row-start-1 lg:self-center",
   },
 ]
 
@@ -87,7 +98,15 @@ const compose = [
 const faq: { q: string; a: string; more?: { href: string; label: string } }[] = [
   {
     q: "Is this a fork of Excalidraw?",
-    a: "No. Excaliself embeds the official Excalidraw editor package unchanged and adds accounts, folders, search, and trash around it. Editor updates arrive with each release.",
+    a: "No. Excaliself embeds the official Excalidraw editor package unchanged and adds accounts, a Team space, folders, search, a shared library, and trash around it. Editor updates arrive with each release.",
+  },
+  {
+    q: "Can I move from Excalidraw+?",
+    a: "Yes. Settings → Import brings over your scenes, collections, and images with an Excalidraw+ API key (beta). You can also drop .excalidraw files onto a folder in the sidebar.",
+  },
+  {
+    q: "Can AI tools use my drawings?",
+    a: "Yes, over MCP. Each member makes an access token in Settings and connects Claude Code, Claude Desktop, or another MCP client. The client can search, read, and create drawings, but it cannot change or delete the drawings you have. The server needs no AI API key.",
   },
   {
     q: "What do I need to run it?",
