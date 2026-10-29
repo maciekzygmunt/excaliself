@@ -144,7 +144,9 @@ export function ImportSection() {
     <section className="animate-in fade-in-0 duration-200 motion-reduce:animate-none">
       <div className="mb-4">
         <h2 className="text-sm font-medium text-foreground">
-          Import from Excalidraw+
+          Import from Excalidraw+{" "}
+          {/* Built from the docs and Excalidraw's CLI, not yet run on a real account. */}
+          <span className="font-normal text-muted-foreground">(Beta)</span>
         </h2>
         <p className="text-xs text-muted-foreground">
           {isAdmin

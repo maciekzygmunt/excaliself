@@ -26,7 +26,7 @@
 - **Team space.** A shared space every member can see and edit, next to each member's private space. Team drawings are always live.
 - **Folders, stars, and recents.** Nest folders and drag drawings between them in the sidebar.
 - **Search** by title and by the text inside drawings, in the gallery and the command palette (<kbd>⌘K</kbd> / <kbd>Ctrl K</kbd>), which also runs actions.
-- **Import from Excalidraw+.** Bring your scenes, collections, and images over with an Excalidraw+ API key (Settings → Import).
+- **Import from Excalidraw+ (beta).** Bring your scenes, collections, and images over with an Excalidraw+ API key (Settings → Import).
 - **Drop files in.** Drag `.excalidraw` files (or `.png`/`.svg` exports with the scene) from your computer onto a folder in the sidebar.
 - **Trash** with restore. Deleted items are purged automatically after 30 days.
 - **Invite-only accounts.** The first visitor creates the admin account; everyone else joins by invite link.
