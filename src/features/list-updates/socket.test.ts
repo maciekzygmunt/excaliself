@@ -5,7 +5,13 @@ import {
   SERVER_RESTART_CLOSE_REASON,
 } from "@/lib/socket/shutdown"
 import { listUpdates } from "./hub"
-import { LISTS_CHANGED, PING, PONG, SIGNED_OUT_CLOSE_CODE } from "./protocol"
+import {
+  LIBRARY_CHANGED,
+  LISTS_CHANGED,
+  PING,
+  PONG,
+  SIGNED_OUT_CLOSE_CODE,
+} from "./protocol"
 
 // Hand back the hooks themselves, so a test can drive them directly.
 vi.mock("nitro", () => ({ defineWebSocketHandler: (hooks: unknown) => hooks }))
@@ -52,6 +58,8 @@ test("a member's socket hears changes until it closes", async () => {
 
   listUpdates.notify()
   expect(peer.send).toHaveBeenCalledWith(LISTS_CHANGED)
+  listUpdates.notify(LIBRARY_CHANGED)
+  expect(peer.send).toHaveBeenCalledWith(LIBRARY_CHANGED)
 
   hooks.close(peer)
   peer.send.mockClear()

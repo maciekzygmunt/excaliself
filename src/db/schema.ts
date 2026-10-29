@@ -1,9 +1,12 @@
+import type { LibraryItem } from "@excalidraw/excalidraw/types"
 import { sql } from "drizzle-orm"
 import {
   boolean,
   check,
   customType,
   foreignKey,
+  integer,
+  jsonb,
   pgTable,
   primaryKey,
   text,
@@ -280,4 +283,12 @@ export const drawingFiles = pgTable("drawing_files", {
   createdAt: timestamp("createdAt")
     .notNull()
     .$defaultFn(() => new Date()),
+})
+
+// The team library: the Library panel's items, one set for the instance.
+// `item` is Excalidraw's LibraryItem as is; newest (highest seq) first.
+export const libraryItems = pgTable("library_items", {
+  id: text("id").primaryKey(),
+  item: jsonb("item").$type<LibraryItem>().notNull(),
+  seq: integer("seq").generatedAlwaysAsIdentity().notNull(),
 })

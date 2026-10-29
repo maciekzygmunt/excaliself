@@ -42,6 +42,7 @@ import {
   useReloadSceneAfterRoom,
   useSaveScenePayload,
 } from "@/features/drawings/scene"
+import { useTeamLibrary } from "@/features/library/use-team-library"
 import { drawingShareQueryOptions } from "@/features/shares/queries"
 import { useAutoSave } from "@/hooks/use-auto-save"
 import { usePreloadTextFont } from "@/hooks/use-preload-text-font"
@@ -99,6 +100,8 @@ export function DrawingCanvas({
   const [excalidrawAPI, setExcalidrawAPI] =
     useState<ExcalidrawImperativeAPI | null>(null)
   usePreloadTextFont(excalidrawAPI)
+  // Private drawings too: the library is the team's, not the space's.
+  const handleLibraryChange = useTeamLibrary(excalidrawAPI)
 
   // Flagged `error` as a room does, so autosave stops sending them.
   const handleImagesOverCap = useCallback(
@@ -313,6 +316,7 @@ export function DrawingCanvas({
         onChange={readOnly ? undefined : handleSceneChange}
         onPointerUpdate={readOnly ? undefined : room.onPointerUpdate}
         onScrollChange={readOnly ? undefined : room.onScrollChange}
+        onLibraryChange={handleLibraryChange}
         renderTopRightUI={
           readOnly
             ? undefined
