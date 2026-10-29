@@ -12,16 +12,22 @@ const ids = (items: LibraryItems) => items.map(({ id }) => id)
 
 /**
  * A sync wired to a fake panel: `show` lands at once and echoes through
- * `change`, as Excalidraw's `onLibraryChange` does. Saves wait for `answer`.
+ * `change`, as Excalidraw's `onLibraryChange` does. Saves and loads wait for
+ * their answer.
  */
 function setup() {
   let panel: LibraryItems = []
   const saves: { change: LibraryChange; answer: (items: string[]) => void }[] =
     []
+  const loads: ((items: string[]) => void)[] = []
   const sync = createLibrarySync({
     save: (change) =>
       new Promise((resolve) => {
         saves.push({ change, answer: (next) => resolve(next.map(item)) })
+      }),
+    load: () =>
+      new Promise((resolve) => {
+        loads.push((next) => resolve(next.map(item)))
       }),
     show: (items) => {
       panel = items
@@ -35,7 +41,7 @@ function setup() {
     sync.change(panel)
   }
   const settle = () => new Promise((resolve) => setTimeout(resolve))
-  return { sync, saves, edit, settle, panel: () => ids(panel) }
+  return { sync, saves, loads, edit, settle, panel: () => ids(panel) }
 }
 
 test("the first load fills the panel and saves nothing back", async () => {
@@ -78,6 +84,46 @@ test("a teammate's change waits for the save in flight, whose answer is newer", 
   expect(saves).toHaveLength(1)
 })
 
+test("a change heard during a save is loaded again, as the save's answer may be older", async () => {
+  const { sync, saves, loads, edit, settle, panel } = setup()
+  sync.receive([item("a")])
+  edit(["mine", "a"])
+  await settle()
+
+  // A teammate saved after this tab's save, and their refetch came first.
+  sync.receive([item("theirs"), item("mine"), item("a")])
+  saves[0].answer(["mine", "a"])
+  await settle()
+  expect(loads).toHaveLength(1)
+
+  loads[0](["theirs", "mine", "a"])
+  await settle()
+  expect(panel()).toEqual(["theirs", "mine", "a"])
+})
+
+test("a load overtaken by a later save is dropped and made again", async () => {
+  const { sync, saves, loads, edit, settle, panel } = setup()
+  sync.receive([item("a")])
+  edit(["b", "a"])
+  await settle()
+  sync.receive([item("b"), item("a")])
+  saves[0].answer(["b", "a"])
+  await settle()
+
+  // The load is in flight when the next edit saves and answers.
+  edit(["c", "b", "a"])
+  await settle()
+  saves[1].answer(["c", "b", "a"])
+  await settle()
+  loads[0](["b", "a"])
+  await settle()
+  expect(panel()).toEqual(["c", "b", "a"])
+
+  loads[1](["c", "b", "a"])
+  await settle()
+  expect(panel()).toEqual(["c", "b", "a"])
+})
+
 test("edits made during a save go up after it, as their own change", async () => {
   const { sync, saves, edit, settle } = setup()
   sync.receive([item("a")])
@@ -97,6 +143,7 @@ test("a failed save puts the server's library back", async () => {
   let panel: LibraryItems = []
   const sync = createLibrarySync({
     save: () => Promise.reject(new Error("offline")),
+    load: () => Promise.resolve([]),
     show: (items) => {
       panel = items
       sync.change(items)

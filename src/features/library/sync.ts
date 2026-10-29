@@ -21,11 +21,13 @@ const sameItems = (a: LibraryItems, b: LibraryItems) =>
 /**
  * Keeps the editor's Library panel and the team library in step. Panel edits
  * go up as adds and removes, one save at a time. The server's library comes
- * back down and replaces the panel, but never while a save is in flight: its
- * answer is newer. A failed save puts the server's library back.
+ * back down and replaces the panel, but never while a save is in flight. A
+ * teammate's change heard then may be newer than the save's answer, so it is
+ * loaded again once saves settle. A failed save puts the server's library back.
  */
 export function createLibrarySync(options: {
   save: (change: LibraryChange) => Promise<LibraryItems>
+  load: () => Promise<LibraryItems>
   show: (items: LibraryItems) => void
   onSaveError: (error: unknown) => void
 }) {
@@ -34,6 +36,9 @@ export function createLibrarySync(options: {
   // The server's library, as last heard.
   let synced: LibraryItems = []
   let saving = 0
+  // Bumped by every save, so a load can tell it went stale.
+  let saves = 0
+  let heardWhileSaving = false
   let queue = Promise.resolve()
 
   const showSynced = () => {
@@ -42,12 +47,29 @@ export function createLibrarySync(options: {
     options.show(synced)
   }
 
+  /** The server's library: the first load, or a teammate's change. */
+  const receive = (items: LibraryItems) => {
+    synced = items
+    if (saving === 0) showSynced()
+    else heardWhileSaving = true
+  }
+
+  // A save that starts during the load may answer first; drop the load's
+  // older list, and load again once saves settle.
+  const reload = () => {
+    const startedAt = saves
+    options.load().then(
+      (items) => {
+        if (saves === startedAt) receive(items)
+        else if (saving > 0) heardWhileSaving = true
+        else reload()
+      },
+      () => {},
+    )
+  }
+
   return {
-    /** The server's library: the first load, or a teammate's change. */
-    receive(items: LibraryItems) {
-      synced = items
-      if (saving === 0) showSynced()
-    },
+    receive,
 
     /** For `onLibraryChange`. Ignores the echo of `show`. */
     change(items: LibraryItems) {
@@ -55,13 +77,18 @@ export function createLibrarySync(options: {
       shown = items
       if (change.add.length === 0 && change.remove.length === 0) return
       saving++
+      saves++
       queue = queue
         .then(() => options.save(change))
         .then((latest) => {
           synced = latest
         }, options.onSaveError)
         .finally(() => {
-          if (--saving === 0) showSynced()
+          if (--saving > 0) return
+          showSynced()
+          if (!heardWhileSaving) return
+          heardWhileSaving = false
+          reload()
         })
     },
   }

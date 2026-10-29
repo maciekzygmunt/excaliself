@@ -1,6 +1,6 @@
 import { useHandleLibrary } from "@excalidraw/excalidraw"
 import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types"
-import { useQuery } from "@tanstack/react-query"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { useEffect, useMemo } from "react"
 import { toast } from "sonner"
 import { libraryQueryOptions } from "./queries"
@@ -12,16 +12,16 @@ import { createLibrarySync } from "./sync"
  * Returns the `onLibraryChange` handler.
  */
 export function useTeamLibrary(excalidrawAPI: ExcalidrawImperativeAPI | null) {
-  // Installs from "Browse libraries": the site sends the tab back with an
-  // `#addLibrary` link, Excalidraw adds the items, and the change saves them.
-  useHandleLibrary({ excalidrawAPI })
-  const { data } = useQuery(libraryQueryOptions())
+  const queryClient = useQueryClient()
+  const { data, isPending } = useQuery(libraryQueryOptions())
 
   const sync = useMemo(
     () =>
       excalidrawAPI &&
       createLibrarySync({
         save: (change) => changeLibrary({ data: change }),
+        load: () =>
+          queryClient.fetchQuery({ ...libraryQueryOptions(), staleTime: 0 }),
         show: (libraryItems) => {
           void excalidrawAPI.updateLibrary({ libraryItems })
         },
@@ -30,11 +30,17 @@ export function useTeamLibrary(excalidrawAPI: ExcalidrawImperativeAPI | null) {
             id: "library-save-error",
           }),
       }),
-    [excalidrawAPI],
+    [excalidrawAPI, queryClient],
   )
   useEffect(() => {
     if (sync && data) sync.receive(data)
   }, [sync, data])
+
+  // Installs from "Browse libraries": the site sends a tab back with an
+  // `#addLibrary` link, Excalidraw adds the items, and the change saves them.
+  // Held until the team library is shown, which would replace the install;
+  // declared after the effect above so it runs second in the same commit.
+  useHandleLibrary({ excalidrawAPI: isPending ? null : excalidrawAPI })
 
   return sync?.change
 }
