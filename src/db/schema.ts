@@ -98,6 +98,23 @@ export const invites = pgTable("invites", {
     .$defaultFn(() => new Date()),
 })
 
+// Personal access tokens: what a member's AI client signs in to the MCP
+// endpoint with. Only a hash is kept; the token itself is shown once.
+export const accessTokens = pgTable("access_tokens", {
+  id: text("id").primaryKey(),
+  userId: text("userId")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  tokenHash: text("tokenHash").notNull().unique(),
+  // The token's first characters, so a member can tell tokens apart.
+  start: text("start").notNull(),
+  lastUsedAt: timestamp("lastUsedAt"),
+  createdAt: timestamp("createdAt")
+    .notNull()
+    .$defaultFn(() => new Date()),
+})
+
 // Admin-generated password-reset links (issue #68) — the product's only
 // reset flow, shared out-of-band. Same single-use token model as invites,
 // but targeted at a user and short-lived (24 h).

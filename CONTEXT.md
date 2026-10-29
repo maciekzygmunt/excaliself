@@ -73,3 +73,6 @@ An image on a Drawing's canvas, stored as bytes under a content-addressed file i
 
 ### Team library
 The instance's one set of reusable shapes and icons, shown in the editor's Library panel in every Drawing, Private or Team. Every member sees and edits the same items, stored on the server; a member's add or remove reaches teammates' open editors live. Guests on a Share link neither see nor change it. Not tied to the Team Space despite the name: it is the team's, not a Space's.
+
+### Access token
+A secret a member makes under Settings so their own AI client can use the instance over MCP (`/api/mcp`). It acts as that member under the same Space rule: it can find, read, and create Drawings, but never change or delete one, since a shared or Team Drawing has its Room as the only writer (Handoff). Shown once, when made. Revoking it, or deleting its member, ends it at once. Not a Share link: it opens no Room and has no Audience.

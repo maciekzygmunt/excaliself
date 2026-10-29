@@ -1,6 +1,5 @@
 "use server"
 
-import { randomUUID } from "node:crypto"
 import { createServerFn } from "@tanstack/react-start"
 import { and, eq, isNull } from "drizzle-orm"
 import { z } from "zod"
@@ -14,6 +13,7 @@ import { accessibleTo } from "@/features/spaces/access"
 import { restoreDrawingUnit } from "@/features/trash/restore"
 import { authMiddleware } from "@/middleware/auth"
 import { listsChangedMiddleware } from "@/middleware/lists-changed"
+import { insertDrawing } from "./create"
 import { bytesToDataUrl } from "./file-bytes"
 import { listDrawings } from "./list"
 import { drawingColumns } from "./list-columns"
@@ -85,27 +85,12 @@ export const createDrawing = createServerFn({ method: "POST" })
     }),
   )
   .handler(async ({ data, context }) => {
-    const userId = context.session.user.id
-    const id = randomUUID()
-    const now = new Date()
-
-    await db.transaction(async (tx) => {
-      await lockFolderTree(tx, "place")
-      const space = data.folderId
-        ? await assertFolderTarget(tx, userId, data.folderId)
-        : data.space
-      await tx.insert(drawings).values({
-        id,
-        name: data.name ?? "Untitled",
-        data: JSON.stringify({ elements: [], appState: {} }),
-        folderId: data.folderId ?? null,
-        space,
-        createdBy: userId,
-        createdAt: now,
-        updatedAt: now,
-      })
+    const { id } = await insertDrawing(db, context.session.user.id, {
+      name: data.name ?? "Untitled",
+      folderId: data.folderId ?? null,
+      space: data.space,
+      elements: [],
     })
-
     return id
   })
 

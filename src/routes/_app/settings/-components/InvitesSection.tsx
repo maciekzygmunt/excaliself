@@ -1,10 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Check, Copy, Plus } from "lucide-react"
-import { useEffect, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { pendingInvitesQueryOptions } from "@/features/invites/queries"
 import { createInvite, deleteInvite } from "@/features/invites/server"
+import { useCopy } from "@/hooks/use-copy"
 import { useDelayedVisible } from "@/hooks/use-delayed-visible"
 
 // Today's invite model, unchanged (issue #64): anonymous single-use links
@@ -14,6 +14,10 @@ export function InvitesSection() {
   const queryClient = useQueryClient()
   const invitesKey = pendingInvitesQueryOptions().queryKey
   const { data: invites, isPending } = useQuery(pendingInvitesQueryOptions())
+  const { copied, copy } = useCopy()
+  // Keyed by token: rows render on the server too, where there is no window.
+  const copyInviteLink = (token: string) =>
+    copy(`${window.location.origin}/invite?token=${token}`, token)
   const {
     mutate: createInviteMutation,
     isPending: isCreatingInvite,
@@ -33,19 +37,6 @@ export function InvitesSection() {
       queryClient.invalidateQueries({ queryKey: invitesKey })
     },
   })
-
-  const [copiedToken, setCopiedToken] = useState<string | null>(null)
-  const copiedTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined)
-
-  useEffect(() => () => clearTimeout(copiedTimeoutRef.current), [])
-
-  const copyInviteLink = (token: string) => {
-    const link = `${window.location.origin}/invite?token=${token}`
-    navigator.clipboard.writeText(link)
-    setCopiedToken(token)
-    clearTimeout(copiedTimeoutRef.current)
-    copiedTimeoutRef.current = setTimeout(() => setCopiedToken(null), 2000)
-  }
 
   const showSkeleton = useDelayedVisible(isPending)
   if (isPending) return showSkeleton ? <InvitesSkeleton /> : null
@@ -102,7 +93,7 @@ export function InvitesSection() {
                 onClick={() => copyInviteLink(invite.token)}
                 className="flex items-center gap-1 rounded px-1.5 py-1 text-xs text-muted-foreground transition-all hover:bg-muted hover:text-foreground"
               >
-                {copiedToken === invite.token ? (
+                {copied === invite.token ? (
                   <>
                     <Check className="h-3.5 w-3.5 text-iris animate-in zoom-in-50 fade-in-0 duration-150 ease-out motion-reduce:animate-none" />
                     Copied

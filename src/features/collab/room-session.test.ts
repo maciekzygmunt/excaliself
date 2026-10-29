@@ -25,6 +25,7 @@ import {
   type RoomPeer,
   type RoomRegistry,
   receiveFromPeer,
+  roomElements,
   type SceneLoader,
   type SceneSaver,
   sweepSilentParticipants,
@@ -552,6 +553,32 @@ test("a late joiner gets the scene as edited, not as stored", async () => {
   expect(elementsOf(framesOf(grace, "SCENE_INIT")[0])).toEqual([
     element("rect", 4),
   ])
+})
+
+test("a reader gets the Room's scene as edited, and nothing where no Room is open", async () => {
+  const registry = registryFrom(async () => ({
+    elements: [element("rect", 1)],
+    access: null,
+    readable: true,
+  }))
+  const ada = fakePeer("peer-ada")
+  await joinRoom(registry, ROOM, ada, member("Ada"))
+  await receiveFromPeer(registry, ROOM, ada, sceneUpdate([element("rect", 4)]))
+
+  expect(await roomElements(registry, ROOM)).toEqual([element("rect", 4)])
+  expect(await roomElements(registry, "drawing-2")).toBeNull()
+})
+
+test("a reader waiting on a Room that fails to load is not handed an empty scene", async () => {
+  const registry = registryFrom(async () => ({
+    elements: [],
+    access: null,
+    readable: false,
+  }))
+  const joining = joinRoom(registry, ROOM, fakePeer("peer-ada"), member("Ada"))
+
+  expect(await roomElements(registry, ROOM)).toBeNull()
+  await joining
 })
 
 test("an edit is relayed to the rest of the room and merged into the Room's copy", async () => {

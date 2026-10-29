@@ -71,3 +71,18 @@ export function isValidFolderTarget(
   if (movingId === undefined) return true
   return !collectFolderSubtreeIds(liveFolders, movingId).has(targetId)
 }
+
+/** Each folder's path from its Space root, "Parent / Child", by id. */
+export function folderPaths(
+  folders: (FolderRef & { name: string })[],
+): Map<string, string> {
+  const byId = new Map(folders.map((folder) => [folder.id, folder]))
+  const path = (id: string): string => {
+    const folder = byId.get(id)
+    if (!folder) return ""
+    return folder.parentId && byId.has(folder.parentId)
+      ? `${path(folder.parentId)} / ${folder.name}`
+      : folder.name
+  }
+  return new Map(folders.map((folder) => [folder.id, path(folder.id)]))
+}
