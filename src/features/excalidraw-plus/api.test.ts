@@ -4,6 +4,7 @@ import { excalidrawPlusApi } from "./api"
 
 afterEach(() => {
   vi.unstubAllGlobals()
+  vi.useRealTimers()
 })
 
 const json = (body: unknown, init: ResponseInit = {}) =>
@@ -42,6 +43,28 @@ test("walks every page and waits out a 429", async () => {
     "/api/v1/collections/private/scenes?limit=100&offset=0",
     "/api/v1/collections/private/scenes?limit=100&offset=1",
   ])
+})
+
+test("after a 429, waits until the rate limit resets", async () => {
+  vi.useFakeTimers({ now: new Date("2026-01-01T00:00:00Z") })
+  const reset = String(Date.now() / 1000 + 30)
+  const fetch = vi
+    .fn()
+    .mockResolvedValueOnce(
+      json({}, { status: 429, headers: { "X-RateLimit-Reset": reset } }),
+    )
+    .mockResolvedValueOnce(json({ data: [], hasNextPage: false }))
+  vi.stubGlobal("fetch", fetch)
+
+  const collections = excalidrawPlusApi(
+    "https://plus.test",
+    "uk-key",
+  ).collections()
+  await vi.advanceTimersByTimeAsync(29_000)
+  expect(fetch).toHaveBeenCalledTimes(1)
+  await vi.advanceTimersByTimeAsync(3_000)
+  await expect(collections).resolves.toEqual([])
+  expect(fetch).toHaveBeenCalledTimes(2)
 })
 
 test("reports a rejected key in plain words", async () => {

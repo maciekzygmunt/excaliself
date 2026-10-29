@@ -70,7 +70,7 @@ export function excalidrawPlusApi(apiUrl: string, apiKey: string) {
         response.status === 504
       if (retry && attempt < MAX_RETRIES) {
         await response.body?.cancel()
-        await sleep(retryDelayMs(response.headers.get("retry-after"), attempt))
+        await sleep(retryDelayMs(response, attempt))
         continue
       }
       if (!response.ok) throw await apiError(response)
@@ -123,11 +123,18 @@ async function apiError(response: Response) {
   )
 }
 
-/** Retry-After seconds when given (capped at 60 s), else exponential backoff. */
-function retryDelayMs(retryAfter: string | null, attempt: number) {
-  const seconds = Number(retryAfter)
-  if (retryAfter && Number.isFinite(seconds) && seconds >= 0)
-    return Math.min(seconds * 1000, 60_000)
+/**
+ * A 429 waits until the limit resets (X-RateLimit-Reset, Unix seconds). Else
+ * Retry-After, else exponential backoff. Capped at 60 s.
+ */
+function retryDelayMs(response: Response, attempt: number) {
+  const header = (name: string) =>
+    Number(response.headers.get(name) ?? Number.NaN)
+  const reset = header("x-ratelimit-reset")
+  if (response.status === 429 && reset > 0)
+    return Math.min(Math.max(reset * 1000 - Date.now(), 0) + 1000, 60_000)
+  const retryAfter = header("retry-after")
+  if (retryAfter >= 0) return Math.min(retryAfter * 1000, 60_000)
   return 500 * 2 ** attempt
 }
 
