@@ -7,24 +7,24 @@ import { McpServer } from "@modelcontextprotocol/server"
 import { and, eq, isNull } from "drizzle-orm"
 import { z } from "zod"
 import type { Db } from "@/db"
-import { drawings, folders, type Space, spaces } from "@/db/schema"
+import { drawings, type Space, spaces } from "@/db/schema"
 import { userDisplayName } from "@/features/account/display-name"
 import { rooms } from "@/features/collab/room-registry"
 import { roomElements } from "@/features/collab/room-session"
 import { insertDrawing } from "@/features/drawings/create"
 import { listDrawings } from "@/features/drawings/list"
 import { matchDrawing, parseSceneElements } from "@/features/drawings/search"
-import { FolderNotFoundError } from "@/features/folders/ownership"
+import { listFolders } from "@/features/folders/list"
+import { folderPaths } from "@/features/folders/subtree"
 import { listUpdates } from "@/features/list-updates/hub"
 import { accessibleTo } from "@/features/spaces/access"
-import { type BuiltElement, buildScene } from "./scene/build"
+import { buildScene } from "./scene/build"
 import { parseMermaid } from "./scene/mermaid"
 import {
   directions,
   elementSkeleton,
   MAX_ELEMENTS,
   type SceneGraph,
-  SceneInputError,
 } from "./scene/skeleton"
 import { summarizeScene } from "./summary"
 
@@ -38,7 +38,6 @@ const text = (value: string) => ({
   content: [{ type: "text" as const, text: value }],
 })
 const json = (value: unknown) => text(JSON.stringify(value))
-const failure = (message: string) => ({ ...text(message), isError: true })
 
 /** One per request: the server knows its member and the instance's origin. */
 export function createMcpServer(db: Db, member: Member, origin: string) {
@@ -52,31 +51,6 @@ export function createMcpServer(db: Db, member: Member, origin: string) {
   )
   const drawingUrl = (id: string) => `${origin}/draw/${id}`
 
-  /** Every folder the member can see, by id, with its path from the root. */
-  const folderPaths = async () => {
-    const rows = await db
-      .select({
-        id: folders.id,
-        name: folders.name,
-        parentId: folders.parentId,
-        space: folders.space,
-      })
-      .from(folders)
-      .where(and(accessibleTo(folders, member.id), isNull(folders.deletedAt)))
-    const byId = new Map(rows.map((row) => [row.id, row]))
-    const path = (id: string): string => {
-      const folder = byId.get(id)
-      if (!folder) return ""
-      return folder.parentId && byId.has(folder.parentId)
-        ? `${path(folder.parentId)} / ${folder.name}`
-        : folder.name
-    }
-    return new Map(
-      rows.map((row) => [row.id, { path: path(row.id), space: row.space }]),
-    )
-  }
-
-  type FolderPaths = Awaited<ReturnType<typeof folderPaths>>
   type ListedDrawing = Awaited<ReturnType<typeof listDrawings>>[number]
 
   /** The drawings the member can see, most recently edited first. */
@@ -84,25 +58,23 @@ export function createMcpServer(db: Db, member: Member, origin: string) {
     space?: Space
     folderId?: string
   }) => {
-    const [all, paths] = await Promise.all([
+    const [all, folders] = await Promise.all([
       listDrawings(db, member.id),
-      folderPaths(),
+      listFolders(db, member.id),
     ])
     const list = all
       .filter((drawing) => !filter.space || drawing.space === filter.space)
       .filter(
         (drawing) => !filter.folderId || drawing.folderId === filter.folderId,
       )
-    return { list, paths }
+    return { list, paths: folderPaths(folders) }
   }
 
-  const toRow = (drawing: ListedDrawing, paths: FolderPaths) => ({
+  const toRow = (drawing: ListedDrawing, paths: Map<string, string>) => ({
     id: drawing.id,
     name: drawing.name,
     space: drawing.space,
-    folder: drawing.folderId
-      ? (paths.get(drawing.folderId)?.path ?? null)
-      : null,
+    folder: drawing.folderId ? (paths.get(drawing.folderId) ?? null) : null,
     folderId: drawing.folderId,
     lastEdited: drawing.updatedAt.toISOString(),
     ...(drawing.space === "team"
@@ -187,10 +159,11 @@ export function createMcpServer(db: Db, member: Member, origin: string) {
       annotations: { readOnlyHint: true },
     },
     async ({ space }) => {
-      const paths = await folderPaths()
-      const rows = [...paths]
-        .filter(([, folder]) => !space || folder.space === space)
-        .map(([id, folder]) => ({ id, ...folder }))
+      const folders = await listFolders(db, member.id)
+      const paths = folderPaths(folders)
+      const rows = folders
+        .filter((folder) => !space || folder.space === space)
+        .map(({ id, space }) => ({ id, path: paths.get(id) ?? "", space }))
         .sort((a, b) => a.path.localeCompare(b.path))
       return json({ folders: rows })
     },
@@ -228,7 +201,7 @@ export function createMcpServer(db: Db, member: Member, origin: string) {
         )
       // Same answer for a missing drawing and one the member can't see.
       if (!drawing) {
-        return failure(
+        throw new Error(
           "No drawing has that id. Find one with list_drawings or search_drawings.",
         )
       }
@@ -236,10 +209,10 @@ export function createMcpServer(db: Db, member: Member, origin: string) {
       const elements =
         (await roomElements(rooms, id)) ?? parseSceneElements(drawing.data)
       if (!elements)
-        return failure("This drawing's data is damaged and can't be read.")
+        throw new Error("This drawing's data is damaged and can't be read.")
 
       const folder = drawing.folderId
-        ? (await folderPaths()).get(drawing.folderId)?.path
+        ? folderPaths(await listFolders(db, member.id)).get(drawing.folderId)
         : undefined
       const where = [
         drawing.space === "team" ? "Team" : "Private",
@@ -296,38 +269,23 @@ Colors: Excalidraw's palette reads best, e.g. backgrounds "#a5d8ff" (blue), "#b2
       },
     },
     async (input) => {
-      let elements: BuiltElement[]
-      try {
-        const flowchart: SceneGraph = input.mermaid
-          ? parseMermaid(input.mermaid)
-          : { elements: [], clusters: [], direction: "TB" }
-        elements = buildScene({
-          elements: [...flowchart.elements, ...(input.elements ?? [])],
-          clusters: flowchart.clusters,
-          direction: input.direction ?? flowchart.direction,
-        })
-      } catch (error) {
-        if (error instanceof SceneInputError) return failure(error.message)
-        throw error
-      }
-
-      let created: { id: string; space: Space }
-      try {
-        created = await insertDrawing(db, member.id, {
-          name: input.name,
-          folderId: input.folderId ?? null,
-          space: input.space,
-          elements,
-        })
-      } catch (error) {
-        if (error instanceof FolderNotFoundError) {
-          return failure("No folder has that id. Find one with list_folders.")
-        }
-        throw error
-      }
+      const flowchart: SceneGraph = input.mermaid
+        ? parseMermaid(input.mermaid)
+        : { elements: [], clusters: [], direction: "TB" }
+      const elements = buildScene({
+        elements: [...flowchart.elements, ...(input.elements ?? [])],
+        clusters: flowchart.clusters,
+        direction: input.direction ?? flowchart.direction,
+      })
+      const created = await insertDrawing(db, member.id, {
+        name: input.name,
+        folderId: input.folderId ?? null,
+        space: input.space,
+        elements,
+      })
       listUpdates.notify()
       const folder = input.folderId
-        ? (await folderPaths()).get(input.folderId)?.path
+        ? folderPaths(await listFolders(db, member.id)).get(input.folderId)
         : undefined
       return json({
         id: created.id,

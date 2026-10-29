@@ -2,8 +2,26 @@
 // (shapes and their labels, text, what connects to what, what sits inside
 // what) in a few lines, instead of the raw element JSON.
 
-type Element = Record<string, unknown>
 type Box = { x: number; y: number; width: number; height: number }
+type Point = { x: number; y: number }
+type End = { boundId: string; at: Point; arrowhead: boolean }
+
+/** The fields the summary reads, out of an element's untyped JSON. */
+type Item = {
+  id: string
+  type: string
+  box: Box
+  /** A text's original (unwrapped) text. */
+  text: string
+  containerId: string
+  frameId: string
+  name: string
+  fill: string
+  strokeStyle: string
+  /** A connector's ends; for other elements, unused. */
+  start: End
+  end: End
+}
 
 const SHAPE_TYPES = new Set([
   "rectangle",
@@ -20,15 +38,40 @@ const NEAR = 20
 const MAX_ITEMS = 200
 const MAX_TEXT = 300
 
-const num = (value: unknown) => (typeof value === "number" ? value : 0)
-const str = (value: unknown) => (typeof value === "string" ? value : "")
-
-function boxOf(element: Element): Box {
+function read(element: Record<string, unknown>): Item {
+  const num = (value: unknown) => (typeof value === "number" ? value : 0)
+  const str = (value: unknown) => (typeof value === "string" ? value : "")
+  const x = num(element.x)
+  const y = num(element.y)
+  const points: unknown[] = Array.isArray(element.points) ? element.points : []
+  const end = (binding: unknown, point: unknown, arrowhead: unknown): End => {
+    const [dx, dy]: unknown[] = Array.isArray(point) ? point : []
+    return {
+      boundId:
+        binding && typeof binding === "object" && "elementId" in binding
+          ? str(binding.elementId)
+          : "",
+      at: { x: x + num(dx), y: y + num(dy) },
+      arrowhead: Boolean(arrowhead),
+    }
+  }
   return {
-    x: num(element.x),
-    y: num(element.y),
-    width: Math.abs(num(element.width)),
-    height: Math.abs(num(element.height)),
+    id: str(element.id),
+    type: str(element.type),
+    box: {
+      x,
+      y,
+      width: Math.abs(num(element.width)),
+      height: Math.abs(num(element.height)),
+    },
+    text: str(element.originalText) || str(element.text),
+    containerId: str(element.containerId),
+    frameId: str(element.frameId),
+    name: str(element.name),
+    fill: str(element.backgroundColor),
+    strokeStyle: str(element.strokeStyle),
+    start: end(element.startBinding, points[0], element.startArrowhead),
+    end: end(element.endBinding, points.at(-1), element.endArrowhead),
   }
 }
 
@@ -54,108 +97,95 @@ function capped(lines: string[]): string[] {
     : lines
 }
 
-const area = (element: Element) => {
-  const { width, height } = boxOf(element)
-  return width * height
-}
+const area = ({ box }: Item) => box.width * box.height
 
-function smallest(elements: Element[]): Element | undefined {
-  return elements.reduce<Element | undefined>(
-    (best, element) => (!best || area(element) < area(best) ? element : best),
+function smallest(items: Item[]): Item | undefined {
+  return items.reduce<Item | undefined>(
+    (best, item) => (!best || area(item) < area(best) ? item : best),
     undefined,
   )
 }
 
-export function summarizeScene(elements: readonly Element[]): string {
-  const live = elements.filter((element) => !element.isDeleted)
+export function summarizeScene(
+  elements: readonly Record<string, unknown>[],
+): string {
+  const live = elements.filter((element) => !element.isDeleted).map(read)
   if (live.length === 0) return "The drawing is empty."
-  const byId = new Map(live.map((element) => [str(element.id), element]))
+  const byId = new Map(live.map((item) => [item.id, item]))
 
   const labels = new Map<string, string>()
-  const freeTexts: Element[] = []
-  for (const element of live) {
-    if (element.type !== "text") continue
-    const text = str(element.originalText) || str(element.text)
-    const containerId = str(element.containerId)
-    if (containerId && byId.has(containerId)) labels.set(containerId, text)
-    else freeTexts.push(element)
+  const freeTexts: Item[] = []
+  for (const item of live) {
+    if (item.type !== "text") continue
+    if (item.containerId && byId.has(item.containerId))
+      labels.set(item.containerId, item.text)
+    else freeTexts.push(item)
   }
 
-  const readingOrder = (a: Element, b: Element) =>
-    num(a.y) - num(b.y) || num(a.x) - num(b.x)
+  const readingOrder = (a: Item, b: Item) =>
+    a.box.y - b.box.y || a.box.x - b.box.x
   const shapes = live
-    .filter((element) => SHAPE_TYPES.has(str(element.type)))
+    .filter((item) => SHAPE_TYPES.has(item.type))
     .sort(readingOrder)
   const refs = new Map(
-    shapes.map((shape, index) => [str(shape.id), `S${index + 1}`]),
+    shapes.map((shape, index) => [shape.id, `S${index + 1}`]),
   )
-  const name = (shape: Element) => {
-    const id = str(shape.id)
-    const label = labels.get(id) ?? str(shape.name)
-    return label ? `${refs.get(id)} ${quote(label)}` : `${refs.get(id)}`
+  const name = (shape: Item) => {
+    const label = labels.get(shape.id) ?? shape.name
+    return label
+      ? `${refs.get(shape.id)} ${quote(label)}`
+      : `${refs.get(shape.id)}`
   }
 
   // The smallest other shape fully around a box, if any.
-  const enclosing = (box: Box, self: Element) =>
+  const enclosing = (self: Item) =>
     smallest(
       shapes.filter(
         (shape) =>
           shape !== self &&
           shape.type !== "image" &&
-          contains(boxOf(shape), box) &&
-          !contains(box, boxOf(shape)),
+          contains(shape.box, self.box) &&
+          !contains(self.box, shape.box),
       ),
     )
-  const placement = (element: Element) => {
-    const frame = byId.get(str(element.frameId))
+  const placement = (item: Item) => {
+    const frame = byId.get(item.frameId)
     if (frame) return `, in frame ${name(frame)}`
-    const outer = enclosing(boxOf(element), element)
-    return outer ? `, inside ${refs.get(str(outer.id))}` : ""
+    const outer = enclosing(item)
+    return outer ? `, inside ${refs.get(outer.id)}` : ""
   }
 
   const shapeLines = shapes.map((shape) => {
-    const { x, y, width, height } = boxOf(shape)
+    const { x, y, width, height } = shape.box
     const details = [
       `${name(shape)}: ${shape.type} at ${at({ x, y })}, ${Math.round(width)}×${Math.round(height)}`,
     ]
-    const fill = str(shape.backgroundColor)
-    if (fill && fill !== "transparent") details.push(`, fill ${fill}`)
+    if (shape.fill && shape.fill !== "transparent")
+      details.push(`, fill ${shape.fill}`)
     if (shape.strokeStyle && shape.strokeStyle !== "solid")
       details.push(`, ${shape.strokeStyle}`)
     return details.join("") + placement(shape)
   })
 
   // An end attached by binding, else read off what it lies on or near.
-  const endOf = (connector: Element, which: "start" | "end") => {
-    const binding = connector[`${which}Binding`] as {
-      elementId?: unknown
-    } | null
-    const bound = byId.get(str(binding?.elementId))
-    if (bound && refs.has(str(bound.id))) return name(bound)
-    if (bound?.type === "text")
-      return `text ${quote(str(bound.originalText) || str(bound.text))}`
-    const points = Array.isArray(connector.points)
-      ? (connector.points as [number, number][])
-      : []
-    const local = which === "start" ? points[0] : points[points.length - 1]
-    const point = {
-      x: num(connector.x) + num(local?.[0]),
-      y: num(connector.y) + num(local?.[1]),
-    }
+  const describeEnd = ({ boundId, at: point }: End) => {
+    const bound = byId.get(boundId)
+    if (bound && refs.has(bound.id)) return name(bound)
+    if (bound?.type === "text") return `text ${quote(bound.text)}`
     const near = smallest(
       shapes.filter((shape) =>
-        contains(boxOf(shape), { ...point, width: 0, height: 0 }, NEAR),
+        contains(shape.box, { ...point, width: 0, height: 0 }, NEAR),
       ),
     )
     return near ? `${name(near)} (not attached)` : at(point)
   }
   const connectors = live.filter(
-    (element) => element.type === "arrow" || element.type === "line",
+    (item) => item.type === "arrow" || item.type === "line",
   )
   const connectorLines = connectors.map((connector) => {
-    const start = endOf(connector, "start")
-    const end = endOf(connector, "end")
-    const heads = [connector.startArrowhead, connector.endArrowhead]
+    const start = describeEnd(connector.start)
+    const end = describeEnd(connector.end)
+    const heads = [connector.start.arrowhead, connector.end.arrowhead]
     const kind = connector.type === "line" ? "line" : "arrow"
     const line =
       heads[1] && !heads[0]
@@ -165,7 +195,7 @@ export function summarizeScene(elements: readonly Element[]): string {
           : heads[0] && heads[1]
             ? `${start} ↔ ${end}`
             : `${start} — ${end} (${kind}, no arrowheads)`
-    const label = labels.get(str(connector.id))
+    const label = labels.get(connector.id)
     const style =
       connector.strokeStyle && connector.strokeStyle !== "solid"
         ? `, ${connector.strokeStyle}`
@@ -175,12 +205,9 @@ export function summarizeScene(elements: readonly Element[]): string {
 
   const textLines = freeTexts
     .sort(readingOrder)
-    .map(
-      (text) =>
-        `${quote(str(text.originalText) || str(text.text))} at ${at(boxOf(text))}${placement(text)}`,
-    )
+    .map((text) => `${quote(text.text)} at ${at(text.box)}${placement(text)}`)
 
-  const freedraws = live.filter((element) => element.type === "freedraw").length
+  const freedraws = live.filter((item) => item.type === "freedraw").length
   const sections = [
     `${live.length} elements. Positions are canvas pixels (x right, y down); S1, S2, … name shapes in reading order.`,
   ]

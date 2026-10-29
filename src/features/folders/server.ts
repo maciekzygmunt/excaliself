@@ -2,7 +2,7 @@
 
 import { randomUUID } from "node:crypto"
 import { createServerFn } from "@tanstack/react-start"
-import { and, asc, eq, inArray, isNull } from "drizzle-orm"
+import { and, eq, inArray, isNull } from "drizzle-orm"
 import { z } from "zod"
 import { db } from "@/db"
 import { drawings, folders, spaces } from "@/db/schema"
@@ -13,6 +13,7 @@ import { accessibleTo } from "@/features/spaces/access"
 import { restoreFolderUnit } from "@/features/trash/restore"
 import { authMiddleware } from "@/middleware/auth"
 import { listsChangedMiddleware } from "@/middleware/lists-changed"
+import { listFolders } from "./list"
 import { assertFolderTarget } from "./ownership"
 import { collectFolderSubtreeIds } from "./subtree"
 import { lockFolderTree } from "./tree-lock"
@@ -20,12 +21,7 @@ import { lockFolderTree } from "./tree-lock"
 export const getFolders = createServerFn({ method: "GET" })
   .middleware([authMiddleware])
   .handler(async ({ context }) => {
-    const userId = context.session.user.id
-    return db
-      .select(folderColumns)
-      .from(folders)
-      .where(and(accessibleTo(folders, userId), isNull(folders.deletedAt)))
-      .orderBy(asc(folders.name))
+    return listFolders(db, context.session.user.id)
   })
 
 export const createFolder = createServerFn({ method: "POST" })

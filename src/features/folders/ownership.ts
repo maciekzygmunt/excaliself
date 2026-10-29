@@ -4,13 +4,6 @@ import { accessibleTo } from "@/features/spaces/access"
 import { isValidFolderTarget } from "./subtree"
 import type { Tx } from "./tree-lock"
 
-/** A folder the caller can't place content into, or that doesn't exist. */
-export class FolderNotFoundError extends Error {
-  constructor() {
-    super("Folder not found")
-  }
-}
-
 /**
  * Rejects a folder id the caller may not place content into: one they can't
  * access, one in the trash, or (when moving a folder) itself or a descendant.
@@ -38,7 +31,7 @@ export async function assertFolderTarget(
     .where(and(accessibleTo(folders, userId), isNull(folders.deletedAt)))
   const target = liveFolders.find((folder) => folder.id === targetId)
   if (!target || !isValidFolderTarget(liveFolders, targetId, movingId)) {
-    throw new FolderNotFoundError()
+    throw new Error("Folder not found")
   }
   return target.space
 }

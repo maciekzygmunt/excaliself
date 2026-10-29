@@ -2,6 +2,7 @@ import { expect, test } from "vitest"
 import {
   collectFolderSubtreeIds,
   findNearestLiveAncestorId,
+  folderPaths,
   isValidFolderTarget,
 } from "./subtree"
 
@@ -85,4 +86,14 @@ test("a folder can't move into itself or a descendant", () => {
   expect(isValidFolderTarget(folders, "x", "a")).toBe(true)
   expect(isValidFolderTarget(folders, "a", "a")).toBe(false)
   expect(isValidFolderTarget(folders, "c", "a")).toBe(false)
+})
+
+test("folderPaths joins names from the root; a hidden parent starts a path", () => {
+  const paths = folderPaths([
+    { id: "a", parentId: null, name: "Work" },
+    { id: "b", parentId: "a", name: "Q3" },
+    { id: "c", parentId: "trashed", name: "Notes" },
+  ])
+  expect(paths.get("b")).toBe("Work / Q3")
+  expect(paths.get("c")).toBe("Notes")
 })

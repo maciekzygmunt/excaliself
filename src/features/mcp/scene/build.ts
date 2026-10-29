@@ -1,26 +1,39 @@
 // Turns skeletons into the elements Excalidraw stores, without Excalidraw:
-// its converter needs a DOM to measure text. Mirrors the editor's own rules
-// for bound text (padding, max width, centering) and arrow bindings, so a
-// built scene opens as if it had been drawn by hand.
+// its converter needs a DOM to measure text. Checks and resolves the input,
+// sizes shapes to their labels, and lays out what has no position;
+// elements.ts then writes the elements.
 
-import { randomBytes, randomInt } from "node:crypto"
-import type { SceneElement } from "@/features/collab/protocol"
+import {
+  type BuiltElement,
+  type ClusterBox,
+  type Connector,
+  DEFAULT_STYLE,
+  emitCluster,
+  emitConnector,
+  emitFreeText,
+  emitShape,
+  type FreeText,
+  type Label,
+  newId,
+  PADDING,
+  type Shape,
+  type ShapeType,
+  type Target,
+  type TextLayout,
+  textBox,
+  textSpace,
+  withIndices,
+} from "./elements"
 import { type Box, layoutGraph, type Point, union } from "./layout"
 import {
-  type ConnectorSkeleton,
   MAX_ELEMENTS,
   type SceneGraph,
   SceneInputError,
   type ShapeSkeleton,
   type TextSkeleton,
 } from "./skeleton"
-import { FONT_SIZE, LINE_HEIGHT, measureText, wrapText } from "./text"
+import { FONT_SIZE, measureText, wrapText } from "./text"
 
-type ShapeType = ShapeSkeleton["type"]
-
-// Excalidraw's BOUND_TEXT_PADDING.
-const PADDING = 5
-const BINDING_GAP = 6
 const MIN_SIZE: Record<ShapeType, [number, number]> = {
   rectangle: [120, 60],
   ellipse: [120, 70],
@@ -37,79 +50,10 @@ const AUTO_WRAP_WIDTH: Record<ShapeType, number> = {
 const LABEL_MARGIN = { x: 16, y: 12 }
 const FREE_TEXT_MAX_WIDTH = 600
 const CLUSTER_FONT_SIZE = 16
-const CLUSTER_STYLE = {
-  strokeColor: "#868e96",
-  backgroundColor: "#f8f9fa",
-  strokeStyle: "dashed",
-} as const
 // Between hand-placed content and the auto-laid-out block beside it.
 const BLOCK_GAP = 100
 
-type Style = {
-  strokeColor: string
-  backgroundColor: string
-  strokeStyle: "solid" | "dashed" | "dotted"
-  strokeWidth: number
-}
-
-const DEFAULT_STYLE: Style = {
-  strokeColor: "#1e1e1e",
-  backgroundColor: "transparent",
-  strokeStyle: "solid",
-  strokeWidth: 2,
-}
-
-type Label = { text: string; original: string; fontSize: number }
-
-type Shape = {
-  id: string
-  type: ShapeType
-  box: Box
-  positioned: boolean
-  label: Label | null
-  style: Style
-  /** Ref of the cluster this sits in. */
-  parent: string | null
-}
-
-/** A subgraph's titled box. Always laid out, around its members. */
-type ClusterBox = {
-  id: string
-  box: Box
-  title: Label | null
-  /** Ref of the cluster this sits in. */
-  parent: string | null
-}
-
-/** What an arrow can join. A cluster binds like a rectangle. */
-type Target = Shape | ClusterBox
-
-type Connector = {
-  id: string
-  index: number
-  skeleton: ConnectorSkeleton
-  label: Label | null
-  from: Target | null
-  to: Target | null
-  /** Set when the auto-layout routed it. */
-  route: Point[] | null
-}
-
-type FreeText = {
-  id: string
-  skeleton: TextSkeleton
-  layout: ReturnType<typeof freeTextLayout>
-  position: Point | null
-}
-
-/** A built element, with the fields every element has typed. */
-export type BuiltElement = SceneElement & {
-  type: string
-  x: number
-  y: number
-  width: number
-  height: number
-}
+export type { BuiltElement }
 
 /** Builds a scene's elements. Throws SceneInputError listing every problem in the input. */
 export function buildScene(graph: SceneGraph): BuiltElement[] {
@@ -140,6 +84,7 @@ export function buildScene(graph: SceneGraph): BuiltElement[] {
     for (const member of cluster.members) clusterOf.set(member, cluster.id)
     clusters.set(cluster.id, {
       id: newId(),
+      type: "rectangle",
       box: { x: 0, y: 0, width: 0, height: 0 },
       title: labelOf(cluster.label, CLUSTER_FONT_SIZE),
       parent: cluster.parent,
@@ -248,10 +193,6 @@ export function buildScene(graph: SceneGraph): BuiltElement[] {
   ])
 }
 
-function newId(): string {
-  return randomBytes(15).toString("base64url")
-}
-
 function cleanText(text: string): string {
   return text.replace(/\r\n?/g, "\n").replace(/\t/g, "    ").trim()
 }
@@ -260,19 +201,6 @@ function cleanText(text: string): string {
 function labelOf(text: string, fontSize: number): Label | null {
   const original = cleanText(text)
   return original ? { text: original, original, fontSize } : null
-}
-
-// Excalidraw's getBoundTextMaxWidth / getBoundTextMaxHeight: the box inside a
-// container that its label must fit.
-function maxTextWidth(type: ShapeType, width: number): number {
-  if (type === "ellipse")
-    return Math.round((width / 2) * Math.SQRT2) - PADDING * 2
-  if (type === "diamond") return Math.round(width / 2) - PADDING * 2
-  return width - PADDING * 2
-}
-
-function maxTextHeight(type: ShapeType, height: number): number {
-  return maxTextWidth(type, height)
 }
 
 // Excalidraw's computeContainerDimensionForBoundText: the container size
@@ -310,7 +238,7 @@ function sizeShape(
         containerSize(type, fit.width + LABEL_MARGIN.x * 2),
       )
     }
-    const text = wrapText(original, fontSize, maxTextWidth(type, width))
+    const text = wrapText(original, fontSize, textSpace(type, width))
     label = { text, original, fontSize }
     const textHeight = measureText(text, fontSize).height
     height =
@@ -442,7 +370,7 @@ function boundsOf(boxes: Box[]): Box | null {
 }
 
 /** Free text wraps only past FREE_TEXT_MAX_WIDTH; then its width is fixed. */
-function freeTextLayout(skeleton: TextSkeleton) {
+function freeTextLayout(skeleton: TextSkeleton): TextLayout {
   const fontSize = skeleton.fontSize ?? FONT_SIZE
   const original = cleanText(skeleton.text)
   const natural = measureText(original, fontSize)
@@ -458,331 +386,4 @@ function freeTextLayout(skeleton: TextSkeleton) {
     height: measureText(text, fontSize).height,
     autoResize: false,
   }
-}
-
-function textBox({ layout, position }: FreeText): Box {
-  const [x, y] = position ?? [0, 0]
-  return { x, y, width: layout.width, height: layout.height }
-}
-
-function base(id: string, type: string, box: Box, style: Style) {
-  return {
-    id,
-    type,
-    x: box.x,
-    y: box.y,
-    width: box.width,
-    height: box.height,
-    angle: 0,
-    strokeColor: style.strokeColor,
-    backgroundColor: style.backgroundColor,
-    fillStyle: "solid",
-    strokeWidth: style.strokeWidth,
-    strokeStyle: style.strokeStyle,
-    roughness: 1,
-    opacity: 100,
-    groupIds: [],
-    frameId: null,
-    index: null,
-    roundness: null as { type: number } | null,
-    seed: randomInt(1, 2 ** 31),
-    version: 1,
-    versionNonce: randomInt(1, 2 ** 31),
-    isDeleted: false,
-    boundElements: [] as { id: string; type: "arrow" | "text" }[],
-    updated: Date.now(),
-    link: null,
-    locked: false,
-  }
-}
-
-function textElement(options: {
-  id: string
-  box: Box
-  text: string
-  original: string
-  fontSize: number
-  strokeColor: string
-  containerId: string | null
-  textAlign: "left" | "center"
-  verticalAlign: "top" | "middle"
-  autoResize: boolean
-}) {
-  return {
-    ...base(options.id, "text", options.box, {
-      ...DEFAULT_STYLE,
-      strokeColor: options.strokeColor,
-    }),
-    fontSize: options.fontSize,
-    // Excalifont
-    fontFamily: 5,
-    text: options.text,
-    originalText: options.original,
-    textAlign: options.textAlign,
-    verticalAlign: options.verticalAlign,
-    containerId: options.containerId,
-    autoResize: options.autoResize,
-    lineHeight: LINE_HEIGHT,
-  }
-}
-
-type BoundElement = { id: string; type: "arrow" | "text" }
-
-function emitShape(shape: Shape, arrows: BoundElement[]) {
-  const textId = shape.label ? newId() : null
-  const element = {
-    ...base(shape.id, shape.type, shape.box, shape.style),
-    roundness:
-      shape.type === "ellipse"
-        ? null
-        : { type: shape.type === "rectangle" ? 3 : 2 },
-    boundElements: [
-      ...(textId ? [{ id: textId, type: "text" as const }] : []),
-      ...arrows,
-    ],
-  }
-  if (!shape.label || !textId) return [element]
-  return [element, boundText(shape, shape.label, textId)]
-}
-
-// Excalidraw's computeBoundTextPosition: centered in the container's text box.
-function boundText(shape: Shape, label: Label, id: string) {
-  const { type, box } = shape
-  const size = measureText(label.text, label.fontSize)
-  let insetX = PADDING
-  let insetY = PADDING
-  if (type === "ellipse") {
-    insetX += (box.width / 2) * (1 - Math.SQRT2 / 2)
-    insetY += (box.height / 2) * (1 - Math.SQRT2 / 2)
-  } else if (type === "diamond") {
-    insetX += box.width / 4
-    insetY += box.height / 4
-  }
-  return textElement({
-    id,
-    box: {
-      x: box.x + insetX + (maxTextWidth(type, box.width) - size.width) / 2,
-      y: box.y + insetY + (maxTextHeight(type, box.height) - size.height) / 2,
-      ...size,
-    },
-    text: label.text,
-    original: label.original,
-    fontSize: label.fontSize,
-    strokeColor: shape.style.strokeColor,
-    containerId: shape.id,
-    textAlign: "center",
-    verticalAlign: "middle",
-    autoResize: true,
-  })
-}
-
-/** A dashed gray box, its title bound top-left. */
-function emitCluster(cluster: ClusterBox, arrows: BoundElement[]) {
-  const { id, box, title } = cluster
-  const textId = title ? newId() : null
-  const element = {
-    ...base(id, "rectangle", box, { ...DEFAULT_STYLE, ...CLUSTER_STYLE }),
-    roundness: { type: 3 },
-    boundElements: [
-      ...(textId ? [{ id: textId, type: "text" as const }] : []),
-      ...arrows,
-    ],
-  }
-  if (!title || !textId) return [element]
-  return [
-    element,
-    textElement({
-      id: textId,
-      box: {
-        x: box.x + PADDING,
-        y: box.y + PADDING,
-        ...measureText(title.text, title.fontSize),
-      },
-      text: title.text,
-      original: title.original,
-      fontSize: title.fontSize,
-      strokeColor: "#495057",
-      containerId: id,
-      textAlign: "left",
-      verticalAlign: "top",
-      autoResize: true,
-    }),
-  ]
-}
-
-function center({ box }: Target): Point {
-  return [box.x + box.width / 2, box.y + box.height / 2]
-}
-
-/** Where a ray from the target's center toward `toward` leaves its outline, plus the binding gap. */
-function outlinePoint(target: Target, toward: Point): Point {
-  const [cx, cy] = center(target)
-  let dx = toward[0] - cx
-  const dy = toward[1] - cy
-  if (dx === 0 && dy === 0) dx = 1
-  const halfWidth = target.box.width / 2
-  const halfHeight = target.box.height / 2
-  const type = "type" in target ? target.type : "rectangle"
-  const scale =
-    type === "ellipse"
-      ? 1 / Math.hypot(dx / halfWidth, dy / halfHeight)
-      : type === "diamond"
-        ? 1 / (Math.abs(dx) / halfWidth + Math.abs(dy) / halfHeight)
-        : Math.min(halfWidth / Math.abs(dx), halfHeight / Math.abs(dy))
-  const length = Math.hypot(dx, dy)
-  return [
-    cx + dx * scale + (dx / length) * BINDING_GAP,
-    cy + dy * scale + (dy / length) * BINDING_GAP,
-  ]
-}
-
-/** Drops route bends too slight to matter, so most edges come out straight. */
-function simplify(points: Point[]): Point[] {
-  const kept = [...points]
-  for (let index = 1; index < kept.length - 1; ) {
-    const [ax, ay] = kept[index - 1]
-    const [px, py] = kept[index]
-    const [bx, by] = kept[index + 1]
-    const length = Math.hypot(bx - ax, by - ay)
-    const offLine =
-      length === 0
-        ? Math.hypot(px - ax, py - ay)
-        : Math.abs((bx - ax) * (ay - py) - (ax - px) * (by - ay)) / length
-    if (offLine < 4) kept.splice(index, 1)
-    else index++
-  }
-  return kept
-}
-
-function connectorPoints({ skeleton, from, to, route }: Connector): Point[] {
-  // Validation guarantees a point wherever there is no shape.
-  const anchor = (target: Target | null, point: number[] | undefined): Point =>
-    target ? center(target) : [point?.[0] ?? 0, point?.[1] ?? 0]
-  let points: Point[]
-  if (route) {
-    points = simplify(route)
-  } else if (from && from === to) {
-    // A loop off the top-right corner.
-    const { x, y, width, height } = from.box
-    points = [
-      [x + width * 0.75, y],
-      [x + width + 40, y - 40],
-      [x + width, y + height * 0.25],
-    ]
-  } else {
-    points = [anchor(from, skeleton.start), anchor(to, skeleton.end)]
-  }
-  if (from) points[0] = outlinePoint(from, points[1])
-  if (to)
-    points[points.length - 1] = outlinePoint(to, points[points.length - 2])
-  return points
-}
-
-// Excalidraw puts an arrow's label on its middle point, or the middle of its
-// middle segment.
-function midpoint(points: Point[]): Point {
-  if (points.length % 2 === 1) return points[Math.floor(points.length / 2)]
-  const [ax, ay] = points[points.length / 2 - 1]
-  const [bx, by] = points[points.length / 2]
-  return [(ax + bx) / 2, (ay + by) / 2]
-}
-
-function emitConnector(connector: Connector) {
-  const { skeleton, from, to } = connector
-  const points = connectorPoints(connector)
-  const [x0, y0] = points[0]
-  const local = points.map(([x, y]): Point => [x - x0, y - y0])
-  const xs = local.map(([x]) => x)
-  const ys = local.map(([, y]) => y)
-  const box = {
-    x: x0,
-    y: y0,
-    width: Math.max(...xs) - Math.min(...xs),
-    height: Math.max(...ys) - Math.min(...ys),
-  }
-  const isLine = skeleton.type === "line"
-  // A line attached to shapes is an arrow without heads: lines can't bind.
-  const type = isLine && !from && !to ? "line" : "arrow"
-  const label = type === "arrow" ? connector.label : null
-  const labelId = label ? newId() : null
-  const binding = (target: Target | null) =>
-    target ? { elementId: target.id, focus: 0, gap: BINDING_GAP } : null
-
-  const element = {
-    ...base(connector.id, type, box, {
-      ...DEFAULT_STYLE,
-      strokeColor: skeleton.strokeColor ?? DEFAULT_STYLE.strokeColor,
-      strokeStyle: skeleton.strokeStyle ?? DEFAULT_STYLE.strokeStyle,
-      strokeWidth: skeleton.strokeWidth ?? DEFAULT_STYLE.strokeWidth,
-    }),
-    roundness: { type: 2 },
-    boundElements: labelId ? [{ id: labelId, type: "text" as const }] : [],
-    points: local,
-    lastCommittedPoint: null,
-    startBinding: type === "arrow" ? binding(from) : null,
-    endBinding: type === "arrow" ? binding(to) : null,
-    startArrowhead:
-      skeleton.startArrowhead === undefined ? null : skeleton.startArrowhead,
-    endArrowhead:
-      skeleton.endArrowhead === undefined
-        ? isLine
-          ? null
-          : "arrow"
-        : skeleton.endArrowhead,
-    ...(type === "arrow" ? { elbowed: false } : {}),
-  }
-  if (!label || !labelId) return [element]
-
-  // Excalidraw's getBoundTextMaxWidth for arrows.
-  const maxWidth = Math.max(box.width * 0.7, label.fontSize * 11)
-  const text = wrapText(label.original, label.fontSize, maxWidth)
-  const size = measureText(text, label.fontSize)
-  const [mx, my] = midpoint(points)
-  return [
-    element,
-    textElement({
-      id: labelId,
-      box: { x: mx - size.width / 2, y: my - size.height / 2, ...size },
-      text,
-      original: label.original,
-      fontSize: label.fontSize,
-      strokeColor: element.strokeColor,
-      containerId: connector.id,
-      textAlign: "center",
-      verticalAlign: "middle",
-      autoResize: true,
-    }),
-  ]
-}
-
-function emitFreeText(text: FreeText) {
-  const { layout } = text
-  return textElement({
-    id: text.id,
-    box: textBox(text),
-    text: layout.text,
-    original: layout.original,
-    fontSize: layout.fontSize,
-    strokeColor: text.skeleton.strokeColor ?? DEFAULT_STYLE.strokeColor,
-    containerId: null,
-    textAlign: "left",
-    verticalAlign: "top",
-    autoResize: layout.autoResize,
-  })
-}
-
-const BASE_62 = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
-
-/**
- * Fractional indices in array order: "c" and three base-62 digits, an
- * integer key in Excalidraw's scheme. Not the fractional-indexing package:
- * the server bundle would load it from Excalidraw's chunk, and with it
- * Excalidraw, which needs a browser.
- */
-function withIndices(elements: BuiltElement[]): BuiltElement[] {
-  return elements.map((element, position) => {
-    const digit = (place: number) =>
-      BASE_62[Math.floor(position / 62 ** place) % 62]
-    return { ...element, index: `c${digit(2)}${digit(1)}${digit(0)}` }
-  })
 }
