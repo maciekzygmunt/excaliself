@@ -7,7 +7,7 @@ import {
   SERVER_RESTART_CLOSE_REASON,
 } from "@/lib/socket/shutdown"
 import { listUpdates } from "./hub"
-import { LISTS_CHANGED, PING, PONG, SIGNED_OUT_CLOSE_CODE } from "./protocol"
+import { PING, PONG, SIGNED_OUT_CLOSE_CODE } from "./protocol"
 
 type ListsContext = { signedIn?: true; unsubscribe?: () => void }
 
@@ -25,7 +25,7 @@ export const listsSocket = defineWebSocketHandler({
     if (!context.signedIn)
       return peer.close(SIGNED_OUT_CLOSE_CODE, "Signed out")
     context.unsubscribe = listUpdates.add({
-      notify: () => peer.send(LISTS_CHANGED),
+      notify: (update) => peer.send(update),
       close: () =>
         peer.close(SERVER_RESTART_CLOSE_CODE, SERVER_RESTART_CLOSE_REASON),
     })

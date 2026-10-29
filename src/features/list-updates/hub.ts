@@ -1,10 +1,11 @@
-// Every signed-in tab's lists socket, told when drawings or folders change.
-// In-memory, so the app stays single-replica.
+// Every signed-in tab's lists socket, told when drawings, folders, or the
+// team library change. In-memory, so the app stays single-replica.
 
 import { processSingleton } from "@/lib/process-singleton"
 import { registerShutdownFlush } from "@/lib/socket/shutdown"
+import { LISTS_CHANGED, type ListUpdate } from "./protocol"
 
-type Listener = { notify: () => void; close: () => void }
+type Listener = { notify: (update: ListUpdate) => void; close: () => void }
 
 export function createListUpdateHub() {
   const listeners = new Set<Listener>()
@@ -22,8 +23,8 @@ export function createListUpdateHub() {
      * Reaches every tab, Private changes too: the frame carries no data, and
      * each tab refetches under its own access rule.
      */
-    notify() {
-      for (const listener of listeners) listener.notify()
+    notify(update: ListUpdate = LISTS_CHANGED) {
+      for (const listener of listeners) listener.notify(update)
     },
 
     /** Hangs up every tab, so open sockets don't hold a stopping server alive. */

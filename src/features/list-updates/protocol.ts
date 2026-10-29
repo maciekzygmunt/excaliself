@@ -1,7 +1,9 @@
 // The lists socket's wire: plain strings, since nothing rides along. The
-// server says the lists changed and the tab refetches them.
+// server says what changed and the tab refetches it.
 
 export const LISTS_CHANGED = "changed"
+export const LIBRARY_CHANGED = "library"
+export type ListUpdate = typeof LISTS_CHANGED | typeof LIBRARY_CHANGED
 export const PING = "ping"
 export const PONG = "pong"
 

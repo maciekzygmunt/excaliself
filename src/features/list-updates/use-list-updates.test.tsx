@@ -3,7 +3,11 @@ import { act, cleanup, renderHook, waitFor } from "@testing-library/react"
 import type { ReactNode } from "react"
 import { afterEach, beforeEach, expect, test, vi } from "vitest"
 import { RECONNECT_MAX_DELAY_MS } from "@/lib/socket/backoff"
-import { LISTS_CHANGED, SIGNED_OUT_CLOSE_CODE } from "./protocol"
+import {
+  LIBRARY_CHANGED,
+  LISTS_CHANGED,
+  SIGNED_OUT_CLOSE_CODE,
+} from "./protocol"
 import { useListUpdates } from "./use-list-updates"
 
 // The query modules import server functions; the hook only needs their keys.
@@ -76,6 +80,15 @@ test("a change refetches the drawing, folder, and trash lists", () => {
   expect(invalidatedKeys()).toEqual([["drawings"], ["folders"], ["trash"]])
 })
 
+test("a library change refetches only the library", () => {
+  const { invalidate, invalidatedKeys } = renderListUpdates()
+  act(() => sockets[0].open())
+  invalidate.mockClear()
+
+  act(() => sockets[0].receive(LIBRARY_CHANGED))
+  expect(invalidatedKeys()).toEqual([["library"]])
+})
+
 test("a change during this tab's own mutation waits for it to settle", async () => {
   // Query's notify batching runs on timers.
   vi.useRealTimers()
@@ -107,13 +120,13 @@ test("a change during this tab's own mutation waits for it to settle", async () 
 test("each open catches up on changes the tab missed", () => {
   const { invalidate } = renderListUpdates()
   act(() => sockets[0].open())
-  expect(invalidate).toHaveBeenCalledTimes(3)
+  expect(invalidate).toHaveBeenCalledTimes(4)
   act(() => sockets[0].close(1006))
 
   waitOutBackoff()
   expect(sockets).toHaveLength(2)
   act(() => sockets[1].open())
-  expect(invalidate).toHaveBeenCalledTimes(6)
+  expect(invalidate).toHaveBeenCalledTimes(8)
 })
 
 test("a signed-out close stops dialing", () => {
