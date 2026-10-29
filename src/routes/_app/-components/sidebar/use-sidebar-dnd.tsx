@@ -6,6 +6,7 @@ import {
   useContext,
   useState,
 } from "react"
+import { useImportDrawingFiles } from "@/features/drawings/import-files"
 import { type Drawing, drawingsQueryOptions } from "@/features/drawings/queries"
 import { updateDrawing } from "@/features/drawings/server"
 import { type Folder, foldersQueryOptions } from "@/features/folders/queries"
@@ -23,6 +24,10 @@ const sameTarget = (a: DropTarget | null, b: DropTarget) =>
   a.space === b.space &&
   (a.type !== "folder" || b.type !== "folder" || a.id === b.id)
 
+/** Files dragged in from the computer, not a sidebar row. */
+export const isFileDrag = (e: DragEvent) =>
+  e.dataTransfer.types.includes("Files")
+
 type Options = {
   drawings: Drawing[]
   foldersById: Map<string, Folder>
@@ -32,6 +37,7 @@ function useSidebarDnDValue({ drawings, foldersById }: Options) {
   const [dragItem, setDragItem] = useState<DragItem | null>(null)
   const [dropTarget, setDropTarget] = useState<DropTarget | null>(null)
   const { requestMoveToTeam } = useMoveToTeamDialog()
+  const importFiles = useImportDrawingFiles()
 
   const moveDrawing = useOptimisticListMutation<
     Drawing,
@@ -74,10 +80,12 @@ function useSidebarDnDValue({ drawings, foldersById }: Options) {
 
   const onDragOver = useCallback(
     (target: DropTarget) => (e: DragEvent) => {
-      if (!dragItem || !isAllowed(dragItem, target)) return
+      // Dropped files become new drawings, so any target takes them.
+      const fileDrop = !dragItem && isFileDrag(e)
+      if (!fileDrop && (!dragItem || !isAllowed(dragItem, target))) return
       e.preventDefault()
       e.stopPropagation()
-      e.dataTransfer.dropEffect = "move"
+      e.dataTransfer.dropEffect = fileDrop ? "copy" : "move"
       // dragover fires continuously; keep the old object so nothing re-renders.
       setDropTarget((prev) => (sameTarget(prev, target) ? prev : target))
     },
@@ -90,11 +98,19 @@ function useSidebarDnDValue({ drawings, foldersById }: Options) {
     (target: DropTarget) => (e: DragEvent) => {
       e.preventDefault()
       e.stopPropagation()
-      if (!dragItem) return
-
       const targetFolderId = target.type === "folder" ? target.id : null
-
       setDropTarget(null)
+
+      if (!dragItem) {
+        const files = [...e.dataTransfer.files]
+        if (files.length > 0)
+          void importFiles(files, {
+            folderId: targetFolderId,
+            space: target.space,
+          })
+        return
+      }
+
       setDragItem(null)
 
       if (!isAllowed(dragItem, target)) return
@@ -132,6 +148,7 @@ function useSidebarDnDValue({ drawings, foldersById }: Options) {
       foldersById,
       isAllowed,
       requestMoveToTeam,
+      importFiles,
       moveDrawing,
       moveFolder,
     ],

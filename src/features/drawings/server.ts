@@ -16,6 +16,8 @@ import { authMiddleware } from "@/middleware/auth"
 import { listsChangedMiddleware } from "@/middleware/lists-changed"
 import { bytesToDataUrl } from "./file-bytes"
 import { listDrawings } from "./list"
+import { drawingColumns } from "./list-columns"
+import { importDrawing, sceneContentSchema } from "./scene-import"
 import { writeDrawingScene } from "./scene-write"
 
 export const getDrawings = createServerFn({ method: "GET" })
@@ -48,7 +50,7 @@ export const getDrawingWithFiles = createServerFn({ method: "GET" })
     // read-only trashed view (spec §5.11) instead of a dead end. Writes stay
     // blocked server-side in saveDrawingScene regardless.
     const [drawing] = await db
-      .select()
+      .select(drawingColumns)
       .from(drawings)
       .where(and(eq(drawings.id, id), accessibleTo(drawings, userId)))
     if (!drawing) return null
@@ -106,6 +108,22 @@ export const createDrawing = createServerFn({ method: "POST" })
 
     return id
   })
+
+/** One .excalidraw file dropped on the sidebar, as a new drawing. */
+export const importDrawingFile = createServerFn({ method: "POST" })
+  .middleware([authMiddleware, listsChangedMiddleware])
+  .validator(
+    z.object({
+      name: z.string(),
+      folderId: z.string().nullable(),
+      // Ignored inside a folder: the drawing takes the folder's space.
+      space: z.enum(spaces),
+      content: sceneContentSchema,
+    }),
+  )
+  .handler(({ data, context }) =>
+    importDrawing(db, context.session.user.id, data),
+  )
 
 export const updateDrawing = createServerFn({ method: "POST" })
   .middleware([authMiddleware, listsChangedMiddleware])

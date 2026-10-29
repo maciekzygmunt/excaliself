@@ -25,9 +25,7 @@ function SettingsLayout() {
           </h1>
         </div>
         <div className="flex flex-1 flex-col gap-6 md:flex-row md:items-start md:gap-10">
-          {/* Sub-nav is adaptive: members see only the one Account page, so
-              they get no second column at all. */}
-          {isAdmin && <SettingsSubNav />}
+          <SettingsSubNav isAdmin={isAdmin} />
           <div className="min-w-0 flex-1">
             <Outlet />
           </div>
@@ -37,9 +35,8 @@ function SettingsLayout() {
   )
 }
 
-// Outline-style second-column sub-nav. Only admins see it, so the Instance
-// group needs no per-entry gating.
-function SettingsSubNav() {
+// Outline-style second-column sub-nav. Only admins get the Instance group.
+function SettingsSubNav({ isAdmin }: { isAdmin: boolean }) {
   return (
     <nav
       aria-label="Settings sections"
@@ -51,15 +48,20 @@ function SettingsSubNav() {
       </div>
       <div className="flex flex-row gap-1 md:flex-col">
         <SettingsNavItem to="/settings" label="Account" />
+        <SettingsNavItem to="/settings/import" label="Import" />
       </div>
-      <div className="px-2 pb-0.5 pt-3 text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground/60">
-        Instance
-      </div>
-      <div className="flex flex-row gap-1 md:flex-col">
-        <SettingsNavItem to="/settings/members" label="Members" />
-        <SettingsNavItem to="/settings/invites" label="Invites" />
-        <SettingsNavItem to="/settings/instance" label="Instance" />
-      </div>
+      {isAdmin && (
+        <>
+          <div className="px-2 pb-0.5 pt-3 text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground/60">
+            Instance
+          </div>
+          <div className="flex flex-row gap-1 md:flex-col">
+            <SettingsNavItem to="/settings/members" label="Members" />
+            <SettingsNavItem to="/settings/invites" label="Invites" />
+            <SettingsNavItem to="/settings/instance" label="Instance" />
+          </div>
+        </>
+      )}
     </nav>
   )
 }

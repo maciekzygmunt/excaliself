@@ -26,6 +26,7 @@ import { Route as AppDrawIndexRouteImport } from './routes/_app/draw/index'
 import { Route as AppDrawIdRouteImport } from './routes/_app/draw/$id'
 import { Route as AppFolderIdRouteImport } from './routes/_app/folder.$id'
 import { Route as AppSettingsIndexRouteImport } from './routes/_app/settings/index'
+import { Route as AppSettingsImportRouteImport } from './routes/_app/settings/import'
 import { Route as AppSettingsInstanceRouteImport } from './routes/_app/settings/instance'
 import { Route as AppSettingsInvitesRouteImport } from './routes/_app/settings/invites'
 import { Route as AppSettingsMembersRouteImport } from './routes/_app/settings/members'
@@ -117,6 +118,11 @@ const AppSettingsIndexRoute = AppSettingsIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AppSettingsRouteRoute,
 } as any)
+const AppSettingsImportRoute = AppSettingsImportRouteImport.update({
+  id: '/import',
+  path: '/import',
+  getParentRoute: () => AppSettingsRouteRoute,
+} as any)
 const AppSettingsInstanceRoute = AppSettingsInstanceRouteImport.update({
   id: '/instance',
   path: '/instance',
@@ -165,6 +171,7 @@ export interface FileRoutesByFullPath {
   '/share/$token': typeof ShareTokenRoute
   '/draw/$id': typeof AppDrawIdRoute
   '/folder/$id': typeof AppFolderIdRoute
+  '/settings/import': typeof AppSettingsImportRoute
   '/settings/instance': typeof AppSettingsInstanceRoute
   '/settings/invites': typeof AppSettingsInvitesRoute
   '/settings/members': typeof AppSettingsMembersRoute
@@ -188,6 +195,7 @@ export interface FileRoutesByTo {
   '/share/$token': typeof ShareTokenRoute
   '/draw/$id': typeof AppDrawIdRoute
   '/folder/$id': typeof AppFolderIdRoute
+  '/settings/import': typeof AppSettingsImportRoute
   '/settings/instance': typeof AppSettingsInstanceRoute
   '/settings/invites': typeof AppSettingsInvitesRoute
   '/settings/members': typeof AppSettingsMembersRoute
@@ -214,6 +222,7 @@ export interface FileRoutesById {
   '/share/$token': typeof ShareTokenRoute
   '/_app/draw/$id': typeof AppDrawIdRoute
   '/_app/folder/$id': typeof AppFolderIdRoute
+  '/_app/settings/import': typeof AppSettingsImportRoute
   '/_app/settings/instance': typeof AppSettingsInstanceRoute
   '/_app/settings/invites': typeof AppSettingsInvitesRoute
   '/_app/settings/members': typeof AppSettingsMembersRoute
@@ -240,6 +249,7 @@ export interface FileRouteTypes {
     | '/share/$token'
     | '/draw/$id'
     | '/folder/$id'
+    | '/settings/import'
     | '/settings/instance'
     | '/settings/invites'
     | '/settings/members'
@@ -263,6 +273,7 @@ export interface FileRouteTypes {
     | '/share/$token'
     | '/draw/$id'
     | '/folder/$id'
+    | '/settings/import'
     | '/settings/instance'
     | '/settings/invites'
     | '/settings/members'
@@ -288,6 +299,7 @@ export interface FileRouteTypes {
     | '/share/$token'
     | '/_app/draw/$id'
     | '/_app/folder/$id'
+    | '/_app/settings/import'
     | '/_app/settings/instance'
     | '/_app/settings/invites'
     | '/_app/settings/members'
@@ -435,6 +447,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppSettingsIndexRouteImport
       parentRoute: typeof AppSettingsRouteRoute
     }
+    '/_app/settings/import': {
+      id: '/_app/settings/import'
+      path: '/import'
+      fullPath: '/settings/import'
+      preLoaderRoute: typeof AppSettingsImportRouteImport
+      parentRoute: typeof AppSettingsRouteRoute
+    }
     '/_app/settings/instance': {
       id: '/_app/settings/instance'
       path: '/instance'
@@ -481,6 +500,7 @@ declare module '@tanstack/react-router' {
 }
 
 interface AppSettingsRouteRouteChildren {
+  AppSettingsImportRoute: typeof AppSettingsImportRoute
   AppSettingsInstanceRoute: typeof AppSettingsInstanceRoute
   AppSettingsInvitesRoute: typeof AppSettingsInvitesRoute
   AppSettingsMembersRoute: typeof AppSettingsMembersRoute
@@ -488,6 +508,7 @@ interface AppSettingsRouteRouteChildren {
 }
 
 const AppSettingsRouteRouteChildren: AppSettingsRouteRouteChildren = {
+  AppSettingsImportRoute: AppSettingsImportRoute,
   AppSettingsInstanceRoute: AppSettingsInstanceRoute,
   AppSettingsInvitesRoute: AppSettingsInvitesRoute,
   AppSettingsMembersRoute: AppSettingsMembersRoute,
