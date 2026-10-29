@@ -103,7 +103,7 @@ If the only admin loses their password, see
 Excaliself has an [MCP](https://modelcontextprotocol.io) server at `/api/mcp`.
 Your AI client brings the model, so the instance needs no LLM API key.
 
-1. In Excaliself, open **Settings**, then **Access tokens**, and click
+1. In Excaliself, open **Settings**, then **MCP**, and click
    **New token**. Copy the token: you see it only once.
 2. Add the server to your client, with your instance's URL and the token.
 

@@ -5,7 +5,6 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { currentUserQueryOptions } from "@/features/account/queries"
 import { useDelayedVisible } from "@/hooks/use-delayed-visible"
 import { useDocumentTitle } from "@/lib/document-title"
-import { AccessTokensSection } from "./-components/AccessTokensSection"
 import { AppearanceSection } from "./-components/AppearanceSection"
 import { DangerZoneSection } from "./-components/DangerZoneSection"
 import { EmailSection } from "./-components/EmailSection"
@@ -37,8 +36,6 @@ function AccountPage() {
       <PasswordSection />
       <Separator />
       <SessionsSection />
-      <Separator />
-      <AccessTokensSection />
       <Separator />
       <AppearanceSection />
       <Separator />

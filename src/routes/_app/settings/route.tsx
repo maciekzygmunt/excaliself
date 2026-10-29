@@ -49,6 +49,7 @@ function SettingsSubNav({ isAdmin }: { isAdmin: boolean }) {
       <div className="flex flex-row gap-1 md:flex-col">
         <SettingsNavItem to="/settings" label="Account" />
         <SettingsNavItem to="/settings/import" label="Import" />
+        <SettingsNavItem to="/settings/mcp" label="MCP" />
       </div>
       {isAdmin && (
         <>
