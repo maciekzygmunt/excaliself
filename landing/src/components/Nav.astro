@@ -9,6 +9,7 @@ const links = [
   { href: `${base}#tour`, label: "Tour" },
   { href: `${base}#deploy`, label: "Deploy" },
   { href: `${base}#faq`, label: "FAQ" },
+  { href: `${base}docs/`, label: "Docs" },
 ]
 // One rough underline per link, each with its own wobble.
 const underline = (seed: number) => line([[0, 4], [100, 4]], { seed, stroke: pen, width: 2, roughness: 1.4 }).filter((p) => p.draw)[0].d
@@ -25,7 +26,7 @@ const underline = (seed: number) => line([[0, 4], [100, 4]], { seed, stroke: pen
       <ul class="flex items-center gap-7 text-[0.9375rem] font-medium" data-nav-links>
         {links.map((l, i) => (
           <li>
-            <a href={l.href} class="draw-link">
+            <a href={l.href} class="draw-link" aria-current={l.label === "Docs" && Astro.url.pathname.startsWith(`${base}docs`) ? "true" : undefined}>
               {l.label}
               <svg viewBox="0 0 100 8" preserveAspectRatio="none" aria-hidden="true">
                 <path d={underline(40 + i)} fill="none" stroke={pen} stroke-width="2" stroke-linecap="round" pathLength="1" vector-effect="non-scaling-stroke" />

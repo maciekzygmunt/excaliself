@@ -1,4 +1,7 @@
-# Break-glass recovery: sole-admin lockout
+---
+title: Recover admin access
+description: What to do when no admin can sign in, for example when the only admin lost their password.
+---
 
 The normal way to recover a lost password is an admin-generated reset link
 (Settings → Members → Generate reset link). This recipe is for the case where
@@ -9,12 +12,12 @@ Recovery operates directly on the database. There is deliberately no UI for
 this: anyone with shell access to the server already owns the instance, and a
 web-reachable recovery surface would only weaken it.
 
-Both recipes below assume the stock Docker Compose deployment from the README.
+Both recipes below assume the stock [Docker Compose](/docs/docker-compose/) deployment.
 If you deploy differently (e.g. a managed Postgres or a PaaS like Coolify),
 the SQL is identical — just open `psql` against whatever database your
 `DATABASE_URL` points at.
 
-## 1. Open a database shell
+## Open a database shell
 
 From the directory containing `docker-compose.yaml`:
 
@@ -32,7 +35,7 @@ camelCase, so they must be double-quoted in SQL; table names are lowercase):
 SELECT id, email, role FROM users;
 ```
 
-## 2a. Promote an existing member to admin
+## Promote an existing member to admin
 
 If anyone else on the instance can still sign in, make them an admin — they
 can then issue a normal reset link for the locked-out account:
@@ -47,7 +50,7 @@ promotion is effective immediately. The member's UI may not show the
 admin-only surfaces until their cached session refreshes (up to 5 minutes) —
 signing out and back in picks it up instantly.
 
-## 2b. Reset the sole admin's own password
+## Reset the sole admin's own password
 
 If there is no other account to promote, generate a password-reset token
 directly in the database, then finish through the app's normal reset page.

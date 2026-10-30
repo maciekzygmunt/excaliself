@@ -93,6 +93,7 @@ tour shows only the sidebar, each short note beside its row with a small arrow. 
 - Genericness check: a generic model would ship a centered hero, a purple glow and three feature cards.
   Changed: left-aligned poster headline, the diagram instead of a screenshot hero, no cards, pastel colors
   only inside sketches, iris used only for selection and notes.
-- No loader or page transition theatre: three static pages with plain navigation.
+- No loader or page transition theatre: static pages with plain navigation.
+- Docs (`/docs/`): markdown in `src/content/docs`, listed in `src/lib/docs.ts`. Same tokens, smaller type. The current page in the sidebar is the selection box. No search until the page count asks for it.
 - Idle state: the autosave sheet in the hero. The rest of the page is still at rest by choice.
 - Under reduced motion: all strokes drawn, cards rest in the stack, cylinder shows its fill, no scrub.

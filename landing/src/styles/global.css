@@ -276,6 +276,125 @@ details[open] .caret {
   rotate: 45deg;
 }
 
+/* Docs: the current page is the selected element. */
+.docs-nav-link .sel {
+  inset: 0;
+  scale: 1;
+}
+.docs-nav-link[aria-current="page"] .sel {
+  opacity: 1;
+}
+
+/* Docs: markdown body. */
+.prose {
+  > * + * {
+    margin-top: 1.1rem;
+  }
+  h2 {
+    margin-top: 2.75rem;
+    font-size: 1.5rem;
+    font-weight: 600;
+    letter-spacing: -0.025em;
+    line-height: 1.2;
+    scroll-margin-top: 5.5rem;
+  }
+  h3 {
+    margin-top: 2rem;
+    font-size: 1.125rem;
+    font-weight: 600;
+    letter-spacing: -0.015em;
+    scroll-margin-top: 5.5rem;
+  }
+  a {
+    font-weight: 500;
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 0.2em;
+    text-decoration-color: var(--iris);
+  }
+  ul,
+  ol {
+    padding-left: 1.25rem;
+  }
+  ul {
+    list-style: disc;
+  }
+  ol {
+    list-style: decimal;
+  }
+  li + li {
+    margin-top: 0.4rem;
+  }
+  li::marker {
+    color: var(--muted);
+  }
+  blockquote {
+    border-left: 2px solid var(--iris);
+    padding-left: 1rem;
+    color: var(--muted);
+  }
+  :not(pre) > code,
+  kbd {
+    border-radius: 4px;
+    background: var(--well);
+    padding: 0.1em 0.35em;
+    font-family: var(--font-mono);
+    font-size: 0.875em;
+    overflow-wrap: anywhere;
+  }
+  pre {
+    overflow-x: auto;
+    border-radius: 8px;
+    background: var(--ink) !important;
+    padding: 1rem 1.25rem;
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
+    line-height: 1.65;
+  }
+  /* The block scrolls sideways under its fixed copy button. */
+  .code-block {
+    position: relative;
+  }
+  .code-block button {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    border-radius: 6px;
+    background: var(--ink);
+    padding: 0.2rem 0.6rem;
+    color: #d4d4d4;
+    font-size: 0.8125rem;
+    box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.18);
+    transition: background-color 0.3s var(--ease-out);
+  }
+  .code-block button:hover {
+    background: #3a3a3a;
+  }
+  /* Wide tables scroll inside the column, not the page. */
+  table {
+    display: block;
+    overflow-x: auto;
+    border-collapse: collapse;
+    font-size: 0.9375rem;
+  }
+  th {
+    text-align: left;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  /* Keep variable names whole; the table scrolls instead. */
+  table code {
+    white-space: nowrap;
+    overflow-wrap: normal;
+  }
+  th,
+  td {
+    border-bottom: 1px solid var(--line);
+    padding: 0.6rem 1.25rem 0.6rem 0;
+    vertical-align: top;
+  }
+}
+
 /* Mobile menu */
 .menu-overlay {
   opacity: 0;
