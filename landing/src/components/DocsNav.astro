@@ -1,0 +1,34 @@
+---
+// The docs page list. Rendered twice: a sticky sidebar on desktop, a disclosure on mobile.
+import Selection from "./Selection.astro"
+import { docHref, getDocsNav } from "../lib/docs"
+
+interface Props {
+  current: string
+  label: string
+}
+const { current, label } = Astro.props
+const nav = await getDocsNav()
+---
+
+<nav aria-label={label} class="flex flex-col gap-7">
+  {nav.map((section) => (
+    <div>
+      <p class="px-2.5 text-sm font-semibold">{section.label}</p>
+      <ul class="mt-1.5 flex flex-col">
+        {section.pages.map((page) => (
+          <li>
+            <a
+              href={docHref(page.id)}
+              aria-current={page.id === current ? "page" : undefined}
+              class="docs-nav-link relative block rounded-sm px-2.5 py-1.5 text-[0.9375rem] text-muted transition-colors duration-300 hover:text-ink aria-[current=page]:text-ink"
+            >
+              {page.data.title}
+              <Selection />
+            </a>
+          </li>
+        ))}
+      </ul>
+    </div>
+  ))}
+</nav>

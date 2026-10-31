@@ -11,7 +11,8 @@
 </p>
 
 <p align="center">
-  <a href="https://excaliself.com"><b>Website</b></a>
+  <a href="https://excaliself.com"><b>Website</b></a> ·
+  <a href="https://excaliself.com/docs/"><b>Docs</b></a>
 </p>
 
 <p align="center">
@@ -61,7 +62,7 @@ To update, run `docker compose pull && docker compose up -d`. To pin a release,
 set `EXCALISELF_VERSION` (e.g. `1.0.0`) in `.env`. To build the image from
 source instead (needs about 4 GB of RAM), clone the repo and run
 `docker compose -f docker-compose.yaml -f docker-compose.build.yaml up -d --build`.
-[docs/deployment.md](./docs/deployment.md) has the details.
+The [docs](https://excaliself.com/docs/docker-compose/) have the details.
 
 ### Coolify
 
@@ -97,7 +98,7 @@ Docker Compose reads these from `.env`. Coolify sets them for you.
 `GET /api/health` returns `200` when the app is up and can reach Postgres.
 
 If the only admin loses their password, see
-[break-glass recovery](./docs/break-glass-recovery.md).
+[Recover admin access](https://excaliself.com/docs/admin-recovery/).
 
 ## Connect an AI client (MCP)
 
