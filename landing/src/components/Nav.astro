@@ -10,6 +10,7 @@ const links = [
   { href: `${base}#deploy`, label: "Deploy" },
   { href: `${base}#faq`, label: "FAQ" },
   { href: `${base}docs/`, label: "Docs" },
+  { href: `${base}blog/`, label: "Blog" },
 ]
 // One rough underline per link, each with its own wobble.
 const underline = (seed: number) => line([[0, 4], [100, 4]], { seed, stroke: pen, width: 2, roughness: 1.4 }).filter((p) => p.draw)[0].d
