@@ -16,6 +16,27 @@
 </p>
 
 <p align="center">
+  <img src="docs/images/demo.gif" width="800" alt="Demo: browsing folders, searching with the command palette, then editing a Team drawing while a second person's cursor moves on the canvas">
+  <br>
+  <sub><a href="docs/images/demo.mp4">Watch as MP4</a></sub>
+</p>
+
+## Try it in 60 seconds
+
+You need Docker. This downloads the compose file, generates the secrets, and starts the app and its Postgres:
+
+```bash
+mkdir excaliself && cd excaliself
+curl -fsSLO https://raw.githubusercontent.com/maciekzygmunt/excaliself/main/docker-compose.yaml
+printf 'POSTGRES_PASSWORD=%s\nBETTER_AUTH_SECRET=%s\nBASE_URL=http://localhost:3000\n' \
+  "$(openssl rand -hex 16)" "$(openssl rand -hex 32)" > .env
+docker compose up -d
+```
+
+Open <http://localhost:3000> and create the admin account. For a public install, set `BASE_URL`
+and put HTTPS in front of it; see [Deploy](#deploy).
+
+<p align="center">
   <img src="docs/images/home-light.png" width="49%" alt="Excaliself home screen in the light theme: a sidebar with starred drawings and folders next to a grid of drawing previews">
   <img src="docs/images/home-dark.png" width="49%" alt="The same home screen in the dark theme">
 </p>
