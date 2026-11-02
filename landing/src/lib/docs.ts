@@ -7,6 +7,7 @@ const sidebar = [
   { label: "Configure", pages: ["environment", "single-sign-on"] },
   { label: "Use", pages: ["team-space", "sharing", "team-library", "organize", "import", "mcp"] },
   { label: "Administer", pages: ["members", "admin-recovery"] },
+  { label: "Guides and comparisons", pages: ["self-host-excalidraw", "vs-excalidraw-plus", "vs-excalidraw-room"] },
   { label: "Develop", pages: ["local-development"] },
 ]
 
