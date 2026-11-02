@@ -207,6 +207,10 @@ test("registration takes only https or loopback redirect URIs", async () => {
   expect((await registerClient(["myapp://callback"])).body.error).toBe(
     "invalid_redirect_uri",
   )
+  expect(
+    (await registerClient([`https://claude.ai/${"a".repeat(2000)}`])).body
+      .error,
+  ).toBe("invalid_client_metadata")
   const ok = await registerClient(["http://localhost:3334/oauth/callback"])
   expect(ok).toMatchObject({
     status: 201,

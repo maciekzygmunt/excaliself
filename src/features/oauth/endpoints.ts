@@ -79,8 +79,9 @@ export function authorizationServerMetadata(request: Request) {
   })
 }
 
+// Bounded: registration is open to anyone, and every row is kept a day.
 const registration = z.object({
-  redirect_uris: z.array(z.string()).min(1).max(10),
+  redirect_uris: z.array(z.string().max(2000)).min(1).max(10),
   client_name: z.string().optional(),
 })
 
@@ -99,7 +100,10 @@ export async function register(db: Db, request: Request) {
   }
   const body = registration.safeParse(await request.json().catch(() => null))
   if (!body.success) {
-    return oauthError("invalid_client_metadata", "Send redirect_uris")
+    return oauthError(
+      "invalid_client_metadata",
+      "Send 1 to 10 redirect_uris of up to 2000 characters",
+    )
   }
   const redirectUris = body.data.redirect_uris
   if (!redirectUris.every(isAllowedRedirectUri)) {
