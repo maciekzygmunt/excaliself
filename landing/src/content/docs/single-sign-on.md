@@ -27,7 +27,8 @@ Each provider limits who can claim a domain:
   account that uses a work address does not count.
 - **Microsoft:** only accounts in the one tenant you set.
 - **OIDC:** every account your provider signs in. Limit access to the
-  application in your provider.
+  application in your provider. The provider must send
+  `email_verified: true`, or existing members cannot link their accounts.
 
 Deleting a member does not stop them from signing in again with SSO: an
 allowed domain recreates the account. Remove them in your provider too.
