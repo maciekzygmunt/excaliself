@@ -81,6 +81,15 @@ To pin a release instead of `latest`, set
 `EXCALISELF_VERSION` (e.g. `1.0.0`) in the resource's environment variables.
 Drawings live in the `pgdata` volume and survive redeploys.
 
+### Unraid
+
+Unraid users can add the template by hand until it is listed in Community
+Applications: save [`deploy/unraid/excaliself.xml`](deploy/unraid/excaliself.xml) to
+`/boot/config/plugins/dockerMan/templates-user/excaliself.xml`, then add the
+container from **Docker → Add Container → excaliself**. It needs a PostgreSQL
+container (for example Postgres from Community Applications); set `DATABASE_URL`,
+`BETTER_AUTH_SECRET` (`openssl rand -hex 32`), and `BASE_URL`.
+
 ### Configuration
 
 Docker Compose reads these from `.env`. Coolify sets them for you.

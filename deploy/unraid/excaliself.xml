@@ -1,0 +1,27 @@
+<?xml version="1.0"?>
+<Container version="2">
+  <Name>excaliself</Name>
+  <Repository>ghcr.io/maciekzygmunt/excaliself:latest</Repository>
+  <Registry>https://github.com/maciekzygmunt/excaliself/pkgs/container/excaliself</Registry>
+  <Network>bridge</Network>
+  <Shell>sh</Shell>
+  <Privileged>false</Privileged>
+  <Support>https://github.com/maciekzygmunt/excaliself/issues</Support>
+  <Project>https://github.com/maciekzygmunt/excaliself</Project>
+  <Overview>Self-hosted Excalidraw with accounts, folders, search, live collaboration, single sign-on, and an MCP server. Requires a PostgreSQL database: install the Postgres17 (or any Postgres) container from Community Applications first, create a database and user, and point DATABASE_URL at it. Open the WebUI and the first visit takes you to /setup to create the admin account.</Overview>
+  <Category>Productivity: Tools:</Category>
+  <WebUI>http://[IP]:[PORT:3000]/</WebUI>
+  <TemplateURL>https://raw.githubusercontent.com/maciekzygmunt/excaliself/main/deploy/unraid/excaliself.xml</TemplateURL>
+  <Icon>https://raw.githubusercontent.com/maciekzygmunt/excaliself/main/public/logo192.png</Icon>
+  <ExtraParams>--health-start-period=30s</ExtraParams>
+  <Config Name="WebUI Port" Target="3000" Default="3000" Mode="tcp" Description="Port the web app listens on." Type="Port" Display="always" Required="true" Mask="false">3000</Config>
+  <Config Name="DATABASE_URL" Target="DATABASE_URL" Default="postgresql://excaliself:CHANGEME@192.168.1.10:5432/excaliself" Mode="" Description="PostgreSQL connection URL. Use a hex password: it goes into a URL." Type="Variable" Display="always" Required="true" Mask="true"/>
+  <Config Name="BETTER_AUTH_SECRET" Target="BETTER_AUTH_SECRET" Default="" Mode="" Description="Session signing secret. Generate with: openssl rand -hex 32" Type="Variable" Display="always" Required="true" Mask="true"/>
+  <Config Name="BASE_URL" Target="BASE_URL" Default="http://192.168.1.10:3000" Mode="" Description="The public URL you open Excaliself at, including http(s):// and port if not 80/443. Must match for sign-in and collaboration links." Type="Variable" Display="always" Required="true" Mask="false">http://192.168.1.10:3000</Config>
+  <Config Name="GOOGLE_CLIENT_ID" Target="GOOGLE_CLIENT_ID" Default="" Mode="" Description="Optional SSO. See https://excaliself.com/docs/single-sign-on/" Type="Variable" Display="advanced" Required="false" Mask="false"/>
+  <Config Name="GOOGLE_CLIENT_SECRET" Target="GOOGLE_CLIENT_SECRET" Default="" Mode="" Description="Optional SSO." Type="Variable" Display="advanced" Required="false" Mask="true"/>
+  <Config Name="OIDC_ISSUER" Target="OIDC_ISSUER" Default="" Mode="" Description="Optional generic OIDC provider (Authentik, Keycloak, Okta)." Type="Variable" Display="advanced" Required="false" Mask="false"/>
+  <Config Name="OIDC_CLIENT_ID" Target="OIDC_CLIENT_ID" Default="" Mode="" Description="Optional OIDC client ID." Type="Variable" Display="advanced" Required="false" Mask="false"/>
+  <Config Name="OIDC_CLIENT_SECRET" Target="OIDC_CLIENT_SECRET" Default="" Mode="" Description="Optional OIDC client secret." Type="Variable" Display="advanced" Required="false" Mask="true"/>
+  <Config Name="SSO_ALLOWED_DOMAINS" Target="SSO_ALLOWED_DOMAINS" Default="" Mode="" Description="Optional: email domains that may join on first SSO sign-in." Type="Variable" Display="advanced" Required="false" Mask="false"/>
+</Container>
