@@ -410,7 +410,8 @@ function setFollowTarget(
 
 /**
  * Merges a delta; others get the winners, the sender only its corrections.
- * Stale tombstones go only to the sender: others never got them. Returns
+ * Stale tombstones go only to a sender who can open the drawing: others
+ * never got them, and a guest must not read older deletions. Returns
  * whether the scene changed, by identity: a version sum misses nonce
  * tie-breaks.
  */
@@ -446,8 +447,14 @@ function applySceneUpdate(
       type: "SCENE_UPDATE",
       payload: { elements: published },
     })
-  if (corrections.length)
-    peer.send({ type: "SCENE_UPDATE", payload: { elements: corrections } })
+  const userId = room.seats.get(peer.id)?.userId ?? null
+  const seesStale =
+    userId !== null && room.access !== null && canAccess(room.access, userId)
+  const corrected = seesStale
+    ? corrections
+    : corrections.filter((el) => isSyncableElement(el, now))
+  if (corrected.length)
+    peer.send({ type: "SCENE_UPDATE", payload: { elements: corrected } })
 
   return changed
 }

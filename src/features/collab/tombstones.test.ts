@@ -170,3 +170,32 @@ test("a tab with a pre-delete copy is corrected after a save and reload", async 
     broadcast?.type === "SCENE_UPDATE" && ids(broadcast.payload.elements),
   ).toEqual(["recent"])
 })
+
+// A guest who kept element ids could send a stale copy on purpose.
+test("a guest with a pre-delete copy gets only recent tombstones back", async () => {
+  await teamDrawing("guest-stale")
+  const registry = roomFor()
+  const guest = recordingPeer("guest")
+  await joinRoom(registry, "guest-stale", guest.peer, {
+    userId: null,
+    displayName: "g",
+  })
+
+  const stale = ["recent", "old"].map((id) => ({
+    id,
+    type: "text",
+    version: 2,
+    versionNonce: 5,
+  }))
+  await receiveFromPeer(
+    registry,
+    "guest-stale",
+    guest.peer,
+    JSON.stringify({ type: "SCENE_UPDATE", payload: { elements: stale } }),
+  )
+
+  const correction = guest.sent.at(-1)
+  expect(
+    correction?.type === "SCENE_UPDATE" && ids(correction.payload.elements),
+  ).toEqual(["recent"])
+})
