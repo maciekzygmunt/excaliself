@@ -71,10 +71,14 @@ export const auth = betterAuth({
         // change to it with an SSO link kept. So linking SSO ends the
         // password, other SSO links, all sessions and access tokens, before
         // the SSO session is made. An admin reset link gives a password back.
-        before: async (account, ctx) => {
+        // After the insert: a failed insert keeps the old login, and of two
+        // links racing to one account, the later cleanup removes the other.
+        after: async (account, ctx) => {
           if (account.providerId === "credential" || !ctx) return
           const { internalAdapter } = ctx.context
-          const others = await internalAdapter.findAccounts(account.userId)
+          const others = (
+            await internalAdapter.findAccounts(account.userId)
+          ).filter((row) => row.id !== account.id)
           if (others.length === 0) return
           for (const row of others) await internalAdapter.deleteAccount(row.id)
           await internalAdapter.deleteUserSessions(account.userId)

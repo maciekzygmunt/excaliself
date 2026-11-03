@@ -107,7 +107,7 @@ test("linking SSO to a password account ends its password, sessions and tokens",
     store[table].filter((row) => row.userId === user.id)
   expect(rows("session")).toHaveLength(1)
 
-  const link = auth.options.databaseHooks?.account?.create?.before
+  const link = auth.options.databaseHooks?.account?.create?.after
   const now = new Date()
   await link?.(
     {
@@ -391,16 +391,20 @@ test("the owner's first SSO sign-in ends other SSO links to the account", async 
   const row = store.user.find((u) => u.id === user.id)
   if (row) row.email = "w@corp.test"
 
-  await (await startOidc("/sign-in/social"))("w-sub", "w@corp.test")
+  const owner = await (await startOidc("/sign-in/social"))(
+    "w-sub",
+    "w@corp.test",
+  )
   const again = await (await startOidc("/sign-in/social"))(
     "n-sub",
     "n@corp.test",
   )
 
+  const sessionOf = (response: Response) =>
+    auth.api.getSession({
+      headers: new Headers({ cookie: cookiesOf(response) }),
+    })
   expect(providersOf(user.id)).toEqual(["oidc:w-sub"])
-  expect(
-    await auth.api.getSession({
-      headers: new Headers({ cookie: cookiesOf(again) }),
-    }),
-  ).toBeNull()
+  expect((await sessionOf(owner))?.user.id).toBe(user.id)
+  expect(await sessionOf(again)).toBeNull()
 })
