@@ -18,24 +18,6 @@ export type StoredScene = {
   readable: boolean
 }
 
-/**
- * Leaves out tombstones older than the sync window, for what a joiner gets: a
- * guest must not read what was deleted before it came. Storage keeps them, so
- * the Room can still correct a tab with a pre-delete copy. Unstamped ones
- * count as old, as they do for image bytes.
- */
-export function withoutStaleTombstones(
-  elements: SceneElement[],
-  now: number,
-): SceneElement[] {
-  const keepSince = now - DELETED_ELEMENT_TIMEOUT_MS
-  return elements.filter(
-    (element) =>
-      !element.isDeleted ||
-      (typeof element.updated === "number" && element.updated > keepSince),
-  )
-}
-
 /** Lenient like `restore()`: our own data, so defaults beat dropping elements. */
 export function toRoomElements(value: unknown): SceneElement[] {
   if (!Array.isArray(value)) return []

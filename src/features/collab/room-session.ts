@@ -18,7 +18,8 @@ import {
   SCENE_UNREADABLE_CLOSE_REASON,
 } from "./protocol"
 import { reconcileElements } from "./reconcile"
-import { type StoredScene, withoutStaleTombstones } from "./scene-store"
+import type { StoredScene } from "./scene-store"
+import { isSyncableElement } from "./scene-sync"
 
 /** The slice of a crossws `Peer` the room logic uses. */
 export interface RoomPeer {
@@ -358,7 +359,8 @@ export async function joinRoom(
   if (room.seats.has(peer.id)) {
     // The Room keeps stale tombstones to correct tabs with a pre-delete
     // copy; a joiner never needs them.
-    const elements = withoutStaleTombstones(room.elements, registry.now())
+    const now = registry.now()
+    const elements = room.elements.filter((el) => isSyncableElement(el, now))
     peer.send({ type: "SCENE_INIT", payload: { elements } })
   }
   return { status: "ok" }
@@ -408,8 +410,9 @@ function setFollowTarget(
 
 /**
  * Merges a delta; others get the winners, the sender only its corrections.
- * Stale tombstones go only to the sender: others never got them. Returns whether the scene changed, by identity: a version sum misses
- * nonce tie-breaks.
+ * Stale tombstones go only to the sender: others never got them. Returns
+ * whether the scene changed, by identity: a version sum misses nonce
+ * tie-breaks.
  */
 function applySceneUpdate(
   room: Room,
@@ -437,7 +440,7 @@ function applySceneUpdate(
     if (winner !== element) corrections.push(winner)
   }
 
-  const published = withoutStaleTombstones(winners, now)
+  const published = winners.filter((el) => isSyncableElement(el, now))
   if (published.length)
     peer.publish(ROOM_TOPIC, {
       type: "SCENE_UPDATE",
