@@ -356,8 +356,8 @@ export async function joinRoom(
 
   await room.loaded
   if (room.seats.has(peer.id)) {
-    // The Room keeps stale tombstones in memory, so it can still correct a
-    // peer with an old copy; a joiner never needs them.
+    // The Room keeps stale tombstones to correct tabs with a pre-delete
+    // copy; a joiner never needs them.
     const elements = withoutStaleTombstones(room.elements, registry.now())
     peer.send({ type: "SCENE_INIT", payload: { elements } })
   }

@@ -1,5 +1,4 @@
 // @vitest-environment node
-import { eq } from "drizzle-orm"
 import { beforeAll, expect, test } from "vitest"
 import { demoAdmin } from "@/db/demo-content"
 import type { Db } from "@/db/index"
@@ -109,7 +108,7 @@ test("an anyone-link visit carries no deleted elements or their images", async (
   expect(visit.files.map((file) => file.fileId)).toEqual(["shown-file"])
 })
 
-test("SCENE_INIT and a save drop month-old tombstones but keep recent ones", async () => {
+test("SCENE_INIT leaves out month-old tombstones but keeps recent ones", async () => {
   await teamDrawing("init")
   const guest = recordingPeer("guest")
 
@@ -117,21 +116,23 @@ test("SCENE_INIT and a save drop month-old tombstones but keep recent ones", asy
     userId: null,
     displayName: "g",
   })
-  await saveRoomScene(db, "init", (await loadRoomScene(db, "init")).elements)
 
   const init = guest.sent.find((m) => m.type === "SCENE_INIT")
   expect(init?.type === "SCENE_INIT" && ids(init.payload.elements)).toEqual([
     "live",
     "recent",
   ])
-  const [row] = await db.select().from(drawings).where(eq(drawings.id, "init"))
-  expect(ids(JSON.parse(row.data).elements)).toEqual(["live", "recent"])
 })
 
-// A tab that missed the delete still holds the element as it was. Not saved
-// first, so the Room loads the month-old tombstone too, as from older data.
-test("a peer with a pre-delete copy is corrected, even by a stale tombstone", async () => {
+// A tab asleep since before the delete reconnects with the element as it was,
+// to a Room loaded fresh from a save.
+test("a tab with a pre-delete copy is corrected after a save and reload", async () => {
   await teamDrawing("converge")
+  await saveRoomScene(
+    db,
+    "converge",
+    (await loadRoomScene(db, "converge")).elements,
+  )
   const registry = roomFor()
   const member = recordingPeer("member")
   await joinRoom(registry, "converge", member.peer, {
