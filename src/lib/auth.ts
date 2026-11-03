@@ -66,18 +66,17 @@ export const auth = betterAuth({
   databaseHooks: {
     account: {
       create: {
-        // SSO proves who owns the email; a password account never did (an
-        // invitee could type a colleague's address). So linking SSO ends the
-        // password, all sessions and access tokens, before the SSO session
-        // is made. An admin reset link gives the password back.
+        // A new SSO link proves who owns the email now. Older ways in did
+        // not: an invitee could type a colleague's address, or a member could
+        // change to it with an SSO link kept. So linking SSO ends the
+        // password, other SSO links, all sessions and access tokens, before
+        // the SSO session is made. An admin reset link gives a password back.
         before: async (account, ctx) => {
           if (account.providerId === "credential" || !ctx) return
           const { internalAdapter } = ctx.context
-          const credential = (
-            await internalAdapter.findAccounts(account.userId)
-          ).find((row) => row.providerId === "credential")
-          if (!credential) return
-          await internalAdapter.deleteAccount(credential.id)
+          const others = await internalAdapter.findAccounts(account.userId)
+          if (others.length === 0) return
+          for (const row of others) await internalAdapter.deleteAccount(row.id)
           await internalAdapter.deleteUserSessions(account.userId)
           await db
             .delete(schema.accessTokens)
@@ -111,10 +110,20 @@ export const auth = betterAuth({
   // No cookie cache: every request reads the session row, so a deleted or
   // signed-out member loses access at once.
   user: {
-    // Every new account passes here. Email sign-ups come only from the
-    // invite and setup server functions (see the hook above). Any other
-    // method is SSO and must pass the domain rule.
-    validateUserInfo: ({ user, source }) => {
+    // Every new account and SSO link passes here. Email sign-ups come only
+    // from the invite and setup server functions (see the hook above). Any
+    // other new account comes from SSO and must pass the domain rule.
+    validateUserInfo: async ({ user, source }, ctx) => {
+      // /link-social checks the email from when the link began. Check the
+      // current one too, or a link begun before an email change would join
+      // the caller's identity to an address they do not own.
+      if (source.action === "link-account") {
+        const owner =
+          user.id && (await ctx.context.internalAdapter.findUserById(user.id))
+        if (!owner || owner.email !== user.email?.toLowerCase())
+          return { error: "email_does_not_match" }
+        return
+      }
       if (source.action !== "create-user" || source.method === "email-password")
         return
       const allowed =
