@@ -37,8 +37,9 @@ provider too, or they can come back.
 ## Your own account
 
 Under **Settings**, then **Account**, you can see the devices signed in to your
-account and sign out the others. You can also delete your account there. The
-only admin of an instance must promote another member first.
+account and sign out the others. A device you sign out also leaves any drawing
+it has open, so it stops seeing and making live edits. You can also delete your
+account there. The only admin of an instance must promote another member first.
 
 ## Instance stats
 

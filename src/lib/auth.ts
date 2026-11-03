@@ -12,7 +12,15 @@ import {
   ssoPlugins,
 } from "@/features/auth/sso"
 import { rooms } from "@/features/collab/room-registry"
-import { evictUser } from "@/features/collab/room-session"
+import { evictEndedSessions, evictUser } from "@/features/collab/room-session"
+
+// Better Auth paths that delete some of the caller's sessions.
+const SESSION_ENDING_PATHS = new Set([
+  "/revoke-session",
+  "/revoke-sessions",
+  "/revoke-other-sessions",
+  "/change-password",
+])
 
 type DynamicBaseURL = Exclude<NonNullable<BetterAuthOptions["baseURL"]>, string>
 
@@ -50,6 +58,9 @@ export const auth = betterAuth({
     enabled: true,
   },
   socialProviders,
+  // SSO is redirect-only. These hand a session holder the IdP's tokens,
+  // which outlive revoking that session.
+  disabledPaths: ["/get-access-token", "/refresh-token", "/account-info"],
   account: {
     accountLinking: {
       // Password members never verify their email (no SMTP). The provider's
@@ -96,6 +107,17 @@ export const auth = betterAuth({
           message: "Sign-up is invite-only",
         })
       }
+    }),
+    // Open sockets checked the session only when they joined. Also runs
+    // for the auth.api calls in the account server functions.
+    after: createAuthMiddleware(async (ctx) => {
+      const userId = ctx.context.session?.user.id
+      if (!SESSION_ENDING_PATHS.has(ctx.path) || !userId) return
+      const now = new Date()
+      const live = (await ctx.context.internalAdapter.listSessions(userId))
+        .filter((session) => session.expiresAt > now)
+        .map((session) => session.id)
+      await evictEndedSessions(rooms, userId, new Set(live))
     }),
   },
   // No cookie cache: every request reads the session row, so a deleted or

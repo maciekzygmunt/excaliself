@@ -7,6 +7,8 @@ import { and, eq, gt, isNull } from "drizzle-orm"
 import z from "zod"
 import { db } from "@/db"
 import { accounts, passwordResets, sessions, users } from "@/db/schema"
+import { rooms } from "@/features/collab/room-registry"
+import { evictEndedSessions } from "@/features/collab/room-session"
 import { auth } from "@/lib/auth"
 import { adminMiddleware } from "@/middleware/admin"
 
@@ -119,7 +121,7 @@ export const resetPasswordWithToken = createServerFn({ method: "POST" })
     // submissions from both setting the password, and a failure past that
     // point rolls the consume back — a single-use link must never burn
     // without the password actually changing.
-    const email = await db.transaction(async (tx) => {
+    const { userId, email } = await db.transaction(async (tx) => {
       const consumed = await tx
         .update(passwordResets)
         .set({ usedAt: new Date() })
@@ -161,8 +163,10 @@ export const resetPasswordWithToken = createServerFn({ method: "POST" })
       // Every existing session dies — the holder of the link may not be
       // the only one signed in as this user.
       await tx.delete(sessions).where(eq(sessions.userId, userId))
-      return user.email
+      return { userId, email: user.email }
     })
+    // Open sockets checked the session only when they joined.
+    await evictEndedSessions(rooms, userId, new Set())
 
     // The fresh sign-in mints the only surviving session, and
     // tanstackStartCookies copies its cookie onto this server function's
