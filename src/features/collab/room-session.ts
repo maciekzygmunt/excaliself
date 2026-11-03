@@ -408,13 +408,14 @@ function setFollowTarget(
 
 /**
  * Merges a delta; others get the winners, the sender only its corrections.
- * Returns whether the scene changed, by identity: a version sum misses
+ * Stale tombstones go only to the sender: others never got them. Returns whether the scene changed, by identity: a version sum misses
  * nonce tie-breaks.
  */
 function applySceneUpdate(
   room: Room,
   peer: RoomPeer,
   incoming: SceneElement[],
+  now: number,
 ): boolean {
   const previous = room.elements
   const previousById = new Map(previous.map((el) => [el.id, el]))
@@ -436,10 +437,11 @@ function applySceneUpdate(
     if (winner !== element) corrections.push(winner)
   }
 
-  if (winners.length)
+  const published = withoutStaleTombstones(winners, now)
+  if (published.length)
     peer.publish(ROOM_TOPIC, {
       type: "SCENE_UPDATE",
-      payload: { elements: winners },
+      payload: { elements: published },
     })
   if (corrections.length)
     peer.send({ type: "SCENE_UPDATE", payload: { elements: corrections } })
@@ -505,7 +507,9 @@ export async function receiveFromPeer(
       // Wait for the stored scene, or the merge would drop it.
       await room.loaded
       if (!room.seats.has(peer.id)) return "evicted"
-      if (applySceneUpdate(room, peer, message.payload.elements))
+      if (
+        applySceneUpdate(room, peer, message.payload.elements, registry.now())
+      )
         markDirty(registry, room)
       return "ok"
 

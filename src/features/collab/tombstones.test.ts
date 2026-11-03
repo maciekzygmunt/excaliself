@@ -62,14 +62,15 @@ const roomFor = () =>
 
 function recordingPeer(id: string) {
   const sent: ServerMessage[] = []
+  const published: ServerMessage[] = []
   const peer: RoomPeer = {
     id,
     send: (data) => void sent.push(data),
-    publish: () => {},
+    publish: (_topic, data) => void published.push(data),
     subscribe: () => {},
     close: () => {},
   }
-  return { peer, sent }
+  return { peer, sent, published }
 }
 
 const ids = (elements: { id: string }[]) => elements.map((el) => el.id)
@@ -125,7 +126,8 @@ test("SCENE_INIT leaves out month-old tombstones but keeps recent ones", async (
 })
 
 // A tab asleep since before the delete reconnects with the element as it was,
-// to a Room loaded fresh from a save.
+// to a Room loaded fresh from a save. Peers who joined since never got the
+// month-old tombstone, so it is not published to them.
 test("a tab with a pre-delete copy is corrected after a save and reload", async () => {
   await teamDrawing("converge")
   await saveRoomScene(
@@ -163,4 +165,8 @@ test("a tab with a pre-delete copy is corrected after a save and reload", async 
     ["recent", true],
     ["old", true],
   ])
+  const broadcast = member.published.at(-1)
+  expect(
+    broadcast?.type === "SCENE_UPDATE" && ids(broadcast.payload.elements),
+  ).toEqual(["recent"])
 })
