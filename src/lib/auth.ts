@@ -102,10 +102,12 @@ export const auth = betterAuth({
         // SSO sign-in overrides the user with the IdP's profile (see sso.ts),
         // only to refresh the photo. Name and email stay the member's own.
         // Better Auth merges a returned `data`, so drop the keys in place.
+        // No photo from the IdP clears the old one.
         before: async (user, ctx) => {
           if (!ctx?.path.includes("/callback/") || !("image" in user)) return
           for (const key of Object.keys(user))
             if (key !== "image") delete user[key as keyof typeof user]
+          user.image ??= null
         },
       },
     },
