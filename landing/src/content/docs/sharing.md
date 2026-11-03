@@ -41,6 +41,7 @@ exists.
 - A live drawing holds up to 50,000 elements (deleted ones count) and 20 MB of
   drawing data, not counting images. Past that, new content does not sync or
   save. Changes that do not make the drawing larger still sync.
-- A connection that falls more than 8 MB behind on incoming changes is closed.
-  The app reconnects by itself and loads the drawing again.
+- A connection that stops reading is closed when its unread data passes the
+  size of the drawing plus 8 MB. The app reconnects by itself and loads the
+  drawing again.
 - Guests do not see the [Team library](/docs/team-library/).
