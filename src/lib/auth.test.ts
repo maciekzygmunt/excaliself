@@ -155,45 +155,50 @@ async function seat(roomId: string, owner: Device) {
   }
 }
 
-test.each<[string, (here: Device, other: Device) => Promise<unknown>, boolean]>(
+type Ended = "other" | "here" | "both"
+
+test.each<[string, (here: Device, other: Device) => Promise<unknown>, Ended]>([
   [
-    [
-      "revoking one device",
-      (here, other) =>
-        auth.api.revokeSession({
-          headers: here.headers,
-          body: { token: other.token },
-        }),
-      false,
-    ],
-    [
-      "signing out the other devices",
-      (here) => auth.api.revokeOtherSessions({ headers: here.headers }),
-      false,
-    ],
-    [
-      "signing out every device",
-      (here) => auth.api.revokeSessions({ headers: here.headers }),
-      true,
-    ],
-    [
-      "a password change that signs out the others",
-      (here) =>
-        auth.api.changePassword({
-          headers: here.headers,
-          body: {
-            currentPassword: "password-123",
-            newPassword: "password-123",
-            revokeOtherSessions: true,
-          },
-        }),
-      // Re-issued, so this tab's socket rejoins with the new cookie.
-      true,
-    ],
+    "revoking one device",
+    (here, other) =>
+      auth.api.revokeSession({
+        headers: here.headers,
+        body: { token: other.token },
+      }),
+    "other",
   ],
-)(
+  [
+    "signing out the other devices",
+    (here) => auth.api.revokeOtherSessions({ headers: here.headers }),
+    "other",
+  ],
+  [
+    "signing out every device",
+    (here) => auth.api.revokeSessions({ headers: here.headers }),
+    "both",
+  ],
+  [
+    "a password change that signs out the others",
+    (here) =>
+      auth.api.changePassword({
+        headers: here.headers,
+        body: {
+          currentPassword: "password-123",
+          newPassword: "password-123",
+          revokeOtherSessions: true,
+        },
+      }),
+    // Re-issued, so this tab's socket rejoins with the new cookie.
+    "both",
+  ],
+  [
+    "signing out",
+    (here) => auth.api.signOut({ headers: here.headers }),
+    "here",
+  ],
+])(
   "%s hangs up the room seats of the ended sessions",
-  async (name, revoke, endsHere) => {
+  async (name, end, ended) => {
     const email = `${name.replaceAll(" ", "-")}@example.com`
     await auth.api.signUpEmail({
       body: { email, password: "password-123", name: "Dave" },
@@ -201,18 +206,22 @@ test.each<[string, (here: Device, other: Device) => Promise<unknown>, boolean]>(
     const here = await device(email)
     const other = await device(email)
     const roomId = `room-${name}`
-    const hereSeat = await seat(roomId, here)
-    const otherSeat = await seat(roomId, other)
+    const seats = {
+      here: await seat(roomId, here),
+      other: await seat(roomId, other),
+    }
 
-    await revoke(here, other)
-    await otherSeat.draw()
-    await hereSeat.draw()
+    await end(here, other)
+    await seats.other.draw()
+    await seats.here.draw()
 
+    const ends = (who: keyof typeof seats) => ended === who || ended === "both"
     const rejoin = { code: 1000, reason: "Rejoin" }
-    expect(otherSeat.closes).toEqual([rejoin])
-    expect(hereSeat.closes).toEqual(endsHere ? [rejoin] : [])
+    expect(seats.here.closes).toEqual(ends("here") ? [rejoin] : [])
+    expect(seats.other.closes).toEqual(ends("other") ? [rejoin] : [])
     const drawn = rooms.rooms.get(roomId)?.elements.map((element) => element.id)
-    expect(drawn ?? []).toEqual(endsHere ? [] : [hereSeat.id])
+    const kept = (["here", "other"] as const).filter((who) => !ends(who))
+    expect(drawn ?? []).toEqual(kept.map((who) => seats[who].id))
   },
 )
 

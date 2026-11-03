@@ -696,22 +696,19 @@ export async function evictUser(
 }
 
 /**
- * Some of a member's sessions ended: closes the seats that joined with any
- * session not in `liveSessionIds`. They rejoin, and the join checks again.
+ * Sessions ended: closes the seats that joined with them. They rejoin, and
+ * the join checks the session again.
  */
-export async function evictEndedSessions(
+export async function evictSessions(
   registry: RoomRegistry,
-  userId: string,
-  liveSessionIds: ReadonlySet<string>,
+  sessionIds: ReadonlySet<string>,
 ): Promise<void> {
   await Promise.all(
     [...registry.rooms.values()].map((room) =>
       evictSeats(
         registry,
         room,
-        (seat) =>
-          seat.userId === userId &&
-          !(seat.sessionId && liveSessionIds.has(seat.sessionId)),
+        (seat) => seat.sessionId !== null && sessionIds.has(seat.sessionId),
         closeToRejoin,
       ),
     ),

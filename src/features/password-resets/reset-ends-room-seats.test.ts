@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { expect, test, vi } from "vitest"
-import { passwordResets } from "@/db/schema"
+import { passwordResets, sessions } from "@/db/schema"
 import type { RoomPeer } from "@/features/collab/room-session"
 
 // Server fns without the Start compiler: each one is just its handler.
@@ -55,6 +55,12 @@ test("a reset link hangs up the room seats of the sessions it ends", async () =>
     userId: demoAdmin.id,
     sessionId: "stolen-session",
     displayName: "Admin",
+  })
+  await db.insert(sessions).values({
+    id: "stolen-session",
+    token: "stolen-token",
+    userId: demoAdmin.id,
+    expiresAt: new Date(Date.now() + 60_000),
   })
   await db.insert(passwordResets).values({
     id: "reset-1",
