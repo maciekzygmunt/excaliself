@@ -18,7 +18,7 @@ import {
   SCENE_UNREADABLE_CLOSE_REASON,
 } from "./protocol"
 import { reconcileElements } from "./reconcile"
-import type { StoredScene } from "./scene-store"
+import { type StoredScene, withoutStaleTombstones } from "./scene-store"
 
 /** The slice of a crossws `Peer` the room logic uses. */
 export interface RoomPeer {
@@ -356,7 +356,10 @@ export async function joinRoom(
 
   await room.loaded
   if (room.seats.has(peer.id)) {
-    peer.send({ type: "SCENE_INIT", payload: { elements: room.elements } })
+    // The Room keeps stale tombstones in memory, so it can still correct a
+    // peer with an old copy; a joiner never needs them.
+    const elements = withoutStaleTombstones(room.elements, registry.now())
+    peer.send({ type: "SCENE_INIT", payload: { elements } })
   }
   return { status: "ok" }
 }

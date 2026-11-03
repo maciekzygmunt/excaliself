@@ -18,6 +18,23 @@ export type StoredScene = {
   readable: boolean
 }
 
+/**
+ * Drops tombstones older than the sync window: no peer still sends them, and a
+ * guest who joins later must not read what was deleted. Unstamped ones count
+ * as old, as they do for image bytes.
+ */
+export function withoutStaleTombstones(
+  elements: SceneElement[],
+  now: number,
+): SceneElement[] {
+  const keepSince = now - DELETED_ELEMENT_TIMEOUT_MS
+  return elements.filter(
+    (element) =>
+      !element.isDeleted ||
+      (typeof element.updated === "number" && element.updated > keepSince),
+  )
+}
+
 /** Lenient like `restore()`: our own data, so defaults beat dropping elements. */
 export function toRoomElements(value: unknown): SceneElement[] {
   if (!Array.isArray(value)) return []
@@ -98,15 +115,17 @@ export function mergeSceneElements(
 export const FILE_GRACE_MS = 60 * 60 * 1000
 
 /**
- * Writes a Room's scene, bumps `updatedAt` and drops images nothing uses. Not
- * guarded on `deletedAt`, so a trash mid-session keeps guest work for a restore.
+ * Writes a Room's scene without stale tombstones, bumps `updatedAt` and drops
+ * images nothing uses. Not guarded on `deletedAt`, so a trash mid-session
+ * keeps guest work for a restore.
  */
 export async function saveRoomScene(
   db: Db,
   drawingId: string,
-  elements: SceneElement[],
+  roomElements: SceneElement[],
 ): Promise<void> {
   const now = Date.now()
+  const elements = withoutStaleTombstones(roomElements, now)
   await db.transaction(async (tx) => {
     const [drawing] = await tx
       .select({ data: drawings.data })
