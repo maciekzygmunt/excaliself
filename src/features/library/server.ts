@@ -92,6 +92,11 @@ export const changeLibrary = createServerFn({ method: "POST" })
     let json: string
     try {
       json = await db.transaction(async (tx) => {
+        // One change at a time, so concurrent adds can't each fit the cap
+        // alone and pass it together. Plain reads still run.
+        await tx.execute(
+          sql`lock table ${libraryItems} in share row exclusive mode`,
+        )
         if (data.remove.length > 0)
           await tx
             .delete(libraryItems)
