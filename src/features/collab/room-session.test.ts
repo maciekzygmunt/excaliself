@@ -1177,7 +1177,13 @@ test("a failed write is retried, and the empty room stays until it lands", async
   try {
     let fail = true
     const registry = recordingRegistry([], async () => {
-      if (fail) throw new Error("database is down")
+      // Shaped like a failed query, whose message lists the scene.
+      if (fail)
+        throw new Error("Failed query: update … params: <scene>", {
+          cause: Object.assign(new Error("connection refused"), {
+            code: "ECONNREFUSED",
+          }),
+        })
     })
     const ada = fakePeer("peer-ada")
     await joinRoom(registry, ROOM, ada, member("Ada"))
@@ -1188,6 +1194,11 @@ test("a failed write is retried, and the empty room stays until it lands", async
     // Room now would drop them.
     expect(registry.writes.map(idsOf)).toEqual([["a"]])
     expect(registry.rooms.has(ROOM)).toBe(true)
+    // Only the code is logged: the scene never lands in the logs.
+    expect(errors).toHaveBeenCalledWith(
+      `[collab] could not flush room ${ROOM}`,
+      "ECONNREFUSED",
+    )
 
     fail = false
     await vi.advanceTimersByTimeAsync(ROOM_FLUSH_INTERVAL_MS)

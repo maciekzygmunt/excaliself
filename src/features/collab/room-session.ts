@@ -177,6 +177,14 @@ function markDirty(registry: RoomRegistry, room: Room) {
   armFlush(registry, room)
 }
 
+/** A failed query's message lists its params, which is the whole scene. */
+function errorCode(error: unknown): string {
+  const cause = error instanceof Error ? error.cause : undefined
+  if (typeof cause === "object" && cause !== null && "code" in cause)
+    return String(cause.code)
+  return error instanceof Error ? error.name : String(error)
+}
+
 /**
  * Writes now if dirty; resolves once landed. Chained on `flushing`, so two
  * read-modify-writes never race and the older one can't land last.
@@ -194,7 +202,10 @@ function flushRoom(registry: RoomRegistry, room: Room): Promise<void> {
       },
       (error) => {
         // Still in memory: retry on the throttle. An empty Room stays until it lands.
-        console.error(`[collab] could not flush room ${room.id}`, error)
+        console.error(
+          `[collab] could not flush room ${room.id}`,
+          errorCode(error),
+        )
         room.dirty = true
         armFlush(registry, room)
       },
