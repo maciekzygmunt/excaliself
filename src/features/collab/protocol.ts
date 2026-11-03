@@ -136,9 +136,6 @@ function parseSceneBounds(value: unknown): SceneBounds | null {
   return [x1, y1, x2, y2]
 }
 
-/** Far above any version Excalidraw reaches, far below where `+1` stops counting. */
-const MAX_VERSION = 2 ** 31
-
 /** Excalidraw elements nest a few levels; Node 22's JSON.stringify overflows near 10k. */
 const MAX_ELEMENT_DEPTH = 64
 
@@ -151,16 +148,15 @@ function nestedDeeperThan(value: unknown, depth: number): boolean {
 }
 
 /**
- * What the server must not take from a peer: a version past Excalidraw's
- * range or a negative nonce wins every later merge, and a deep value can't be
- * serialized, so the Room could never save or seat anyone again.
+ * What the server must not take from a peer: a version where `+1` stops
+ * counting or a negative nonce wins every later merge, and a deep value can't
+ * be serialized, so the Room could never save or seat anyone again.
  */
 function isSafeFromPeer(element: SceneElement): boolean {
   const { version, versionNonce } = element
   return (
-    Number.isInteger(version) &&
+    Number.isSafeInteger(version) &&
     version >= 0 &&
-    version < MAX_VERSION &&
     Number.isSafeInteger(versionNonce) &&
     versionNonce >= 0 &&
     !nestedDeeperThan(element, MAX_ELEMENT_DEPTH)

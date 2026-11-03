@@ -318,7 +318,6 @@ test("the server refuses a version or nonce no Excalidraw client makes, so no pe
   for (const [version, versionNonce] of [
     [Number.MAX_VALUE, 1],
     [2 ** 53, 1],
-    [2 ** 31, 1],
     [1.5, 1],
     [1, -1],
     [1, -Number.MAX_VALUE],
@@ -328,8 +327,8 @@ test("the server refuses a version or nonce no Excalidraw client makes, so no pe
     // The client takes them: the Room may hold an old stored scene.
     expect(parseServerMessage(update(version, versionNonce))).not.toBeNull()
   }
-  // Excalidraw's range: versions count up from 1, nonces are in [0, 2^31).
-  expect(parseClientMessage(update(2 ** 31 - 1, 0))).not.toBeNull()
+  // Excalidraw counts versions up from 1 and draws nonces from [0, 2^31).
+  expect(parseClientMessage(update(2 ** 31, 0))).not.toBeNull()
   expect(parseClientMessage(update(1, 2 ** 31 - 1))).not.toBeNull()
 })
 
