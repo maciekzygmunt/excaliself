@@ -97,7 +97,7 @@ const compose = [
 ]
 
 // One container with example drawings and an in-memory database, to look around before installing.
-const tryIt = ["docker run --rm -p 3000:3000 -e PREVIEW_MODE=true ghcr.io/maciekzygmunt/excaliself"]
+const tryIt = ["docker run --rm -p 127.0.0.1:3000:3000 -e PREVIEW_MODE=true ghcr.io/maciekzygmunt/excaliself"]
 
 // `more` is an optional in-page link after the answer; the FAQ schema gets the plain answer.
 const faq: { q: string; a: string; more?: { href: string; label: string } }[] = [

@@ -12,7 +12,7 @@ To look around before you install, run one container. It needs no Postgres and
 no `.env`:
 
 ```bash
-docker run --rm -p 3000:3000 -e PREVIEW_MODE=true ghcr.io/maciekzygmunt/excaliself
+docker run --rm -p 127.0.0.1:3000:3000 -e PREVIEW_MODE=true ghcr.io/maciekzygmunt/excaliself
 ```
 
 Open `http://localhost:3000/preview/login` to sign in as the admin, with
