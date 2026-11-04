@@ -20,6 +20,10 @@
   <img src="docs/images/home-dark.png" width="49%" alt="The same home screen in the dark theme">
 </p>
 
+<p align="center">
+  <img src="docs/images/live-collab.gif" width="100%" alt="Two browsers edit one drawing: a box drawn on the left appears live on the right, an arrow drawn on the right appears on the left, and after a reload every change is still there">
+</p>
+
 ## Try it in 10 seconds
 
 ```bash
