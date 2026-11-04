@@ -90,7 +90,7 @@ async function authorize() {
   return { userId, clientId: client.client_id as string, exchange }
 }
 
-test("a code buys tokens that act as the member, and refresh rotates them", async () => {
+test("a code buys tokens that act as the member, refresh rotates them, and a replay ends the grant", async () => {
   const { userId, clientId, exchange } = await authorize()
 
   const first = await callToken(exchange)
@@ -120,6 +120,15 @@ test("a code buys tokens that act as the member, and refresh rotates them", asyn
     status: 400,
     body: { error: "invalid_grant" },
   })
+  // The replay means a second holder, so the newest tokens end too.
+  expect(await memberForOAuthToken(db, refreshed.body.access_token)).toBeNull()
+  const newest = await callToken({
+    grant_type: "refresh_token",
+    refresh_token: refreshed.body.refresh_token,
+    client_id: clientId,
+  })
+  expect(newest.body.error).toBe("invalid_grant")
+  expect(await listGrants(db, userId)).toEqual([])
 })
 
 test("a code works once", async () => {

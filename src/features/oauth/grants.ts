@@ -166,10 +166,13 @@ export async function createGrant(
 
 export type TokenPair = { accessToken: string; refreshToken: string }
 
-function newTokens(now: Date) {
+// `exr_<grant id>.<secret>`: a spent refresh token still names its grant.
+const REFRESH_TOKEN = /^exr_([0-9a-f-]{36})\.[\w-]+$/
+
+function newTokens(now: Date, grantId: string) {
   const tokens: TokenPair = {
     accessToken: secret(ACCESS_PREFIX),
-    refreshToken: secret(REFRESH_PREFIX),
+    refreshToken: `${REFRESH_PREFIX}${grantId}.${secret()}`,
   }
   const columns = {
     accessTokenHash: hashToken(tokens.accessToken),
@@ -196,11 +199,10 @@ export async function exchangeCode(
   },
 ): Promise<TokenPair | null> {
   const now = new Date()
-  const { tokens, columns } = newTokens(now)
   // One statement: two racing requests can't both spend the code.
   const [grant] = await db
     .update(oauthGrants)
-    .set({ codeHash: null, ...columns })
+    .set({ codeHash: null })
     .where(
       and(
         eq(oauthGrants.codeHash, hashToken(input.code)),
@@ -222,6 +224,8 @@ export async function exchangeCode(
     await db.delete(oauthGrants).where(eq(oauthGrants.id, grant.id))
     return null
   }
+  const { tokens, columns } = newTokens(now, grant.id)
+  await db.update(oauthGrants).set(columns).where(eq(oauthGrants.id, grant.id))
   return tokens
 }
 
@@ -233,19 +237,30 @@ export async function refreshTokens(
   db: Db,
   input: { refreshToken: string; clientId: string },
 ): Promise<TokenPair | null> {
-  if (!input.refreshToken.startsWith(REFRESH_PREFIX)) return null
-  const { tokens, columns } = newTokens(new Date())
+  const grantId = REFRESH_TOKEN.exec(input.refreshToken)?.[1]
+  if (!grantId) return null
+  const ofClient = and(
+    eq(oauthGrants.id, grantId),
+    eq(oauthGrants.clientId, input.clientId),
+  )
+  const { tokens, columns } = newTokens(new Date(), grantId)
   const rotated = await db
     .update(oauthGrants)
     .set(columns)
     .where(
       and(
+        ofClient,
         eq(oauthGrants.refreshTokenHash, hashToken(input.refreshToken)),
-        eq(oauthGrants.clientId, input.clientId),
       ),
     )
     .returning({ id: oauthGrants.id })
-  return rotated.length > 0 ? tokens : null
+  if (rotated.length > 0) return tokens
+  // A spent token came back, so two parties hold this grant's tokens. We
+  // can't tell which one is the thief, so the grant ends (RFC 9700 §4.14.2).
+  await db
+    .delete(oauthGrants)
+    .where(and(ofClient, isNotNull(oauthGrants.refreshTokenHash)))
+  return null
 }
 
 /** The member an OAuth access token acts as, or null. */
