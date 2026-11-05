@@ -94,7 +94,7 @@ Only preview mode makes this token. Other instances refuse it.
   connect. It does not send the raw Excalidraw JSON.
 - `create_drawing` makes a new drawing in your private space or in Team,
   optionally in a folder, from simple shapes and arrows or a Mermaid flowchart.
-  Mermaid `style` lines color the nodes (`fill` and `stroke`).
+  Mermaid `style` lines color the nodes (`fill` and `stroke`, as hex or named colors).
 - `create_folder` makes a folder in your private space or in Team, optionally
   inside another folder.
 - `move_drawing` moves a drawing into a folder, or to the top of its space. A
