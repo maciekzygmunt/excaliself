@@ -79,12 +79,13 @@ access token for the example admin: `exs_preview-mode-public-token`. Use it
 to try a client, or to let an MCP inspector list the tools, with no sign-in:
 
 ```bash
-docker run --rm -p 127.0.0.1:3000:3000 -e PREVIEW_MODE=true ghcr.io/maciekzygmunt/excaliself
+docker run -d --rm --name excaliself-preview -p 127.0.0.1:3000:3000 -e PREVIEW_MODE=true ghcr.io/maciekzygmunt/excaliself
 claude mcp add --transport http excaliself-preview http://localhost:3000/api/mcp \
   --header "Authorization: Bearer exs_preview-mode-public-token"
 ```
 
-Only preview mode makes this token. Other instances refuse it.
+Only preview mode makes this token. Other instances refuse it. Stop the
+preview with `docker stop excaliself-preview`.
 
 ## Tools
 
