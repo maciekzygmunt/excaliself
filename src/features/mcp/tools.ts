@@ -384,7 +384,8 @@ Colors: Excalidraw's palette reads best, e.g. backgrounds "#a5d8ff" (blue), "#b2
       }),
       annotations: {
         readOnlyHint: false,
-        destructiveHint: false,
+        // Per the MCP spec, false means additive only; a move rewrites folderId.
+        destructiveHint: true,
         // A repeat still refreshes updatedAt, so the drawing jumps up the lists.
         idempotentHint: false,
       },
