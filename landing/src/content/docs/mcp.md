@@ -147,8 +147,9 @@ change yet.
 
 1. Open the drawing in Excaliself. The client gives you its link. If the
    drawing is open already, the proposal shows at once.
-2. A card shows the change: a preview with new elements in green, changed
-   ones in blue, and removed ones in red, and a list of each change.
+2. A card shows a preview of the drawing after the change: new elements in
+   green, changed ones in blue, and removed ones in red. Click the preview to
+   open it larger, on a canvas you can zoom and pan but not edit.
 3. Click **Apply** or **Discard**.
 
 On **Apply**, your browser makes the change on your canvas, as if you drew
