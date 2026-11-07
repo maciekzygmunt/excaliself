@@ -35,6 +35,9 @@ const MARKERS: Record<string, { sign: string; color: string }> = {
   Remove: { sign: "−", color: HIGHLIGHT.removed },
 }
 
+/** Applies stop this long before expiry, so the outcome reaches the server in time. */
+const EXPIRY_MARGIN_MS = 30_000
+
 type Props = {
   drawingId: string
   excalidrawAPI: ExcalidrawImperativeAPI | null
@@ -67,6 +70,16 @@ export function DrawingEditCard({ drawingId, excalidrawAPI, theme }: Props) {
   if (!edit || !excalidrawAPI) return null
 
   const apply = async () => {
+    // An expired proposal must not land: its client was told nothing changed.
+    if (Date.now() > edit.expiresAt - EXPIRY_MARGIN_MS) {
+      toast.error("This proposal expired", {
+        description: "Nothing was changed. Ask your AI client to try again.",
+      })
+      void queryClient.invalidateQueries({
+        queryKey: drawingEditQueryOptions(drawingId).queryKey,
+      })
+      return
+    }
     // Checked and applied with no await between, so no remote edit slips in;
     // the server hears the outcome after.
     const current = excalidrawAPI.getSceneElementsIncludingDeleted()
