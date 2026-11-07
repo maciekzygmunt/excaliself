@@ -1,11 +1,17 @@
 import type { SQL } from "drizzle-orm"
 import { PgDialect } from "drizzle-orm/pg-core"
-import { expect, test } from "vitest"
+import { expect, test, vi } from "vitest"
 import { drawingFiles, drawings, type Space } from "@/db/schema"
 import { MAX_DRAWING_IMAGE_BYTES } from "@/features/collab/room-files"
 import { accessibleTo } from "@/features/spaces/access"
 import { expectCondition } from "@/features/spaces/expect-condition"
 import { writeDrawingScene } from "./scene-write"
+
+// Version history runs its own queries; it has a PGlite test of its own.
+vi.mock("@/features/drawings/versions", () => ({
+  snapshotBeforeWrite: vi.fn(),
+  keepVersionImages: vi.fn(),
+}))
 
 type Call =
   | { kind: "select"; table: unknown; where: SQL }

@@ -1,6 +1,12 @@
 import { queryOptions } from "@tanstack/react-query"
 import { polled } from "@/lib/polling"
-import { getDrawingScene, getDrawings, getDrawingWithFiles } from "./server"
+import {
+  getDrawingScene,
+  getDrawings,
+  getDrawingVersion,
+  getDrawingVersions,
+  getDrawingWithFiles,
+} from "./server"
 
 export type Drawing = Awaited<ReturnType<typeof getDrawings>>[number]
 
@@ -27,5 +33,21 @@ export const drawingSceneQueryOptions = (id: string, updatedAt: Date) =>
   queryOptions({
     queryKey: ["drawing-scene", id, new Date(updatedAt).getTime()] as const,
     queryFn: () => getDrawingScene({ data: id }),
+    staleTime: Number.POSITIVE_INFINITY,
+  })
+
+/** Refetched on each open of the history panel: new versions land any time. */
+export const drawingVersionsQueryOptions = (drawingId: string) =>
+  queryOptions({
+    queryKey: ["drawing-versions", drawingId] as const,
+    queryFn: () => getDrawingVersions({ data: drawingId }),
+    staleTime: 0,
+  })
+
+/** A version never changes, so its scene is fetched once. */
+export const drawingVersionSceneQueryOptions = (versionId: string) =>
+  queryOptions({
+    queryKey: ["drawing-version", versionId] as const,
+    queryFn: () => getDrawingVersion({ data: versionId }),
     staleTime: Number.POSITIVE_INFINITY,
   })
