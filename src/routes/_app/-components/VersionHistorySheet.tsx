@@ -67,7 +67,10 @@ export function VersionHistorySheet({ drawingId, open, onOpenChange }: Props) {
         {versions?.length === 0 && (
           <p className="px-4 text-muted-foreground text-sm">No versions yet.</p>
         )}
-        {selected && <VersionPreview versionId={selected} />}
+        {selected && (
+          // Remounted per version, so a stale preview never shows while loading.
+          <VersionPreview key={selected} versionId={selected} />
+        )}
         <ul className="min-h-0 flex-1 overflow-y-auto px-2">
           {versions?.map((version) => (
             <li key={version.id}>
