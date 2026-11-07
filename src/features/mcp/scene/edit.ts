@@ -436,6 +436,16 @@ export function planEdit(
     const startId = boundIdOf(current.startBinding)
     const endId = boundIdOf(current.endBinding)
     if (!moved.has(startId) && !moved.has(endId)) continue
+    // A loop on one shape keeps its form and moves along with it.
+    if (startId === endId) {
+      const before = boxOf(live.get(startId) as SceneElement)
+      const after = boxOf(read(startId) as SceneElement)
+      const element = touch(arrow.id)
+      element.x = num(element.x) + after.x - before.x
+      element.y = num(element.y) + after.y - before.y
+      setLabel(element, null, connectorLabel(element))
+      continue
+    }
     const points = pointsOf(current)
     const start = live.has(startId)
       ? targetOf(read(startId) as SceneElement)

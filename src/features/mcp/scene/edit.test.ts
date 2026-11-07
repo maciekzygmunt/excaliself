@@ -123,6 +123,26 @@ test("a moved shape takes its label and the arrows bound to it along", () => {
   expect(result.changes).toEqual(['Change rectangle "API": position'])
 })
 
+test("a loop on a moved shape moves with it, keeping its form", () => {
+  const scene = buildScene({
+    elements: [
+      { type: "rectangle", id: "box", x: 0, y: 0 },
+      { type: "arrow", from: "box", to: "box" },
+    ],
+    clusters: [],
+    direction: "TB",
+  })
+  const box = scene.find((element) => element.type === "rectangle")
+  const loop = scene.find((element) => element.type === "arrow")
+  if (!box || !loop) throw new Error("scene not built")
+  const result = plan(scene, { change: [{ id: box.id, x: 300, y: 200 }] })
+
+  const moved = byId(result.elements, loop.id)
+  expect(moved.x).toBe(loop.x + 300)
+  expect(moved.y).toBe(loop.y + 200)
+  expect(moved.points).toEqual(loop.points)
+})
+
 test("a longer label grows the shape; an empty one removes the label", () => {
   const { elements, client, api, labelOf } = drawing()
   const long = "API gateway with rate limits, auth, and request logging"
