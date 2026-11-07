@@ -6,7 +6,7 @@ import type {
   ExcalidrawImperativeAPI,
 } from "@excalidraw/excalidraw/types"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
-import { PanelLeftIcon, Share2Icon, Users } from "lucide-react"
+import { HistoryIcon, PanelLeftIcon, Share2Icon, Users } from "lucide-react"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
 import {
@@ -53,6 +53,7 @@ import { useMoveToTeamDialog } from "./MoveToTeamDialog"
 import { SaveStatusPill } from "./SaveStatusPill"
 import { ShareDialog } from "./ShareDialog"
 import { TopLeftControls } from "./TopLeftControls"
+import { VersionHistorySheet } from "./VersionHistorySheet"
 
 import "@excalidraw/excalidraw/index.css"
 
@@ -133,6 +134,7 @@ export function DrawingCanvas({
   const saveScenePayload = useSaveScenePayload(drawingId, handleImagesOverCap)
 
   const [shareOpen, setShareOpen] = useState(false)
+  const [historyOpen, setHistoryOpen] = useState(false)
   const { data: share } = useQuery({
     ...drawingShareQueryOptions(drawingId),
     enabled: !readOnly,
@@ -410,6 +412,14 @@ export function DrawingCanvas({
               </span>
             </MainMenu.Item>
           )}
+          {!readOnly && (
+            <MainMenu.Item
+              icon={<HistoryIcon className="h-4 w-4" />}
+              onSelect={() => setHistoryOpen(true)}
+            >
+              Version history
+            </MainMenu.Item>
+          )}
           {!readOnly && !isTeam && requestMoveToTeam && (
             <MainMenu.Item
               icon={<Users className="h-4 w-4" />}
@@ -468,6 +478,13 @@ export function DrawingCanvas({
           open={shareOpen}
           onOpenChange={setShareOpen}
           onBeforeCreate={flushAutoSave}
+        />
+      )}
+      {!readOnly && (
+        <VersionHistorySheet
+          drawingId={drawingId}
+          open={historyOpen}
+          onOpenChange={setHistoryOpen}
         />
       )}
     </div>

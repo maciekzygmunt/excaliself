@@ -13,6 +13,7 @@ import {
 import { accessibleTo } from "@/features/spaces/access"
 import { dataUrlToBytes } from "./file-bytes"
 import { parseSceneElements, sceneText } from "./search"
+import { keepVersionImages, snapshotBeforeWrite } from "./versions"
 
 export type SceneWriteResult =
   /**
@@ -72,6 +73,8 @@ export async function writeDrawingScene(
     if (target.shareId || target.space === "team")
       return { status: "shared" as const }
 
+    await snapshotBeforeWrite(tx, id, now)
+
     // Re-check on the UPDATE: another tab may share the drawing or move it to
     // Team in between. The join-time reconcile covers what still slips through.
     const written = await tx
@@ -110,14 +113,11 @@ export async function writeDrawingScene(
     const newFiles = files.filter((file) => !existingFileIds.has(file.fileId))
 
     if (fileIdsToRemove.length > 0) {
+      const removed = inArray(drawingFiles.fileId, fileIdsToRemove)
+      await keepVersionImages(tx, id, removed)
       await tx
         .delete(drawingFiles)
-        .where(
-          and(
-            eq(drawingFiles.drawingId, id),
-            inArray(drawingFiles.fileId, fileIdsToRemove),
-          ),
-        )
+        .where(and(eq(drawingFiles.drawingId, id), removed))
     }
 
     // Measured after the delete, so removing images frees room for new ones.

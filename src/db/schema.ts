@@ -5,6 +5,7 @@ import {
   check,
   customType,
   foreignKey,
+  index,
   integer,
   jsonb,
   pgTable,
@@ -343,6 +344,47 @@ export const drawingFiles = pgTable(
       table.drawingId,
       table.fileId,
     ),
+  }),
+)
+
+// A past scene of a drawing, kept for its history. Live images stay in
+// drawing_files; `fileIds` names the images this version uses.
+export const drawingVersions = pgTable(
+  "drawing_versions",
+  {
+    id: text("id").primaryKey(),
+    drawingId: text("drawingId")
+      .notNull()
+      .references(() => drawings.id, { onDelete: "cascade" }),
+    data: text("data").notNull(),
+    fileIds: text("fileIds").array().notNull(),
+    // When the drawing last saved this scene; the history shows this time.
+    savedAt: timestamp("savedAt").notNull(),
+    // When the version was taken; the checkpoint rule counts from it.
+    createdAt: timestamp("createdAt").notNull(),
+  },
+  (table) => ({
+    byDrawing: index("drawing_versions_by_drawing").on(
+      table.drawingId,
+      table.createdAt,
+    ),
+  }),
+)
+
+// Images that only versions still use. They move here when the live scene
+// drops them, so live uploads, the image cap and share links never see them.
+export const drawingVersionFiles = pgTable(
+  "drawing_version_files",
+  {
+    drawingId: text("drawingId")
+      .notNull()
+      .references(() => drawings.id, { onDelete: "cascade" }),
+    fileId: text("fileId").notNull(),
+    mimeType: text("mimeType").notNull(),
+    bytes: bytea("bytes").notNull(),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.drawingId, table.fileId] }),
   }),
 )
 

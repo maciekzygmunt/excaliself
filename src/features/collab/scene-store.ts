@@ -5,6 +5,10 @@ import type { Db } from "@/db"
 import { drawingFiles, drawings } from "@/db/schema"
 import { referencedFileIds } from "@/features/drawings/scene-write"
 import { sceneText } from "@/features/drawings/search"
+import {
+  keepVersionImages,
+  snapshotBeforeWrite,
+} from "@/features/drawings/versions"
 import type { AccessRow } from "@/features/spaces/access"
 import type { SceneElement } from "./protocol"
 import { DELETED_ELEMENT_TIMEOUT_MS } from "./scene-sync"
@@ -113,6 +117,7 @@ export async function saveRoomScene(
       .from(drawings)
       .where(eq(drawings.id, drawingId))
     if (!drawing) return
+    await snapshotBeforeWrite(tx, drawingId, new Date(now))
     await tx
       .update(drawings)
       .set({
@@ -125,14 +130,13 @@ export async function saveRoomScene(
     // Undo brings a deleted image back as "saved" and nothing re-uploads it,
     // so recent tombstones keep their bytes.
     const used = referencedFileIds(elements, now - DELETED_ELEMENT_TIMEOUT_MS)
+    const unused = and(
+      lt(drawingFiles.createdAt, new Date(now - FILE_GRACE_MS)),
+      notInArray(drawingFiles.fileId, [...used]),
+    )
+    await keepVersionImages(tx, drawingId, unused)
     await tx
       .delete(drawingFiles)
-      .where(
-        and(
-          eq(drawingFiles.drawingId, drawingId),
-          lt(drawingFiles.createdAt, new Date(now - FILE_GRACE_MS)),
-          notInArray(drawingFiles.fileId, [...used]),
-        ),
-      )
+      .where(and(eq(drawingFiles.drawingId, drawingId), unused))
   })
 }
