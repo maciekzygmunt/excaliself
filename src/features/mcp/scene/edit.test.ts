@@ -139,6 +139,20 @@ test("a longer label grows the shape; an empty one removes the label", () => {
   )
 })
 
+test("an arrow relabeled while its shape moves keeps the new label", () => {
+  const { elements, api, arrow, labelOf } = drawing()
+  const result = plan(elements, {
+    change: [
+      { id: api.id, x: 700 },
+      { id: arrow.id, label: "gRPC" },
+    ],
+  })
+  const label = byId(result.elements, labelOf(arrow.id).id)
+  expect(label.originalText).toBe("gRPC")
+  // Re-placed on the rerouted arrow, not where the old one ran.
+  expect(label.x as number).toBeGreaterThan(300)
+})
+
 test("a shape with no label gets one, bound both ways", () => {
   const [box] = buildScene({
     elements: [{ type: "rectangle", x: 0, y: 0 }],

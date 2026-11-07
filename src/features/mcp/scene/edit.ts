@@ -265,31 +265,35 @@ export function planEdit(
     original: string | null,
     place: (label: Label, strokeColor: string) => SceneElement,
   ) => {
+    // The label as this plan has it so far: new, changed, or gone.
     const text = labels.get(container.id)
+    const working = text && (next.get(text.id) ?? text)
     const strokeColor = str(container.strokeColor) || "#1e1e1e"
     if (original === "") {
       if (!text) return
+      labels.delete(container.id)
       touch(text.id).isDeleted = true
       unbind(container.id, text.id)
       return
     }
-    if (!text && original === null) return
-    const fontSize = num(text?.fontSize, FONT_SIZE)
+    if (!working && original === null) return
+    const fontSize = num(working?.fontSize, FONT_SIZE)
     const label: Label = {
-      text: original ?? str(text?.text),
-      original: original ?? str(text?.originalText),
+      text: original ?? str(working?.text),
+      original: original ?? str(working?.originalText),
       fontSize,
     }
     const placed = place(label, strokeColor)
     if (!text) {
       created.push(placed)
+      labels.set(container.id, placed)
       container.boundElements = [
         ...boundElementsOf(container),
         { id: placed.id, type: "text" },
       ]
       return
     }
-    Object.assign(touch(text.id), {
+    Object.assign(live.has(text.id) ? touch(text.id) : text, {
       x: placed.x,
       y: placed.y,
       width: placed.width,

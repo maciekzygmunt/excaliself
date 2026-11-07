@@ -67,22 +67,25 @@ export function DrawingEditCard({ drawingId, excalidrawAPI, theme }: Props) {
   if (!edit || !excalidrawAPI) return null
 
   const apply = async () => {
-    if (isStale(excalidrawAPI.getSceneElementsIncludingDeleted(), edit.base)) {
-      await decide.mutateAsync("stale")
+    // Checked and applied with no await between, so no remote edit slips in;
+    // the server hears the outcome after.
+    const current = excalidrawAPI.getSceneElementsIncludingDeleted()
+    const stale = isStale(current, edit.base)
+    if (!stale)
+      excalidrawAPI.updateScene({
+        elements: withEdit(current, elements as OrderedExcalidrawElement[]),
+        captureUpdate: CaptureUpdateAction.IMMEDIATELY,
+      })
+    const recorded = await decide.mutateAsync(stale ? "stale" : "applied")
+    if (stale)
       toast.error("The drawing changed before you applied this", {
         description: "Nothing was changed. Ask your AI client to try again.",
       })
-      return
-    }
-    if (!(await decide.mutateAsync("applied"))) return
-    excalidrawAPI.updateScene({
-      // Read again: the canvas may have moved on while the click was sent.
-      elements: withEdit(
-        excalidrawAPI.getSceneElementsIncludingDeleted(),
-        elements as OrderedExcalidrawElement[],
-      ),
-      captureUpdate: CaptureUpdateAction.IMMEDIATELY,
-    })
+    // Another tab decided first, or the proposal was replaced or expired.
+    else if (!recorded)
+      toast.warning("Applied, but this proposal had already closed", {
+        description: "Your AI client may report that it was not applied.",
+      })
   }
 
   return (
