@@ -56,8 +56,9 @@ export function DrawingEditCard({ drawingId, excalidrawAPI, theme }: Props) {
   )
 
   const decide = useMutation({
-    mutationFn: (decision: Decision) =>
-      decideDrawingEdit({ data: { id: edit?.id ?? "", decision } }),
+    // The id rides along: the claim refetches the query to null mid-apply.
+    mutationFn: (data: { id: string; decision: Decision }) =>
+      decideDrawingEdit({ data }),
     onSettled: () =>
       queryClient.invalidateQueries({
         queryKey: drawingEditQueryOptions(drawingId).queryKey,
@@ -69,7 +70,7 @@ export function DrawingEditCard({ drawingId, excalidrawAPI, theme }: Props) {
   const apply = async () => {
     // Claimed first: a proposal another tab decided, or one replaced or
     // expired, never reaches the canvas.
-    if (!(await decide.mutateAsync("applying"))) {
+    if (!(await decide.mutateAsync({ id: edit.id, decision: "applying" }))) {
       toast.error("This proposal is no longer open", {
         description: "Nothing was changed.",
       })
@@ -83,7 +84,10 @@ export function DrawingEditCard({ drawingId, excalidrawAPI, theme }: Props) {
         elements: withEdit(current, elements as OrderedExcalidrawElement[]),
         captureUpdate: CaptureUpdateAction.IMMEDIATELY,
       })
-    await decide.mutateAsync(stale ? "stale" : "applied")
+    await decide.mutateAsync({
+      id: edit.id,
+      decision: stale ? "stale" : "applied",
+    })
     if (stale)
       toast.error("The drawing changed before you applied this", {
         description: "Nothing was changed. Ask your AI client to try again.",
@@ -136,7 +140,9 @@ export function DrawingEditCard({ drawingId, excalidrawAPI, theme }: Props) {
             variant="outline"
             size="sm"
             disabled={decide.isPending}
-            onClick={() => decide.mutate("discarded")}
+            onClick={() =>
+              decide.mutate({ id: edit.id, decision: "discarded" })
+            }
           >
             Discard
           </Button>
@@ -146,7 +152,7 @@ export function DrawingEditCard({ drawingId, excalidrawAPI, theme }: Props) {
             disabled={decide.isPending}
             onClick={() => void apply()}
           >
-            {decide.isPending && decide.variables !== "discarded"
+            {decide.isPending && decide.variables?.decision !== "discarded"
               ? "Applying…"
               : "Apply"}
           </Button>
