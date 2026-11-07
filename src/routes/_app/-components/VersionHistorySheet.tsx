@@ -60,12 +60,23 @@ export function VersionHistorySheet({ drawingId, open, onOpenChange }: Props) {
         <SheetHeader>
           <SheetTitle>Version history</SheetTitle>
           <SheetDescription>
-            A version is saved when you start to edit after a break, and every
-            30 minutes while you edit. The last 50 are kept.
+            Your edits save on their own. This list also keeps earlier versions
+            of the drawing:
           </SheetDescription>
+          <ul className="list-disc space-y-0.5 pl-5 text-muted-foreground text-sm">
+            <li>
+              When you edit again after a break of 10 minutes or more, the
+              drawing as you left it.
+            </li>
+            <li>Every 30 minutes while you edit.</li>
+            <li>Only the last 50 versions are kept.</li>
+          </ul>
         </SheetHeader>
         {versions?.length === 0 && (
-          <p className="px-4 text-muted-foreground text-sm">No versions yet.</p>
+          <p className="px-4 text-muted-foreground text-sm">
+            No versions yet. The first one is kept when you come back to edit
+            after a break.
+          </p>
         )}
         {selected && (
           // Remounted per version, so a stale preview never shows while loading.

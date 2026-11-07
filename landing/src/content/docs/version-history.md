@@ -3,7 +3,8 @@ title: Version history
 description: Go back to an earlier version of a drawing.
 ---
 
-Each drawing keeps its past versions. Open a drawing, then select
+Your edits save on their own. In addition, each drawing keeps earlier
+versions that you can go back to. Open a drawing, then select
 **Version history** in the menu.
 
 ## When a version is saved
