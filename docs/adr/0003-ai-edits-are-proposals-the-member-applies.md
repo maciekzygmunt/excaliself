@@ -8,7 +8,7 @@ We chose this over a server-side write because a server write needs a second wri
 
 - Nothing changes until the member opens the Drawing and clicks Apply. A Proposal on a Drawing nobody has open waits for that; opening a Team Drawing joins its Room as usual.
 - The Apply is one undo step on that tab, and teammates get it live like any edit.
-- Apply first claims the Proposal on the server, so one that another tab decided, a newer one replaced, or that expired never reaches a canvas. Only then does the tab check and apply, with no wait between, and report the outcome.
+- Apply first claims the Proposal on the server, so one that another tab decided, a newer one replaced, or that expired never reaches a canvas. Only then does the tab check and apply, with no wait between, and report the outcome. A claim not settled within a minute (the tab closed, or went offline) ends "unconfirmed", and the client reads the Drawing to see what landed.
 - The plan bumps each changed element's version once and records the version it was planned on. If any of those elements moved on before the Apply, the tab applies nothing and reports the Proposal stale; the client reads the Drawing again.
 - Proposals live in process memory (`processSingleton`), like Rooms: a restart drops them, which loses nothing, since nothing was written.
 - `edit_drawing` waits up to 25 s for the decision, so a member with the Drawing open answers within one tool call; otherwise the client asks again with `get_drawing_edit`.

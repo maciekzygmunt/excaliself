@@ -362,6 +362,8 @@ Colors: Excalidraw's palette reads best, e.g. backgrounds "#a5d8ff" (blue), "#b2
     replaced:
       "A newer proposal for this drawing took its place. Nothing changed from this one.",
     expired: "It expired before the member decided. Nothing changed.",
+    unconfirmed:
+      "The member clicked Apply, but their tab never confirmed the outcome. Read the drawing to see whether the change is there before proposing it again.",
   }
   const editResult = (edit: DrawingEdit) =>
     json({

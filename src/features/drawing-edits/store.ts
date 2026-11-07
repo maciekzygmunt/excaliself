@@ -16,6 +16,8 @@ export type EditStatus =
   /** A newer proposal for the same drawing took its place. */
   | "replaced"
   | "expired"
+  /** Claimed, but the tab never reported the outcome (closed, or offline). */
+  | "unconfirmed"
 
 /** What the member's tab reports. */
 export type Decision = "applying" | "applied" | "discarded" | "stale"
@@ -39,13 +41,21 @@ export type DrawingEdit = {
   /** Element id → the version the edit was planned on. */
   base: Record<string, number>
   createdAt: number
+  /** When a tab claimed it, for the claim's lease. */
+  claimedAt: number | null
   status: EditStatus
 }
 
-export type ProposedEdit = Omit<DrawingEdit, "id" | "createdAt" | "status">
+export type ProposedEdit = Omit<
+  DrawingEdit,
+  "id" | "createdAt" | "claimedAt" | "status"
+>
 
 /** A pending edit expires after this. */
 export const EDIT_TTL_MS = 30 * 60 * 1000
+
+/** A claim the tab hasn't settled by then ends unconfirmed. */
+export const CLAIM_LEASE_MS = 60 * 1000
 
 export function createEditStore(now: () => number = () => Date.now()) {
   const edits = new Map<string, DrawingEdit>()
@@ -62,6 +72,11 @@ export function createEditStore(now: () => number = () => Date.now()) {
   const fresh = (edit: DrawingEdit) => {
     if (edit.status === "pending" && now() - edit.createdAt > EDIT_TTL_MS)
       settle(edit, "expired")
+    if (
+      edit.status === "applying" &&
+      now() - (edit.claimedAt ?? 0) > CLAIM_LEASE_MS
+    )
+      settle(edit, "unconfirmed")
     return edit
   }
   const mine = (id: string, userId: string) => {
@@ -86,6 +101,7 @@ export function createEditStore(now: () => number = () => Date.now()) {
         ...proposed,
         id: randomUUID(),
         createdAt: now(),
+        claimedAt: null,
         status: "pending",
       }
       edits.set(edit.id, edit)
@@ -114,6 +130,7 @@ export function createEditStore(now: () => number = () => Date.now()) {
     decide(id: string, userId: string, decision: Decision): boolean {
       const edit = mine(id, userId)
       if (!edit || !NEXT[edit.status]?.includes(decision)) return false
+      if (decision === "applying") edit.claimedAt = now()
       settle(edit, decision)
       return true
     },

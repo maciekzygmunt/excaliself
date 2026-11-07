@@ -1,5 +1,10 @@
 import { expect, test } from "vitest"
-import { createEditStore, EDIT_TTL_MS, type ProposedEdit } from "./store"
+import {
+  CLAIM_LEASE_MS,
+  createEditStore,
+  EDIT_TTL_MS,
+  type ProposedEdit,
+} from "./store"
 
 const proposal = (overrides: Partial<ProposedEdit> = {}): ProposedEdit => ({
   drawingId: "d1",
@@ -75,4 +80,15 @@ test("an undecided proposal expires and can no longer be applied", () => {
   expect(store.pending("u1", "d1")).toBeNull()
   expect(store.decide(edit.id, "u1", "applying")).toBe(false)
   expect(store.get(edit.id, "u1")?.status).toBe("expired")
+})
+
+test("a claim the tab never settles ends unconfirmed", () => {
+  let now = 0
+  const store = createEditStore(() => now)
+  const edit = store.propose(proposal())
+  store.decide(edit.id, "u1", "applying")
+  now = CLAIM_LEASE_MS + 1
+
+  expect(store.get(edit.id, "u1")?.status).toBe("unconfirmed")
+  expect(store.decide(edit.id, "u1", "applied")).toBe(false)
 })
