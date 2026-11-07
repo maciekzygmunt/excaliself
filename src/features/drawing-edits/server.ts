@@ -6,7 +6,7 @@ import { z } from "zod"
 import { listUpdates } from "@/features/list-updates/hub"
 import { EDITS_CHANGED } from "@/features/list-updates/protocol"
 import { authMiddleware } from "@/middleware/auth"
-import { drawingEdits, EDIT_TTL_MS } from "./store"
+import { drawingEdits } from "./store"
 
 /** The signed-in member's open proposal on a drawing, or null. */
 export const getDrawingEdit = createServerFn({ method: "GET" })
@@ -23,19 +23,17 @@ export const getDrawingEdit = createServerFn({ method: "GET" })
       summary,
       changes,
       base,
-      // Relative, so the tab's clock needn't match the server's.
-      expiresInMs: edit.createdAt + EDIT_TTL_MS - Date.now(),
       elements: JSON.stringify(edit.elements),
     }
   })
 
-/** False when another tab decided first, or the proposal is gone. */
+/** False when another tab decided first, or the proposal was replaced or expired. */
 export const decideDrawingEdit = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
   .validator(
     z.object({
       id: z.string(),
-      decision: z.enum(["applied", "discarded", "stale"]),
+      decision: z.enum(["applying", "applied", "discarded", "stale"]),
     }),
   )
   .handler(({ data, context }) => {

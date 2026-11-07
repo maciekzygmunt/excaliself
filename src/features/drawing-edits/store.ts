@@ -7,6 +7,8 @@ import { processSingleton } from "@/lib/process-singleton"
 
 export type EditStatus =
   | "pending"
+  /** One tab claimed it and is applying it; it reports the outcome next. */
+  | "applying"
   | "applied"
   | "discarded"
   /** The drawing changed under it before the Apply. */
@@ -16,7 +18,13 @@ export type EditStatus =
   | "expired"
 
 /** What the member's tab reports. */
-export type Decision = "applied" | "discarded" | "stale"
+export type Decision = "applying" | "applied" | "discarded" | "stale"
+
+/** Which decisions each open status takes: a tab claims before it applies. */
+const NEXT: Partial<Record<EditStatus, Decision[]>> = {
+  pending: ["applying", "discarded"],
+  applying: ["applied", "stale"],
+}
 
 export type DrawingEdit = {
   id: string
@@ -45,6 +53,8 @@ export function createEditStore(now: () => number = () => Date.now()) {
 
   const settle = (edit: DrawingEdit, status: EditStatus) => {
     edit.status = status
+    // Waiters want the outcome, not the claim.
+    if (status === "applying") return
     for (const wake of waiters.get(edit.id) ?? []) wake()
     waiters.delete(edit.id)
   }
@@ -97,10 +107,13 @@ export function createEditStore(now: () => number = () => Date.now()) {
     /** The member's edit by id, or null for anyone else's. */
     get: mine,
 
-    /** First decision wins: false once it's decided, or for anyone else's edit. */
+    /**
+     * First claim or discard wins; the claimer then reports applied or stale.
+     * False for anything else, or for anyone else's edit.
+     */
     decide(id: string, userId: string, decision: Decision): boolean {
       const edit = mine(id, userId)
-      if (edit?.status !== "pending") return false
+      if (!edit || !NEXT[edit.status]?.includes(decision)) return false
       settle(edit, decision)
       return true
     },
@@ -112,7 +125,7 @@ export function createEditStore(now: () => number = () => Date.now()) {
       ms: number,
     ): Promise<DrawingEdit | null> {
       const edit = mine(id, userId)
-      if (edit?.status !== "pending") return edit
+      if (!edit || !NEXT[edit.status]) return edit
       await new Promise<void>((resolve) => {
         const set = waiters.get(id) ?? new Set()
         waiters.set(id, set)

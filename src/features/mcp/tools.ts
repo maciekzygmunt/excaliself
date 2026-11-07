@@ -352,6 +352,8 @@ Colors: Excalidraw's palette reads best, e.g. backgrounds "#a5d8ff" (blue), "#b2
 
   const editMessages: Record<DrawingEdit["status"], string> = {
     pending: `Nothing has changed yet. ${userDisplayName(member)} must click Apply on the drawing in Excaliself. Give them the link, then call get_drawing_edit for the result.`,
+    applying:
+      "The member clicked Apply and it is being applied. Call get_drawing_edit for the result.",
     applied:
       "Applied. Everyone with the drawing open sees the change, and the member can undo it.",
     discarded: "The member discarded it. Nothing changed.",

@@ -34,10 +34,27 @@ test("the first decision wins, and only the member can make it", () => {
   expect(store.pending("u1", "d1")).toBeNull()
 })
 
-test("a wait ends on the decision, not the timeout", async () => {
+test("a tab claims before it applies; the claim shuts out other tabs and newer proposals", () => {
+  const store = createEditStore()
+  const edit = store.propose(proposal())
+  expect(store.decide(edit.id, "u1", "applied")).toBe(false)
+  expect(store.decide(edit.id, "u1", "applying")).toBe(true)
+
+  // A second tab, and a newer proposal, find it taken.
+  expect(store.decide(edit.id, "u1", "applying")).toBe(false)
+  expect(store.decide(edit.id, "u1", "discarded")).toBe(false)
+  store.propose(proposal())
+  expect(store.get(edit.id, "u1")?.status).toBe("applying")
+
+  expect(store.decide(edit.id, "u1", "stale")).toBe(true)
+  expect(store.get(edit.id, "u1")?.status).toBe("stale")
+})
+
+test("a wait ends on the outcome, not on the claim or the timeout", async () => {
   const store = createEditStore()
   const edit = store.propose(proposal())
   const waiting = store.wait(edit.id, "u1", 60_000)
+  store.decide(edit.id, "u1", "applying")
   store.decide(edit.id, "u1", "applied")
   expect((await waiting)?.status).toBe("applied")
   expect(await store.wait(edit.id, "u2", 10)).toBeNull()
@@ -56,6 +73,6 @@ test("an undecided proposal expires and can no longer be applied", () => {
   now = EDIT_TTL_MS + 1
 
   expect(store.pending("u1", "d1")).toBeNull()
-  expect(store.decide(edit.id, "u1", "applied")).toBe(false)
+  expect(store.decide(edit.id, "u1", "applying")).toBe(false)
   expect(store.get(edit.id, "u1")?.status).toBe("expired")
 })

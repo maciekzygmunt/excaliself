@@ -35,9 +35,6 @@ const MARKERS: Record<string, { sign: string; color: string }> = {
   Remove: { sign: "−", color: HIGHLIGHT.removed },
 }
 
-/** Applies stop this long before expiry, so the outcome reaches the server in time. */
-const EXPIRY_MARGIN_MS = 30_000
-
 type Props = {
   drawingId: string
   excalidrawAPI: ExcalidrawImperativeAPI | null
@@ -70,18 +67,15 @@ export function DrawingEditCard({ drawingId, excalidrawAPI, theme }: Props) {
   if (!edit || !excalidrawAPI) return null
 
   const apply = async () => {
-    // An expired proposal must not land: its client was told nothing changed.
-    if (Date.now() > edit.expiresAt - EXPIRY_MARGIN_MS) {
-      toast.error("This proposal expired", {
-        description: "Nothing was changed. Ask your AI client to try again.",
-      })
-      void queryClient.invalidateQueries({
-        queryKey: drawingEditQueryOptions(drawingId).queryKey,
+    // Claimed first: a proposal another tab decided, or one replaced or
+    // expired, never reaches the canvas.
+    if (!(await decide.mutateAsync("applying"))) {
+      toast.error("This proposal is no longer open", {
+        description: "Nothing was changed.",
       })
       return
     }
-    // Checked and applied with no await between, so no remote edit slips in;
-    // the server hears the outcome after.
+    // Checked and applied with no await between, so no remote edit slips in.
     const current = excalidrawAPI.getSceneElementsIncludingDeleted()
     const stale = isStale(current, edit.base)
     if (!stale)
@@ -89,15 +83,10 @@ export function DrawingEditCard({ drawingId, excalidrawAPI, theme }: Props) {
         elements: withEdit(current, elements as OrderedExcalidrawElement[]),
         captureUpdate: CaptureUpdateAction.IMMEDIATELY,
       })
-    const recorded = await decide.mutateAsync(stale ? "stale" : "applied")
+    await decide.mutateAsync(stale ? "stale" : "applied")
     if (stale)
       toast.error("The drawing changed before you applied this", {
         description: "Nothing was changed. Ask your AI client to try again.",
-      })
-    // Another tab decided first, or the proposal was replaced or expired.
-    else if (!recorded)
-      toast.warning("Applied, but this proposal had already closed", {
-        description: "Your AI client may report that it was not applied.",
       })
   }
 
@@ -157,7 +146,7 @@ export function DrawingEditCard({ drawingId, excalidrawAPI, theme }: Props) {
             disabled={decide.isPending}
             onClick={() => void apply()}
           >
-            {decide.isPending && decide.variables === "applied"
+            {decide.isPending && decide.variables !== "discarded"
               ? "Applying…"
               : "Apply"}
           </Button>
