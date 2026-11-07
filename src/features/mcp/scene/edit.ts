@@ -5,6 +5,7 @@
 import { randomInt } from "node:crypto"
 import { z } from "zod"
 import type { SceneElement } from "@/features/collab/protocol"
+import type { Revision } from "@/features/drawing-edits/apply"
 import { buildScene, cleanText, containerSize } from "./build"
 import {
   arrowLabel,
@@ -63,8 +64,8 @@ export type EditInput = {
 export type EditPlan = {
   /** Every new and changed element, whole, with its version bumped. */
   elements: SceneElement[]
-  /** Element id → the version this plan was made on, for the stale check. */
-  base: Record<string, number>
+  /** Element id → the revision this plan was made on, for the stale check. */
+  base: Record<string, Revision>
   /** One line per change, for the member to read. */
   changes: string[]
 }
@@ -232,7 +233,7 @@ export function planEdit(
   if (errors.length > 0) throw new SceneInputError(errors.join("\n"))
 
   const next = new Map<string, SceneElement>()
-  const base: Record<string, number> = {}
+  const base: Record<string, Revision> = {}
   const created: SceneElement[] = []
   const lines: string[] = []
 
@@ -248,7 +249,7 @@ export function planEdit(
       updated: Date.now(),
     }
     next.set(id, copy)
-    base[id] = current.version
+    base[id] = { version: current.version, versionNonce: current.versionNonce }
     return copy
   }
   const read = (id: string) => next.get(id) ?? live.get(id)

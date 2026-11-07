@@ -1,17 +1,24 @@
 // How a member's tab applies a proposed edit to its own canvas. From there
 // the canvas's usual writer (the Room, or autosave) carries it.
 
-type Versioned = { readonly id: string; readonly version: number }
+/**
+ * Which edit of an element this is. Both parts: two edits can share a
+ * version, and the nonce picks the winner.
+ */
+export type Revision = { version: number; versionNonce: number }
+
+type Versioned = Revision & { readonly id: string }
 
 /** True when an element the edit changes is gone or has moved on since it was planned. */
 export function isStale(
   current: readonly Versioned[],
-  base: Record<string, number>,
+  base: Record<string, Revision>,
 ): boolean {
-  const versions = new Map(current.map(({ id, version }) => [id, version]))
-  return Object.entries(base).some(
-    ([id, version]) => versions.get(id) !== version,
-  )
+  const byId = new Map(current.map((element) => [element.id, element]))
+  return Object.entries(base).some(([id, { version, versionNonce }]) => {
+    const element = byId.get(id)
+    return element?.version !== version || element.versionNonce !== versionNonce
+  })
 }
 
 /** The scene with the edit in it: changed elements replaced in place, new ones on top. */

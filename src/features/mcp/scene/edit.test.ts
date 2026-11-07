@@ -86,7 +86,10 @@ test("puts a CDN between two shapes: remove one arrow, add a shape and two", () 
   for (const element of result.elements) {
     const before = elements.find((old) => old.id === element.id)
     if (before) {
-      expect(result.base[element.id]).toBe(before.version)
+      expect(result.base[element.id]).toEqual({
+        version: before.version,
+        versionNonce: before.versionNonce,
+      })
       expect(element.version).toBe(before.version + 1)
     } else {
       expect(element.index).toBeNull()

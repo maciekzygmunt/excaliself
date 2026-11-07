@@ -1,13 +1,23 @@
 import { expect, test } from "vitest"
 import { isStale, withEdit } from "./apply"
 
-const el = (id: string, version: number) => ({ id, version })
+const el = (id: string, version: number, versionNonce = 1) => ({
+  id,
+  version,
+  versionNonce,
+})
 
 test("stale once a changed element moved on or is gone", () => {
   const scene = [el("a", 3), el("b", 1)]
-  expect(isStale(scene, { a: 3 })).toBe(false)
-  expect(isStale(scene, { a: 2 })).toBe(true)
-  expect(isStale(scene, { c: 1 })).toBe(true)
+  const base = (version: number, versionNonce = 1) => ({
+    version,
+    versionNonce,
+  })
+  expect(isStale(scene, { a: base(3) })).toBe(false)
+  expect(isStale(scene, { a: base(2) })).toBe(true)
+  expect(isStale(scene, { c: base(1) })).toBe(true)
+  // Another edit at the same version: its nonce tells it apart.
+  expect(isStale(scene, { a: base(3, 2) })).toBe(true)
 })
 
 test("replaces changed elements in place and puts new ones on top", () => {

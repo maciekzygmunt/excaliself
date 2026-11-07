@@ -4,6 +4,7 @@
 import { randomUUID } from "node:crypto"
 import type { SceneElement } from "@/features/collab/protocol"
 import { processSingleton } from "@/lib/process-singleton"
+import type { Revision } from "./apply"
 
 export type EditStatus =
   | "pending"
@@ -38,8 +39,8 @@ export type DrawingEdit = {
   changes: string[]
   /** New and changed elements, whole. */
   elements: SceneElement[]
-  /** Element id → the version the edit was planned on. */
-  base: Record<string, number>
+  /** Element id → the revision the edit was planned on. */
+  base: Record<string, Revision>
   createdAt: number
   /** When a tab claimed it, for the claim's lease. */
   claimedAt: number | null
