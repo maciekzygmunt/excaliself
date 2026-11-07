@@ -14,7 +14,7 @@ const color = { background: "#fa5252", stroke: "#c92a2a" }
 const badge = (drawingId: string, count: number): LiveDrawing => ({
   drawingId,
   count,
-  participants: [{ name: "Quiet Otter", color }],
+  participants: [{ name: "Quiet Otter", color, image: null }],
 })
 
 const snapshot = (...drawings: LiveDrawing[]): LiveSnapshot => ({
@@ -112,7 +112,15 @@ test("a roster change in the open room refreshes the badge before the next poll"
 
   vi.mocked(getLiveDrawings).mockResolvedValue(snapshot(badge("d1", 1)))
   rerender(
-    view([{ connectionId: "c2", name: "Quiet Otter", color, isGuest: false }]),
+    view([
+      {
+        connectionId: "c2",
+        name: "Quiet Otter",
+        image: null,
+        color,
+        isGuest: false,
+      },
+    ]),
   )
 
   await waitFor(() => {
