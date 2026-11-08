@@ -178,8 +178,11 @@ function describe(issues: z.core.$ZodIssue[]): string {
   return lines.join("\n")
 }
 
+/** Below 2^31, like Excalidraw's own values, so +1 keeps counting. */
 const isVersion = (value: unknown): value is number =>
-  Number.isSafeInteger(value) && (value as number) >= 1
+  Number.isSafeInteger(value) &&
+  (value as number) >= 1 &&
+  (value as number) < 2 ** 31
 
 export type ImportedScene = {
   content: SceneContent

@@ -64,7 +64,7 @@ test("keeps a saved file's elements, ids, and versions, and indexes them in orde
 test("replaces bad and repeated ids and bad versions, and drops deleted elements", () => {
   const { content } = parseImportedScene(
     file([
-      rect({ version: 2 ** 60, versionNonce: "x" }),
+      rect({ version: Number.MAX_SAFE_INTEGER, versionNonce: "x" }),
       rect({ x: 10, versionNonce: -5 }),
       rect({ id: 5 }),
       rect({ id: "gone", isDeleted: true }),
