@@ -284,7 +284,13 @@ export async function setResolved(
         ? { resolvedAt: new Date(), resolvedBy: userId }
         : { resolvedAt: null, resolvedBy: null },
     )
-    .where(eq(commentThreads.id, threadId))
+    // Resolving again keeps who resolved it first, and when.
+    .where(
+      and(
+        eq(commentThreads.id, threadId),
+        resolved ? isNull(commentThreads.resolvedAt) : undefined,
+      ),
+    )
 }
 
 /** Changes the text of the caller's own comment. */

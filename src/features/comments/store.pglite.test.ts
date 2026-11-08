@@ -77,6 +77,7 @@ test("a trashed drawing's comments stay readable but take no writes", async () =
 test("a resolved thread takes no replies until it is reopened", async () => {
   const thread = await start(ada.id, "team")
   await setResolved(db, bo.id, thread, true)
+  await setResolved(db, ada.id, thread, true)
 
   expect((await threadOf(ada.id, "team", thread))?.resolvedBy?.name).toBe("Bo")
   await expect(
