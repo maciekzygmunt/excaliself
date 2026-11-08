@@ -144,7 +144,7 @@ claude mcp add --transport http excaliself https://draw.example.com/api/mcp \
 
 - `list_drawings`、`search_drawings` 和 `list_folders`：查找绘图与文件夹，并显示它们所属的空间和文件夹。
 - `read_drawing`：描述绘图中的形状、文字及箭头连接关系；不会返回原始 Excalidraw JSON。
-- `export_drawing`：把绘图导出为 PNG 或 SVG 图片，例如用于文档。SVG 内嵌绘图所用的字体。
+- `export_drawing`：把绘图导出为 PNG 或 SVG 图片，例如用于文档。SVG 内嵌绘图所用的字体。`export_scene` 把绘图导出为 `.excalidraw` 文件。
 - `create_drawing`：使用简单的形状和箭头，或 Mermaid 流程图，在私人空间或团队空间中创建绘图，也可指定存入某个文件夹。
 - `edit_drawing`：提议修改绘图，可以添加、修改或删除形状、文字和箭头。只有你在绘图上点击 **Apply**（应用）后，修改才会生效；`get_drawing_edit` 告诉客户端你是否已应用。
 - `create_folder`：在私人空间或团队空间创建文件夹，也可以放在另一个文件夹内。

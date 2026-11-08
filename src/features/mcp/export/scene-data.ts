@@ -1,17 +1,25 @@
 // What an export needs besides the elements: the drawing's image files and
-// its canvas color.
+// the appState saved with its scene.
 
 import { and, eq, inArray } from "drizzle-orm"
 import type { Db } from "@/db"
 import { drawingFiles } from "@/db/schema"
-import type { ExportFile } from "./svg"
+import { bytesToDataUrl } from "@/features/drawings/file-bytes"
 
-/** The stored files of the scene's image elements, as data URLs. */
+/** An image file, as Excalidraw's BinaryFiles hold it. */
+export type SceneFile = {
+  id: string
+  mimeType: string
+  dataURL: string
+  created: number
+}
+
+/** The stored files of the scene's live image elements, by fileId. */
 export async function loadImageFiles(
   db: Db,
   drawingId: string,
   elements: readonly Record<string, unknown>[],
-): Promise<Map<string, ExportFile>> {
+): Promise<Map<string, SceneFile>> {
   const fileIds = [
     ...new Set(
       elements.flatMap((element) =>
@@ -29,6 +37,7 @@ export async function loadImageFiles(
       fileId: drawingFiles.fileId,
       mimeType: drawingFiles.mimeType,
       bytes: drawingFiles.bytes,
+      createdAt: drawingFiles.createdAt,
     })
     .from(drawingFiles)
     .where(
@@ -38,22 +47,30 @@ export async function loadImageFiles(
       ),
     )
   return new Map(
-    rows.map(({ fileId, mimeType, bytes }) => [
+    rows.map(({ fileId, mimeType, bytes, createdAt }) => [
       fileId,
       {
+        id: fileId,
         mimeType,
-        dataURL: `data:${mimeType};base64,${Buffer.from(bytes).toString("base64")}`,
+        dataURL: bytesToDataUrl(mimeType, Buffer.from(bytes)),
+        created: createdAt.getTime(),
       },
     ]),
   )
 }
 
+/** The appState saved with the scene; empty when there is none. */
+export function storedAppState(data: string | null): Record<string, unknown> {
+  try {
+    const appState = JSON.parse(data ?? "")?.appState
+    return typeof appState === "object" && appState !== null ? appState : {}
+  } catch {
+    return {}
+  }
+}
+
 /** The canvas color saved with the scene; white when there is none. */
 export function sceneBackgroundColor(data: string | null) {
-  try {
-    const color = JSON.parse(data ?? "")?.appState?.viewBackgroundColor
-    return typeof color === "string" && color ? color : "#ffffff"
-  } catch {
-    return "#ffffff"
-  }
+  const color = storedAppState(data).viewBackgroundColor
+  return typeof color === "string" && color ? color : "#ffffff"
 }

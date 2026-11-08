@@ -125,7 +125,8 @@ client still works, but you can't open the app.
 - `read_drawing` describes a drawing: its shapes, text, and what the arrows
   connect. It does not send the raw Excalidraw JSON.
 - `export_drawing` exports a drawing as a PNG or SVG image, for example to put
-  it in your documentation. See [Export a drawing](#export-a-drawing).
+  it in your documentation. `export_scene` exports it as an `.excalidraw`
+  file. See [Export a drawing](#export-a-drawing).
 - `create_drawing` makes a new drawing in your private space or in Team,
   optionally in a folder, from simple shapes and arrows or a Mermaid flowchart.
   Mermaid `style` lines color the nodes (`fill` and `stroke`, as hex or named colors).
@@ -188,6 +189,18 @@ space around the drawing, and a different size.
 
 The image comes back to the client as an attachment. Claude Code saves it to a
 file and copies it where you want it.
+
+### As an `.excalidraw` file
+
+Ask for the drawing as a file, for example "Save the System overview drawing
+as an .excalidraw file in docs/". The file is the same as what Excalidraw's
+**Save to file** writes, so Excalidraw, excalidraw.com, and Excaliself's
+[import](/docs/import/) open it. If someone has the drawing open, the file
+has their latest changes.
+
+Images are left out unless the client asks for them: their elements stay in
+the file, but show as missing images. With images, the file holds them as
+base64 text and can get large. A file can be at most 10 MB.
 
 ## Access
 

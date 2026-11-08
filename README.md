@@ -181,7 +181,8 @@ The tools:
 - `read_drawing` describes a drawing: its shapes, text, and what the arrows
   connect. It does not send the raw Excalidraw JSON.
 - `export_drawing` exports a drawing as a PNG or SVG image, for example for
-  your documentation. An SVG contains the drawing's fonts.
+  your documentation. An SVG contains the drawing's fonts. `export_scene`
+  exports it as an `.excalidraw` file.
 - `create_drawing` makes a new drawing in your private space or in Team,
   optionally in a folder, from simple shapes and arrows or a Mermaid flowchart.
 - `edit_drawing` proposes a change to a drawing: shapes, text, and arrows to

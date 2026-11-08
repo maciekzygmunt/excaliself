@@ -30,7 +30,12 @@ import { purgeDeadline, TRASH_RETENTION_DAYS } from "@/features/trash/retention"
 import { trashDrawingUnit, trashFolderUnit } from "@/features/trash/trash"
 import packageJson from "../../../package.json"
 import { exportImage } from "./export/image"
-import { loadImageFiles, sceneBackgroundColor } from "./export/scene-data"
+import {
+  loadImageFiles,
+  sceneBackgroundColor,
+  storedAppState,
+} from "./export/scene-data"
+import { MAX_SCENE_BYTES, toExcalidrawFile } from "./export/scene-file"
 import { buildScene } from "./scene/build"
 import { elementChange, planEdit } from "./scene/edit"
 import { parseMermaid } from "./scene/mermaid"
@@ -92,7 +97,7 @@ export function createMcpServer(db: Db, member: Member, origin: string) {
     {
       // Bounds the work one create_drawing call can ask for.
       maxToolInputElements: 20_000,
-      instructions: `Excaliself is a self-hosted Excalidraw. You act as ${userDisplayName(member)}. Every drawing and folder lives in a Space: "private" (only this member sees it) or "team" (every member sees it). You can find, read, create, and export drawings as images, create folders, move drawings between folders of one Space, and move drawings and folders to the trash or back. Members can restore trashed items from Trash for ${TRASH_RETENTION_DAYS} days. You can't delete anything for good.
+      instructions: `Excaliself is a self-hosted Excalidraw. You act as ${userDisplayName(member)}. Every drawing and folder lives in a Space: "private" (only this member sees it) or "team" (every member sees it). You can find, read, create, and export drawings (as images or .excalidraw files), create folders, move drawings between folders of one Space, and move drawings and folders to the trash or back. Members can restore trashed items from Trash for ${TRASH_RETENTION_DAYS} days. You can't delete anything for good.
 
 To change what is in an existing drawing, read it with read_drawing, then propose the change with edit_drawing. Nothing changes until the member clicks Apply on the drawing in Excaliself. Give them the drawing's link, and never say a change is done until a tool reports "applied".`,
     },
@@ -369,6 +374,75 @@ To change what is in an existing drawing, read it with read_drawing, then propos
                   blob: data,
                 },
               },
+        ],
+      }
+    },
+  )
+
+  server.registerTool(
+    "export_scene",
+    {
+      title: "Export drawing as .excalidraw file",
+      description: `Exports a drawing as an .excalidraw file: the raw scene JSON that Excalidraw's "Save to file" writes, which Excalidraw and excalidraw.com open. The file comes back attached as an embedded resource; clients that save attachments give you a file path to copy from. To understand a drawing, use read_drawing instead.
+
+Images are left out by default: their elements stay, but show as missing images. With includeImages they are embedded as base64, which can be large. Files over ${MAX_SCENE_BYTES / 1024 / 1024} MB are refused.`,
+      inputSchema: z.object({
+        id: z
+          .string()
+          .describe("A drawing id from list_drawings or search_drawings."),
+        includeImages: z
+          .boolean()
+          .default(false)
+          .describe("Embed the drawing's images. Default false."),
+      }),
+      annotations: { readOnlyHint: true },
+    },
+    async ({ id, includeImages }) => {
+      const drawing = await findDrawing(id)
+      // A live Room holds newer edits than the stored scene.
+      const elements =
+        (await roomElements(rooms, id)) ?? parseSceneElements(drawing.data)
+      if (!elements)
+        throw new Error("This drawing's data is damaged and can't be read.")
+      const files = includeImages
+        ? await loadImageFiles(db, id, elements)
+        : new Map()
+      const file = Buffer.from(
+        toExcalidrawFile({
+          elements,
+          appState: storedAppState(drawing.data),
+          files,
+          source: origin,
+        }),
+      )
+      if (file.length > MAX_SCENE_BYTES) {
+        const size = `${(file.length / 1024 / 1024).toFixed(1)} MB`
+        throw new Error(
+          includeImages
+            ? `The file would be ${size}, over the ${MAX_SCENE_BYTES / 1024 / 1024} MB limit. Leave out images (includeImages: false).`
+            : `The file would be ${size}, over the ${MAX_SCENE_BYTES / 1024 / 1024} MB limit.`,
+        )
+      }
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: JSON.stringify({
+              name: drawing.name,
+              elements: elements.filter((element) => !element.isDeleted).length,
+              images: files.size,
+              bytes: file.length,
+              url: drawingUrl(id),
+            }),
+          },
+          {
+            type: "resource" as const,
+            resource: {
+              uri: `excaliself://export/${id}.excalidraw`,
+              mimeType: "application/vnd.excalidraw+json",
+              blob: file.toString("base64"),
+            },
+          },
         ],
       }
     },
