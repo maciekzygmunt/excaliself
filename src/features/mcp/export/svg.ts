@@ -537,6 +537,10 @@ function renderImage(
         "clipPath",
         { id: clipId },
         tag("rect", {
+          // Over the crop's visible part, like the mask (Excalidraw's own
+          // export leaves it at 0 0 and cuts cropped images short).
+          x: crop ? cropX : undefined,
+          y: crop ? cropY : undefined,
           width: element.width,
           height: element.height,
           rx: radius,

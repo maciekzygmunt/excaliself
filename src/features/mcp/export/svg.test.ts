@@ -329,6 +329,42 @@ test("a PNG gets the font of an embed's placeholder label", async () => {
   expect(result?.fontFiles).toEqual(["Liberation/LiberationSans-Regular.woff2"])
 })
 
+test("a cropped, rounded image is clipped over its visible part", async () => {
+  const result = await renderSvg(
+    [
+      {
+        id: "photo",
+        type: "image",
+        x: 0,
+        y: 0,
+        width: 100,
+        height: 50,
+        fileId: "file1",
+        roundness: { type: 3 },
+        crop: {
+          x: 40,
+          y: 20,
+          width: 100,
+          height: 50,
+          naturalWidth: 200,
+          naturalHeight: 100,
+        },
+      },
+    ],
+    new Map([["file1", { mimeType: "image/png", dataURL: PNG }]]),
+    options,
+  )
+  // The rounded clip and the crop mask cover the same rectangle.
+  const mask = result?.svg.match(
+    /<mask id="mask-image-crop-photo"[^>]*><rect x="(\d+)" y="(\d+)"/,
+  )
+  const clip = result?.svg.match(
+    /<clipPath id="image-clipPath-photo"><rect x="(\d+)" y="(\d+)"/,
+  )
+  expect(mask?.slice(1)).toEqual(["40", "20"])
+  expect(clip?.slice(1)).toEqual(mask?.slice(1))
+})
+
 test("applies the export options", async () => {
   const box = [{ ...scene[0], boundElements: null }]
   const plain = await renderSvg(box, new Map(), { ...options, padding: 0 })
