@@ -24,10 +24,11 @@ export function SelectionCheckbox({
       aria-label={`Select ${name}`}
       onClick={(event) => onToggle(event.shiftKey)}
       className={cn(
-        "pointer-events-auto absolute top-2 left-2 z-10 flex size-5 items-center justify-center rounded-[5px] border shadow-keycap transition-[opacity,background-color,border-color] duration-150 outline-none focus-visible:ring-[2px] focus-visible:ring-ring/30",
+        "pointer-events-auto absolute top-2 left-2 z-10 flex size-5 items-center justify-center rounded-[5px] border transition-[opacity,background-color,border-color] duration-150 outline-none focus-visible:ring-[2px] focus-visible:ring-ring/30",
         checked
-          ? "border-iris bg-iris text-white"
-          : "border-keycap-border bg-keycap-from text-transparent hover:border-keycap-border-hover",
+          ? // The primary button's soft top light; the keycap's is too bright on iris
+            "border-iris bg-iris text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.16)]"
+          : "border-keycap-border bg-keycap-from text-transparent shadow-keycap hover:border-keycap-border-hover",
         !selecting &&
           "pointer-fine:opacity-0 pointer-fine:group-focus-within:opacity-100 pointer-fine:group-hover:opacity-100",
       )}
