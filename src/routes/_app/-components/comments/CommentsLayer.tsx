@@ -307,7 +307,8 @@ export function CommentsLayer({
 
       {openThread && openPin && (
         <div
-          className="absolute z-10 flex overflow-hidden rounded-lg bg-popover shadow-lg ring-1 ring-border"
+          // Above the panel: a narrow canvas has no room beside it.
+          className="absolute z-20 flex overflow-hidden rounded-lg bg-popover shadow-lg ring-1 ring-border"
           style={cardStyle(openPin)}
         >
           <div className="min-w-0 flex-1">
@@ -326,7 +327,7 @@ export function CommentsLayer({
 
       {draft && draftPin && (
         <div
-          className="absolute z-10 rounded-lg bg-popover p-3 shadow-lg ring-1 ring-border"
+          className="absolute z-20 rounded-lg bg-popover p-3 shadow-lg ring-1 ring-border"
           style={cardStyle(draftPin)}
         >
           <CommentComposer

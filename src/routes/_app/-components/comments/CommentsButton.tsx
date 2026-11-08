@@ -1,4 +1,5 @@
-// Opens the comments panel. The badge counts unread threads, else open ones.
+// Opens the comments panel. The badge counts unread open threads, else open
+// ones.
 
 import { useQuery } from "@tanstack/react-query"
 import { MessageSquareIcon } from "lucide-react"
@@ -11,7 +12,8 @@ export function useCommentCounts(drawingId: string) {
   const open = threads.filter((thread) => thread.resolvedAt === null)
   return {
     open: open.length,
-    unread: threads.filter((thread) => thread.unread).length,
+    // Resolved threads are done and hidden, so they don't ask to be read.
+    unread: open.filter((thread) => thread.unread).length,
   }
 }
 
