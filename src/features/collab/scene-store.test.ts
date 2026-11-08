@@ -10,6 +10,12 @@ import {
   saveRoomScene,
 } from "./scene-store"
 
+// Version history runs its own queries; it has a PGlite test of its own.
+vi.mock("@/features/drawings/versions", () => ({
+  snapshotBeforeWrite: vi.fn(),
+  keepVersionImages: vi.fn(),
+}))
+
 const stored = (scene: unknown) => JSON.stringify(scene)
 
 const elementsFrom = (data: string | null | undefined) =>

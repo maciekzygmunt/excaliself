@@ -19,6 +19,11 @@ import { drawingColumns, MAX_NAME_LENGTH } from "./list-columns"
 import { importDrawing, sceneContentSchema } from "./scene-import"
 import { writeDrawingScene } from "./scene-write"
 import { updateDrawingFields } from "./update"
+import {
+  getDrawingVersionData,
+  listDrawingVersions,
+  restoreVersionAsCopy,
+} from "./versions"
 
 export const getDrawings = createServerFn({ method: "GET" })
   .middleware([authMiddleware])
@@ -199,4 +204,28 @@ export const restoreDrawing = createServerFn({ method: "POST" })
   .validator(z.string())
   .handler(async ({ data: id, context }) =>
     restoreDrawingUnit(db, context.session.user.id, id),
+  )
+
+/** A drawing's history, newest first. Members who can see the drawing only. */
+export const getDrawingVersions = createServerFn({ method: "GET" })
+  .middleware([authMiddleware])
+  .validator((id: string) => id)
+  .handler(({ data: id, context }) =>
+    listDrawingVersions(db, context.session.user.id, id),
+  )
+
+/** One version's scene JSON, for its preview. */
+export const getDrawingVersion = createServerFn({ method: "GET" })
+  .middleware([authMiddleware])
+  .validator((id: string) => id)
+  .handler(({ data: id, context }) =>
+    getDrawingVersionData(db, context.session.user.id, id),
+  )
+
+/** Restores a version as a new Private drawing; returns its id. */
+export const restoreDrawingVersion = createServerFn({ method: "POST" })
+  .middleware([authMiddleware, listsChangedMiddleware])
+  .validator(z.string())
+  .handler(({ data: id, context }) =>
+    restoreVersionAsCopy(db, context.session.user.id, id),
   )
