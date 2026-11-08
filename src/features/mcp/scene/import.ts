@@ -4,6 +4,7 @@
 // result; ids and versions are trusted no more than restore() trusts them.
 
 import { z } from "zod"
+import { MAX_ELEMENT_DEPTH, nestedDeeperThan } from "@/features/collab/protocol"
 import {
   MAX_DRAWING_IMAGE_BYTES,
   parseFileUpload,
@@ -204,7 +205,17 @@ export function parseImportedScene(input: string | object): ImportedScene {
   const parsed = scene.safeParse(readJson(input))
   if (!parsed.success) throw new SceneInputError(describe(parsed.error.issues))
 
+  // The Room refuses deeper elements, so its later syncs would fail.
+  const deep = parsed.data.elements.findIndex((element) =>
+    nestedDeeperThan(element, MAX_ELEMENT_DEPTH),
+  )
+  if (deep >= 0)
+    throw new SceneInputError(
+      `elements[${deep}]: nested more than ${MAX_ELEMENT_DEPTH} levels deep.`,
+    )
+
   // As restore(): keep valid ids and versions, replace bad or repeated ids.
+  // A negative nonce is reset too, since the Room refuses it.
   // Deleted elements are dropped, as "Save to file" drops them.
   const seen = new Set<string>()
   const elements = withIndices(
@@ -218,8 +229,8 @@ export function parseImportedScene(input: string | object): ImportedScene {
           ...element,
           id,
           version: isVersion(element.version) ? element.version : 1,
-          versionNonce: Number.isSafeInteger(element.versionNonce)
-            ? (element.versionNonce as number)
+          versionNonce: isVersion(element.versionNonce)
+            ? element.versionNonce
             : 0,
         }
       }),

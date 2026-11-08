@@ -65,7 +65,7 @@ test("replaces bad and repeated ids and bad versions, and drops deleted elements
   const { content } = parseImportedScene(
     file([
       rect({ version: 2 ** 60, versionNonce: "x" }),
-      rect({ x: 10 }),
+      rect({ x: 10, versionNonce: -5 }),
       rect({ id: 5 }),
       rect({ id: "gone", isDeleted: true }),
     ]),
@@ -74,6 +74,7 @@ test("replaces bad and repeated ids and bad versions, and drops deleted elements
   expect(content.elements).toHaveLength(3)
   expect(first).toMatchObject({ id: "r1", version: 1, versionNonce: 0 })
   expect(second.id).not.toBe("r1")
+  expect(second.versionNonce).toBe(0)
   expect(typeof third.id).toBe("string")
   expect(third.id).not.toBe(second.id)
 })
@@ -87,6 +88,12 @@ test("names each element problem by its place in the scene", () => {
     errorOf(file([{ type: "arrow", id: "a", x: 0, y: 0, points: "far" }])),
   ).toMatch(/^elements\[0\]\.points: /)
   expect(errorOf(file([rect({ x: "1" })]))).toMatch(/^elements\[0\]\.x: /)
+  // The Room refuses elements nested deeper than 64 levels.
+  let deep: unknown = 1
+  for (let i = 0; i < 70; i++) deep = { deep }
+  expect(errorOf(file([rect(), rect({ customData: deep })]))).toBe(
+    "elements[1]: nested more than 64 levels deep.",
+  )
   // Restore reads points.length and fixedSegments.map() as they are.
   expect(errorOf(file([{ type: "line", id: "l", x: 0, y: 0 }]))).toMatch(
     /^elements\[0\]\.points: /,
