@@ -365,6 +365,28 @@ test("a cropped, rounded image is clipped over its visible part", async () => {
   expect(clip?.slice(1)).toEqual(mask?.slice(1))
 })
 
+test("an embed in a frame is clipped to the frame", async () => {
+  const result = await renderSvg(
+    [
+      { id: "frame", type: "frame", x: 0, y: 0, width: 100, height: 100 },
+      {
+        id: "embed",
+        type: "embeddable",
+        x: 50,
+        y: 50,
+        width: 100,
+        height: 100,
+        frameId: "frame",
+      },
+    ],
+    new Map(),
+    options,
+  )
+  expect(result?.svg).toMatch(
+    /<g clip-path="url\(#clip-frame\)"><g [^>]*stroke-linecap="round"/,
+  )
+})
+
 test("applies the export options", async () => {
   const box = [{ ...scene[0], boundElements: null }]
   const plain = await renderSvg(box, new Map(), { ...options, padding: 0 })

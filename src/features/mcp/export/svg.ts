@@ -301,21 +301,15 @@ function renderElement(scene: Scene, element: Element): string {
       )
       break
     case "iframe":
-    case "embeddable": {
-      const elementOpacity = element.opacity / 100
-      node =
+    case "embeddable":
+      node = clipped(
         drawable(shape[0], {
-          ...(elementOpacity !== 1
-            ? {
-                "stroke-opacity": elementOpacity,
-                "fill-opacity": elementOpacity,
-              }
-            : {}),
+          ...opacityAttrs,
           "stroke-linecap": "round",
           transform,
-        }) + renderElement(scene, embedLabel(element))
+        }) + renderElement(scene, embedLabel(element)),
+      )
       break
-    }
     case "line":
     case "arrow": {
       const boundText = element.boundTextId

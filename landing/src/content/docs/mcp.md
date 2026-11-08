@@ -180,6 +180,9 @@ in the README as an SVG". The image looks like Excalidraw's own
   looks the same everywhere, also in an `<img>` tag. Because of the fonts, a
   small drawing is still about 40 KB.
 
+A PNG has no emoji font, so emoji in its text do not show. An SVG leaves
+emoji to the viewer's system font.
+
 The client can also ask for dark mode, a transparent background, more or less
 space around the drawing, and a different size.
 
