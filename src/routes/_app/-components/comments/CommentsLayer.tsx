@@ -312,6 +312,8 @@ export function CommentsLayer({
         >
           <div className="min-w-0 flex-1">
             <CommentThreadCard
+              // A new thread gets an empty reply box, not the last one's draft.
+              key={openThread.id}
               drawingId={drawingId}
               thread={openThread}
               detached={pinPosition(openThread, elementsById).detached}
