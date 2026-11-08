@@ -35,9 +35,9 @@ function escapeIsTaken(event: KeyboardEvent) {
 }
 
 /**
- * The gallery's multi-select over the cards in `order` (grid order). Only
- * cards on screen count as selected, so a trashed, moved-out, or filtered-out
- * card drops out by itself. Escape clears.
+ * The gallery's multi-select over the cards in `order` (grid order). A card
+ * that leaves the screen (trashed, moved out, filtered out) leaves the
+ * selection for good, so it can't come back unseen. Escape clears.
  */
 export function useGallerySelection(order: readonly string[]) {
   const [chosen, setChosen] = useState<ReadonlySet<string>>(() => new Set())
@@ -47,6 +47,11 @@ export function useGallerySelection(order: readonly string[]) {
     () => new Set(order.filter((id) => chosen.has(id))),
     [order, chosen],
   )
+  useEffect(() => {
+    setChosen((current) =>
+      current.size === selected.size ? current : selected,
+    )
+  }, [selected])
 
   const toggle = useCallback(
     (id: string, extend: boolean) => {

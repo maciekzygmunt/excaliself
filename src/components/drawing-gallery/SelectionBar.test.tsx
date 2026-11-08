@@ -16,6 +16,8 @@ vi.mock("@/features/collab/server", () => ({
 }))
 vi.mock("@/features/drawings/server", () => ({
   getDrawingScene: vi.fn(async () => "{}"),
+  setDrawingStarred: vi.fn(),
+  updateDrawing: vi.fn(),
 }))
 vi.mock("@/features/drawings/bulk-server", () => ({
   trashDrawings: vi.fn(async () => {}),
@@ -30,6 +32,7 @@ vi.mock("@/features/account/server", () => ({
 vi.mock("@/features/shares/server", () => ({}))
 vi.mock("@/features/folders/server", () => ({
   getFolders: vi.fn(async () => []),
+  updateFolder: vi.fn(),
 }))
 vi.mock("./preview", () => ({ renderPreviewSvg: vi.fn(async () => null) }))
 vi.mock("@tanstack/react-router", () => ({
@@ -79,18 +82,21 @@ const drawings = ["a", "b", "c", "d"].map(
 )
 
 function renderGallery() {
-  render(
-    <QueryClientProvider client={new QueryClient()}>
+  const client = new QueryClient()
+  const ui = (shown: Drawing[]) => (
+    <QueryClientProvider client={client}>
       <DrawingGallery
-        drawings={drawings}
+        drawings={shown}
         isPending={false}
         loadingLabel="Loading"
         onTrash={() => {}}
         selectable
         empty={null}
       />
-    </QueryClientProvider>,
+    </QueryClientProvider>
   )
+  const { rerender } = render(ui(drawings))
+  return { show: (shown: Drawing[]) => rerender(ui(shown)) }
 }
 
 const box = (id: string) =>
@@ -143,4 +149,13 @@ test("Move to trash sends the selection in one call and ends it", async () => {
     }),
   )
   expect(screen.queryByRole("region", { name: "Selected drawings" })).toBeNull()
+})
+
+test("a card filtered out leaves the selection, and does not return with it", () => {
+  const { show } = renderGallery()
+  fireEvent.click(box("a"))
+  show(drawings.slice(1))
+  fireEvent.click(box("b"))
+  show(drawings)
+  expect(checked()).toEqual(["Select Drawing b"])
 })
