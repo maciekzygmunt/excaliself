@@ -29,6 +29,7 @@ survive redeploys. The other settings, such as
 ## Upgrade or pin a version
 
 Railway does not pull a newer image on its own. To upgrade, redeploy the
-service, or turn on automatic updates in its settings. To pin a version, use a
-release tag in the image name, e.g.
-`ghcr.io/maciekzygmunt/excaliself:1.2.3`.
+service, or turn on automatic updates in its settings. To pin a version, turn
+automatic updates off and use a release tag in the image name, e.g.
+`ghcr.io/maciekzygmunt/excaliself:1.2.3`. Automatic updates move a release tag
+to newer releases.
