@@ -33,6 +33,13 @@ export const env = createEnv({
           message: "BETTER_AUTH_SECRET must be at least 32 characters",
         }),
     BASE_URL: z.url().optional(),
+    // Comma-separated extra origins the app also opens at, e.g.
+    // "http://192.168.1.20:3000". SSO and MCP OAuth still use BASE_URL.
+    TRUSTED_ORIGINS: list().pipe(
+      z.array(
+        z.url({ protocol: /^https?$/ }).transform((url) => new URL(url).origin),
+      ),
+    ),
     PREVIEW_MODE: flag(),
     // Comma-separated host patterns a preview answers on, e.g.
     // "*.draw.example.com". Auth refuses any other host.

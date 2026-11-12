@@ -36,7 +36,8 @@ See the [Quick start](/docs/) for the install commands and
 Postgres is not published on the host; only the app port is
 (`EXCALISELF_PORT`, default `3000`). On a public server, put a reverse proxy
 with TLS (Caddy, Traefik, nginx) in front of it and set `BASE_URL` to the
-public `https://` URL. Auth rejects sign-ins from any other origin. Set
+public `https://` URL. Auth rejects sign-ins from any other origin, unless you
+list it in [`TRUSTED_ORIGINS`](/docs/environment/#more-than-one-address). Set
 `EXCALISELF_PORT=127.0.0.1:3000` to keep the app port local to the proxy.
 
 Rate limits, sign-in included, count per client IP address. The app trusts

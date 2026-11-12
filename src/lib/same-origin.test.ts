@@ -8,7 +8,11 @@ const request = (headers: Record<string, string>) =>
   new Request("http://internal:3000/ws/lists", { headers })
 
 beforeEach(() => {
-  Object.assign(env, { BASE_URL: undefined, PREVIEW_MODE: false })
+  Object.assign(env, {
+    BASE_URL: undefined,
+    PREVIEW_MODE: false,
+    TRUSTED_ORIGINS: [],
+  })
 })
 
 describe("fromOwnOrigin", () => {
@@ -35,6 +39,18 @@ describe("fromOwnOrigin", () => {
     expect(
       fromOwnOrigin(request({ origin: "https://42.draw.example.com" })),
     ).toBe(false)
+  })
+
+  it("also takes a TRUSTED_ORIGINS entry, matched exactly", () => {
+    Object.assign(env, {
+      BASE_URL: "http://umbrel.local:3000",
+      TRUSTED_ORIGINS: ["http://192.168.1.20:3000"],
+    })
+    expect(fromOwnOrigin(request({ origin: "http://192.168.1.20:3000" }))).toBe(
+      true,
+    )
+    for (const origin of ["https://192.168.1.20:3000", "http://192.168.1.20"])
+      expect(fromOwnOrigin(request({ origin }))).toBe(false)
   })
 
   it("without BASE_URL, or in preview, compares with the forwarded origin", () => {

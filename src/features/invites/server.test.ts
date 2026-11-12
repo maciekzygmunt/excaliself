@@ -25,7 +25,11 @@ vi.mock("@tanstack/react-start/server", () => ({
 }))
 vi.mock("@/middleware/admin", () => ({ adminMiddleware: {} }))
 vi.mock("@/env", () => ({
-  env: { BASE_URL: "http://127.0.0.1:3000", PREVIEW_HOSTS: [] },
+  env: {
+    BASE_URL: "http://127.0.0.1:3000",
+    PREVIEW_HOSTS: [],
+    TRUSTED_ORIGINS: [],
+  },
 }))
 vi.stubEnv("BETTER_AUTH_SECRET", "test-secret-test-secret-test-secret-00")
 vi.mock("@/features/collab/room-registry", async () => {

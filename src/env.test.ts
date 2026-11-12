@@ -33,3 +33,23 @@ test("MCP_STDIO starts in preview mode", async () => {
   const { env } = await import("./env")
   expect(env.MCP_STDIO).toBe(true)
 })
+
+test("TRUSTED_ORIGINS keeps only the origin of each entry", async () => {
+  vi.stubEnv("PREVIEW_MODE", "true")
+  vi.stubEnv(
+    "TRUSTED_ORIGINS",
+    "http://192.168.1.20:3000/, HTTP://Umbrel.local:3000/draw",
+  )
+  const { env } = await import("./env")
+  expect(env.TRUSTED_ORIGINS).toEqual([
+    "http://192.168.1.20:3000",
+    "http://umbrel.local:3000",
+  ])
+})
+
+test("TRUSTED_ORIGINS refuses a value that is not an http(s) URL", async () => {
+  vi.stubEnv("PREVIEW_MODE", "true")
+  vi.stubEnv("TRUSTED_ORIGINS", "192.168.1.20:3000")
+  vi.spyOn(console, "error").mockImplementation(() => {})
+  await expect(import("./env")).rejects.toThrow("Invalid environment variables")
+})
