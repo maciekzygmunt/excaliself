@@ -71,6 +71,18 @@ jobs:
           BETTER_AUTH_SECRET: smoke-secret-at-least-32-characters-long
         run: docker compose -f docker-compose.build.yaml config --quiet
 
+      # Portainer's file must differ from docker-compose.yaml only in requiring BASE_URL
+      - name: Check docker-compose.portainer.yaml
+        env:
+          POSTGRES_PASSWORD: smoke-password
+          BETTER_AUTH_SECRET: smoke-secret-at-least-32-characters-long
+        run: |
+          if BASE_URL= docker compose -f docker-compose.portainer.yaml config --quiet; then
+            echo "::error::docker-compose.portainer.yaml must require BASE_URL"; exit 1
+          fi
+          export BASE_URL=http://192.168.1.10:3000
+          diff <(docker compose -p x config) <(docker compose -p x -f docker-compose.portainer.yaml config)
+
       - name: Logs on failure
         if: failure()
         run: |

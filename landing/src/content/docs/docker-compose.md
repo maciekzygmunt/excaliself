@@ -88,9 +88,11 @@ migrations, so restoring it is the safe way back to the older version.
 
 In Portainer, add a stack from **Repository** with the URL
 `https://github.com/maciekzygmunt/excaliself` and the compose path
-`docker-compose.yaml`. Add `POSTGRES_PASSWORD`, `BETTER_AUTH_SECRET`, and
-`BASE_URL` as environment variables, then deploy. The repository's
-`portainer-template.json` is the same stack as a Portainer app template.
+`docker-compose.portainer.yaml`. Add `POSTGRES_PASSWORD`, `BETTER_AUTH_SECRET`,
+and `BASE_URL` as environment variables, then deploy. Set `BASE_URL` to the
+address you open the app at, e.g. `http://192.168.1.10:3000`. The stack does
+not start without it. The repository's `portainer-template.json` is the same
+stack as a Portainer app template.
 
 ## Build from source
 

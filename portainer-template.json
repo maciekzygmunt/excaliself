@@ -9,7 +9,7 @@
   "restart_policy": "unless-stopped",
   "repository": {
     "url": "https://github.com/maciekzygmunt/excaliself",
-    "stackfile": "docker-compose.yaml"
+    "stackfile": "docker-compose.portainer.yaml"
   },
   "env": [
     {
@@ -24,9 +24,8 @@
     },
     {
       "name": "BASE_URL",
-      "label": "Address you open Excaliself at",
-      "description": "Port included, e.g. http://192.168.1.10:3000 or https://draw.example.com. Sign-in refuses any other address.",
-      "default": "http://localhost:3000"
+      "label": "Address you open Excaliself at (required)",
+      "description": "Port included, e.g. http://192.168.1.10:3000 or https://draw.example.com. Sign-in refuses any other address."
     },
     {
       "name": "EXCALISELF_PORT",
@@ -34,5 +33,5 @@
       "default": "3000"
     }
   ],
-  "note": "Set the <b>database password</b> (<code>openssl rand -hex 24</code>) and the <b>auth secret</b> (<code>openssl rand -base64 32</code>) before you deploy. The stack won't start without them. Set the address to where you will open the app, e.g. <code>http://&lt;your-host&gt;:3000</code>. Then open it: the first visitor creates the admin account, so do this right away. Drawings are stored in the <code>pgdata</code> volume. For a public server, put a reverse proxy with HTTPS in front. Docs: <a href=\"https://excaliself.com/docs/docker-compose/\" target=\"_blank\">excaliself.com/docs</a>"
+  "note": "Set the <b>database password</b> (<code>openssl rand -hex 24</code>), the <b>auth secret</b> (<code>openssl rand -base64 32</code>) and the <b>address</b> you will open the app at, e.g. <code>http://&lt;your-host&gt;:3000</code>, before you deploy. The stack won't start without them. Then open that address: the first visitor creates the admin account, so do this right away. Drawings are stored in the <code>pgdata</code> volume. For a public server, put a reverse proxy with HTTPS in front. Docs: <a href=\"https://excaliself.com/docs/docker-compose/\" target=\"_blank\">excaliself.com/docs</a>"
 }
