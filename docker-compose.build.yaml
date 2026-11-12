@@ -27,6 +27,7 @@ services:
       # variable into previews too. The app checks the secret at boot.
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
       BASE_URL: ${BASE_URL:-http://localhost:3000}
+      TRUSTED_ORIGINS: ${TRUSTED_ORIGINS:-}
       # PREVIEW_MODE, PREVIEW_HOSTS and the optional single sign-on variables
       # (https://excaliself.com/docs/single-sign-on/) come from Coolify's .env,
       # which it adds to every service. See docs/pr-previews.md.

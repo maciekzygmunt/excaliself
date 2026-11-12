@@ -9,7 +9,8 @@ description: The settings of a deployment. Docker Compose takes them from .env, 
 |---|---|---|---|
 | `POSTGRES_PASSWORD` | Yes | — | Database password. Use hex (`openssl rand -hex 24`): it goes into a connection URL |
 | `BETTER_AUTH_SECRET` | Yes | — | Auth signing secret, min 32 chars (`openssl rand -base64 32`) |
-| `BASE_URL` | In production | `http://localhost:3000` | Public URL users open in the browser. Sign-in refuses pages from any other origin; live collaboration and image uploads refuse pages from any other host |
+| `BASE_URL` | In production | `http://localhost:3000` | Public URL users open in the browser. Sign-in refuses pages from any other origin; live collaboration and image uploads refuse pages from any other host. Add more addresses with `TRUSTED_ORIGINS` |
+| `TRUSTED_ORIGINS` | No | — | Comma-separated extra origins users may also open, e.g. `http://192.168.1.20:3000,http://nas.local:3000`. See [More than one address](#more-than-one-address) |
 | `EXCALISELF_VERSION` | No | `latest` | Image tag to run: `latest`, a release like `1.2.3` or `1.2`, or `main` |
 | `EXCALISELF_PORT` | No | `3000` | Host port for the app. `127.0.0.1:3000` keeps it local to a reverse proxy |
 | `POSTGRES_USER` | No | `excaliself` | Database user |
@@ -19,6 +20,21 @@ description: The settings of a deployment. Docker Compose takes them from .env, 
 To use your own Postgres, change `DATABASE_URL` in the compose file.
 
 `GET /api/health` returns `200` when the app is up and can reach Postgres.
+
+### More than one address
+
+A NAS often opens the app at more than one address: a LAN IP, a `.local`
+name, and a domain. Set `BASE_URL` to the main one and list the others in
+`TRUSTED_ORIGINS`. Each entry is a scheme, host, and port, with no path.
+
+- Sign-in, live collaboration, and image uploads work at every listed origin.
+  A sign-in holds only for the address where you signed in.
+- Invite and share links use the address you copy them from.
+- Single sign-on and MCP sign-in work only at `BASE_URL`, because the
+  provider sends you back there.
+- If `BASE_URL` is `https://` and an entry is `http://`, sign-in cookies lose
+  the `Secure` flag on every address, because browsers drop secure cookies on
+  plain HTTP. Members sign in again once after you add it.
 
 ## Single sign-on
 

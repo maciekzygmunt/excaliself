@@ -27,6 +27,7 @@ vi.mock("@/env", () => ({
   env: {
     BASE_URL: "http://127.0.0.1:3000",
     PREVIEW_HOSTS: [],
+    TRUSTED_ORIGINS: [],
     MICROSOFT_CLIENT_ID: "ms-client",
     MICROSOFT_CLIENT_SECRET: "ms-secret",
     MICROSOFT_TENANT_ID: "11111111-1111-1111-1111-111111111111",

@@ -35,6 +35,8 @@ export const auth = betterAuth({
   // Public origin when behind a reverse proxy; better-auth infers from the
   // request when unset.
   baseURL: env.PREVIEW_MODE ? previewBaseURL : env.BASE_URL,
+  // Sign-in also works from these pages. Each origin keeps its own cookie.
+  trustedOrigins: env.TRUSTED_ORIGINS,
   // Read from env.ts, which gives preview a default.
   secret: env.BETTER_AUTH_SECRET,
   database: drizzleAdapter(db, {
@@ -189,6 +191,13 @@ export const auth = betterAuth({
     // Preview sits behind Coolify's proxy, whose x-forwarded-proto makes the
     // derived scheme https. allowedHosts bounds a forged x-forwarded-host.
     trustedProxyHeaders: env.PREVIEW_MODE,
+    // Browsers drop Secure cookies on plain HTTP, so an http:// extra origin
+    // (a NAS on the LAN) turns the flag off. Unset: Better Auth's default.
+    useSecureCookies: env.TRUSTED_ORIGINS.some((origin) =>
+      origin.startsWith("http:"),
+    )
+      ? false
+      : undefined,
   },
   plugins: [...ssoPlugins, tanstackStartCookies()],
 })
