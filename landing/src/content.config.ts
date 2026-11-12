@@ -8,4 +8,10 @@ const docs = defineCollection({
   schema: z.object({ title: z.string(), description: z.string() }),
 })
 
-export const collections = { docs }
+// Blog posts. The file name is the URL slug; `date` is the publish date.
+const blog = defineCollection({
+  loader: glob({ pattern: "**/*.md", base: "./src/content/blog" }),
+  schema: z.object({ title: z.string(), description: z.string(), date: z.coerce.date() }),
+})
+
+export const collections = { docs, blog }

@@ -8,8 +8,10 @@ interface Props {
   title: string
   description: string
   noindex?: boolean
+  // "article" for blog posts.
+  ogType?: "website" | "article"
 }
-const { title, description, noindex = false } = Astro.props
+const { title, description, noindex = false, ogType = "website" } = Astro.props
 const base = import.meta.env.BASE_URL
 const ogImage = new URL(`${base}og.png`, Astro.site)
 const ogImageAlt =
@@ -29,9 +31,10 @@ const canonical = new URL(Astro.url.pathname, Astro.site)
     <link rel="icon" href={`${base}favicon.svg`} type="image/svg+xml" />
     <link rel="apple-touch-icon" href={`${base}apple-touch-icon.png`} />
     <link rel="sitemap" href={`${base}sitemap-index.xml`} />
+    <link rel="alternate" type="application/rss+xml" title="Excaliself blog" href={`${base}blog/rss.xml`} />
     <link rel="preload" href={handFont} as="font" type="font/woff2" crossorigin />
     <meta name="theme-color" content="#ffffff" />
-    <meta property="og:type" content="website" />
+    <meta property="og:type" content={ogType} />
     <meta property="og:site_name" content="Excaliself" />
     <meta property="og:url" content={canonical} />
     <meta property="og:title" content={title} />

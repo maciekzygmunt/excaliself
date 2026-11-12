@@ -1,0 +1,37 @@
+---
+import Layout from "../../layouts/Layout.astro"
+import { formatDate, getPosts, postHref } from "../../lib/blog"
+
+const posts = await getPosts()
+const base = import.meta.env.BASE_URL
+---
+
+<Layout
+  title="Blog: Excaliself"
+  description="Notes from the maintainer of Excaliself on self-hosting Excalidraw, live collaboration on your own server, and open-source alternatives to Excalidraw+."
+>
+  <main id="main" class="page pt-16 pb-10 md:pt-24">
+    <div class="grid-12 gap-y-10">
+      <div class="col-span-12 lg:col-span-4">
+        <h1 class="display text-display">Blog</h1>
+        <p class="hand mt-6 text-xl text-pen">notes on running Excalidraw on your own server</p>
+        <p class="mt-6 text-sm text-muted">
+          <a href={`${base}blog/rss.xml`} class="link">RSS feed</a>
+        </p>
+      </div>
+      <ol class="col-span-12 flex max-w-[44rem] flex-col lg:col-span-7 lg:col-start-6">
+        {posts.map((post) => (
+          <li class="border-t border-line py-7 first:border-t-0 first:pt-0">
+            <article>
+              <p class="text-sm text-muted"><time datetime={post.data.date.toISOString().slice(0, 10)}>{formatDate(post.data.date)}</time></p>
+              <h2 class="mt-2 text-2xl font-semibold tracking-tight">
+                <a href={postHref(post.id)} class="transition-colors duration-300 hover:text-pen">{post.data.title}</a>
+              </h2>
+              <p class="mt-2 text-muted">{post.data.description}</p>
+            </article>
+          </li>
+        ))}
+      </ol>
+    </div>
+  </main>
+</Layout>
