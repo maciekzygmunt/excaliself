@@ -303,6 +303,8 @@ export function planEdit(
       text: placed.text,
       originalText: placed.originalText,
       strokeColor,
+      // An arrow's label is back on its middle, not where a user dragged it.
+      labelPosition: null,
     })
   }
 

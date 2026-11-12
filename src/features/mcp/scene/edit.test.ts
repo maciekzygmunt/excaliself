@@ -185,6 +185,17 @@ test("an arrow relabeled while its shape moves keeps the new label", () => {
   expect(label.x as number).toBeGreaterThan(300)
 })
 
+test("a label dragged along its arrow goes back to the middle when the arrow is rerouted", () => {
+  const { elements, api, arrow, labelOf } = drawing()
+  const dragged = elements.map((element) =>
+    element.id === labelOf(arrow.id).id
+      ? { ...element, labelPosition: 0.2 }
+      : element,
+  )
+  const result = plan(dragged, { change: [{ id: api.id, x: 700 }] })
+  expect(byId(result.elements, labelOf(arrow.id).id).labelPosition).toBeNull()
+})
+
 test("a shape with no label gets one, bound both ways", () => {
   const [box] = buildScene({
     elements: [{ type: "rectangle", x: 0, y: 0 }],
