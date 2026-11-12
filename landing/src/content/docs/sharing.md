@@ -45,3 +45,8 @@ exists.
   size of the drawing plus 8 MB. The app reconnects by itself and loads the
   drawing again.
 - Guests do not see the [Team library](/docs/team-library/).
+- In a live drawing, only the drawing elements (shapes, text, arrows, and
+  images) sync and save. Changes to the canvas background color or the grid do
+  not reach others and are not saved: the drawing keeps the background and grid
+  it had before it went live. Team drawings are always live, so this applies to
+  them all the time. A private drawing is live while it has a share link.

@@ -43,7 +43,7 @@ const features = [
   {
     title: "A space the whole team shares",
     body: "A Private | Team switch in the sidebar. Team folders and drawings belong to everyone, and a badge shows who is in each drawing right now. Move a private drawing over when it is ready.",
-    note: "shows up once you invite someone",
+    note: "shows up with a second member or anything in Team",
     image: teamShot,
     crop: "",
     alt: "The Team space home: the sidebar switch set to Team with two people live, team folders, and drawing cards with their creators",
@@ -52,7 +52,7 @@ const features = [
   },
   {
     title: "Let your AI client draw",
-    body: "Connect Claude Code, Claude Desktop, or any MCP client with a personal access token. It finds and reads your drawings, and draws new ones from a sentence or a Mermaid flowchart. Your client brings the model, so the server needs no AI key.",
+    body: "Connect Claude.ai, Claude Code, Claude Desktop, or another MCP client. Sign in with OAuth or use a personal access token. The client finds and reads the drawings you can see, and draws new ones from a sentence or a Mermaid flowchart. Your client brings the model, so the server needs no AI key.",
     note: "Claude Code drew this from one prompt",
     image: mcpShot,
     crop: "",
@@ -72,7 +72,7 @@ const features = [
   },
   {
     title: "Your team only",
-    body: "The first visitor becomes the admin. Everyone else joins through a single use invite link. Admins manage roles and password resets from Settings.",
+    body: "The first visitor becomes the admin. Others join through a single use invite link. With optional SSO, your identity provider signs people in, and people from email domains you allow join without an invite. Admins manage roles and password resets from Settings.",
     note: "no public signup page",
     image: membersShot,
     crop: "aspect-[2760/790]",
@@ -84,17 +84,20 @@ const features = [
 
 const steps = [
   { title: "Download two files", body: "The compose file and an example env file, straight from the repository." },
-  { title: "Set three variables", body: "A Postgres password, a session secret, and your public URL." },
+  { title: "Set three variables", body: "Generate a Postgres password and a session secret, and set your public URL in .env." },
   { title: "Start it and open the URL", body: "The first visit creates the admin account. Share invite links from Settings." },
 ]
 
-const compose = [
+// Step 1 and step 3 commands. Step 2 is an edit of .env, so it has no command to copy.
+const download = [
   "mkdir excaliself && cd excaliself",
   "curl -fsSLO https://raw.githubusercontent.com/maciekzygmunt/excaliself/main/docker-compose.yaml",
   "curl -fsSL -o .env https://raw.githubusercontent.com/maciekzygmunt/excaliself/main/.env.example",
-  "# set POSTGRES_PASSWORD, BETTER_AUTH_SECRET, and BASE_URL in .env",
-  "docker compose up -d",
 ]
+const start = ["docker compose up -d"]
+
+// Inline code on the light background.
+const code = "rounded bg-well px-1.5 py-0.5 font-mono text-[0.875em] whitespace-nowrap text-ink"
 
 // One container with example drawings and an in-memory database, to look around before installing.
 const tryIt = ["docker run --rm -p 127.0.0.1:3000:3000 -e PREVIEW_MODE=true ghcr.io/maciekzygmunt/excaliself"]
@@ -111,7 +114,7 @@ const faq: { q: string; a: string; more?: { href: string; label: string } }[] = 
   },
   {
     q: "Can AI tools use my drawings?",
-    a: "Yes, over MCP. Each member makes an access token in Settings and connects Claude Code, Claude Desktop, or another MCP client. The client can search, read, create, and export drawings, create folders, comment on drawings, move drawings between folders, and move drawings and folders to the trash. It can propose a change to a drawing, but nothing changes until you click Apply. It cannot delete anything for good. The server needs no AI API key.",
+    a: "Yes, over MCP, if a member connects one. The member connects Claude.ai, Claude Code, Claude Desktop, or another MCP client, and signs in with OAuth or uses an access token from Settings. The client sees only the drawings that member can see. It can search, read, create, and export drawings, create folders, comment on drawings, move drawings between folders, and move drawings and folders to the trash. It can propose a change to a drawing, but nothing changes until you click Apply. It cannot delete anything for good. The server needs no AI API key.",
   },
   {
     q: "What do I need to run it?",
@@ -119,7 +122,7 @@ const faq: { q: string; a: string; more?: { href: string; label: string } }[] = 
   },
   {
     q: "Where are my drawings stored?",
-    a: "In your own Postgres database, including pasted images. Back up the pgdata volume and you have everything. Nothing is sent to a third party.",
+    a: "In your own Postgres database, including pasted images. Back up the pgdata volume and you have everything. It needs no third party account or service. Optional integrations work only when you set them up: an AI client that a member connects reads the drawings that member can see, and SSO signs people in through your identity provider.",
   },
   {
     q: "How do updates work?",
@@ -131,7 +134,7 @@ const faq: { q: string; a: string; more?: { href: string; label: string } }[] = 
   },
   {
     q: "How do people join?",
-    a: "The first visitor creates the admin account. Admins send invite links from Settings and can manage members, roles, and password resets there.",
+    a: "The first visitor creates the admin account. Admins send invite links from Settings and can manage members, roles, and password resets there. If you set up SSO with Google Workspace, Microsoft Entra ID, or an OIDC provider, people from the email domains you allow join the first time they sign in, with no invite.",
   },
   {
     q: "Does it support live collaboration?",
@@ -214,9 +217,15 @@ const stepArrow = (i: number) => arrow([[20, 2], [22, 26], [20, 50]], { seed: 33
             Excaliself is self-hosted Excalidraw: the full canvas, plus a shared Team space, live collaboration, folders,
             and search. Every drawing lives in your own Postgres.
           </p>
-          <div class="flex flex-wrap items-center gap-4">
-            <a href="#deploy" class="btn btn-ink selectable max-sm:w-full">Deploy in five minutes<Selection /></a>
-            <a href={repo} class="btn btn-line selectable max-sm:w-full"><Icon name="github-logo" size={18} />Read the source<StarCount /><Selection /></a>
+          <div class="flex flex-col gap-4">
+            <div class="flex flex-wrap items-center gap-4">
+              <a href="#deploy" class="btn btn-ink selectable max-sm:w-full">Deploy in five minutes<Selection /></a>
+              <a href={repo} class="btn btn-line selectable max-sm:w-full"><Icon name="github-logo" size={18} />Read the source<StarCount /><Selection /></a>
+            </div>
+            <p class="text-sm text-muted">
+              <a href="#try" class="link font-medium text-ink">Try locally</a> first. You need Docker, and the preview data
+              is gone when the container stops.
+            </p>
           </div>
         </div>
         <div class="hero-diagram mt-10 md:mt-12">
@@ -337,18 +346,51 @@ const stepArrow = (i: number) => arrow([[20, 2], [22, 26], [20, 50]], { seed: 33
             <Icon name="arrow-right" size={16} class="transition-transform duration-300 group-hover:translate-x-1" />
           </a>
         </div>
-        <Terminal lines={compose} class="col-span-12 self-start lg:sticky lg:top-24 lg:col-span-7" />
+        <div class="col-span-12 flex flex-col gap-8 self-start lg:col-span-7">
+          <div>
+            <p class="mb-3 font-semibold"><span class="hand mr-2 text-pen">1.</span>Download the files</p>
+            <Terminal lines={download} />
+          </div>
+          <div>
+            <p class="mb-3 font-semibold"><span class="hand mr-2 text-pen">2.</span>Set three values in .env</p>
+            <div class="rounded-xl border border-line p-5 md:p-6">
+              <ul class="flex flex-col gap-3 text-muted">
+                <li>
+                  <code class={code}>POSTGRES_PASSWORD</code>: run <code class={code}>openssl rand -hex 24</code> and paste
+                  its output.
+                </li>
+                <li>
+                  <code class={code}>BETTER_AUTH_SECRET</code>: run <code class={code}>openssl rand -base64 32</code> and
+                  paste its output.
+                </li>
+                <li>
+                  <code class={code}>BASE_URL</code>: the URL people will open, such as
+                  <code class={code}>https://draw.example.com</code>.
+                </li>
+              </ul>
+              <p class="mt-4 text-muted">
+                On a public server, put{" "}
+                <a href={`${import.meta.env.BASE_URL}docs/docker-compose/#reverse-proxy`} class="link font-medium text-ink">a reverse proxy with HTTPS</a>
+                {" "}in front of the app before you start it.
+              </p>
+            </div>
+          </div>
+          <div>
+            <p class="mb-3 font-semibold"><span class="hand mr-2 text-pen">3.</span>Start it</p>
+            <Terminal lines={start} />
+          </div>
+        </div>
       </div>
       <div id="try" class="grid-12 mt-20 scroll-mt-24 items-center gap-y-8 md:mt-28">
         <div class="col-span-12 lg:col-span-5">
           <h3 class="text-head leading-[1.02] font-semibold tracking-[-0.035em]">Or try it first, with one command</h3>
           <p class="mt-4 text-muted">
-            No Postgres and no .env. The container starts with example drawings and keeps everything in memory, so it is
-            gone when the container stops.
+            You need only Docker: no Postgres and no .env. The container starts with example drawings and keeps everything
+            in memory, so it is gone when the container stops.
           </p>
           <p class="mt-4 text-muted">
-            Open <code class="rounded bg-well px-1.5 py-0.5 font-mono text-[0.875em] whitespace-nowrap text-ink">localhost:3000/preview/login</code>.
-            To draw together, open it with <code class="rounded bg-well px-1.5 py-0.5 font-mono text-[0.875em] whitespace-nowrap text-ink">?account=new</code>
+            Open <code class={code}>localhost:3000/preview/login</code>.
+            To draw together, open it with <code class={code}>?account=new</code>
             in a second browser: that signs in as a new member.
           </p>
         </div>
@@ -413,7 +455,10 @@ const stepArrow = (i: number) => arrow([[20, 2], [22, 26], [20, 50]], { seed: 33
       <div class="grid-12 gap-y-8">
         <h2 id="cta-title" class="heading col-span-12 lg:col-span-8">Nothing to sign up for. Nothing to export later.</h2>
         <div class="col-span-12 flex flex-col gap-7 lg:col-span-4 lg:self-end">
-          <p class="text-muted">No third party accounts, no telemetry, no lock in. Stop the container and your drawings are still in your Postgres.</p>
+          <p class="text-muted">
+            No third party account required, no telemetry, no lock in. AI clients and SSO are optional, and you set them up
+            yourself. Stop the app container and your drawings are still in your Postgres.
+          </p>
           <div class="flex flex-wrap gap-4">
             <a href="#deploy" class="btn btn-ink selectable max-sm:w-full">Deploy in five minutes<Selection /></a>
             <a href={repo} class="btn btn-line selectable max-sm:w-full"><Icon name="github-logo" size={18} />GitHub<StarCount /><Selection /></a>
