@@ -55,7 +55,8 @@ let people sign in with [Google, Microsoft, or OIDC](/docs/single-sign-on/).
 ## Next steps
 
 - Put a reverse proxy with HTTPS in front of it: [Docker Compose](/docs/docker-compose/).
-- Run it on Coolify or Railway instead: [Coolify](/docs/coolify/), [Railway](/docs/railway/).
+- Run it on Coolify, Railway, or Hostinger instead: [Coolify](/docs/coolify/),
+  [Railway](/docs/railway/), [Hostinger](/docs/hostinger/).
 - See every setting: [Environment variables](/docs/environment/).
 - Bring your team in: [Members and invites](/docs/members/).
 - Take your first backup: [Backup and restore](/docs/backup-restore/).

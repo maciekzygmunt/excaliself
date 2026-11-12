@@ -84,6 +84,14 @@ Drawings live in the `pgdata` volume, which survives upgrades and
 Take a [backup](/docs/backup-restore/) before each upgrade. There are no down
 migrations, so restoring it is the safe way back to the older version.
 
+## Portainer
+
+In Portainer, add a stack from **Repository** with the URL
+`https://github.com/maciekzygmunt/excaliself` and the compose path
+`docker-compose.yaml`. Add `POSTGRES_PASSWORD`, `BETTER_AUTH_SECRET`, and
+`BASE_URL` as environment variables, then deploy. The repository's
+`portainer-template.json` is the same stack as a Portainer app template.
+
 ## Build from source
 
 To build the image on the server instead of pulling it (needs ~4 GB RAM),
