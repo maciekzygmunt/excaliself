@@ -111,7 +111,7 @@ const faq: { q: string; a: string; more?: { href: string; label: string } }[] = 
   },
   {
     q: "Can AI tools use my drawings?",
-    a: "Yes, over MCP. Each member makes an access token in Settings and connects Claude Code, Claude Desktop, or another MCP client. The client can search, read, and create drawings, create folders, move drawings between folders, and move drawings and folders to the trash. It cannot change what is in a drawing, and it cannot delete anything for good. The server needs no AI API key.",
+    a: "Yes, over MCP. Each member makes an access token in Settings and connects Claude Code, Claude Desktop, or another MCP client. The client can search, read, create, and export drawings, create folders, comment on drawings, move drawings between folders, and move drawings and folders to the trash. It can propose a change to a drawing, but nothing changes until you click Apply. It cannot delete anything for good. The server needs no AI API key.",
   },
   {
     q: "What do I need to run it?",
@@ -148,11 +148,12 @@ const appSchema = {
   "@context": "https://schema.org",
   "@type": "SoftwareApplication",
   name: "Excaliself",
-  description: "Self-hosted Excalidraw for teams, with a shared Team space, live collaboration, folders, search, and a trash can.",
+  description:
+    "Self-hosted Excalidraw for teams: accounts, single sign-on, a shared Team space, folders, search, live collaboration, comments, and an MCP server. Drawings are stored in your own Postgres.",
   url: new URL(import.meta.env.BASE_URL, Astro.site).href,
   image: new URL(`${import.meta.env.BASE_URL}og.png`, Astro.site).href,
   applicationCategory: "DesignApplication",
-  operatingSystem: "Docker",
+  operatingSystem: "Linux, Docker",
   license: "https://opensource.org/licenses/MIT",
   codeRepository: repo,
   offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
