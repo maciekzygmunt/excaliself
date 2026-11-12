@@ -6,6 +6,7 @@
   <Network>bridge</Network>
   <Shell>sh</Shell>
   <Privileged>false</Privileged>
+  <ExtraParams>--restart=unless-stopped</ExtraParams>
   <Support>https://github.com/maciekzygmunt/excaliself/issues</Support>
   <Project>https://excaliself.com</Project>
   <ReadMe>https://excaliself.com/docs/unraid/</ReadMe>
