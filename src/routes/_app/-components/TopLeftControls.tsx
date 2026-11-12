@@ -27,7 +27,7 @@ export function TopLeftControls({
         aria-label="Toggle Sidebar"
         title="Toggle Sidebar"
       >
-        <PanelLeftIcon className="h-(--lg-icon-size) w-(--lg-icon-size)" />
+        <PanelLeftIcon className="h-(--lg-icon-size) w-(--lg-icon-size) shrink-0" />
       </button>
       {readOnly ? (
         <span

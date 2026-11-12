@@ -76,6 +76,7 @@ const ELEMENT_TYPES = [
   "rectangle",
   "diamond",
   "ellipse",
+  "stickynote",
   "text",
   "arrow",
   "line",
@@ -93,6 +94,11 @@ const element = z.discriminatedUnion(
     z.looseObject({
       type: z.enum(["rectangle", "diamond", "ellipse", "embeddable", "iframe"]),
       ...common,
+    }),
+    z.looseObject({
+      type: z.literal("stickynote"),
+      ...common,
+      baseHeight: num.optional(),
     }),
     z.looseObject({
       type: z.literal("text"),
@@ -219,7 +225,7 @@ export function parseImportedScene(input: string | object): ImportedScene {
 
   // As restore(): keep valid ids and versions, replace bad or repeated ids.
   // A negative nonce is reset too, since the Room refuses it.
-  // Deleted elements are dropped, as "Save to file" drops them.
+  // Deleted elements are dropped.
   const seen = new Set<string>()
   const elements = withIndices(
     parsed.data.elements

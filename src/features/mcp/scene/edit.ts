@@ -11,6 +11,7 @@ import {
   arrowLabel,
   boundText,
   center,
+  centerBinding,
   type Label,
   outlinePoint,
   type ShapeType,
@@ -465,6 +466,9 @@ export function planEdit(
         [0, 0],
         [to[0] - from[0], to[1] - from[1]],
       ],
+      // The new route aims at each shape's center, whatever it did before.
+      ...(start ? { startBinding: centerBinding(start.id) } : {}),
+      ...(end ? { endBinding: centerBinding(end.id) } : {}),
     })
     setLabel(element, null, connectorLabel(element))
   }

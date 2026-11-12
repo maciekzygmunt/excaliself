@@ -192,8 +192,30 @@ const scene = [
     ],
     pressures: [],
     simulatePressure: true,
+    strokeOptions: { variability: "variable", streamline: 0.5 },
     seed: 20,
-    lastCommittedPoint: null,
+  },
+  // A stroke of one width, with a sharp corner.
+  {
+    ...base,
+    id: "marker",
+    type: "freedraw",
+    x: 550,
+    y: 300,
+    width: 65,
+    height: 45,
+    points: [
+      [0, 0],
+      [30, 5],
+      [60, 0],
+      [65, 40],
+      [20, 45],
+      [25, 20],
+    ],
+    pressures: [],
+    simulatePressure: true,
+    strokeOptions: { variability: "constant", streamline: 0.2 },
+    seed: 22,
   },
   text({
     id: "note",
@@ -228,6 +250,69 @@ const scene = [
     seed: 31,
     backgroundColor: "#d0bfff",
   },
+  // In the frame, and not clipped to it: an arrow can leave its frame.
+  {
+    ...base,
+    id: "relation",
+    type: "arrow",
+    x: 720,
+    y: 60,
+    width: 160,
+    height: 0,
+    points: [
+      [0, 0],
+      [160, 0],
+    ],
+    frameId: "frame",
+    seed: 33,
+    startArrowhead: "cardinality_zero_or_one",
+    endArrowhead: "cardinality_zero_or_many",
+  },
+  // Its last segment is too short for a full-size arrowhead.
+  {
+    ...base,
+    id: "hook",
+    type: "arrow",
+    x: 400,
+    y: 400,
+    width: 60,
+    height: 14,
+    points: [
+      [0, 0],
+      [60, 0],
+      [60, 14],
+    ],
+    seed: 34,
+    startArrowhead: "cardinality_exactly_one",
+    endArrowhead: "arrow",
+  },
+  {
+    ...base,
+    id: "sticky",
+    type: "stickynote",
+    x: 950,
+    y: 0,
+    width: 200,
+    height: 200,
+    baseHeight: 200,
+    backgroundColor: "#ffdf6b",
+    roughness: 2,
+    roundness: { type: 3 },
+    seed: 35,
+    created: Date.UTC(2025, 8, 7, 12),
+    boundElements: [{ id: "stickyText", type: "text" }],
+  },
+  text({
+    id: "stickyText",
+    x: 1000,
+    y: 77.5,
+    text: "Ask ops",
+    textAlign: "center",
+    verticalAlign: "middle",
+    containerId: "sticky",
+    baseFontSize: 20,
+    seed: 36,
+  }),
   {
     ...base,
     id: "image",
@@ -267,14 +352,17 @@ test("draws a scene as Excalidraw's own SVG export does", async () => {
       constructor(public family: string) {}
     },
   })
-  const { exportToSvg } = await import("@excalidraw/excalidraw")
-  const theirs = await exportToSvg({
-    elements: scene as never,
-    appState: { exportBackground: true, viewBackgroundColor: "#ffffff" },
-    files: {
-      file1: { id: "file1", mimeType: "image/png", dataURL: PNG, created: 1 },
-    } as never,
-    skipInliningFonts: true,
+  const { exportScene } = await import("@excalidraw/excalidraw")
+  const theirs = await exportScene({
+    type: "svg",
+    data: {
+      elements: scene as never,
+      appState: { viewBackgroundColor: "#ffffff" },
+      files: {
+        file1: { id: "file1", mimeType: "image/png", dataURL: PNG, created: 1 },
+      } as never,
+    },
+    config: { skipInliningFonts: true },
   })
   const mine = await renderSvg(
     scene,
@@ -359,7 +447,7 @@ test("a cropped, rounded image is clipped over its visible part", async () => {
     /<mask id="mask-image-crop-photo"[^>]*><rect x="(\d+)" y="(\d+)"/,
   )
   const clip = result?.svg.match(
-    /<clipPath id="image-clipPath-photo"><rect x="(\d+)" y="(\d+)"/,
+    /<clipPath id="image-clipPath-photo"[^>]*><rect x="(\d+)" y="(\d+)"/,
   )
   expect(mask?.slice(1)).toEqual(["40", "20"])
   expect(clip?.slice(1)).toEqual(mask?.slice(1))

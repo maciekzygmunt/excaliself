@@ -34,7 +34,8 @@ export function useImportDrawingFiles() {
   return useCallback(
     async (files: File[], target: ImportTarget) => {
       const toastId = toast.loading(`Importing ${plural(files.length, "file")}`)
-      const { loadFromBlob, serializeAsJSON } = await loadExcalidraw()
+      const { getNonDeletedElements, loadFromBlob, serializeAsJSON } =
+        await loadExcalidraw()
       const failed: string[] = []
       let skippedImages = 0
 
@@ -46,7 +47,7 @@ export function useImportDrawingFiles() {
         try {
           const scene = await loadFromBlob(file, null, null)
           const json = serializeAsJSON(
-            scene.elements,
+            getNonDeletedElements(scene.elements),
             scene.appState,
             scene.files,
             "local",

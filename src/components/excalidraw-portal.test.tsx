@@ -1,6 +1,6 @@
 import { cleanup, render, screen, waitFor } from "@testing-library/react"
 import { afterEach, expect, test } from "vitest"
-import { FooterRightPortal, TopLeftPortal } from "./excalidraw-portal"
+import { FooterRightPortal } from "./excalidraw-portal"
 
 afterEach(() => {
   cleanup()
@@ -12,50 +12,39 @@ function mountExcalidrawUi() {
   document.querySelector(".excalidraw")?.remove()
   const root = document.createElement("div")
   root.className = "excalidraw"
-  root.innerHTML = `
-    <div class="App-menu_top__left"><div></div></div>
-    <div class="layer-ui__wrapper__footer-right"></div>`
+  root.innerHTML = `<div class="layer-ui__wrapper__footer-right"></div>`
   document.body.append(root)
   return root
 }
 
-test("portals render once Excalidraw mounts its UI slots", async () => {
+const renderPortal = () =>
   render(
-    <>
-      <TopLeftPortal>
-        <button type="button">Toggle</button>
-      </TopLeftPortal>
-      <FooterRightPortal>
-        <span>Saved</span>
-      </FooterRightPortal>
-    </>,
+    <FooterRightPortal>
+      <span>Saved</span>
+    </FooterRightPortal>,
   )
-  expect(screen.queryByText("Toggle")).toBeNull()
+
+test("the portal renders once Excalidraw mounts its footer", async () => {
+  renderPortal()
+  expect(screen.queryByText("Saved")).toBeNull()
 
   mountExcalidrawUi()
 
-  await waitFor(() => {
-    expect(
-      screen.getByText("Toggle").closest(".App-menu_top__left"),
-    ).not.toBeNull()
+  await waitFor(() =>
     expect(
       screen.getByText("Saved").closest(".layer-ui__wrapper__footer-right"),
-    ).not.toBeNull()
-  })
+    ).not.toBeNull(),
+  )
 })
 
-test("portals follow Excalidraw when it re-creates its UI", async () => {
+test("the portal follows Excalidraw when it re-creates its UI", async () => {
   mountExcalidrawUi()
-  render(
-    <TopLeftPortal>
-      <button type="button">Toggle</button>
-    </TopLeftPortal>,
-  )
-  await waitFor(() => expect(screen.getByText("Toggle").isConnected).toBe(true))
+  renderPortal()
+  await waitFor(() => expect(screen.getByText("Saved").isConnected).toBe(true))
 
   const next = mountExcalidrawUi()
 
   await waitFor(() =>
-    expect(next.contains(screen.getByText("Toggle"))).toBe(true),
+    expect(next.contains(screen.getByText("Saved"))).toBe(true),
   )
 })

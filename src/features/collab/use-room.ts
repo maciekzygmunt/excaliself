@@ -12,6 +12,8 @@ import type { OrderedExcalidrawElement } from "@excalidraw/excalidraw/element/ty
 import type {
   BinaryFiles,
   ExcalidrawImperativeAPI,
+  SocketId,
+  UserToFollow,
 } from "@excalidraw/excalidraw/types"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { createReconnectBackoff } from "@/lib/socket/backoff"
@@ -415,6 +417,15 @@ export function useRoom(options: {
       null,
     [others, follow.followedConnectionId],
   )
+  // The canvas reports a pan or zoom that ends the follow only while it has this.
+  const userToFollow = useMemo<UserToFollow | null>(
+    () =>
+      followedParticipant && {
+        socketId: followedParticipant.connectionId as SocketId,
+        username: followedParticipant.name,
+      },
+    [followedParticipant],
+  )
 
   return {
     self,
@@ -423,6 +434,7 @@ export function useRoom(options: {
     onChange,
     onPointerUpdate,
     followedParticipant,
+    userToFollow,
     onScrollChange: follow.onScrollChange,
     toggleFollow: follow.toggleFollow,
     stopFollowing: follow.stopFollowing,
