@@ -90,8 +90,9 @@ than the websocket:
   `json.excalidraw.com`
   ([data/index.ts](https://github.com/excalidraw/excalidraw/blob/master/excalidraw-app/data/index.ts)).
 
-All three are encrypted in the browser. The key is in the part of the link
-after `#room=`, and browsers do not send that part to any server. So
+All three are encrypted in the browser. The key is in the link fragment
+(`#room=` for a collaboration room, `#json=` for a read-only link), and
+browsers do not send the fragment to any server. So
 excalidraw.com stores ciphertext. Still, if your rule is "drawings do not
 leave our network", the stock image does not follow it.
 
