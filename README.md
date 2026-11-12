@@ -18,6 +18,10 @@
 </p>
 
 <p align="center">
+  <a href="https://www.opensourcealternatives.to"><img src="https://www.opensourcealternatives.to/badge-osa.svg" height="20" alt="As seen on Open Source Alternatives"></a>
+</p>
+
+<p align="center">
   <img src="docs/images/home-light.png" width="49%" alt="Excaliself home screen in the light theme: a sidebar with starred drawings and folders next to a grid of drawing previews">
   <img src="docs/images/home-dark.png" width="49%" alt="The same home screen in the dark theme">
 </p>
