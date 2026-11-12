@@ -1,0 +1,32 @@
+<?xml version="1.0"?>
+<Container version="2">
+  <Name>Excaliself</Name>
+  <Repository>ghcr.io/maciekzygmunt/excaliself:latest</Repository>
+  <Registry>https://github.com/maciekzygmunt/excaliself/pkgs/container/excaliself</Registry>
+  <Network>bridge</Network>
+  <Shell>sh</Shell>
+  <Privileged>false</Privileged>
+  <ExtraParams>--restart=unless-stopped</ExtraParams>
+  <Support>https://github.com/maciekzygmunt/excaliself/issues</Support>
+  <Project>https://excaliself.com</Project>
+  <ReadMe>https://excaliself.com/docs/unraid/</ReadMe>
+  <Overview>Excaliself is a self-hosted Excalidraw for teams: the Excalidraw editor with accounts, live collaboration, a team space, folders, search, and share links. Every drawing is stored in PostgreSQL.
+
+Before you install:
+- Install a PostgreSQL container, for example postgresql17 from Community Applications. Set its POSTGRES_USER and POSTGRES_DB to excaliself, and its POSTGRES_PASSWORD to the output of: openssl rand -hex 24
+- Generate the auth secret with: openssl rand -base64 32
+
+Then open the WebUI. The first account you create is the admin.</Overview>
+  <Category>Productivity:</Category>
+  <WebUI>http://[IP]:[PORT:3000]/</WebUI>
+  <TemplateURL>https://raw.githubusercontent.com/maciekzygmunt/excaliself/main/unraid/excaliself.xml</TemplateURL>
+  <Icon>https://raw.githubusercontent.com/maciekzygmunt/excaliself/main/public/logo512.png</Icon>
+  <Requires>A PostgreSQL database, for example the postgresql17 container from Community Applications.</Requires>
+  <License>MIT</License>
+  <ExtraSearchTerms>excalidraw whiteboard diagram drawing collaboration</ExtraSearchTerms>
+  <Config Name="WebUI Port" Target="3000" Default="3000" Mode="tcp" Description="Port for the web interface." Type="Port" Display="always" Required="true" Mask="false">3000</Config>
+  <Config Name="App URL" Target="BASE_URL" Default="" Mode="" Description="The address you open Excaliself at, with the port, for example http://192.168.1.10:3000 or https://draw.example.com. Sign-in refuses pages from any other address." Type="Variable" Display="always" Required="true" Mask="false"/>
+  <Config Name="Other URLs" Target="TRUSTED_ORIGINS" Default="" Mode="" Description="Optional. Other addresses you also open Excaliself at, separated by commas, for example http://tower.local:3000" Type="Variable" Display="always" Required="false" Mask="false"/>
+  <Config Name="Database URL" Target="DATABASE_URL" Default="" Mode="" Description="postgresql://excaliself:PASSWORD@SERVER-IP:5432/excaliself, with the PostgreSQL container's password and your server's IP." Type="Variable" Display="always" Required="true" Mask="true"/>
+  <Config Name="Auth secret" Target="BETTER_AUTH_SECRET" Default="" Mode="" Description="At least 32 characters. Generate with: openssl rand -base64 32" Type="Variable" Display="always" Required="true" Mask="true"/>
+</Container>

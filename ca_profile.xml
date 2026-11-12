@@ -1,0 +1,6 @@
+<?xml version="1.0"?>
+<CommunityApplications>
+  <Profile>Excaliself is a self-hosted Excalidraw for teams. Docs are at [excaliself.com/docs](https://excaliself.com/docs/). Questions and bug reports go to the [GitHub issue tracker](https://github.com/maciekzygmunt/excaliself/issues).</Profile>
+  <Icon>https://raw.githubusercontent.com/maciekzygmunt/excaliself/main/public/logo512.png</Icon>
+  <WebPage>https://github.com/maciekzygmunt/excaliself</WebPage>
+</CommunityApplications>
