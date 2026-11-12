@@ -3,11 +3,18 @@ title: Docker Compose
 description: Run the prebuilt image behind a reverse proxy, pin a version, and upgrade.
 ---
 
-Excaliself ships as a prebuilt multi-arch (amd64, arm64) image:
+Excaliself ships as a prebuilt multi-arch (amd64, arm64) image, on GitHub
+Container Registry and on
+[Docker Hub](https://hub.docker.com/r/maciekzygmunt/excaliself):
 
 ```
 ghcr.io/maciekzygmunt/excaliself
+maciekzygmunt/excaliself
 ```
+
+Both have the same tags. The compose files use the GHCR one. To pull from
+Docker Hub, change the `image:` line in `docker-compose.yaml` to
+`maciekzygmunt/excaliself:${EXCALISELF_VERSION:-latest}`.
 
 | Tag | Tracks |
 |---|---|

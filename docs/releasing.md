@@ -2,7 +2,8 @@
 
 The `Docker` workflow (`.github/workflows/docker.yml`) builds the image and
 boots both deploy compose files against it on every PR and push. Pushes then
-publish to `ghcr.io/maciekzygmunt/excaliself`:
+publish to `ghcr.io/maciekzygmunt/excaliself` and `maciekzygmunt/excaliself` on
+Docker Hub, and update the Docker Hub overview from `docs/dockerhub.md`:
 
 - push to `main` → `:main`
 - tag `v1.2.3` → `:1.2.3`, `:1.2` and `:latest`
@@ -27,3 +28,8 @@ The first publish creates the package as private. Make it public once under
 the package's **Settings → Danger Zone → Change visibility**, or anonymous
 pulls (and Coolify) fail. Check with `docker logout ghcr.io && docker pull
 ghcr.io/maciekzygmunt/excaliself:main`.
+
+Docker Hub needs the repo variable `DOCKERHUB_USERNAME` and the repo secret
+`DOCKERHUB_TOKEN`: a personal access token with **Read, Write, Delete** scope.
+`peter-evans/dockerhub-description`, which writes the overview, asks for that
+scope. Pushing images needs only Read & Write.

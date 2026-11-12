@@ -61,7 +61,9 @@ Data lives in memory and is gone when the container stops. For real use, see
 
 Each path runs the app next to its Postgres database and pulls the prebuilt
 image `ghcr.io/maciekzygmunt/excaliself` (amd64 and arm64), so nothing is built
-on your server. `latest` is the newest release. The app applies database
+on your server. The same image is on Docker Hub as
+[`maciekzygmunt/excaliself`](https://hub.docker.com/r/maciekzygmunt/excaliself).
+`latest` is the newest release. The app applies database
 migrations when it starts, so updating is running a newer image.
 
 ### Docker Compose
