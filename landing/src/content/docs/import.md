@@ -1,5 +1,5 @@
 ---
-title: Import drawings
+title: Import Excalidraw+ drawings and local files
 description: Bring your drawings over from Excalidraw+ or from files on your computer.
 ---
 

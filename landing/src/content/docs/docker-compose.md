@@ -1,5 +1,5 @@
 ---
-title: Docker Compose
+title: Deploy Excaliself with Docker Compose
 description: Run the prebuilt image behind a reverse proxy, pin a version, and upgrade.
 ---
 
