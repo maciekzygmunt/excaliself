@@ -31,6 +31,14 @@ is reachable; the image uses it as its container healthcheck.
 See the [Quick start](/docs/) for the install commands and
 [Environment variables](/docs/environment/) for every setting.
 
+## Run one app container
+
+Run exactly one app container (one replica, one process). The app keeps each
+live drawing's collaboration room in its own memory. Do not scale the app
+service or put several replicas behind a load balancer: people on different
+replicas would not see each other's edits, and the replicas' saves would
+overwrite each other.
+
 ## Reverse proxy
 
 Postgres is not published on the host; only the app port is
