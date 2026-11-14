@@ -76,6 +76,7 @@ export function useRoomFiles(options: {
   /** Stored, in flight, or given up on. Claimed before the request goes out. */
   const skipUploadRef = useRef<Set<string>>(new Set(storedFileIds))
   const uploadAttemptsRef = useRef<Map<string, number>>(new Map())
+  const uploadsRef = useRef<Set<Promise<unknown>>>(new Set())
   const inFlightFetchRef = useRef<Set<string>>(new Set())
   const fetchAttemptsRef = useRef<Map<string, number>>(new Map())
   const retryTimersRef = useRef<Set<ReturnType<typeof setTimeout>>>(new Set())
@@ -115,7 +116,7 @@ export function useRoomFiles(options: {
         const attempt = (uploadAttemptsRef.current.get(file.fileId) ?? 0) + 1
         uploadAttemptsRef.current.set(file.fileId, attempt)
 
-        void uploadRoomFile(room, file).then((outcome) => {
+        const upload = uploadRoomFile(room, file).then((outcome) => {
           // A network blip leaves it `pending` for the next onChange to retry.
           if (outcome === "failed" && attempt < MAX_UPLOAD_ATTEMPTS) {
             skipUploadRef.current.delete(file.fileId)
@@ -130,10 +131,17 @@ export function useRoomFiles(options: {
             outcome === "stored" ? "saved" : "error",
           )
         })
+        uploadsRef.current.add(upload)
+        void upload.finally(() => uploadsRef.current.delete(upload))
       }
     },
     [],
   )
+
+  /** Resolves once the uploads in flight now have settled. */
+  const flushUploads = useCallback(async () => {
+    await Promise.allSettled(uploadsRef.current)
+  }, [])
 
   // A ref so the retry can call itself and see the latest room.
   const requestFileRef = useRef<(room: RoomPath, fileId: string) => void>(
@@ -169,5 +177,5 @@ export function useRoomFiles(options: {
     }
   }, [])
 
-  return { uploadPending, fetchMissing }
+  return { uploadPending, fetchMissing, flushUploads }
 }

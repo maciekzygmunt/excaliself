@@ -199,6 +199,7 @@ function renderRoom(
       ) => void)
     | null = null
   let status: ConnectionStatus = "connecting"
+  let flushUploads: () => Promise<void> = async () => {}
   const onRoomFull = vi.fn()
   const onLinkDead = vi.fn()
   const onSceneUnreadable = vi.fn()
@@ -215,6 +216,7 @@ function renderRoom(
     })
     onChange = room.onChange as never
     status = room.connectionStatus
+    flushUploads = room.flushUploads
     return null
   }
   const { rerender } = render(<Harness token={TOKEN} />)
@@ -230,6 +232,7 @@ function renderRoom(
     onLinkDead,
     onSceneUnreadable,
     status: () => status,
+    flushUploads: () => flushUploads(),
     /** The socket the hook is on now — a reconnect makes a new one. */
     latest: () => sockets[sockets.length - 1],
     // The canvas commits the edit before it announces it — which is what
@@ -626,6 +629,37 @@ test("an image pasted here is stored over HTTP, then syncs as a saved delta", as
   const broadcast = socket.scenesSent.at(-1) ?? []
   expect(broadcast.map((e) => [e.id, e.status])).toEqual([["img", "saved"]])
   expect(socket.sent.join("")).not.toContain(PNG)
+})
+
+test("flushUploads waits for an upload still in flight", async () => {
+  let answer!: () => void
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(
+      () =>
+        new Promise((resolve) => {
+          answer = () =>
+            resolve({ ok: true, status: 200, json: () => Promise.resolve({}) })
+        }),
+    ),
+  )
+  const api = fakeExcalidraw()
+  const { socket, change, flushUploads } = renderRoom(api)
+  act(() => socket.receive({ type: "SCENE_INIT", payload: { elements: [] } }))
+  change([image("img", 1, "file-1")], {
+    "file-1": { id: "file-1", dataURL: PNG },
+  })
+
+  let flushed = false
+  const flush = flushUploads().then(() => {
+    flushed = true
+  })
+  await settle()
+  expect(flushed).toBe(false)
+
+  answer()
+  await act(() => flush)
+  expect(flushed).toBe(true)
 })
 
 test("a refused upload gets the errored-image placeholder", async () => {
