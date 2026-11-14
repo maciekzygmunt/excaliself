@@ -124,6 +124,18 @@ you deploy, set `POSTGRES_PASSWORD`, `BETTER_AUTH_SECRET`, and `BASE_URL` in the
 project's environment, as for [Docker Compose](#docker-compose). Open `BASE_URL`
 to create the admin account. See the [docs](https://excaliself.com/docs/hostinger/).
 
+### App stores
+
+- **TrueNAS**: in **Apps**, search for Excaliself (community train). Set
+  **App URL** to the address you open it at.
+  [Store page](https://apps.truenas.com/catalog/excaliself_community/).
+- **Unraid**: in **Apps**, search for Excaliself. Install **postgresql17**
+  first. [Store page](https://ca.unraid.net/apps/excaliself-1ulvvg01m0exfg).
+- **Portainer**: in the
+  [Portainer Templates](https://portainer-templates.as93.net/excaliself) list.
+
+The [docs](https://excaliself.com/docs/app-stores/) have the fields to fill in.
+
 ### Configuration
 
 Docker Compose reads these from `.env`. Coolify sets them for you.
