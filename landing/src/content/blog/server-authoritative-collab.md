@@ -69,7 +69,7 @@ The Room passes an empty editing state, because it is never in the middle of a d
 
 **Presence comes from the server.** The server keeps the roster and picks cursor colors. Other people see only a random connection id per socket, never a user id. Members' names come from their session; a guest picks its own name, and only its own browser stores it. For follow mode, the Room sends viewport frames only to followers, so a room where nobody follows anyone carries no viewport traffic.
 
-**Guests and links.** A share link is a 256-bit random token with an audience: members of the instance, or anyone. The server checks the origin and the token on the upgrade, and checks the token again after the socket has a seat, so a link that is stopped during the handshake cannot let someone in. A dead link closes with code 4010, which tells the client to stop retrying. A room holds 25 people. People without access to the drawing, such as guests, can fill only 24 seats, so they cannot lock out someone who has access.
+**Guests and links.** A share link is a 256-bit random token with an audience: members of the instance, or anyone. The server checks the origin and the token on the upgrade, and checks the token again after the socket has a seat, so a link that is stopped during the handshake cannot leave anyone seated. A dead link closes with code 4010, which tells the client to stop retrying. A room holds 25 people. People without access to the drawing, such as guests, can fill only 24 seats, so they cannot lock out someone who has access.
 
 **When the owner leaves,** nothing special happens. The owner is one seat like the others. The Room lives while anyone is connected and saves when the last person leaves.
 
