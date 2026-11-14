@@ -46,7 +46,7 @@ guest tab   ─┘                            in memory, merges      drawings.da
 
 **The same protocol, without the envelope.** The message types are upstream's: `SCENE_INIT`, `SCENE_UPDATE`, `MOUSE_LOCATION`, `USER_VISIBLE_SCENE_BOUNDS`. They go as plain JSON over a native WebSocket on the app's own port, not Socket.IO. The client logic is a port of upstream's too: send only elements whose version changed, and send the full scene again 20 seconds after a change, so a peer that missed a frame is repaired.
 
-**The server merges first.** The server has its own copy of `reconcileElements`. I kept the port as close to upstream as I could, so the Room and the browsers pick the same winner:
+**The server merges first.** The server has its own copy of `reconcileElements`. I kept the port as close to the 0.18 release that the browsers run as I could, so the Room and the browsers pick the same winner:
 
 ```ts
 // local element is newer
@@ -67,7 +67,7 @@ The Room passes an empty editing state, because it is never in the middle of a d
 
 **AI edits take the same path.** An MCP client cannot write a scene. Its edit waits as a proposal until a member clicks Apply on the drawing. Then that member's tab puts the change on its canvas as an ordinary local edit, and the Room merges and saves it like any other. When an AI client reads a drawing that has a live Room, it reads the Room's scene, not the stored one.
 
-**Presence comes from the server.** The server keeps the roster and picks cursor colors. Other people see only a random connection id per socket, never a user id. Members' names come from their session; a guest's name lives only in its own browser. For follow mode, the Room sends viewport frames only to followers, so a room where nobody follows anyone carries no viewport traffic.
+**Presence comes from the server.** The server keeps the roster and picks cursor colors. Other people see only a random connection id per socket, never a user id. Members' names come from their session; a guest picks its own name, and only its own browser stores it. For follow mode, the Room sends viewport frames only to followers, so a room where nobody follows anyone carries no viewport traffic.
 
 **Guests and links.** A share link is a 256-bit random token with an audience: members of the instance, or anyone. The server checks the origin and the token on the upgrade, and checks the token again after the socket has a seat, so a link that is stopped during the handshake cannot let someone in. A dead link closes with code 4010, which tells the client to stop retrying. A room holds 25 people. People without access to the drawing, such as guests, can fill only 24 seats, so they cannot lock out someone who has access.
 
