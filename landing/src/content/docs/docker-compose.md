@@ -100,7 +100,8 @@ In Portainer, add a stack from **Repository** with the URL
 and `BASE_URL` as environment variables, then deploy. Set `BASE_URL` to the
 address you open the app at, e.g. `http://192.168.1.10:3000`. The stack does
 not start without it. The repository's `portainer-template.json` is the same
-stack as a Portainer app template.
+stack as a Portainer app template, and it is in the
+[Portainer Templates](/docs/app-stores/#portainer) list.
 
 ## Build from source
 

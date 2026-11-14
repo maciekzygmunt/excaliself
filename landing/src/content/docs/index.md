@@ -108,6 +108,7 @@ let people sign in with [Google, Microsoft, or OIDC](/docs/single-sign-on/).
 - Put a reverse proxy with HTTPS in front of it: [Docker Compose](/docs/docker-compose/).
 - Run it on Coolify, Railway, Hostinger, or Unraid instead: [Coolify](/docs/coolify/),
   [Railway](/docs/railway/), [Hostinger](/docs/hostinger/), [Unraid](/docs/unraid/).
+- Install it from the TrueNAS, Unraid, or Portainer catalog: [App stores](/docs/app-stores/).
 - See every setting: [Environment variables](/docs/environment/).
 - Bring your team in: [Members and invites](/docs/members/).
 - Take your first backup: [Backup and restore](/docs/backup-restore/).
