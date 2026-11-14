@@ -11,8 +11,10 @@ address you open the app at. See
 ## TrueNAS
 
 In **Apps**, click **Discover Apps** and search for **Excaliself**. It is in
-the **community** train: if it does not show, turn that train on under
-**Configuration → Choose Train**. The app runs its own Postgres. Fill in:
+the **community** train: if it does not show, open **Configuration →
+Settings**, select **community** under **Preferred Trains**, click **Save**,
+and then click **Refresh Catalog** on the **Discover** screen. The app runs its
+own Postgres. Fill in:
 
 | Field | Value |
 |---|---|
