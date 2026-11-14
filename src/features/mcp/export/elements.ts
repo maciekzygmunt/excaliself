@@ -8,16 +8,18 @@ export type Point = readonly [number, number]
 export type Arrowhead =
   | "arrow"
   | "bar"
-  | "dot"
   | "circle"
   | "circle_outline"
   | "triangle"
   | "triangle_outline"
   | "diamond"
   | "diamond_outline"
-  | "crowfoot_one"
-  | "crowfoot_many"
-  | "crowfoot_one_or_many"
+  | "cardinality_one"
+  | "cardinality_many"
+  | "cardinality_one_or_many"
+  | "cardinality_exactly_one"
+  | "cardinality_zero_or_one"
+  | "cardinality_zero_or_many"
 
 export type Element = {
   id: string
@@ -48,6 +50,8 @@ export type Element = {
   elbowed: boolean
   pressures: number[]
   simulatePressure: boolean
+  /** A freedraw's stroke: pressure-shaped ("variable") or of one width. */
+  strokeOptions: { variability: "variable" | "constant"; streamline: number }
   // Text.
   text: string
   originalText: string
@@ -68,22 +72,44 @@ export type Element = {
   } | null
   // Frames.
   name: string | null
+  /** When it was made, in epoch ms: a sticky note's footer shows the date. */
+  created: number | null
 }
 
 const ARROWHEADS = new Set<string>([
   "arrow",
   "bar",
-  "dot",
   "circle",
   "circle_outline",
   "triangle",
   "triangle_outline",
   "diamond",
   "diamond_outline",
-  "crowfoot_one",
-  "crowfoot_many",
-  "crowfoot_one_or_many",
+  "cardinality_one",
+  "cardinality_many",
+  "cardinality_one_or_many",
+  "cardinality_exactly_one",
+  "cardinality_zero_or_one",
+  "cardinality_zero_or_many",
 ])
+
+/** Names older files use (Excalidraw's normalizeArrowhead). */
+const LEGACY_ARROWHEADS: Record<string, Arrowhead> = {
+  dot: "circle",
+  crowfoot_one: "cardinality_one",
+  crowfoot_many: "cardinality_many",
+  crowfoot_one_or_many: "cardinality_one_or_many",
+}
+
+// Excalidraw's sticky note defaults and floor (STICKY_NOTE_MIN_SIZE).
+const STICKY_NOTE_BACKGROUND = "#ffdf6b"
+const STICKY_NOTE_MIN_SIZE = 75
+const STICKY_NOTE_DEFAULT_SIZE = 250
+
+export const isTransparent = (color: string) =>
+  color === "transparent" ||
+  (color.length === 5 && color[4] === "0") ||
+  (color.length === 9 && color.slice(7) === "00")
 
 const num = (value: unknown, fallback = 0) =>
   typeof value === "number" && Number.isFinite(value) ? value : fallback
@@ -97,12 +123,15 @@ const isObject = (value: unknown): value is Record<string, unknown> =>
 const point = (value: unknown): Point | null =>
   Array.isArray(value) ? [num(value[0]), num(value[1])] : null
 
-const arrowhead = (value: unknown, fallback: Arrowhead | null) =>
-  value === undefined
-    ? fallback
-    : typeof value === "string" && ARROWHEADS.has(value)
-      ? (value as Arrowhead)
-      : null
+/** An arrowhead this version can't draw is left out. */
+function arrowhead(value: unknown, fallback: Arrowhead | null) {
+  if (value === undefined) return fallback
+  if (typeof value !== "string") return null
+  return (
+    LEGACY_ARROWHEADS[value] ??
+    (ARROWHEADS.has(value) ? (value as Arrowhead) : null)
+  )
+}
 
 export function readElement(raw: Record<string, unknown>): Element {
   const type = str(raw.type)
@@ -134,7 +163,8 @@ export function readElement(raw: Record<string, unknown>): Element {
   const strokeStyle = str(raw.strokeStyle)
   const text = str(raw.text)
   const fontFamily = num(raw.fontFamily, 5)
-  return {
+  const strokeOptions = isObject(raw.strokeOptions) ? raw.strokeOptions : {}
+  const element: Element = {
     id: str(raw.id),
     type,
     x: num(raw.x),
@@ -142,9 +172,9 @@ export function readElement(raw: Record<string, unknown>): Element {
     width: num(raw.width),
     height: num(raw.height),
     angle: num(raw.angle),
-    strokeColor: str(raw.strokeColor, "#1e1e1e"),
-    backgroundColor: str(raw.backgroundColor, "transparent"),
-    fillStyle: str(raw.fillStyle, "solid"),
+    strokeColor: str(raw.strokeColor) || "#1e1e1e",
+    backgroundColor: str(raw.backgroundColor) || "transparent",
+    fillStyle: str(raw.fillStyle) || "solid",
     strokeWidth: num(raw.strokeWidth, 2),
     strokeStyle:
       strokeStyle === "dashed" || strokeStyle === "dotted"
@@ -174,6 +204,11 @@ export function readElement(raw: Record<string, unknown>): Element {
       ? raw.pressures.map((value) => num(value, 0.5))
       : [],
     simulatePressure: raw.simulatePressure !== false,
+    strokeOptions: {
+      variability:
+        strokeOptions.variability === "constant" ? "constant" : "variable",
+      streamline: num(strokeOptions.streamline, 0.5),
+    },
     text,
     originalText: str(raw.originalText, text),
     fontSize: num(raw.fontSize, 20),
@@ -184,5 +219,26 @@ export function readElement(raw: Record<string, unknown>): Element {
     scale: point(raw.scale) ?? [1, 1],
     crop,
     name: strOrNull(raw.name),
+    created: typeof raw.created === "number" ? raw.created : null,
+  }
+  return type === "stickynote" ? stickyNote(element, raw) : element
+}
+
+/** Excalidraw's normalizeStickyNote: always filled, never under its floor. */
+function stickyNote(element: Element, raw: Record<string, unknown>): Element {
+  const baseHeight = Math.max(
+    num(raw.baseHeight) || element.height || STICKY_NOTE_DEFAULT_SIZE,
+    STICKY_NOTE_MIN_SIZE,
+  )
+  return {
+    ...element,
+    backgroundColor: isTransparent(element.backgroundColor)
+      ? STICKY_NOTE_BACKGROUND
+      : element.backgroundColor,
+    strokeColor: isTransparent(element.strokeColor)
+      ? "#1e1e1e"
+      : element.strokeColor,
+    width: Math.max(element.width, STICKY_NOTE_MIN_SIZE),
+    height: Math.max(element.height, baseHeight),
   }
 }

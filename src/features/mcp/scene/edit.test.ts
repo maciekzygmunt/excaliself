@@ -105,6 +105,8 @@ test("puts a CDN between two shapes: remove one arrow, add a shape and two", () 
 
 test("a moved shape takes its label and the arrows bound to it along", () => {
   const { elements, api, arrow, labelOf } = drawing()
+  // As stored by Excalidraw 0.18: a legacy binding, off the shape's center.
+  arrow.endBinding = { elementId: api.id, focus: 0.6, gap: 6 }
   const result = plan(elements, { change: [{ id: api.id, x: 700, y: 300 }] })
 
   const moved = byId(result.elements, api.id)
@@ -117,9 +119,16 @@ test("a moved shape takes its label and the arrows bound to it along", () => {
   expect(center(label)[1]).toBeCloseTo(center(moved)[1], 0)
 
   // The arrow now ends just outside the moved box, at its new place.
-  const [, end] = endpoints(byId(result.elements, arrow.id))
+  const rerouted = byId(result.elements, arrow.id)
+  const [, end] = endpoints(rerouted)
   expect(end[0]).toBeGreaterThan(690)
   expect(end[1]).toBeGreaterThan(290)
+  // It aims at the center now, and its binding says so.
+  expect(rerouted.endBinding).toEqual({
+    elementId: api.id,
+    fixedPoint: [0.5001, 0.5001],
+    mode: "orbit",
+  })
   expect(result.changes).toEqual(['Change rectangle "API": position'])
 })
 
@@ -174,6 +183,17 @@ test("an arrow relabeled while its shape moves keeps the new label", () => {
   expect(label.originalText).toBe("gRPC")
   // Re-placed on the rerouted arrow, not where the old one ran.
   expect(label.x as number).toBeGreaterThan(300)
+})
+
+test("a label dragged along its arrow goes back to the middle when the arrow is rerouted", () => {
+  const { elements, api, arrow, labelOf } = drawing()
+  const dragged = elements.map((element) =>
+    element.id === labelOf(arrow.id).id
+      ? { ...element, labelPosition: 0.2 }
+      : element,
+  )
+  const result = plan(dragged, { change: [{ id: api.id, x: 700 }] })
+  expect(byId(result.elements, labelOf(arrow.id).id).labelPosition).toBeNull()
 })
 
 test("a shape with no label gets one, bound both ways", () => {

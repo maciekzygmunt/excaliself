@@ -13,7 +13,19 @@ export type ShapeType = ShapeSkeleton["type"]
 
 // Excalidraw's BOUND_TEXT_PADDING.
 export const PADDING = 5
+// Excalidraw's getBindingGap for a target with the default stroke width.
 const BINDING_GAP = 6
+
+/**
+ * An arrow end bound to a shape the way the builder draws it: aimed at the
+ * shape's center, stopping at its outline ("orbit"). Excalidraw keeps a
+ * center off the exact 0.5 (normalizeFixedPoint).
+ */
+export const centerBinding = (elementId: string) => ({
+  elementId,
+  fixedPoint: [0.5001, 0.5001],
+  mode: "orbit",
+})
 
 export type Style = {
   strokeColor: string
@@ -123,6 +135,7 @@ function base(
   style: Style,
   links: { roundness: { type: number } | null; boundElements: BoundElement[] },
 ) {
+  const now = Date.now()
   return {
     id,
     type,
@@ -147,7 +160,8 @@ function base(
     versionNonce: randomInt(1, 2 ** 31),
     isDeleted: false,
     boundElements: links.boundElements,
-    updated: Date.now(),
+    updated: now,
+    created: now,
     link: null,
     locked: false,
   }
@@ -181,6 +195,8 @@ function textElement(options: {
     containerId: options.containerId,
     autoResize: options.autoResize,
     lineHeight: LINE_HEIGHT,
+    labelPosition: null,
+    baseFontSize: null,
   }
 }
 
@@ -366,7 +382,7 @@ export function emitConnector(connector: Connector) {
   const type = isLine && !from && !to ? "line" : "arrow"
   const strokeColor = skeleton.strokeColor ?? DEFAULT_STYLE.strokeColor
   const binding = (target: Target | null) =>
-    target ? { elementId: target.id, focus: 0, gap: BINDING_GAP } : null
+    target ? centerBinding(target.id) : null
 
   const element = {
     ...base(
@@ -382,7 +398,6 @@ export function emitConnector(connector: Connector) {
       { roundness: { type: 2 }, boundElements: [] },
     ),
     points: local,
-    lastCommittedPoint: null,
     startBinding: type === "arrow" ? binding(from) : null,
     endBinding: type === "arrow" ? binding(to) : null,
     startArrowhead:
@@ -393,7 +408,7 @@ export function emitConnector(connector: Connector) {
           ? null
           : "arrow"
         : skeleton.endArrowhead,
-    ...(type === "arrow" ? { elbowed: false } : {}),
+    ...(type === "arrow" ? { elbowed: false } : { polygon: false }),
   }
   const { label } = connector
   if (type !== "arrow" || !label) return [element]

@@ -61,6 +61,35 @@ test("keeps a saved file's elements, ids, and versions, and indexes them in orde
   expect(content.appState).toEqual({ viewBackgroundColor: "#fff" })
 })
 
+test("takes what Excalidraw writes now: sticky notes and fixed-point bindings", () => {
+  const elements = [
+    { type: "stickynote", id: "s1", x: 0, y: 0, baseHeight: 250, created: 1 },
+    {
+      type: "arrow",
+      id: "a1",
+      x: 300,
+      y: 0,
+      points: [
+        [0, 0],
+        [-44, 0],
+      ],
+      startBinding: null,
+      endBinding: {
+        elementId: "s1",
+        fixedPoint: [0.5001, 0.5001],
+        mode: "orbit",
+      },
+      endArrowhead: "cardinality_zero_or_many",
+    },
+  ]
+  expect(parseImportedScene(file(elements)).content.elements).toMatchObject(
+    elements,
+  )
+  expect(
+    errorOf(file([{ type: "stickynote", x: 0, y: 0, baseHeight: "tall" }])),
+  ).toMatch(/^elements\[0\]\.baseHeight: /)
+})
+
 test("replaces bad and repeated ids and bad versions, and drops deleted elements", () => {
   const { content } = parseImportedScene(
     file([
