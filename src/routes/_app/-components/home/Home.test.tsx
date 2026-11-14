@@ -41,6 +41,8 @@ vi.mock("../MoveToTeamDialog", () => ({
 }))
 
 vi.mock("@tanstack/react-router", () => ({
+  // The card menu's Duplicate toast opens the copy
+  useNavigate: () => vi.fn(),
   Link: ({
     to,
     params,
@@ -83,10 +85,11 @@ vi.mock("@/features/drawings/server", () => ({
   getDrawingScene: vi.fn(async () => "{}"),
   getDrawings: vi.fn(),
   getDrawingWithFiles: vi.fn(),
-  // The gallery card menu (trash, star, rename) binds these
+  // The gallery card menu (trash, star, rename, duplicate) binds these
   trashDrawing: vi.fn(),
   restoreDrawing: vi.fn(),
   setDrawingStarred: vi.fn(),
+  duplicateDrawing: vi.fn(),
   updateDrawing: vi.fn(),
 }))
 

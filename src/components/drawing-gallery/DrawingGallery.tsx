@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query"
 import { Link } from "@tanstack/react-router"
 import { createClientOnlyFn } from "@tanstack/react-start"
 import {
+  Copy,
   Download,
   Folder as FolderIcon,
   MoreHorizontal,
@@ -32,7 +33,10 @@ import {
 import { UserAvatar } from "@/components/user-avatar"
 import { useLiveDrawing } from "@/features/collab/queries"
 import { exportDrawing } from "@/features/drawings/export"
-import { useToggleStarDrawing } from "@/features/drawings/mutations"
+import {
+  useDuplicateDrawing,
+  useToggleStarDrawing,
+} from "@/features/drawings/mutations"
 import {
   type Drawing,
   drawingSceneQueryOptions,
@@ -385,6 +389,7 @@ function CardActions({
 }) {
   const name = drawing.name
   const starMutation = useToggleStarDrawing()
+  const duplicateMutation = useDuplicateDrawing()
   const [renameOpen, setRenameOpen] = useState(false)
 
   return (
@@ -419,6 +424,13 @@ function CardActions({
           <DropdownMenuItem onClick={() => setRenameOpen(true)}>
             <Pencil className="mr-2 h-4 w-4" />
             Rename
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            // Gallery pages have no open canvas, so nothing to flush
+            onClick={() => duplicateMutation.mutate({ id: drawing.id })}
+          >
+            <Copy className="mr-2 h-4 w-4" />
+            Duplicate
           </DropdownMenuItem>
           <DropdownMenuItem onClick={() => exportDrawing(drawing)}>
             <Download className="mr-2 h-4 w-4" />

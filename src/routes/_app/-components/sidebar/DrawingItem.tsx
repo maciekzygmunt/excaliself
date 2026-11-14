@@ -6,6 +6,7 @@ import { SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar"
 import { useLiveDrawing } from "@/features/collab/queries"
 import { exportDrawing } from "@/features/drawings/export"
 import {
+  useDuplicateDrawing,
   useRenameDrawing,
   useToggleStarDrawing,
   useTrashDrawing,
@@ -43,8 +44,9 @@ export function DrawingItem({ drawing }: DrawingItemProps) {
 
   const trashDrawing = useTrashDrawing()
   const starMutation = useToggleStarDrawing()
+  const duplicateMutation = useDuplicateDrawing()
   const live = useLiveDrawing(drawing.id)
-  const { requestMoveToTeam } = useMoveToTeamDialog()
+  const { requestMoveToTeam, flushCanvas } = useMoveToTeamDialog()
 
   const handleTrash = () => {
     // Instant, no confirm — the mutation shows the undo toast itself
@@ -119,6 +121,12 @@ export function DrawingItem({ drawing }: DrawingItemProps) {
         onStartRename={() => rename.start(drawing.name)}
         menuFinalFocus={rename.menuFinalFocus}
         onTrash={handleTrash}
+        onDuplicate={() =>
+          duplicateMutation.mutate({
+            id: drawing.id,
+            beforeDuplicate: flushCanvas,
+          })
+        }
         onExport={() => exportDrawing(drawing)}
         onMoveToTeam={
           requestMoveToTeam && drawing.space === "private"

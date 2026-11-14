@@ -1,6 +1,6 @@
 ---
 title: Organize and find
-description: Folders, stars, selecting many drawings, search, the command palette, export, and the trash.
+description: Folders, stars, copies, selecting many drawings, search, the command palette, export, and the trash.
 ---
 
 ## Folders and stars
@@ -11,8 +11,12 @@ were last edited. **All drawings** shows them all. Drawing and folder names
 can be up to 1,000 characters.
 
 Each drawing card has a **⋯** menu, like each row in the sidebar. Use it to
-**Star** or **Unstar**, **Rename**, **Export .excalidraw**, **Move to Team**, or
-**Move to trash**.
+**Star** or **Unstar**, **Rename**, **Duplicate**, **Export .excalidraw**,
+**Move to Team**, or **Move to trash**.
+
+**Duplicate** makes a copy of the drawing, with its images, in the same folder
+and space. The copy is named like the drawing, with " (copy)" at the end. It
+has no stars and no share link.
 
 ## Select many drawings
 

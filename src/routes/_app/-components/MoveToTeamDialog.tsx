@@ -100,6 +100,8 @@ type MoveToTeamContextValue = {
    * point saves the last solo edits first. Returns the unregister.
    */
   registerFlush: (flush: () => Promise<void>) => () => void
+  /** Runs the open canvas's autosave flush; resolves at once without one. */
+  flushCanvas: () => Promise<void>
 }
 
 const MoveToTeamContext = createContext<MoveToTeamContextValue | null>(null)
@@ -158,12 +160,17 @@ export function MoveToTeamProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  const flushCanvas = useCallback(async () => {
+    await flushRef.current?.()
+  }, [])
+
   const value = useMemo(
     () => ({
       requestMoveToTeam: teamEnabled ? requestMoveToTeam : null,
       registerFlush,
+      flushCanvas,
     }),
-    [teamEnabled, requestMoveToTeam, registerFlush],
+    [teamEnabled, requestMoveToTeam, registerFlush, flushCanvas],
   )
 
   return (
