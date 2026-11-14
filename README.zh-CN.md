@@ -56,7 +56,7 @@ docker run --rm -p 127.0.0.1:3000:3000 -e PREVIEW_MODE=true ghcr.io/maciekzygmun
 
 ## 部署
 
-下面两种部署方式都会通过一份 Compose 配置同时启动应用和 PostgreSQL 数据库，并拉取预先构建好的镜像 `ghcr.io/maciekzygmunt/excaliself`（支持 amd64 和 arm64），无需在服务器上自行构建。`latest` 标签对应最新发布版本。应用会在启动时自动执行数据库迁移，更新时拉取新镜像并重新部署即可。
+Docker Compose 和 Coolify 两种部署方式都会通过一份 Compose 配置同时启动应用和 PostgreSQL 数据库，并拉取预先构建好的镜像 `ghcr.io/maciekzygmunt/excaliself`（支持 amd64 和 arm64），无需在服务器上自行构建。`latest` 标签对应最新发布版本。应用会在启动时自动执行数据库迁移，更新时拉取新镜像并重新部署即可。
 
 ### Docker Compose
 
@@ -79,6 +79,14 @@ docker compose up -d
 3. 点击 **Deploy**（部署）。
 
 Coolify 会创建数据库、生成密钥并分配域名，因此不需要额外配置。如果服务器尚未配置通配符域名，请先为 `excaliself` 服务配置域名，并在地址中注明容器端口，例如 `https://draw.example.com:3000`。访问该地址后即可创建管理员账号。若要使用指定版本而不是 `latest`，请在资源的环境变量中设置 `EXCALISELF_VERSION`（例如 `1.0.0`）。绘图保存在 `pgdata` 数据卷中，重新部署后仍会保留。
+
+### 应用商店
+
+- **TrueNAS**：在 **Apps** 中搜索 Excaliself（位于 **community** train 中）。将 **App URL** 设为你访问应用时使用的地址。[商店页面](https://apps.truenas.com/catalog/excaliself_community/)。
+- **Unraid**：在 **Apps** 中搜索 Excaliself，并先安装 **postgresql17**。[商店页面](https://ca.unraid.net/apps/excaliself-1ulvvg01m0exfg)。
+- **Portainer**：已收录在 [Portainer Templates](https://portainer-templates.as93.net/excaliself) 列表中。
+
+各项需要填写的字段请参阅[英文文档](https://excaliself.com/docs/app-stores/)。
 
 ### 配置
 
