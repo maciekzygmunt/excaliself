@@ -1,4 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query"
+import { useNavigate } from "@tanstack/react-router"
 import { toast } from "sonner"
 import {
   patchById,
@@ -8,6 +9,7 @@ import {
 import { type Drawing, drawingsQueryOptions } from "./queries"
 import {
   createDrawing,
+  duplicateDrawing,
   restoreDrawing,
   setDrawingStarred,
   trashDrawing,
@@ -27,6 +29,33 @@ export function useCreateDrawing() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: createDrawing,
+    onSettled: () => queryClient.invalidateQueries(drawingsQueryOptions()),
+  })
+}
+
+type DuplicateVars = {
+  id: string
+  /** Flushes the open canvas's last solo save, so the copy has it. */
+  beforeDuplicate?: () => Promise<void>
+}
+
+/** The "Duplicate" menu action. The toast offers to open the copy. */
+export function useDuplicateDrawing() {
+  const queryClient = useQueryClient()
+  const navigate = useNavigate()
+  return useMutation({
+    mutationFn: async ({ id, beforeDuplicate }: DuplicateVars) => {
+      await beforeDuplicate?.()
+      return duplicateDrawing({ data: id })
+    },
+    onSuccess: (copy) =>
+      toast(`Created "${copy.name}"`, {
+        action: {
+          label: "Open",
+          onClick: () => navigate({ to: "/draw/$id", params: { id: copy.id } }),
+        },
+      }),
+    onError: () => toast.error("Couldn't duplicate drawing"),
     onSettled: () => queryClient.invalidateQueries(drawingsQueryOptions()),
   })
 }

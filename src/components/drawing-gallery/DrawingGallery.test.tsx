@@ -9,7 +9,11 @@ import {
 } from "@testing-library/react"
 import { afterEach, beforeAll, beforeEach, expect, test, vi } from "vitest"
 import type { Drawing } from "@/features/drawings/queries"
-import { setDrawingStarred, updateDrawing } from "@/features/drawings/server"
+import {
+  duplicateDrawing,
+  setDrawingStarred,
+  updateDrawing,
+} from "@/features/drawings/server"
 import type { Folder } from "@/features/folders/queries"
 import { DrawingGallery } from "./DrawingGallery"
 import { renderPreviewSvg } from "./preview"
@@ -24,6 +28,7 @@ vi.mock("@/features/collab/server", () => ({
 vi.mock("@/features/drawings/server", () => ({
   getDrawingScene: vi.fn(async () => "{}"),
   setDrawingStarred: vi.fn(async () => {}),
+  duplicateDrawing: vi.fn(async () => ({ id: "copy", name: "Plan (copy)" })),
   updateDrawing: vi.fn(async () => {}),
 }))
 
@@ -47,6 +52,8 @@ const render = (ui: React.ReactElement) => {
 }
 
 vi.mock("@tanstack/react-router", () => ({
+  // The card menu's Duplicate toast opens the copy
+  useNavigate: () => vi.fn(),
   Link: ({
     to,
     params,
@@ -422,6 +429,24 @@ test("the card menu stars and unstars, labelled by current state", async () => {
       { data: { id: "d1", starred: true } },
       { data: { id: "d2", starred: false } },
     ]),
+  )
+})
+
+test("the card menu duplicates its drawing", async () => {
+  render(
+    <DrawingGallery
+      {...defaultProps}
+      drawings={[makeDrawing({ id: "d1", name: "Plan" })]}
+    />,
+  )
+
+  openActions("Plan")
+  fireEvent.click(screen.getByRole("menuitem", { name: "Duplicate" }))
+
+  await waitFor(() =>
+    expect(vi.mocked(duplicateDrawing).mock.calls[0]?.[0]).toEqual({
+      data: "d1",
+    }),
   )
 })
 

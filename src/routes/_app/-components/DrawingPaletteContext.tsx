@@ -1,9 +1,10 @@
 import { useQuery } from "@tanstack/react-query"
 import { useNavigate } from "@tanstack/react-router"
-import { FolderInput, Pencil, Star, StarOff, Trash2 } from "lucide-react"
+import { Copy, FolderInput, Pencil, Star, StarOff, Trash2 } from "lucide-react"
 import { useEffect, useMemo, useRef, useState } from "react"
 import { RenameDialog } from "@/components/rename-dialog"
 import {
+  useDuplicateDrawing,
   useMoveDrawingToFolder,
   useToggleStarDrawing,
   useTrashDrawing,
@@ -13,6 +14,7 @@ import {
   type PaletteContextSection,
   usePaletteContextSection,
 } from "./CommandPalette"
+import { useMoveToTeamDialog } from "./MoveToTeamDialog"
 
 type DrawingPaletteContextProps = {
   drawingId: string
@@ -21,7 +23,7 @@ type DrawingPaletteContextProps = {
 /**
  * Contributes the canvas's "This drawing" palette section (spec §5.4):
  * Rename (closes into the standard rename dialog), Star/Unstar (label follows
- * current state), Move to folder… (nested picker, optimistic move), Move to
+ * current state), Duplicate, Move to folder… (nested picker, optimistic move), Move to
  * trash (tier-1: instant, undo toast, lands on Home).
  * Reads from the live drawings list, so a trashed drawing — whose section is
  * a later slice — contributes nothing.
@@ -41,6 +43,8 @@ export function DrawingPaletteContext({
 
   const starMutation = useToggleStarDrawing()
   const starMutate = starMutation.mutate
+  const duplicateMutate = useDuplicateDrawing().mutate
+  const { flushCanvas } = useMoveToTeamDialog()
   const moveMutation = useMoveDrawingToFolder()
   const moveMutate = moveMutation.mutate
   const trashDrawing = useTrashDrawing()
@@ -72,6 +76,14 @@ export function DrawingPaletteContext({
             }),
         },
         {
+          id: "drawing:duplicate",
+          label: "Duplicate",
+          icon: Copy,
+          // The open canvas is this drawing: save its last edits first
+          onSelect: () =>
+            duplicateMutate({ id: drawing.id, beforeDuplicate: flushCanvas }),
+        },
+        {
           id: "drawing:move-folder",
           label: "Move to folder…",
           icon: FolderInput,
@@ -100,7 +112,7 @@ export function DrawingPaletteContext({
         },
       ],
     }
-  }, [drawing, starMutate, moveMutate, navigate])
+  }, [drawing, starMutate, duplicateMutate, flushCanvas, moveMutate, navigate])
 
   usePaletteContextSection(section)
 

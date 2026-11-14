@@ -309,11 +309,16 @@ export function DrawingCanvas({
     },
   })
 
-  // Any move to Team flushes this canvas first, whichever menu started it.
+  // Any move to Team or Duplicate flushes this canvas first, whichever menu
+  // started it: the solo save, and the live Room's image uploads.
   const { requestMoveToTeam, registerFlush } = useMoveToTeamDialog()
+  const flushRoomUploads = room.flushUploads
   useEffect(() => {
-    if (!readOnly) return registerFlush(flushAutoSave)
-  }, [readOnly, registerFlush, flushAutoSave])
+    if (readOnly) return
+    return registerFlush(async () => {
+      await Promise.all([flushAutoSave(), flushRoomUploads()])
+    })
+  }, [readOnly, registerFlush, flushAutoSave, flushRoomUploads])
 
   const roomChange = room.onChange
   const handleSceneChange = useCallback(
