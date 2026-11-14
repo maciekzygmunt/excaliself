@@ -65,7 +65,7 @@ The Room passes an empty editing state, because it is never in the middle of a d
 
 **One writer at a time.** A private drawing with no link is saved by its creator's tab, as before. When a link exists, or the drawing is in the Team space, the server refuses that save, and the tab joins the Room instead. Team drawings are always a Room, even with one person in it. Then a second member's arrival is a plain join and not a change of writer, which was the riskiest moment in the design.
 
-**AI edits take the same path.** An MCP client cannot write a scene. Its edit waits as a proposal until a member clicks Apply on the drawing. Then that member's tab puts the change on its canvas as an ordinary local edit, and the Room merges and saves it like any other. When an AI client reads a drawing that has a live Room, it reads the Room's scene, not the stored one.
+**AI edits take the same path.** An MCP client cannot write a scene. Its edit waits as a proposal until a member clicks Apply on the drawing. Then that member's tab puts the change on its canvas as an ordinary local edit, and the drawing's one writer saves it: the Room, or the tab's own autosave for a private drawing with no link. When an AI client reads a drawing that has a live Room, it reads the Room's scene, not the stored one.
 
 **Presence comes from the server.** The server keeps the roster and picks cursor colors. Other people see only a random connection id per socket, never a user id. Members' names come from their session; a guest picks its own name, and only its own browser stores it. For follow mode, the Room sends viewport frames only to followers, so a room where nobody follows anyone carries no viewport traffic.
 
