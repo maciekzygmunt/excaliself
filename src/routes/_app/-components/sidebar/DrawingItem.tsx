@@ -124,7 +124,8 @@ export function DrawingItem({ drawing }: DrawingItemProps) {
         onDuplicate={() =>
           duplicateMutation.mutate({
             id: drawing.id,
-            beforeDuplicate: flushCanvas,
+            // Only the open drawing has unsaved edits to carry over
+            beforeDuplicate: isActive ? flushCanvas : undefined,
           })
         }
         onExport={() => exportDrawing(drawing)}
