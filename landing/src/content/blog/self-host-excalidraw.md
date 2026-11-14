@@ -165,7 +165,8 @@ the excalidraw.com app leaves to its own services:
   instance ([Backup and restore](/docs/backup-restore/)).
 - **Collaboration in the same process.** The websocket is on the app's own
   port, under `/ws/`. The server keeps the scene of each open drawing, merges
-  each change, and saves it. There is no separate room server to run.
+  each change, and saves it. There is no separate room server to run
+  ([how the server merges](/blog/server-authoritative-collab/)).
 - **Accounts.** The first visitor creates the admin account, and everyone
   else joins with an invite link or
   [single sign-on](/docs/single-sign-on/) (Google Workspace, Microsoft Entra
