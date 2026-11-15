@@ -41,6 +41,34 @@ export function toastImageCapFull() {
   })
 }
 
+export function toastImageTooLarge() {
+  toast.error("Image too large", {
+    id: "image-too-large",
+    description: "Image exceeds max allowed size.",
+  })
+}
+
+export function toastImageRateLimited() {
+  toast.error("Upload limit reached", {
+    id: "image-rate-limited",
+    description: "Too many image uploads, please wait a moment.",
+  })
+}
+
+export function toastImageInvalid() {
+  toast.error("Invalid image", {
+    id: "image-invalid",
+    description: "The image format or data is invalid.",
+  })
+}
+
+export function toastImageUploadFailed() {
+  toast.error("Image upload failed", {
+    id: "image-upload-failed",
+    description: "Could not upload image. Please try again.",
+  })
+}
+
 /** Version bump syncs the flip to peers; NEVER keeps it out of local undo. */
 export function markImageStatus(
   api: ExcalidrawImperativeAPI,
@@ -125,6 +153,11 @@ export function useRoomFiles(options: {
           const api = apiRef.current
           if (!api) return
           if (outcome === "full") toastImageCapFull()
+          else if (outcome === "too-large") toastImageTooLarge()
+          else if (outcome === "rate-limited") toastImageRateLimited()
+          else if (outcome === "invalid") toastImageInvalid()
+          else if (outcome === "failed") toastImageUploadFailed()
+
           markImageStatus(
             api,
             file.fileId,

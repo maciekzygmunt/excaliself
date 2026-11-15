@@ -34,6 +34,7 @@ import { useRoom } from "@/features/collab/use-room"
 import {
   markImageStatus,
   toastImageCapFull,
+  toastImageTooLarge,
 } from "@/features/collab/use-room-files"
 import { useRenameDrawing } from "@/features/drawings/mutations"
 import {
@@ -335,9 +336,7 @@ export function DrawingCanvas({
           storedFileIdSet,
         )) {
           markImageStatus(excalidrawAPI, fileId, "error")
-          toast.error("This image is too large to save", {
-            description: "Images up to 2 MB are saved with the drawing.",
-          })
+          toastImageTooLarge()
         }
       }
       handleChange({ elements, appState, files })

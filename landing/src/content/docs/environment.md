@@ -49,6 +49,16 @@ Optional. Each provider is on when its variables are set. See
 | `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET` | Sign-in with one OIDC provider |
 | `OIDC_NAME` | Label of the OIDC button (default `SSO`) |
 
+## Limits
+
+Optional. Tune image upload sizes, storage budgets, and rate limits.
+
+| Variable | Default | Description |
+|---|---|---|
+| `MAX_IMAGE_MB` | `2` | Maximum size of an individual image in megabytes |
+| `MAX_DRAWING_IMAGE_MB` | `20` | Total image storage budget per drawing in megabytes |
+| `IMAGE_UPLOADS_PER_MINUTE` | `30` | Maximum image uploads per minute per IP per room |
+
 ## Previews
 
 For throwaway instances: a [quick try](/docs/#try-it-first) on your machine, or

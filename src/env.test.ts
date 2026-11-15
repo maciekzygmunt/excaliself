@@ -53,3 +53,38 @@ test("TRUSTED_ORIGINS refuses a value that is not an http(s) URL", async () => {
   vi.spyOn(console, "error").mockImplementation(() => {})
   await expect(import("./env")).rejects.toThrow("Invalid environment variables")
 })
+
+test("image limit env vars default to 2 MB, 20 MB, and 30 per minute", async () => {
+  vi.stubEnv("PREVIEW_MODE", "true")
+  const { env } = await import("./env")
+  expect(env.MAX_IMAGE_MB).toBe(2)
+  expect(env.MAX_DRAWING_IMAGE_MB).toBe(20)
+  expect(env.IMAGE_UPLOADS_PER_MINUTE).toBe(30)
+})
+
+test("image limit env vars accept custom positive values", async () => {
+  vi.stubEnv("PREVIEW_MODE", "true")
+  vi.stubEnv("MAX_IMAGE_MB", "4.5")
+  vi.stubEnv("MAX_DRAWING_IMAGE_MB", "50")
+  vi.stubEnv("IMAGE_UPLOADS_PER_MINUTE", "60")
+  const { env } = await import("./env")
+  expect(env.MAX_IMAGE_MB).toBe(4.5)
+  expect(env.MAX_DRAWING_IMAGE_MB).toBe(50)
+  expect(env.IMAGE_UPLOADS_PER_MINUTE).toBe(60)
+})
+
+test.each([
+  ["MAX_IMAGE_MB", "0"],
+  ["MAX_IMAGE_MB", "-1"],
+  ["MAX_IMAGE_MB", "not-a-number"],
+  ["MAX_DRAWING_IMAGE_MB", "0"],
+  ["MAX_DRAWING_IMAGE_MB", "-5"],
+  ["IMAGE_UPLOADS_PER_MINUTE", "0"],
+  ["IMAGE_UPLOADS_PER_MINUTE", "-10"],
+  ["IMAGE_UPLOADS_PER_MINUTE", "3.5"],
+])("refuses invalid %s=%s", async (key, value) => {
+  vi.stubEnv("PREVIEW_MODE", "true")
+  vi.stubEnv(key, value)
+  vi.spyOn(console, "error").mockImplementation(() => {})
+  await expect(import("./env")).rejects.toThrow("Invalid environment variables")
+})

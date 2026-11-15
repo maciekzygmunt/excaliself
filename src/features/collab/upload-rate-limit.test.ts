@@ -1,4 +1,4 @@
-import { expect, test } from "vitest"
+import { expect, test, vi } from "vitest"
 import { allowImageUpload, IMAGE_UPLOADS_PER_MINUTE } from "./upload-rate-limit"
 
 // The limiter is process-wide on purpose, so each test uses an address and a
@@ -41,4 +41,13 @@ test("the window rolls forward", () => {
   }
 
   expect(allowImageUpload(uploader, 60_000)).toBe(true)
+})
+
+test("derives upload rate limit from IMAGE_UPLOADS_PER_MINUTE env var", async () => {
+  vi.stubEnv("IMAGE_UPLOADS_PER_MINUTE", "45")
+  vi.resetModules()
+  const mod = await import("./upload-rate-limit")
+  expect(mod.IMAGE_UPLOADS_PER_MINUTE).toBe(45)
+  vi.unstubAllEnvs()
+  vi.resetModules()
 })

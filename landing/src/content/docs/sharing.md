@@ -36,7 +36,8 @@ exists.
 ## Limits
 
 - A live drawing has 25 seats. One seat is kept for the owner.
-- An image can be up to 2 MB, and a drawing can store up to 20 MB of images.
+- By default, an image can be up to 2 MB, and a drawing can store up to 20 MB of
+  images (configurable with [environment variables](/docs/environment/#limits)).
   Other people see a placeholder for an image that is refused.
 - A live drawing holds up to 50,000 elements (deleted ones count) and 20 MB of
   drawing data, not counting images. Past that, new content does not sync or
