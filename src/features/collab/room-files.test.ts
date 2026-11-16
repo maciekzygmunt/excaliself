@@ -1,15 +1,10 @@
-import { afterEach, expect, test, vi } from "vitest"
+import { expect, test } from "vitest"
 import {
   MAX_IMAGE_BYTES,
   MAX_UPLOAD_BODY_BYTES,
   parseFilePayload,
   parseFileUpload,
 } from "./room-files"
-
-afterEach(() => {
-  vi.unstubAllEnvs()
-  vi.resetModules()
-})
 
 /** A data URL whose decoded payload is exactly `bytes` long. */
 const imageOf = (bytes: number, mimeType = "image/png") =>
@@ -151,14 +146,4 @@ test.each([
   ["a payload with no bytes", { fileId: "a", mimeType: "image/png" }],
 ])("refuses to hand %s to addFiles", (_label, value) => {
   expect(parseFilePayload(value)).toBeNull()
-})
-
-test("derives byte caps from MAX_IMAGE_MB and MAX_DRAWING_IMAGE_MB env vars", async () => {
-  vi.stubEnv("MAX_IMAGE_MB", "5")
-  vi.stubEnv("MAX_DRAWING_IMAGE_MB", "50")
-  vi.resetModules()
-  const mod = await import("./room-files")
-  expect(mod.MAX_IMAGE_BYTES).toBe(5 * 1024 * 1024)
-  expect(mod.MAX_DRAWING_IMAGE_BYTES).toBe(50 * 1024 * 1024)
-  expect(mod.MAX_UPLOAD_BODY_BYTES).toBe(3 * (5 * 1024 * 1024) + 1024)
 })

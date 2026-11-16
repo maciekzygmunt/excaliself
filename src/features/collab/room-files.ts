@@ -3,31 +3,14 @@
  * they agree on "too large" and "well formed".
  */
 
-import { env } from "@/env"
-
-const DEFAULT_MAX_IMAGE_MB = 2
-const DEFAULT_MAX_DRAWING_IMAGE_MB = 20
-
-// Avoid reading server env vars when executed on the client browser.
-const isServer =
-  typeof window === "undefined" ||
-  ("process" in globalThis && globalThis.process?.env?.NODE_ENV === "test")
-
-const maxImageMb = isServer ? env.MAX_IMAGE_MB : DEFAULT_MAX_IMAGE_MB
-const maxDrawingImageMb = isServer
-  ? env.MAX_DRAWING_IMAGE_MB
-  : DEFAULT_MAX_DRAWING_IMAGE_MB
-
 /** Measured on decoded bytes, not base64, so "a 2 MB photo" fits. */
-export const MAX_IMAGE_BYTES = Math.floor(maxImageMb * 1024 * 1024)
+export const MAX_IMAGE_BYTES = 2 * 1024 * 1024
 
 /**
  * Stored image bytes per drawing (20 MB). A load sends them all as base64 in
  * one server fn response, which TanStack Start caps at 32 MiB; this is ~27.
  */
-export const MAX_DRAWING_IMAGE_BYTES = Math.floor(
-  maxDrawingImageMb * 1024 * 1024,
-)
+export const MAX_DRAWING_IMAGE_BYTES = 10 * MAX_IMAGE_BYTES
 
 /**
  * Refused on `content-length` alone: max image as a percent-encoded data URL

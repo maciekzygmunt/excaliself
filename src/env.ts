@@ -75,19 +75,13 @@ export const env = createEnv({
     // Where the Excalidraw+ import calls the public API. Override it only to
     // test against a fake server.
     EXCALIDRAW_PLUS_API_URL: z.url().default("https://api.excalidraw.com"),
-    // Image upload and drawing storage limits
-    MAX_IMAGE_MB: z.coerce.number().positive().default(2),
-    MAX_DRAWING_IMAGE_MB: z.coerce.number().positive().default(20),
+    // Image uploads per minute, per IP, in each live drawing.
     IMAGE_UPLOADS_PER_MINUTE: z.coerce.number().int().positive().default(30),
   },
   clientPrefix: "VITE_",
   client: {
     VITE_APP_TITLE: z.string().min(1).optional(),
   },
-  isServer:
-    typeof window === "undefined" ||
-    "Deno" in window ||
-    process.env.NODE_ENV === "test",
   runtimeEnv: process.env,
   // Treat empty strings in .env files (e.g. `FOO=`) as missing rather than ""
   // so optional vars and defaults behave as expected.

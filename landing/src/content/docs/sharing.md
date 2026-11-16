@@ -36,9 +36,12 @@ exists.
 ## Limits
 
 - A live drawing has 25 seats. One seat is kept for the owner.
-- By default, an image can be up to 2 MB, and a drawing can store up to 20 MB of
-  images (configurable with [environment variables](/docs/environment/#limits)).
-  Other people see a placeholder for an image that is refused.
+- An image can be up to 2 MB, and a drawing can store up to 20 MB of images.
+  Other people see a placeholder for an image that is refused, and you see a
+  message that says why.
+- One IP address can add up to 30 images a minute to a live drawing. A
+  self-hoster can change this with
+  [`IMAGE_UPLOADS_PER_MINUTE`](/docs/environment/#limits).
 - A live drawing holds up to 50,000 elements (deleted ones count) and 20 MB of
   drawing data, not counting images. Past that, new content does not sync or
   save. Changes that do not make the drawing larger still sync.

@@ -17,10 +17,3 @@ class InViewObserver {
 
 globalThis.IntersectionObserver ??=
   InViewObserver as unknown as typeof IntersectionObserver
-
-// Vitest sets BASE_URL to "/", which is not a URL.
-if (process.env.BASE_URL === "/") {
-  delete process.env.BASE_URL
-}
-process.env.DATABASE_URL ??= "postgres://test:test@127.0.0.1:5432/test"
-process.env.BETTER_AUTH_SECRET ??= "test-secret-test-secret-test-secret-00"

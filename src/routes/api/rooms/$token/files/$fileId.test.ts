@@ -13,6 +13,7 @@ import { IMAGE_UPLOADS_PER_MINUTE } from "@/features/collab/upload-rate-limit"
 import { getRoomFile, postRoomFile } from "./$fileId"
 
 vi.mock("@/db", () => ({ db: {} }))
+vi.mock("@/env", () => ({ env: { IMAGE_UPLOADS_PER_MINUTE: 30 } }))
 
 const resolveRoomForToken = vi.hoisted(() => vi.fn())
 vi.mock("@/features/collab/room-token", () => ({ resolveRoomForToken }))

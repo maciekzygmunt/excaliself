@@ -51,13 +51,11 @@ Optional. Each provider is on when its variables are set. See
 
 ## Limits
 
-Optional. Tune image upload sizes, storage budgets, and rate limits.
+Optional.
 
-| Variable | Default | Description |
-|---|---|---|
-| `MAX_IMAGE_MB` | `2` | Maximum size of an individual image in megabytes |
-| `MAX_DRAWING_IMAGE_MB` | `20` | Total image storage budget per drawing in megabytes |
-| `IMAGE_UPLOADS_PER_MINUTE` | `30` | Maximum image uploads per minute per IP per room |
+| Variable | Description |
+|---|---|
+| `IMAGE_UPLOADS_PER_MINUTE` | Images that one IP address can add to one [live drawing](/docs/sharing/) each minute (default `30`). Past that, the server refuses them |
 
 ## Previews
 
