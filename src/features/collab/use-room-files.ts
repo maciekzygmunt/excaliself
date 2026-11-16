@@ -151,6 +151,11 @@ export function useRoomFiles(options: {
             skipUploadRef.current.delete(file.fileId)
             return
           }
+          // Their toasts say to add the image again; a re-add must upload.
+          if (outcome === "rate-limited" || outcome === "failed") {
+            skipUploadRef.current.delete(file.fileId)
+            uploadAttemptsRef.current.delete(file.fileId)
+          }
           const api = apiRef.current
           if (!api) return
           if (outcome === "full") toastImageCapFull()

@@ -17,6 +17,7 @@ vi.mock("@excalidraw/excalidraw", () => ({
 }))
 
 beforeEach(() => {
+  vi.restoreAllMocks()
   vi.clearAllMocks()
 })
 
@@ -63,6 +64,16 @@ test.each([
     expect(await upload(1)).toEqual({ status: "error", toasts: [id] })
   },
 )
+
+test("re-adding a rate-limited image uploads it again", async () => {
+  vi.spyOn(fileTransport, "uploadRoomFile")
+    .mockResolvedValueOnce("rate-limited")
+    .mockResolvedValueOnce("stored")
+  expect(await upload(2)).toEqual({
+    status: "saved",
+    toasts: ["image-rate-limited"],
+  })
+})
 
 test("a failed upload retries quietly, then says so on the last attempt", async () => {
   vi.spyOn(fileTransport, "uploadRoomFile").mockResolvedValue("failed")
