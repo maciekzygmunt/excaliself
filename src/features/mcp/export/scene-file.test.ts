@@ -38,9 +38,11 @@ test("writes what Excalidraw's Save to file writes", async () => {
   HTMLCanvasElement.prototype.getContext = (() => ({
     measureText: () => ({ width: 0 }),
   })) as never
-  const { serializeAsJSON } = await import("@excalidraw/excalidraw")
+  const { getNonDeletedElements, serializeAsJSON } = await import(
+    "@excalidraw/excalidraw"
+  )
   const theirs = serializeAsJSON(
-    elements as never,
+    getNonDeletedElements(elements as never),
     scene.appState as never,
     Object.fromEntries(scene.files) as never,
     "local",

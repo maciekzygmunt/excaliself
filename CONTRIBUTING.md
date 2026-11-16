@@ -20,6 +20,23 @@ pnpm lint
 
 The tests need Node 22.
 
+## Updating Excalidraw
+
+`@excalidraw/excalidraw` is pinned to an exact pre-release build from
+Excalidraw's `release` branch, the code that excalidraw.com runs. Stable
+releases are about a year apart.
+
+To update it:
+
+1. Pin the newer build: `pnpm add -E @excalidraw/excalidraw@<version>`.
+2. Read the "Unreleased" part of its
+   [changelog](https://github.com/excalidraw/excalidraw/blob/master/packages/excalidraw/CHANGELOG.md)
+   for breaking changes.
+3. Run the checks. The tests in `src/features/mcp` compare the server's own
+   drawing code with the real package, so they show what to port.
+4. Run `pnpm tsx scripts/export-fonts.ts` and
+   `pnpm tsx scripts/excalifont-widths.ts`, which read the package's fonts.
+
 ## Pull requests
 
 - Keep each pull request small and about one thing.

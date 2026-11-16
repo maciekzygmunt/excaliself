@@ -1,8 +1,9 @@
 // A drawing as a standalone SVG, the way Excalidraw's own "Export image"
-// writes it: a port of 0.18.1's scene/export.ts and renderer/staticSvgScene.ts
+// writes it: a port of its scene/export.ts and renderer/staticSvgScene.ts
 // (MIT) that builds a string instead of DOM nodes, so it runs on the server.
 // Bound text on arrows uses its stored position, frame names are not
-// truncated, and embeds draw as their placeholder.
+// truncated, embeds draw as their placeholder, and dark mode is one filter
+// on the whole image, where Excalidraw recolors each element.
 
 import { getStroke } from "perfect-freehand"
 import type { Drawable } from "roughjs/bin/core"
@@ -12,8 +13,10 @@ import {
   fontFaces,
   fontFamilyString,
   fontFilesFor,
+  HELVETICA,
   verticalOffset,
 } from "./fonts"
+import { laserOutline } from "./laser"
 import {
   absoluteCoords,
   type Bounds,
@@ -23,6 +26,7 @@ import {
   getCornerRadius,
   isPathALoop,
 } from "./shape"
+import { stickyNoteFooter, stickyNotePath } from "./sticky-note"
 
 export type ExportOptions = {
   darkMode: boolean
@@ -56,12 +60,16 @@ const FRAME_STYLE = {
   nameFontSize: 14,
   nameLineHeight: 1.25,
 }
+// The room Excalidraw leaves around a label (BOUND_TEXT_PADDING).
+const BOUND_TEXT_PADDING = 5
+const STICKY_NOTE_FOOTER_FONT = "Helvetica, Arial, sans-serif"
 const FRAME_TYPES = new Set(["frame", "magicframe"])
 const IFRAME_TYPES = new Set(["iframe", "embeddable"])
 const DRAWN_TYPES = new Set([
   "rectangle",
   "diamond",
   "ellipse",
+  "stickynote",
   "line",
   "arrow",
   "freedraw",
@@ -140,23 +148,29 @@ function drawable(shape: Drawable, values: Attrs, extra = "") {
 // Trims path numbers to two decimals, like Excalidraw.
 const TO_FIXED_PRECISION = /(\s?[A-Z]?,?-?[0-9]*\.[0-9]{0,2})(([0-9]|e|-)*)/g
 
-function freeDrawPath(element: Element) {
+/** The outline of a freedraw stroke, around its points. */
+function freeDrawOutline(element: Element): number[][] {
+  const { streamline, variability } = element.strokeOptions
+  if (variability === "constant")
+    return laserOutline(element.points, element.strokeWidth * 1.4, streamline)
   const input = element.simulatePressure
     ? element.points.map(([x, y]) => [x, y])
     : element.points.length
       ? element.points.map(([x, y], i) => [x, y, element.pressures[i] ?? 0.5])
       : [[0, 0, 0.5]]
-  const points = getStroke(input, {
+  return getStroke(input, {
     simulatePressure: element.simulatePressure,
     size: element.strokeWidth * 4.25,
     thinning: 0.6,
     smoothing: 0.5,
-    streamline: 0.5,
+    streamline,
     easing: (t) => Math.sin((t * Math.PI) / 2),
-    // Excalidraw's restore() clears lastCommittedPoint, so an opened
-    // drawing always draws as false here.
-    last: false,
+    last: true,
   })
+}
+
+function freeDrawPath(element: Element) {
+  const points = freeDrawOutline(element)
   if (!points.length) return ""
   const med = (a: number[], b: number[]) => [
     (a[0] + b[0]) / 2,
@@ -281,9 +295,10 @@ function renderElement(scene: Scene, element: Element): string {
   const opacityAttrs =
     opacity !== 1 ? { "stroke-opacity": opacity, "fill-opacity": opacity } : {}
 
-  // Frame children are clipped to their frame, as on the canvas.
+  // Frame children are clipped to their frame, as on the canvas. Arrows and
+  // their labels are not, so they can leave the frame.
   const clipped = (node: string) =>
-    containingFrame
+    containingFrame && element.type !== "arrow" && container?.type !== "arrow"
       ? tag("g", { "clip-path": `url(#clip-${containingFrame.id})` }, node)
       : node
 
@@ -300,6 +315,66 @@ function renderElement(scene: Scene, element: Element): string {
         }),
       )
       break
+    case "stickynote": {
+      const paper = stickyNotePath(element)
+      const clipId = `sticky-note-clipPath-${element.id}`
+      scene.defs.push(
+        tag(
+          "clipPath",
+          { id: clipId, clipPathUnits: "userSpaceOnUse" },
+          tag("path", { d: paper, fill: "#000", stroke: "none" }),
+        ),
+      )
+      // The dark mode filter turns white into the near-black a shadow needs.
+      const shadow = scene.options.darkMode ? "#fff" : "#000"
+      const footer = stickyNoteFooter(element)
+      node = clipped(
+        tag(
+          "g",
+          { transform, opacity: opacity !== 1 ? opacity : undefined },
+          tag("path", {
+            d: stickyNotePath(element, true),
+            fill: shadow,
+            "fill-opacity": 0.16,
+            stroke: "none",
+          }) +
+            tag("path", {
+              d: paper,
+              fill: element.backgroundColor,
+              stroke: "none",
+            }) +
+            // A thin shadow along the paper's edge, on its inside.
+            tag("path", {
+              d: paper,
+              fill: "none",
+              stroke: shadow,
+              "stroke-opacity": 0.08,
+              "stroke-width": 1,
+              "clip-path": `url(#${clipId})`,
+            }) +
+            (footer
+              ? tag(
+                  "text",
+                  {
+                    x: footer.x,
+                    y: footer.y,
+                    "font-family":
+                      scene.options.target === "svg"
+                        ? STICKY_NOTE_FOOTER_FONT
+                        : fontFamilyString(HELVETICA, "png"),
+                    "font-size": "12px",
+                    "text-anchor": "end",
+                    direction: "ltr",
+                    fill: element.strokeColor,
+                    "fill-opacity": 1,
+                  },
+                  escapeXml(footer.text),
+                )
+              : ""),
+        ),
+      )
+      break
+    }
     case "iframe":
     case "embeddable":
       node = clipped(
@@ -317,23 +392,27 @@ function renderElement(scene: Scene, element: Element): string {
         : undefined
       let mask = ""
       if (boundText) {
-        // Cuts the line where its label sits.
+        // Cuts the line where its label sits. In user space: the default
+        // units give a straight arrow's mask no area, which hides the arrow.
+        const width = element.width + 100 + offsetX
+        const height = element.height + 100 + offsetY
         mask = tag(
           "mask",
-          { id: `mask-${element.id}` },
-          tag("rect", {
+          {
+            id: `mask-${element.id}`,
+            maskUnits: "userSpaceOnUse",
             x: 0,
             y: 0,
-            fill: "#fff",
-            width: element.width + 100 + offsetX,
-            height: element.height + 100 + offsetY,
-          }) +
+            width,
+            height,
+          },
+          tag("rect", { x: 0, y: 0, fill: "#fff", width, height }) +
             tag("rect", {
-              x: scene.offsetX + boundText.x,
-              y: scene.offsetY + boundText.y,
+              x: scene.offsetX + boundText.x - BOUND_TEXT_PADDING,
+              y: scene.offsetY + boundText.y - BOUND_TEXT_PADDING,
               fill: "#000",
-              width: boundText.width,
-              height: boundText.height,
+              width: boundText.width + BOUND_TEXT_PADDING * 2,
+              height: boundText.height + BOUND_TEXT_PADDING * 2,
               opacity: 1,
             }),
         )
@@ -529,12 +608,11 @@ function renderImage(
     scene.defs.push(
       tag(
         "clipPath",
-        { id: clipId },
+        { id: clipId, clipPathUnits: "userSpaceOnUse" },
         tag("rect", {
-          // Over the crop's visible part, like the mask (Excalidraw's own
-          // export leaves it at 0 0 and cuts cropped images short).
-          x: crop ? cropX : undefined,
-          y: crop ? cropY : undefined,
+          // Over the crop's visible part, like the mask.
+          x: cropX,
+          y: cropY,
           width: element.width,
           height: element.height,
           rx: radius,
@@ -649,15 +727,14 @@ export async function renderSvg(
   }
 
   const textsByFamily = new Map<number, string>()
-  const texts = forRender.flatMap((element) =>
-    IFRAME_TYPES.has(element.type) ? [embedLabel(element)] : [element],
-  )
-  for (const element of texts) {
-    if (element.type !== "text") continue
-    textsByFamily.set(
-      element.fontFamily,
-      (textsByFamily.get(element.fontFamily) ?? "") + element.originalText,
-    )
+  const addText = (fontFamily: number, text: string) =>
+    textsByFamily.set(fontFamily, (textsByFamily.get(fontFamily) ?? "") + text)
+  for (const element of forRender) {
+    const text = IFRAME_TYPES.has(element.type) ? embedLabel(element) : element
+    if (text.type === "text") addText(text.fontFamily, text.originalText)
+    // A sticky note's date is in Helvetica, which a PNG has a font file for.
+    else if (text.type === "stickynote")
+      addText(HELVETICA, stickyNoteFooter(text)?.text ?? "")
   }
   const style =
     options.target === "svg"

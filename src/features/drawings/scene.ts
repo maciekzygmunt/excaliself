@@ -1,11 +1,10 @@
 import {
   CaptureUpdateAction,
-  getCommonBounds,
   getNonDeletedElements,
   hashString,
-  restore,
+  restoreAppState,
+  restoreElements,
   serializeAsJSON,
-  zoomToFitBounds,
 } from "@excalidraw/excalidraw"
 import type { ExcalidrawElement } from "@excalidraw/excalidraw/element/types"
 import type {
@@ -13,6 +12,7 @@ import type {
   BinaryFiles,
   ExcalidrawImperativeAPI,
   ExcalidrawInitialDataState,
+  ExcalidrawInitialState,
 } from "@excalidraw/excalidraw/types"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { useCallback, useEffect, useMemo, useState } from "react"
@@ -94,7 +94,8 @@ export function selectOversizedImages(
 export function buildScenePayload(scene: SceneData): ScenePayload {
   return {
     data: serializeAsJSON(
-      scene.elements,
+      // Excalidraw no longer drops deleted elements when it serializes.
+      getNonDeletedElements(scene.elements),
       scene.appState,
       scene.files ?? {},
       "database",
@@ -147,71 +148,45 @@ function parseSceneData(raw: string | undefined | null): {
   }
 }
 
-/** A canvas to open content in; `offsets` keep it clear of the UI on top. */
-export type FitTo = {
-  width: number
-  height: number
-  offsets?: { top: number; right: number; bottom: number; left: number }
-}
-
-/**
- * `fitTo` opens the view centered on the content, zoomed out to fit that
- * canvas, but never past 100%. Saved scenes carry no scroll or zoom, so
- * without it the view opens at the origin.
- */
 export function buildInitialSceneData(
   drawing: { data: string; files?: PersistedFile[] | null } | null | undefined,
-  fitTo?: FitTo,
 ): { initialData: ExcalidrawInitialDataState; isDataCorrupt: boolean } {
   const files = toBinaryFiles(drawing?.files)
   const { parsed, isCorrupt } = parseSceneData(drawing?.data)
-  const restored = restore(
-    parsed
-      ? { elements: parsed.elements, appState: parsed.appState, files }
-      : null,
-    null,
-    null,
-  )
+  const appState = restoreAppState(parsed?.appState, null)
   // JSON persistence flattens collaborators to a plain object; Excalidraw
   // requires a Map.
-  restored.appState.collaborators = new Map()
-  const elements = fitTo ? getNonDeletedElements(restored.elements) : []
-  if (fitTo && elements.length > 0) {
-    const { width, height, offsets } = fitTo
-    // Without fitToViewport it never zooms in past 100%.
-    const { scrollX, scrollY, zoom } = zoomToFitBounds({
-      appState: {
-        ...restored.appState,
-        width,
-        height,
-        offsetTop: 0,
-        offsetLeft: 0,
-      },
-      bounds: getCommonBounds(elements),
-      canvasOffsets: offsets,
-      fitToViewport: false,
-      viewportZoomFactor: 0.9,
-    }).appState
-    // Snap to whole screen pixels: centering in an odd-sized canvas lands on
-    // a half pixel, where Excalidraw's unsmoothed element bitmaps render
-    // ragged on 1x screens until the next pan or zoom.
-    const snap = (scroll: number) =>
-      Math.round(scroll * zoom.value) / zoom.value
-    restored.appState = {
-      ...restored.appState,
-      scrollX: snap(scrollX),
-      scrollY: snap(scrollY),
-      zoom,
-    }
+  appState.collaborators = new Map()
+  return {
+    initialData: {
+      elements: restoreElements(parsed?.elements, null),
+      appState,
+      files,
+    },
+    isDataCorrupt: isCorrupt,
   }
-  return { initialData: { ...restored, files }, isDataCorrupt: isCorrupt }
 }
 
-export function useDrawingScene(id: string, fitTo?: FitTo) {
+/**
+ * Opens the view on the content, zoomed out to fit beside the editor's UI,
+ * but never past 100%. Saved scenes carry no scroll or zoom, so without it
+ * the view opens at the origin.
+ */
+export function fitToContent(
+  initialData: ExcalidrawInitialDataState,
+): ExcalidrawInitialState | undefined {
+  const elements = getNonDeletedElements(initialData.elements ?? [])
+  if (elements.length === 0) return undefined
+  return {
+    viewport: { target: elements, fit: "scale-down", offsets: { ui: true } },
+  }
+}
+
+export function useDrawingScene(id: string) {
   const { data: drawing } = useQuery(drawingQueryOptions(id))
   const scene = useMemo(
-    () => (drawing ? buildInitialSceneData(drawing, fitTo) : null),
-    [drawing, fitTo],
+    () => (drawing ? buildInitialSceneData(drawing) : null),
+    [drawing],
   )
   return {
     drawing,

@@ -1,9 +1,14 @@
-import { MIME_TYPES, serializeAsJSON } from "@excalidraw/excalidraw"
+import {
+  getNonDeletedElements,
+  MIME_TYPES,
+  serializeAsJSON,
+} from "@excalidraw/excalidraw"
 import { buildInitialSceneData, type PersistedFile } from "./scene"
 
 /**
- * A stored drawing as an `.excalidraw` file, byte for byte what Excalidraw's
- * "Save to file" writes. Imports Excalidraw: load it lazily, client-side only.
+ * A stored drawing as an `.excalidraw` file, as Excalidraw's "Save to file"
+ * writes it, without deleted elements. Imports Excalidraw: load it lazily,
+ * client-side only.
  */
 export function toExcalidrawFile(drawing: {
   name: string
@@ -13,7 +18,7 @@ export function toExcalidrawFile(drawing: {
   const { initialData, isDataCorrupt } = buildInitialSceneData(drawing)
   if (isDataCorrupt) throw new Error("The drawing's scene is corrupt")
   const json = serializeAsJSON(
-    initialData.elements ?? [],
+    getNonDeletedElements(initialData.elements ?? []),
     initialData.appState ?? {},
     initialData.files ?? {},
     "local",

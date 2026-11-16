@@ -1,13 +1,14 @@
-import { Excalidraw, MainMenu, useDevice } from "@excalidraw/excalidraw"
+import {
+  Excalidraw,
+  MainMenu,
+  useEditorInterface,
+} from "@excalidraw/excalidraw"
 import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types"
 import { useNavigate } from "@tanstack/react-router"
 import { LogInIcon } from "lucide-react"
 import { useCallback, useMemo, useState } from "react"
-import {
-  FooterRightPortal,
-  TopLeftPortal,
-} from "@/components/excalidraw-portal"
-import { FollowModeOverlay } from "@/components/follow-mode-overlay"
+import { FooterRightPortal } from "@/components/excalidraw-portal"
+import { useFollowStatusFrame } from "@/components/follow-status-frame"
 import { MenuParticipants } from "@/components/menu-participants"
 import { MenuReconnecting } from "@/components/menu-reconnecting"
 import { PresenceAvatars } from "@/components/presence-avatars"
@@ -20,10 +21,10 @@ import { roomPathForToken } from "@/features/collab/room-url"
 import { useRoom } from "@/features/collab/use-room"
 import {
   buildInitialSceneData,
+  fitToContent,
   type PersistedFile,
 } from "@/features/drawings/scene"
 import { useBlockClearCanvasShortcut } from "@/hooks/use-block-clear-canvas-shortcut"
-import { usePreloadTextFont } from "@/hooks/use-preload-text-font"
 import { GuestAttribution } from "./GuestAttribution"
 import { GuestNamePill } from "./GuestNamePill"
 import { GuestTitle } from "./GuestTitle"
@@ -54,20 +55,15 @@ export function SharedCanvas({
   onLinkDead,
   onSceneUnreadable,
 }: Props) {
-  // The owner's view doesn't fit a phone, so open on the content instead.
   const initialData = useMemo(
-    () =>
-      buildInitialSceneData(
-        { data: drawing.data, files },
-        { width: window.innerWidth, height: window.innerHeight },
-      ).initialData,
+    () => buildInitialSceneData({ data: drawing.data, files }).initialData,
     [drawing.data, files],
   )
+  const initialState = useMemo(() => fitToContent(initialData), [initialData])
   // Already stored, so this tab must not upload them again.
   const storedFileIds = useMemo(() => files.map((file) => file.fileId), [files])
   const [excalidrawAPI, setExcalidrawAPI] =
     useState<ExcalidrawImperativeAPI | null>(null)
-  usePreloadTextFont(excalidrawAPI)
 
   // Members send it too; the server uses their session name instead.
   const [name, setName] = useState(getOrCreateGuestName)
@@ -81,6 +77,7 @@ export function SharedCanvas({
     onSceneUnreadable,
     storedFileIds,
   })
+  const followStatusFrame = useFollowStatusFrame(room)
   // A reset would wipe the drawing for everyone in the room.
   useBlockClearCanvasShortcut()
 
@@ -99,12 +96,18 @@ export function SharedCanvas({
     <div className="@container/canvas relative h-dvh w-full">
       <Excalidraw
         initialData={initialData}
-        excalidrawAPI={setExcalidrawAPI}
+        initialState={initialState}
+        onExcalidrawAPI={setExcalidrawAPI}
         theme="light"
         onChange={room.onChange}
         onPointerUpdate={room.onPointerUpdate}
         onScrollChange={room.onScrollChange}
-        // In mobile layout this row starts off screen, so it all moves to the menu.
+        userToFollow={room.userToFollow}
+        viewportStatusFrame={followStatusFrame}
+        renderTopLeftUI={() => (
+          <GuestTitle name={drawing.name} className="hidden lg:flex" />
+        )}
+        // On a phone this row has no room, so it all moves to the menu.
         renderTopRightUI={(isMobile) =>
           isMobile ? null : (
             <>
@@ -164,15 +167,10 @@ export function SharedCanvas({
             <MainMenu.DefaultItems.Socials />
           </MainMenu.Group>
         </MainMenu>
-        <TopLeftPortal>
-          <GuestTitle name={drawing.name} className="hidden lg:flex" />
-        </TopLeftPortal>
         <FooterRightPortal>
           <GuestAttribution token={token} showSignIn={isGuest} />
         </FooterRightPortal>
       </Excalidraw>
-      {/* Outside Excalidraw so the ring sits above portaled chrome. */}
-      <FollowModeOverlay room={room} />
     </div>
   )
 }
@@ -180,7 +178,7 @@ export function SharedCanvas({
 // The mobile layout drops the footer and its Sign in link, so it moves here.
 function MenuSignIn({ token }: { token: string }) {
   const navigate = useNavigate()
-  if (!useDevice().editor.isMobile) return null
+  if (useEditorInterface().formFactor !== "phone") return null
   return (
     <MainMenu.Item
       icon={<LogInIcon className="h-4 w-4" />}

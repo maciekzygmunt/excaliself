@@ -1,7 +1,7 @@
 import { type ReactNode, useLayoutEffect, useState } from "react"
 import { createPortal } from "react-dom"
 
-// Excalidraw mounts its UI slots late and re-creates them when it switches
+// Excalidraw mounts its footer late and re-creates it when it switches
 // between its mobile and desktop layouts (on window or canvas resize). We
 // watch the DOM and look the target up again while it is missing or detached.
 function useExcalidrawPortalTarget(findTarget: () => HTMLElement | null) {
@@ -21,25 +21,6 @@ function useExcalidrawPortalTarget(findTarget: () => HTMLElement | null) {
   }, [findTarget])
 
   return target
-}
-
-const PRIMARY_TARGET_SELECTOR =
-  ".excalidraw .App-menu_top__left > div:first-child"
-const FALLBACK_TRIGGER_SELECTOR = ".excalidraw .main-menu-trigger"
-
-function findTopLeft(): HTMLElement | null {
-  const primary = document.querySelector(PRIMARY_TARGET_SELECTOR)
-  if (primary instanceof HTMLElement) return primary
-
-  const trigger = document.querySelector(FALLBACK_TRIGGER_SELECTOR)
-  const fallback = trigger?.closest("div")
-  return fallback instanceof HTMLElement ? fallback : null
-}
-
-/** Renders beside the burger, inside Excalidraw's top-left island. */
-export function TopLeftPortal({ children }: { children: ReactNode }) {
-  const target = useExcalidrawPortalTarget(findTopLeft)
-  return target ? createPortal(children, target) : null
 }
 
 const FOOTER_RIGHT_SELECTOR = ".excalidraw .layer-ui__wrapper__footer-right"

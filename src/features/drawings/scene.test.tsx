@@ -20,11 +20,8 @@ import { getDrawingWithFiles, saveDrawingScene } from "./server"
 vi.mock("@excalidraw/excalidraw", () => ({
   CaptureUpdateAction: { NEVER: "NEVER" },
   hashString: (value: string) => value.length,
-  restore: (data: { elements?: unknown[] } | null) => ({
-    elements: data?.elements ?? [],
-    appState: {},
-    files: {},
-  }),
+  restoreAppState: () => ({}),
+  restoreElements: (elements?: unknown[]) => elements ?? [],
   serializeAsJSON: () => "{}",
 }))
 

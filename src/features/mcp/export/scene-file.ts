@@ -1,6 +1,6 @@
 // A drawing as an `.excalidraw` file, in the format Excalidraw's "Save to
-// file" writes (serializeAsJSON(…, "local") in 0.18.1), built without
-// Excalidraw so it runs on the server.
+// file" writes (its serializeAsJSON(…, "local")), built without Excalidraw so
+// it runs on the server.
 
 import type { SceneFile } from "./scene-data"
 
@@ -13,9 +13,8 @@ const EXPORTED_APP_STATE = new Set([
   "gridStep",
   "gridModeEnabled",
   "viewBackgroundColor",
+  "lockedMultiSelections",
 ])
-
-const LINEAR_TYPES = new Set(["line", "arrow"])
 
 export function toExcalidrawFile(scene: {
   elements: readonly Record<string, unknown>[]
@@ -24,13 +23,8 @@ export function toExcalidrawFile(scene: {
   /** The instance's origin, as a browser export writes it. */
   source: string
 }): string {
-  const elements = scene.elements
-    .filter((element) => !element.isDeleted)
-    .map((element) =>
-      typeof element.type === "string" && LINEAR_TYPES.has(element.type)
-        ? { ...element, lastCommittedPoint: null }
-        : element,
-    )
+  // As the app's own export: deleted elements stay out of the file.
+  const elements = scene.elements.filter((element) => !element.isDeleted)
   const appState = Object.fromEntries(
     Object.entries(scene.appState).filter(
       ([key, value]) => EXPORTED_APP_STATE.has(key) && value !== undefined,

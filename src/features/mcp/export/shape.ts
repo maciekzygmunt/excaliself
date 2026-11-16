@@ -1,12 +1,17 @@
-// Rough.js shapes and bounds for an element, ported from Excalidraw 0.18.1
-// (scene/Shape.ts, element/bounds.ts, MIT). Same roughjs version and seeds, so
-// strokes come out exactly as on the canvas.
+// Rough.js shapes and bounds for an element, ported from Excalidraw
+// (element/src/shape.ts and bounds.ts, MIT). Same roughjs version and seeds,
+// so strokes come out exactly as on the canvas.
 
 import { simplify } from "points-on-curve"
 import type { Drawable, Op, Options } from "roughjs/bin/core"
 import { RoughGenerator } from "roughjs/bin/generator"
 import type { Point as RoughPoint } from "roughjs/bin/geometry"
-import type { Arrowhead, Element, Point } from "./elements"
+import {
+  type Arrowhead,
+  type Element,
+  isTransparent,
+  type Point,
+} from "./elements"
 
 export type Bounds = [minX: number, minY: number, maxX: number, maxY: number]
 
@@ -17,13 +22,15 @@ const ROUNDNESS = { LEGACY: 1, PROPORTIONAL_RADIUS: 2, ADAPTIVE_RADIUS: 3 }
 const DEFAULT_PROPORTIONAL_RADIUS = 0.25
 const DEFAULT_ADAPTIVE_RADIUS = 32
 const LINE_CONFIRM_THRESHOLD = 8
+const ELBOW_ARROW_CORNER_RADIUS = 16
+// Excalidraw's canChangeRoundness.
 const ROUNDABLE = new Set([
   "rectangle",
   "iframe",
   "embeddable",
-  "arrow",
   "line",
   "diamond",
+  "stickynote",
   "image",
 ])
 
@@ -35,11 +42,6 @@ export const rotate = (
   (x - cx) * Math.cos(angle) - (y - cy) * Math.sin(angle) + cx,
   (x - cx) * Math.sin(angle) + (y - cy) * Math.cos(angle) + cy,
 ]
-
-export const isTransparent = (color: string) =>
-  color === "transparent" ||
-  (color.length === 5 && color[4] === "0") ||
-  (color.length === 9 && color.slice(7) === "00")
 
 export function getCornerRadius(x: number, element: Element) {
   const type = element.roundness?.type
@@ -168,6 +170,16 @@ export function curvePathOps(shape: Drawable | undefined): Op[] {
   return shape.sets[0]?.ops ?? []
 }
 
+// Where the parts of a composite cardinality marker sit, in multiples of the
+// part's size (negative: toward the tip).
+const ONE_OR_MANY_BAR_OFFSET = -0.25
+const INNER_BAR_OFFSET = -0.5
+const ZERO_CIRCLE_OFFSET = 1.5
+const ZERO_CIRCLE_SCALE = 0.8
+
+const isCardinality = (arrowhead: Arrowhead) =>
+  arrowhead.startsWith("cardinality_")
+
 function arrowheadSize(arrowhead: Arrowhead) {
   switch (arrowhead) {
     case "arrow":
@@ -175,25 +187,177 @@ function arrowheadSize(arrowhead: Arrowhead) {
     case "diamond":
     case "diamond_outline":
       return 12
-    case "crowfoot_many":
-    case "crowfoot_one":
-    case "crowfoot_one_or_many":
+    case "cardinality_one":
+    case "cardinality_exactly_one":
+    case "cardinality_zero_or_one":
       return 20
     default:
       return 15
   }
 }
 
-const arrowheadAngle = (arrowhead: Arrowhead) =>
-  arrowhead === "bar" ? 90 : arrowhead === "arrow" ? 20 : 25
+/** In degrees. An "arrow" drawn smaller opens up, to stay off the line. */
+function arrowheadAngle(arrowhead: Arrowhead, size = arrowheadSize(arrowhead)) {
+  if (arrowhead === "bar") return 90
+  if (arrowhead !== "arrow") return 25
+  const fullSize = arrowheadSize(arrowhead)
+  const shrinkage = Math.min(
+    Math.max((fullSize - size) / (fullSize - 10), 0),
+    1,
+  )
+  return 20 + 10 * shrinkage
+}
 
 const radians = (degrees: number) => (degrees * Math.PI) / 180
 
+type Corner = { length: number; prevLength: number; turn: number }
+
+/**
+ * The arrow's last segment at one end, and how far the arrow turns into it
+ * from the segment before. Null when there is no segment before.
+ */
+function arrowheadCorner(
+  element: Element,
+  position: "start" | "end",
+): Corner | null {
+  const { points } = element
+  const [tip, corner, prev] =
+    position === "end"
+      ? [points.at(-1), points.at(-2), points.at(-3)]
+      : [points[0], points[1], points[2]]
+  if (!tip || !corner || !prev) return null
+  let length = Math.hypot(tip[0] - corner[0], tip[1] - corner[1])
+  let prevLength = Math.hypot(corner[0] - prev[0], corner[1] - prev[1])
+  if (length === 0 || prevLength === 0) return null
+  // An elbow arrow turns halfway into its rounded corner.
+  if (element.elbowed) {
+    const rounding =
+      Math.min(ELBOW_ARROW_CORNER_RADIUS, length / 2, prevLength / 2) / 2
+    length -= rounding
+    prevLength -= rounding
+  }
+  const dot =
+    (tip[0] - corner[0]) * (corner[0] - prev[0]) +
+    (tip[1] - corner[1]) * (corner[1] - prev[1])
+  const cos = dot / (length * prevLength)
+  return { length, prevLength, turn: Math.acos(Math.min(Math.max(cos, -1), 1)) }
+}
+
+/**
+ * The size up to which an arrowhead reaching past the last segment keeps its
+ * sides (at `sideAngle`) `clearance` away from the segment before.
+ */
+function sidesClearSize(
+  { length, turn }: Corner,
+  sideAngle: number,
+  clearance: number,
+) {
+  const angle = radians(sideAngle)
+  if (turn <= angle) return Infinity
+  return (length * Math.sin(turn) - clearance) / Math.sin(turn - angle)
+}
+
+/** The scale (at most 1) at which a whole cardinality marker fits the last segment. */
+function cardinalityScale(
+  marker: Arrowhead,
+  { length, turn }: Corner,
+  strokeWidth: number,
+) {
+  const bar = (offset: number) => {
+    const angle = radians(arrowheadAngle("cardinality_one"))
+    return (
+      length /
+      (arrowheadSize("cardinality_one") *
+        (offset + Math.cos(angle) + Math.sin(angle) * Math.tan(turn / 2)))
+    )
+  }
+  const crowsFoot = length / arrowheadSize("cardinality_many")
+  const circle =
+    (length - ((strokeWidth - 2) * ZERO_CIRCLE_SCALE) / 2 - strokeWidth) /
+    (arrowheadSize("circle_outline") *
+      (ZERO_CIRCLE_OFFSET + ZERO_CIRCLE_SCALE / 2))
+  switch (marker) {
+    case "cardinality_one":
+      return Math.min(1, bar(0))
+    case "cardinality_many":
+      return Math.min(1, crowsFoot)
+    case "cardinality_one_or_many":
+      return Math.min(1, crowsFoot, bar(ONE_OR_MANY_BAR_OFFSET))
+    case "cardinality_exactly_one":
+      return Math.min(1, bar(INNER_BAR_OFFSET), bar(0))
+    case "cardinality_zero_or_one":
+      return Math.min(1, circle, bar(INNER_BAR_OFFSET))
+    default:
+      return Math.min(1, crowsFoot, circle)
+  }
+}
+
+/**
+ * The size an arrowhead (or one part of a marker) may grow to when the last
+ * segment is too short for it. 0 when it shouldn't grow.
+ */
+function sizeBeyondLastSegment(
+  element: Element,
+  position: "start" | "end",
+  arrowhead: Arrowhead,
+) {
+  const corner = arrowheadCorner(element, position)
+  if (!corner) return 0
+  const { length, prevLength, turn } = corner
+  const maxSize = (length + prevLength) / 2
+  const isCurved = !!element.roundness && !element.elbowed
+  const marker =
+    position === "start" ? element.startArrowhead : element.endArrowhead
+  // A marker's parts scale together, and stay on the last segment.
+  if (marker && isCardinality(marker)) {
+    return isCurved
+      ? 0
+      : arrowheadSize(arrowhead) *
+          cardinalityScale(marker, corner, element.strokeWidth)
+  }
+  if (arrowhead === "circle" || arrowhead === "circle_outline") return maxSize
+  if (isCurved) return 0
+  switch (arrowhead) {
+    case "bar":
+      return Math.min(maxSize, length / Math.tan(turn / 2))
+    case "diamond":
+    case "diamond_outline":
+      return length / 2
+    case "triangle":
+    case "triangle_outline":
+      return Math.min(
+        maxSize,
+        sidesClearSize(corner, arrowheadAngle(arrowhead), 0),
+      )
+    case "arrow": {
+      const legibleSize = arrowheadSize(arrowhead) / 2
+      return Math.min(
+        legibleSize,
+        maxSize,
+        sidesClearSize(
+          corner,
+          arrowheadAngle(arrowhead, legibleSize),
+          element.strokeWidth,
+        ),
+        sidesClearSize(
+          corner,
+          arrowheadAngle(arrowhead, 0),
+          element.strokeWidth,
+        ),
+      )
+    }
+    default:
+      return 0
+  }
+}
+
+/** `offsetMultiplier` moves the part back from the tip, in its own sizes. */
 function arrowheadPoints(
   element: Element,
   shape: Drawable[],
   position: "start" | "end",
   arrowhead: Arrowhead,
+  offsetMultiplier = 0,
 ): number[] | null {
   const ops = curvePathOps(shape[0])
   if (ops.length < 1) return null
@@ -230,30 +394,38 @@ function arrowheadPoints(
       : [0, 0]
   const length = Math.hypot(cx - px, cy - py)
 
+  const size = arrowheadSize(arrowhead)
   const lengthMultiplier =
     arrowhead === "diamond" || arrowhead === "diamond_outline" ? 0.25 : 0.5
-  const minSize = Math.min(arrowheadSize(arrowhead), length * lengthMultiplier)
-  const xs = x2 - nx * minSize
-  const ys = y2 - ny * minSize
+  let minSize = Math.min(size, length * lengthMultiplier)
+  if (minSize < size) {
+    minSize = Math.min(
+      size,
+      Math.max(minSize, sizeBeyondLastSegment(element, position, arrowhead)),
+    )
+  }
+  const tx = x2 - nx * minSize * offsetMultiplier
+  const ty = y2 - ny * minSize * offsetMultiplier
+  const xs = tx - nx * minSize
+  const ys = ty - ny * minSize
 
-  if (
-    arrowhead === "dot" ||
-    arrowhead === "circle" ||
-    arrowhead === "circle_outline"
-  ) {
-    const diameter = Math.hypot(ys - y2, xs - x2) + element.strokeWidth - 2
-    return [x2, y2, diameter]
+  if (arrowhead === "circle" || arrowhead === "circle_outline") {
+    const diameter = Math.hypot(ys - ty, xs - tx) + element.strokeWidth - 2
+    return [tx, ty, diameter]
   }
 
-  const angle = arrowheadAngle(arrowhead)
-  if (arrowhead === "crowfoot_many" || arrowhead === "crowfoot_one_or_many") {
-    const [x3, y3] = rotate([x2, y2], [xs, ys], radians(-angle))
-    const [x4, y4] = rotate([x2, y2], [xs, ys], radians(angle))
+  const angle = arrowheadAngle(arrowhead, minSize)
+  if (
+    arrowhead === "cardinality_many" ||
+    arrowhead === "cardinality_one_or_many"
+  ) {
+    const [x3, y3] = rotate([tx, ty], [xs, ys], radians(-angle))
+    const [x4, y4] = rotate([tx, ty], [xs, ys], radians(angle))
     return [xs, ys, x3, y3, x4, y4]
   }
 
-  const [x3, y3] = rotate([xs, ys], [x2, y2], radians(-angle))
-  const [x4, y4] = rotate([xs, ys], [x2, y2], radians(angle))
+  const [x3, y3] = rotate([xs, ys], [tx, ty], radians(-angle))
+  const [x4, y4] = rotate([xs, ys], [tx, ty], radians(angle))
 
   if (arrowhead === "diamond" || arrowhead === "diamond_outline") {
     let ox: number
@@ -261,22 +433,40 @@ function arrowheadPoints(
     if (position === "start") {
       const [px, py] = points.length > 1 ? points[1] : [0, 0]
       ;[ox, oy] = rotate(
-        [x2 + minSize * 2, y2],
-        [x2, y2],
-        Math.atan2(py - y2, px - x2),
+        [tx + minSize * 2, ty],
+        [tx, ty],
+        Math.atan2(py - ty, px - tx),
       )
     } else {
       const [px, py] = points.length > 1 ? points[points.length - 2] : [0, 0]
       ;[ox, oy] = rotate(
-        [x2 - minSize * 2, y2],
-        [x2, y2],
-        Math.atan2(y2 - py, x2 - px),
+        [tx - minSize * 2, ty],
+        [tx, ty],
+        Math.atan2(ty - py, tx - px),
       )
     }
-    return [x2, y2, x3, y3, ox, oy, x4, y4]
+    return [tx, ty, x3, y3, ox, oy, x4, y4]
   }
 
-  return [x2, y2, x3, y3, x4, y4]
+  return [tx, ty, x3, y3, x4, y4]
+}
+
+/**
+ * Fills an arrowhead's outline (one rough stroke) along that stroke: rough.js
+ * jitters its own solid fill apart from the outline, which shows at this size.
+ */
+function fillOutline(outline: Drawable, fill: string): Drawable {
+  // A polygon is drawn edge by edge, each starting with a move.
+  const ops = outline.sets
+    .flatMap((set) => set.ops)
+    .map((op, index) =>
+      index > 0 && op.op === "move" ? { ...op, op: "lineTo" as const } : op,
+    )
+  return {
+    ...outline,
+    options: { ...outline.options, fill },
+    sets: [{ type: "fillPath", ops }, ...outline.sets],
+  }
 }
 
 function arrowheadShapes(
@@ -287,106 +477,124 @@ function arrowheadShapes(
   options: Options,
   canvasBackgroundColor: string,
 ): Drawable[] {
-  const points = arrowheadPoints(element, shape, position, arrowhead)
-  if (points === null) return []
+  const pointsOf = (part: Arrowhead = arrowhead, offset = 0) =>
+    arrowheadPoints(element, shape, position, part, offset)
 
-  const crowfootOne = (points: number[] | null, options: Options) => {
-    if (points === null) return []
-    const [, , x3, y3, x4, y4] = points
-    return [generator.line(x3, y3, x4, y4, options)]
+  const lineOptions = { ...options }
+  if (element.strokeStyle === "dotted") {
+    // Dotted arrow caps get a smaller gap, so they stay legible.
+    const dash = dotted(element.strokeWidth - 1)
+    lineOptions.strokeLineDash = [dash[0], dash[1] - 1]
+  } else {
+    delete lineOptions.strokeLineDash
   }
+  lineOptions.roughness = Math.min(1, lineOptions.roughness || 0)
+
+  const linesToTip = (points: number[] | null) => {
+    if (!points) return []
+    const [x2, y2, x3, y3, x4, y4] = points
+    return [
+      generator.line(x3, y3, x2, y2, lineOptions),
+      generator.line(x4, y4, x2, y2, lineOptions),
+    ]
+  }
+  const bar = (points: number[] | null) => {
+    if (!points) return []
+    const [, , x3, y3, x4, y4] = points
+    return [generator.line(x3, y3, x4, y4, lineOptions)]
+  }
+  // Outlines are one solid stroke: a second one would stray from the fill.
+  const circle = (points: number[] | null, fill: string, scale = 1) => {
+    if (!points) return []
+    const [x, y, diameter] = points
+    const circleOptions: Options = {
+      ...options,
+      stroke: element.strokeColor,
+      roughness: Math.min(0.5, options.roughness || 0),
+      disableMultiStroke: true,
+    }
+    delete circleOptions.strokeLineDash
+    return [
+      fillOutline(
+        generator.circle(x, y, diameter * scale, circleOptions),
+        fill,
+      ),
+    ]
+  }
+  const polygon = (corners: RoughPoint[], fill: string) => {
+    const polygonOptions: Options = {
+      ...options,
+      roughness: Math.min(1, options.roughness || 0),
+      disableMultiStroke: true,
+      // The small polygon's corners stay in place; only its edges bow.
+      preserveVertices: true,
+    }
+    delete polygonOptions.strokeLineDash
+    return [fillOutline(generator.polygon(corners, polygonOptions), fill)]
+  }
+  const fillOf = (outlined: boolean) =>
+    outlined ? canvasBackgroundColor : element.strokeColor
+  const zeroCircle = () =>
+    circle(
+      pointsOf("circle_outline", ZERO_CIRCLE_OFFSET),
+      canvasBackgroundColor,
+      ZERO_CIRCLE_SCALE,
+    )
 
   switch (arrowhead) {
-    case "dot":
     case "circle":
-    case "circle_outline": {
-      const [x, y, diameter] = points
-      delete options.strokeLineDash
-      return [
-        generator.circle(x, y, diameter, {
-          ...options,
-          fill:
-            arrowhead === "circle_outline"
-              ? canvasBackgroundColor
-              : element.strokeColor,
-          fillStyle: "solid",
-          stroke: element.strokeColor,
-          roughness: Math.min(0.5, options.roughness || 0),
-        }),
-      ]
-    }
+    case "circle_outline":
+      return circle(pointsOf(), fillOf(arrowhead === "circle_outline"))
     case "triangle":
     case "triangle_outline": {
+      const points = pointsOf()
+      if (!points) return []
       const [x, y, x2, y2, x3, y3] = points
-      delete options.strokeLineDash
-      return [
-        generator.polygon(
-          [
-            [x, y],
-            [x2, y2],
-            [x3, y3],
-            [x, y],
-          ],
-          {
-            ...options,
-            fill:
-              arrowhead === "triangle_outline"
-                ? canvasBackgroundColor
-                : element.strokeColor,
-            fillStyle: "solid",
-            roughness: Math.min(1, options.roughness || 0),
-          },
-        ),
-      ]
+      return polygon(
+        [
+          [x, y],
+          [x2, y2],
+          [x3, y3],
+        ],
+        fillOf(arrowhead === "triangle_outline"),
+      )
     }
     case "diamond":
     case "diamond_outline": {
+      const points = pointsOf()
+      if (!points) return []
       const [x, y, x2, y2, x3, y3, x4, y4] = points
-      delete options.strokeLineDash
-      return [
-        generator.polygon(
-          [
-            [x, y],
-            [x2, y2],
-            [x3, y3],
-            [x4, y4],
-            [x, y],
-          ],
-          {
-            ...options,
-            fill:
-              arrowhead === "diamond_outline"
-                ? canvasBackgroundColor
-                : element.strokeColor,
-            fillStyle: "solid",
-            roughness: Math.min(1, options.roughness || 0),
-          },
-        ),
-      ]
+      return polygon(
+        [
+          [x, y],
+          [x2, y2],
+          [x3, y3],
+          [x4, y4],
+        ],
+        fillOf(arrowhead === "diamond_outline"),
+      )
     }
-    case "crowfoot_one":
-      return crowfootOne(points, options)
-    default: {
-      const [x2, y2, x3, y3, x4, y4] = points
-      if (element.strokeStyle === "dotted") {
-        // Dotted arrow caps get a smaller gap, so they stay legible.
-        const dash = dotted(element.strokeWidth - 1)
-        options.strokeLineDash = [dash[0], dash[1] - 1]
-      } else {
-        delete options.strokeLineDash
-      }
-      options.roughness = Math.min(1, options.roughness || 0)
+    case "cardinality_one":
+      return bar(pointsOf())
+    case "cardinality_one_or_many":
       return [
-        generator.line(x3, y3, x2, y2, options),
-        generator.line(x4, y4, x2, y2, options),
-        ...(arrowhead === "crowfoot_one_or_many"
-          ? crowfootOne(
-              arrowheadPoints(element, shape, position, "crowfoot_one"),
-              options,
-            )
-          : []),
+        ...linesToTip(pointsOf("cardinality_many")),
+        ...bar(pointsOf("cardinality_one", ONE_OR_MANY_BAR_OFFSET)),
       ]
-    }
+    case "cardinality_exactly_one":
+      return [
+        ...bar(pointsOf("cardinality_one", INNER_BAR_OFFSET)),
+        ...bar(pointsOf("cardinality_one")),
+      ]
+    case "cardinality_zero_or_one":
+      return [
+        ...zeroCircle(),
+        ...bar(pointsOf("cardinality_one", INNER_BAR_OFFSET)),
+      ]
+    case "cardinality_zero_or_many":
+      return [...linesToTip(pointsOf("cardinality_many")), ...zeroCircle()]
+    default:
+      return linesToTip(pointsOf())
   }
 }
 
@@ -394,7 +602,21 @@ function arrowheadShapes(
 const isHorizontal = (a: Point, b: Point) =>
   Math.abs(a[0] - b[0]) > 1e-4 && Math.abs(a[0] - b[0]) >= Math.abs(a[1] - b[1])
 
-function elbowArrowPath(points: readonly Point[], radius: number) {
+function elbowArrowPath(route: readonly Point[], radius: number) {
+  const distance = (a: Point, b: Point) => Math.hypot(a[0] - b[0], a[1] - b[1])
+  // A jog too short to see (under 1px, between two longer segments heading
+  // the same way) is drawn straight: rough.js draws its corners as a knot.
+  const isJog = (i: number) => {
+    if (i < 2 || i > route.length - 2) return false
+    const [a, b, c, d] = route.slice(i - 2, i + 2)
+    return (
+      distance(b, c) < 1 &&
+      distance(a, b) >= 1 &&
+      distance(c, d) >= 1 &&
+      (b[0] - a[0]) * (d[0] - c[0]) + (b[1] - a[1]) * (d[1] - c[1]) > 0
+    )
+  }
+  const points = route.filter((_, i) => !isJog(i) && !isJog(i + 1))
   const subpoints: Point[] = []
   for (let i = 1; i < points.length - 1; i += 1) {
     const prev = points[i - 1]
@@ -402,8 +624,8 @@ function elbowArrowPath(points: readonly Point[], radius: number) {
     const point = points[i]
     const corner = Math.min(
       radius,
-      Math.hypot(point[0] - next[0], point[1] - next[1]) / 2,
-      Math.hypot(point[0] - prev[0], point[1] - prev[1]) / 2,
+      distance(point, next) / 2,
+      distance(point, prev) / 2,
     )
     const toward = (other: Point, horizontal: boolean): Point =>
       horizontal
@@ -514,7 +736,7 @@ export function generateShape(
         )
           ? [
               generator.path(
-                elbowArrowPath(points, 16),
+                elbowArrowPath(points, ELBOW_ARROW_CORNER_RADIUS),
                 roughOptions(element, true),
               ),
             ]
@@ -529,7 +751,6 @@ export function generateShape(
         shape = [generator.curve(points as RoughPoint[], options)]
       }
       if (element.type === "arrow") {
-        // Both ends share `options`: the start's changes carry into the end.
         for (const position of ["start", "end"] as const) {
           const arrowhead =
             position === "start" ? element.startArrowhead : element.endArrowhead

@@ -28,6 +28,7 @@ const SHAPE_TYPES = new Set([
   "rectangle",
   "ellipse",
   "diamond",
+  "stickynote",
   "image",
   "frame",
   "magicframe",
@@ -160,8 +161,9 @@ export function summarizeScene(
 
   const shapeLines = shapes.map((shape) => {
     const { x, y, width, height } = shape.box
+    const kind = shape.type === "stickynote" ? "sticky note" : shape.type
     const details = [
-      `${name(shape)} ${idOf(shape)}: ${shape.type} at ${at({ x, y })}, ${Math.round(width)}×${Math.round(height)}`,
+      `${name(shape)} ${idOf(shape)}: ${kind} at ${at({ x, y })}, ${Math.round(width)}×${Math.round(height)}`,
     ]
     if (shape.fill && shape.fill !== "transparent")
       details.push(`, fill ${shape.fill}`)

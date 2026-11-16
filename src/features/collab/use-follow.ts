@@ -1,13 +1,14 @@
 /**
- * Follow mode. `appState.userToFollow` is the source of truth; a leader relays
- * its viewport only while the server says someone follows it (`FOLLOWED_BY`).
+ * Follow mode. This hook owns who is followed; the canvas gets it as its
+ * `userToFollow` prop and reports back when a pan or zoom ends the follow. A
+ * leader relays its viewport only while the server says someone follows it
+ * (`FOLLOWED_BY`).
  */
 
 import { getVisibleSceneBounds, zoomToFitBounds } from "@excalidraw/excalidraw"
 import type {
   ExcalidrawImperativeAPI,
   OnUserFollowedPayload,
-  SocketId,
 } from "@excalidraw/excalidraw/types"
 import { useCallback, useEffect, useRef, useState } from "react"
 import type { ClientMessage, Participant, ServerMessage } from "./protocol"
@@ -73,17 +74,8 @@ export function useFollow(options: {
     }
   }, [publishViewport])
 
-  // The only place follow state changes; fires for clicks and native stops alike.
-  const onUserFollow = useCallback((payload: OnUserFollowedPayload) => {
-    const next =
-      payload.action === "FOLLOW" ? payload.userToFollow.socketId : null
-    // A switch from A to B arrives as UNFOLLOW(A) then FOLLOW(B); ignore
-    // the stale unfollow so it can't cancel the follow that replaced it.
-    if (
-      payload.action === "UNFOLLOW" &&
-      followedRef.current !== payload.userToFollow.socketId
-    )
-      return
+  const setFollowed = useCallback((next: string | null) => {
+    if (followedRef.current === next) return
     followedRef.current = next
     setFollowedConnectionId(next)
     sendRef.current({
@@ -92,31 +84,31 @@ export function useFollow(options: {
     })
   }, [])
 
-  // The `onUserFollow` prop is never called in 0.18; only the API subscription fires.
+  // The canvas asks to stop when the user pans or zooms away.
+  const onUserFollow = useCallback(
+    (payload: OnUserFollowedPayload) => {
+      const { socketId } = payload.userToFollow
+      if (payload.action === "FOLLOW") setFollowed(socketId)
+      // An unfollow of someone no longer followed is stale.
+      else if (followedRef.current === socketId) setFollowed(null)
+    },
+    [setFollowed],
+  )
+
   useEffect(
     () => excalidrawAPI?.onUserFollow(onUserFollow),
     [excalidrawAPI, onUserFollow],
   )
 
-  const toggleFollow = useCallback((participant: Participant) => {
-    const api = apiRef.current
-    if (!api) return
-    const alreadyFollowing = followedRef.current === participant.connectionId
-    api.updateScene({
-      appState: {
-        userToFollow: alreadyFollowing
-          ? null
-          : {
-              socketId: participant.connectionId as SocketId,
-              username: participant.name,
-            },
-      },
-    })
-  }, [])
+  const toggleFollow = useCallback(
+    (participant: Participant) => {
+      const alreadyFollowing = followedRef.current === participant.connectionId
+      setFollowed(alreadyFollowing ? null : participant.connectionId)
+    },
+    [setFollowed],
+  )
 
-  const stopFollowing = useCallback(() => {
-    apiRef.current?.updateScene({ appState: { userToFollow: null } })
-  }, [])
+  const stopFollowing = useCallback(() => setFollowed(null), [setFollowed])
 
   const handleServerMessage = useCallback(
     (message: FollowMessage) => {
@@ -124,11 +116,6 @@ export function useFollow(options: {
 
       if (message.type === "FOLLOWED_BY") {
         followersRef.current = new Set(message.payload.connectionIds)
-        api?.updateScene({
-          appState: {
-            followedBy: new Set(message.payload.connectionIds as SocketId[]),
-          },
-        })
         // A new follower needs a viewport now, not at the next pan.
         publishViewport()
         return
@@ -140,8 +127,7 @@ export function useFollow(options: {
           appState: zoomToFitBounds({
             appState: api.getAppState(),
             bounds: message.payload.bounds,
-            fitToViewport: true,
-            viewportZoomFactor: 1,
+            fit: "contain",
           }).appState,
         })
       }
@@ -152,9 +138,7 @@ export function useFollow(options: {
   const reset = useCallback(() => {
     followersRef.current = new Set()
     relayViewport.current.cancel()
-    apiRef.current?.updateScene({
-      appState: { userToFollow: null, followedBy: new Set() },
-    })
+    // No message: the socket this follow lived on is gone.
     followedRef.current = null
     setFollowedConnectionId(null)
   }, [])

@@ -1,4 +1,8 @@
-import { exportToSvg, restore } from "@excalidraw/excalidraw"
+import {
+  exportScene,
+  getNonDeletedElements,
+  restoreElements,
+} from "@excalidraw/excalidraw"
 import type { ExcalidrawInitialDataState } from "@excalidraw/excalidraw/types"
 
 /**
@@ -21,19 +25,14 @@ export async function renderPreviewSvg(
     return null
   }
 
-  const elements = (parsed?.elements ?? []).filter(
-    (element) => !element.isDeleted,
+  const elements = getNonDeletedElements(
+    restoreElements(parsed?.elements, null),
   )
   if (elements.length === 0) return null
 
-  const restored = restore({ elements, appState: parsed.appState }, null, null)
-  return await exportToSvg({
-    elements: restored.elements,
-    appState: {
-      ...restored.appState,
-      exportBackground: false,
-      exportEmbedScene: false,
-    },
-    files: null,
+  return await exportScene({
+    type: "svg",
+    data: { elements, files: null },
+    config: { canvasBackgroundColor: false },
   })
 }

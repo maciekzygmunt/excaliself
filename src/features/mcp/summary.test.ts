@@ -101,15 +101,20 @@ test("names shapes, follows connections, and places text", () => {
       isDeleted: true,
     },
     { id: "scribble", type: "freedraw", x: 700, y: 0, width: 50, height: 50 },
+    shape("sticky", "stickynote", 700, 100, 250, 250, {
+      backgroundColor: "#ffdf6b",
+    }),
+    label("sticky-label", "sticky", "Ask ops"),
   ])
 
   expect(summary).toBe(
-    `14 elements. Positions are canvas pixels (x right, y down); S1, S2, … name shapes in reading order; [id …] is the element's id.
+    `16 elements. Positions are canvas pixels (x right, y down); S1, S2, … name shapes in reading order; [id …] is the element's id.
 
 Shapes:
 S1 "Backend" [id zone]: rectangle at (0, 0), 600×300, dashed
 S2 "API server" [id api]: rectangle at (40, 60), 160×80, fill #a5d8ff, inside S1
 S3 "Postgres" [id db]: ellipse at (380, 60), 160×80, inside S1
+S4 "Ask ops" [id sticky]: sticky note at (700, 100), 250×250, fill #ffdf6b
 
 Connections:
 S2 "API server" → S3 "Postgres" [id query], labeled "SQL"

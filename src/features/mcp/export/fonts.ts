@@ -1,7 +1,7 @@
-// Excalidraw's text fonts: metrics for laying out lines (from 0.18.1's
-// fonts/FontMetadata.ts), and the font files an export needs: an SVG embeds
-// them, so text looks the same in any viewer, even inside an <img>; a PNG
-// hands them to the rasterizer.
+// Excalidraw's text fonts: metrics for laying out lines (from its
+// common/src/font-metadata.ts), and the font files an export needs: an SVG
+// embeds them, so text looks the same in any viewer, even inside an <img>; a
+// PNG hands them to the rasterizer.
 
 import { existsSync, readdirSync } from "node:fs"
 import { readFile } from "node:fs/promises"
@@ -62,7 +62,7 @@ const FAMILIES: Record<number, Family> = {
       unitsPerEm: 1000,
       ascender: 1011,
       descender: -353,
-      lineHeight: 1.35,
+      lineHeight: 1.25,
     },
   },
   7: {
@@ -98,7 +98,9 @@ const FAMILIES: Record<number, Family> = {
 const CJK_FALLBACK = "Xiaolai"
 const CJK_FALLBACK_FILE_NAME = "Xiaolai SC"
 const EMOJI_FALLBACK = "Segoe UI Emoji"
-const HELVETICA = 2
+export const HELVETICA = 2
+const CASCADIA = 3
+const COMIC_SHANNS = 8
 const LIBERATION = 9
 
 /**
@@ -123,9 +125,14 @@ export function fontFamilyString(fontFamily: number, target: FontTarget) {
   const family = familyOf(fontFamily, target)
   if (target === "svg") {
     if (!family) return EMOJI_FALLBACK
+    // A generic family comes before the emoji font, which lacks some signs.
+    const generic =
+      fontFamily === CASCADIA || fontFamily === COMIC_SHANNS
+        ? "monospace"
+        : "sans-serif"
     return family.handDrawn
-      ? `${family.name}, ${CJK_FALLBACK}, ${EMOJI_FALLBACK}`
-      : `${family.name}, ${EMOJI_FALLBACK}`
+      ? `${family.name}, ${CJK_FALLBACK}, ${generic}, ${EMOJI_FALLBACK}`
+      : `${family.name}, ${generic}, ${EMOJI_FALLBACK}`
   }
   if (!family) return EMOJI_FALLBACK
   const name = family.fileName ?? family.name

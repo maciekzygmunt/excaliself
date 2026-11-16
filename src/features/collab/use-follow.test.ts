@@ -48,7 +48,7 @@ const wren: Participant = {
 /**
  * Enough of Excalidraw's imperative API for follow mode: `updateScene` merges
  * into a recorded appState, and `onUserFollow` hands back the subscriber so a
- * test can fire the FOLLOW/UNFOLLOW the real canvas would.
+ * test can fire the UNFOLLOW the real canvas does on a pan or zoom.
  */
 function fakeExcalidrawAPI() {
   let appState = {
@@ -59,8 +59,6 @@ function fakeExcalidrawAPI() {
     zoom: { value: 1 },
     offsetLeft: 0,
     offsetTop: 0,
-    userToFollow: null as unknown,
-    followedBy: new Set<SocketId>(),
   }
   const subscribers: ((payload: OnUserFollowedPayload) => void)[] = []
   const api = {
@@ -78,7 +76,7 @@ function fakeExcalidrawAPI() {
   return {
     api: api as unknown as ExcalidrawImperativeAPI,
     state: () => appState,
-    /** What Excalidraw emits once `appState.userToFollow` settles. */
+    /** What Excalidraw emits to ask for a follow or a stop. */
     emitFollow: (payload: OnUserFollowedPayload) => {
       for (const subscriber of [...subscribers]) subscriber(payload)
     },
@@ -117,25 +115,29 @@ const unfollowed = (id: string): OnUserFollowedPayload => ({
   userToFollow: { socketId: id as SocketId, username: "Wren" },
 })
 
-test("clicking an avatar asks Excalidraw to follow that socket", () => {
-  const { hook, state } = setup()
+test("clicking an avatar follows that socket", () => {
+  const { hook, sent } = setup()
 
   act(() => hook.current.toggleFollow(wren))
 
-  expect(state().userToFollow).toEqual({
-    socketId: "peer-wren",
-    username: "Wren",
+  expect(hook.current.followedConnectionId).toBe("peer-wren")
+  expect(sent.at(-1)).toEqual({
+    type: "USER_FOLLOW",
+    payload: { followedConnectionId: "peer-wren" },
   })
 })
 
 test("clicking the avatar you are already following stops", () => {
-  const { hook, state, emitFollow } = setup()
+  const { hook, sent } = setup()
 
   act(() => hook.current.toggleFollow(wren))
-  act(() => emitFollow(followed("peer-wren")))
   act(() => hook.current.toggleFollow(wren))
 
-  expect(state().userToFollow).toBeNull()
+  expect(hook.current.followedConnectionId).toBeNull()
+  expect(sent.at(-1)).toEqual({
+    type: "USER_FOLLOW",
+    payload: { followedConnectionId: null },
+  })
 })
 
 test("the room hears about every follow and every stop", () => {
@@ -248,7 +250,7 @@ test("a viewport from anyone else is ignored", () => {
 })
 
 test("a dropped socket ends both sides of the arrangement", () => {
-  const { hook, state, sent, emitFollow } = setup()
+  const { hook, sent, emitFollow } = setup()
 
   act(() => emitFollow(followed("peer-wren")))
   act(() =>
@@ -262,8 +264,6 @@ test("a dropped socket ends both sides of the arrangement", () => {
   act(() => hook.current.reset())
 
   expect(hook.current.followedConnectionId).toBeNull()
-  expect(state().userToFollow).toBeNull()
-  expect(state().followedBy.size).toBe(0)
   act(() => hook.current.onScrollChange())
   expect(sent).toHaveLength(0)
 })
