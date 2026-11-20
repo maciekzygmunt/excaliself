@@ -43,11 +43,12 @@ function Editor({
         (found) => active && setDrawing(found ?? null),
         () => active && setDrawing(null),
       )
+    // Held until the last draft lands, so no sync moves the drawing first.
     return () => {
       active = false
-      release()
+      void (flushRef.current?.() ?? Promise.resolve()).finally(release)
     }
-  }, [owner, id])
+  }, [owner, id, flushRef])
 
   if (drawing === undefined)
     return <Notice>Reading this drawing on this device…</Notice>
@@ -209,7 +210,9 @@ export default function OfflineWorkspace() {
                 if (!flush) return
                 event.preventDefault()
                 const { href } = event.currentTarget
-                void flush().finally(() => window.location.assign(href))
+                void flush().then((ok) => {
+                  if (ok) window.location.assign(href)
+                })
               }}
             />
           }

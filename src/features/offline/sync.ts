@@ -75,7 +75,13 @@ async function upload(owner: string, id: string): Promise<SyncOutcome> {
   }
   if (result.status === "wrong-account") return { status: "failed" }
   if (result.status === "saved") {
-    await markDeviceDrawingSaved(owner, id, data, await sceneRevision(data))
+    await markDeviceDrawingSaved(
+      owner,
+      id,
+      { data, fileIds: drawing.files.map((file) => file.fileId) },
+      await sceneRevision(data),
+      drawing.writer,
+    )
     return { status: "synced" }
   }
   // Changed elsewhere, shared, moved to Team, or trashed: keep both versions.

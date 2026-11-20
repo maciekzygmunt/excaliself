@@ -13,6 +13,8 @@ export type DeviceDrawing = {
   baseRevision: string | null
   /** "pending": holds edits the server has not stored. */
   status: "clean" | "pending"
+  /** The editor session that wrote the latest draft. */
+  writer?: string
 }
 
 type StoredFile = PersistedFile & { owner: string; drawingId: string }
@@ -231,6 +233,7 @@ export function writeDeviceDraft(
   owner: string,
   id: string,
   scene: ScenePayload,
+  writer: string,
 ) {
   return transact("readwrite", async ({ drawings, files }) => {
     const current: DeviceDrawing | undefined = await done(
@@ -243,36 +246,45 @@ export function writeDeviceDraft(
       ),
     )
     const used = new Set(scene.files.map((file) => file.fileId))
-    if (current.data !== scene.data)
-      drawings.put({ ...current, data: scene.data, status: "pending" })
-    putFiles(
-      files,
-      owner,
-      id,
-      scene.files.filter((file) => !storedIds.has(file.fileId)),
-    )
+    const added = scene.files.filter((file) => !storedIds.has(file.fileId))
+    if (current.data !== scene.data || added.length > 0)
+      drawings.put({ ...current, data: scene.data, status: "pending", writer })
+    putFiles(files, owner, id, added)
     for (const fileId of storedIds)
       if (!used.has(fileId)) files.delete([owner, id, fileId])
     return true
   })
 }
 
-/** The server stored `data` at `revision`. Clean if no later edit came. */
+/**
+ * The server stored `saved` at `revision`, written by `writer`. Clean if the
+ * copy holds just that. A later draft of the same writer builds on it; one
+ * of another editor keeps its base, so its upload can't overwrite this save.
+ */
 export function markDeviceDrawingSaved(
   owner: string,
   id: string,
-  data: string,
+  saved: { data: string; fileIds: readonly string[] },
   revision: string,
+  writer: string | undefined,
 ) {
-  return transact("readwrite", async ({ drawings }) => {
+  return transact("readwrite", async ({ drawings, files }) => {
     const current: DeviceDrawing | undefined = await done(
       drawings.get([owner, id]),
     )
     if (!current) return
+    const savedIds = new Set(saved.fileIds)
+    const storedIds = await done(files.getAllKeys(filesOf(owner, id)))
+    const same =
+      current.data === saved.data &&
+      storedIds.every((key) =>
+        savedIds.has((key as [string, string, string])[2]),
+      )
+    if (!same && current.writer !== writer) return
     drawings.put({
       ...current,
       baseRevision: revision,
-      status: current.data === data ? "clean" : "pending",
+      status: same ? "clean" : "pending",
     })
   })
 }

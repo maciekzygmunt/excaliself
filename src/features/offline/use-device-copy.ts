@@ -47,15 +47,25 @@ export function useDeviceCopy(
   const draft = useDeviceDraft(kept && owner ? owner : null, kept)
   const flushDraft = draft.flush
 
+  const writer = draft.writer
   const saved = useCallback(
-    ({ data }: ScenePayload) => {
+    ({ data, files }: ScenePayload) => {
       if (!owner || !kept) return
+      const fileIds = files.map((file) => file.fileId)
       void flushDraft()
         .then(() => sceneRevision(data))
-        .then((revision) => markDeviceDrawingSaved(owner, kept, data, revision))
+        .then((revision) =>
+          markDeviceDrawingSaved(
+            owner,
+            kept,
+            { data, fileIds },
+            revision,
+            writer,
+          ),
+        )
         .catch(() => {})
     },
-    [owner, kept, flushDraft],
+    [owner, kept, flushDraft, writer],
   )
 
   /** Resolves whether this device holds every edit so far. */

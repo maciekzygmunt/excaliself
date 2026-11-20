@@ -16,6 +16,7 @@ export function useDeviceDraft(owner: string | null, id: string | null) {
   // Starts as the scene as it opened, so returning to it writes it back.
   const writtenSig = useRef<string | null>(null)
   const writes = useRef(Promise.resolve(true))
+  const [writer] = useState(() => crypto.randomUUID())
   const [state, setState] = useState<"opened" | "written" | "failed">("opened")
 
   const write = useDebounceCallback((scene: SceneData) => {
@@ -25,7 +26,7 @@ export function useDeviceDraft(owner: string | null, id: string | null) {
     if (sig === writtenSig.current) return
     writtenSig.current = sig
     writes.current = writes.current
-      .then(() => writeDeviceDraft(owner, id, payload))
+      .then(() => writeDeviceDraft(owner, id, payload, writer))
       .catch(() => false)
       .then((ok) => {
         // A failed write is retried by the next change.
@@ -56,5 +57,5 @@ export function useDeviceDraft(owner: string | null, id: string | null) {
 
   useEffect(() => () => write.flush(), [write])
 
-  return { onChange, flush, state }
+  return { onChange, flush, state, writer }
 }
