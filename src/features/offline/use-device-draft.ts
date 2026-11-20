@@ -13,7 +13,7 @@ import { writeDeviceDraft } from "./store"
  * write did not land.
  */
 export function useDeviceDraft(owner: string | null, id: string | null) {
-  const openedSig = useRef<string | null>(null)
+  // Starts as the scene as it opened, so returning to it writes it back.
   const writtenSig = useRef<string | null>(null)
   const writes = useRef(Promise.resolve(true))
   const [state, setState] = useState<"opened" | "written" | "failed">("opened")
@@ -22,21 +22,25 @@ export function useDeviceDraft(owner: string | null, id: string | null) {
     if (!owner || !id) return
     const payload = buildScenePayload(scene)
     const sig = getScenePayloadSignature(payload)
-    if (sig === writtenSig.current || sig === openedSig.current) return
+    if (sig === writtenSig.current) return
     writtenSig.current = sig
     writes.current = writes.current
       .then(() => writeDeviceDraft(owner, id, payload))
       .catch(() => false)
       .then((ok) => {
+        // A failed write is retried by the next change.
+        if (!ok && writtenSig.current === sig) writtenSig.current = null
         setState(ok ? "written" : "failed")
         return ok
       })
   }, 300)
 
+  const opened = useRef(false)
   const onChange = useCallback(
     (scene: SceneData) => {
-      if (openedSig.current === null) {
-        openedSig.current = getScenePayloadSignature(buildScenePayload(scene))
+      if (!opened.current) {
+        opened.current = true
+        writtenSig.current = getScenePayloadSignature(buildScenePayload(scene))
         return
       }
       write.run(scene)

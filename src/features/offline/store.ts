@@ -113,7 +113,12 @@ async function transact<T>(
       files: tx.objectStore(FILES),
     })
   } catch (error) {
-    tx.abort()
+    committed.catch(() => {})
+    try {
+      tx.abort()
+    } catch {
+      // Already aborted by the failed request.
+    }
     throw error
   }
   await committed
@@ -163,22 +168,29 @@ export const deviceDrawingStatus = (owner: string, id: string) =>
     return drawing?.status
   })
 
-/** Names only: reading index keys never loads scenes or images. */
+/** Names only: a key cursor on the names index never loads scenes or images. */
 export const listDeviceDrawings = (owner: string) =>
-  transact("readonly", async ({ drawings }) => {
-    const keys = await done(
-      drawings
-        .index("names")
-        .getAllKeys(IDBKeyRange.bound([owner], [owner, []])),
-    )
-    return keys.map((key) => {
-      const [, name, id] = key as [string, string, string]
-      return { id, name }
-    })
-  })
+  transact(
+    "readonly",
+    ({ drawings }) =>
+      new Promise<{ id: string; name: string }[]>((resolve, reject) => {
+        const list: { id: string; name: string }[] = []
+        const cursor = drawings
+          .index("names")
+          .openKeyCursor(IDBKeyRange.bound([owner], [owner, []]))
+        cursor.onsuccess = () => {
+          if (!cursor.result) return resolve(list)
+          const [, name, id] = cursor.result.key as [string, string, string]
+          list.push({ id, name })
+          cursor.result.continue()
+        }
+        cursor.onerror = () => reject(cursor.error)
+      }),
+  )
 
 export const listPendingDeviceDrawings = (owner: string) =>
   transact("readonly", async ({ drawings }) => {
+    // An index's getAllKeys gives primary keys: [owner, id].
     const keys = await done(
       drawings.index("status").getAllKeys([owner, "pending"]),
     )
@@ -225,14 +237,14 @@ export function writeDeviceDraft(
       drawings.get([owner, id]),
     )
     if (!current) return false
-    if (current.data === scene.data) return true
     const storedIds = new Set(
       (await done(files.getAllKeys(filesOf(owner, id)))).map(
         (key) => (key as [string, string, string])[2],
       ),
     )
     const used = new Set(scene.files.map((file) => file.fileId))
-    drawings.put({ ...current, data: scene.data, status: "pending" })
+    if (current.data !== scene.data)
+      drawings.put({ ...current, data: scene.data, status: "pending" })
     putFiles(
       files,
       owner,

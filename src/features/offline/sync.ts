@@ -3,7 +3,7 @@
 // saves its own edits, and the offline page's open drawing waits until it
 // closes.
 
-import { useEffect } from "react"
+import { useEffect, useRef } from "react"
 import { toast } from "sonner"
 import { MAX_NAME_LENGTH } from "@/features/drawings/list-columns"
 import { sceneRevision } from "@/features/drawings/scene-revision"
@@ -83,7 +83,8 @@ async function upload(owner: string, id: string): Promise<SyncOutcome> {
   const copyName = `${name.slice(0, MAX_NAME_LENGTH - suffix.length)}${suffix}`
   const copy = await moveToNewDeviceDrawing(owner, id, copyName)
   if (!copy) return { status: "clean" }
-  await upload(owner, copy.id)
+  // Pending until it goes up; a later sync retries it.
+  await syncDeviceDrawingNow(owner, copy.id)
   return { status: "copied", name, copyName }
 }
 
@@ -113,11 +114,12 @@ export async function syncDeviceDrawingNow(
 
 let syncing: Promise<void> | undefined
 
-function syncAll(owner: string) {
+function syncAll(owner: string, onSynced?: (id: string) => void) {
   syncing ??= listPendingDeviceDrawings(owner)
     .then(async (ids) => {
       for (const id of ids) {
         const outcome = await syncDeviceDrawingNow(owner, id)
+        if (outcome.status === "synced") onSynced?.(id)
         if (outcome.status === "copied") toastCopied(outcome)
       }
     })
@@ -128,12 +130,20 @@ function syncAll(owner: string) {
   return syncing
 }
 
-/** Syncs on load, on reconnect, on focus, and every 10 seconds. */
-export function useDeviceSync(owner: string | null) {
+/**
+ * Syncs on load, on reconnect, on focus, and every 10 seconds. `onSynced`
+ * gets each drawing whose stored scene the sync replaced.
+ */
+export function useDeviceSync(
+  owner: string | null,
+  onSynced?: (id: string) => void,
+) {
+  const synced = useRef(onSynced)
+  synced.current = onSynced
   useEffect(() => {
     if (!owner) return
     const run = () => {
-      if (navigator.onLine) void syncAll(owner)
+      if (navigator.onLine) void syncAll(owner, (id) => synced.current?.(id))
     }
     run()
     const interval = setInterval(run, 10_000)

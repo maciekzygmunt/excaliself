@@ -1,6 +1,9 @@
-import { useQuery } from "@tanstack/react-query"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { useEffect } from "react"
-import { drawingsQueryOptions } from "@/features/drawings/queries"
+import {
+  drawingQueryOptions,
+  drawingsQueryOptions,
+} from "@/features/drawings/queries"
 import {
   forgetDeviceDrawing,
   listDeviceDrawings,
@@ -22,7 +25,15 @@ export function useOfflineSupport(owner: string) {
     if (import.meta.env.PROD && "serviceWorker" in navigator)
       navigator.serviceWorker.register("/offline-worker.js").catch(() => {})
   }, [supported, owner])
-  useDeviceSync(supported ? owner : null)
+  // A cached scene is now stale: an editor opening it would save over the
+  // edits that just went up.
+  const queryClient = useQueryClient()
+  useDeviceSync(supported ? owner : null, (id) =>
+    queryClient.removeQueries({
+      queryKey: drawingQueryOptions(id).queryKey,
+      exact: true,
+    }),
+  )
 
   const { data: drawings } = useQuery(drawingsQueryOptions())
   useEffect(() => {

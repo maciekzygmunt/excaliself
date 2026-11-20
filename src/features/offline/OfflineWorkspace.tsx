@@ -1,6 +1,6 @@
 import { Excalidraw, MainMenu } from "@excalidraw/excalidraw"
 import { ArrowLeft, CloudOff, Plus } from "lucide-react"
-import { useEffect, useState } from "react"
+import { type RefObject, useEffect, useRef, useState } from "react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -21,8 +21,18 @@ import "@excalidraw/excalidraw/index.css"
 
 type Opened = NonNullable<Awaited<ReturnType<typeof readDeviceDrawing>>>
 
+type Flush = RefObject<(() => Promise<boolean>) | null>
+
 /** Holds the drawing first, so no sync moves it while it opens. */
-function Editor({ owner, id }: { owner: string; id: string }) {
+function Editor({
+  owner,
+  id,
+  flushRef,
+}: {
+  owner: string
+  id: string
+  flushRef: Flush
+}) {
   const [drawing, setDrawing] = useState<Opened | null>()
   useEffect(() => {
     const { granted, release } = holdDeviceDrawing(owner, id)
@@ -43,15 +53,26 @@ function Editor({ owner, id }: { owner: string; id: string }) {
     return <Notice>Reading this drawing on this device…</Notice>
   if (drawing === null)
     return <Notice>This drawing isn’t available on this device.</Notice>
-  return <Canvas owner={owner} drawing={drawing} />
+  return <Canvas owner={owner} drawing={drawing} flushRef={flushRef} />
 }
 
-function Canvas({ owner, drawing }: { owner: string; drawing: Opened }) {
+function Canvas({
+  owner,
+  drawing,
+  flushRef,
+}: {
+  owner: string
+  drawing: Opened
+  flushRef: Flush
+}) {
   const theme = useCanvasTheme()
   const [{ initialData, isDataCorrupt }] = useState(() =>
     buildInitialSceneData(drawing),
   )
   const draft = useDeviceDraft(isDataCorrupt ? null : owner, drawing.id)
+  useEffect(() => {
+    flushRef.current = draft.flush
+  }, [flushRef, draft.flush])
   const status = isDataCorrupt
     ? "This drawing couldn’t be opened"
     : draft.state === "failed"
@@ -114,6 +135,7 @@ export default function OfflineWorkspace() {
   )
   const [name, setName] = useState("")
   const [creating, setCreating] = useState(false)
+  const flushEditor = useRef<(() => Promise<boolean>) | null>(null)
   useDeviceSync(supported ? owner : null)
 
   // Signing in or out in another tab switches whose drawings these are.
@@ -175,12 +197,20 @@ export default function OfflineWorkspace() {
           variant="ghost"
           size="sm"
           nativeButton={false}
-          // Opening the drawing online uploads its edits first.
+          // Opening the drawing online uploads its edits first. A document
+          // navigation skips unmount, so the last edit is written here.
           render={
             <a
               href={
                 selected ? `/draw/${encodeURIComponent(selected)}` : "/draw"
               }
+              onClick={(event) => {
+                const flush = flushEditor.current
+                if (!flush) return
+                event.preventDefault()
+                const { href } = event.currentTarget
+                void flush().finally(() => window.location.assign(href))
+              }}
             />
           }
         >
@@ -235,7 +265,12 @@ export default function OfflineWorkspace() {
             </nav>
           </aside>
           {selected ? (
-            <Editor key={selected} owner={owner} id={selected} />
+            <Editor
+              key={selected}
+              owner={owner}
+              id={selected}
+              flushRef={flushEditor}
+            />
           ) : (
             <Notice>
               {drawings

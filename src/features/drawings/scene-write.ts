@@ -91,7 +91,7 @@ export async function writeDrawingScene(
     if (target.shareId || target.space === "team")
       return { status: "shared" as const }
 
-    // Re-check on the UPDATE: another tab may share the drawing or move it to
+    // Re-check on the UPDATE: another tab may share, trash, or move it to
     // Team in between. The join-time reconcile covers what still slips through.
     const written = await tx
       .update(drawings)
@@ -104,6 +104,7 @@ export async function writeDrawingScene(
         and(
           eq(drawings.id, id),
           eq(drawings.space, "private"),
+          isNull(drawings.deletedAt),
           notExists(
             tx
               .select({ one: sql`1` })

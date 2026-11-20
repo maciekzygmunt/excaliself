@@ -61,7 +61,10 @@ import {
 } from "@/features/drawings/scene"
 import { useDrawingViewport } from "@/features/drawings/use-drawing-viewport"
 import { useTeamLibrary } from "@/features/library/use-team-library"
-import { supportsDeviceDrawings } from "@/features/offline/store"
+import {
+  forgetDeviceDrawing,
+  supportsDeviceDrawings,
+} from "@/features/offline/store"
 import { useDeviceCopy } from "@/features/offline/use-device-copy"
 import { drawingShareQueryOptions } from "@/features/shares/queries"
 import { useAutoSave } from "@/hooks/use-auto-save"
@@ -324,6 +327,12 @@ export function DrawingCanvas({
       !isDataCorrupt &&
       !reloadingScene,
   )
+  // Shared or moved to Team: the Room owns it now. Unsent edits stay, and
+  // sync as a new drawing.
+  useEffect(() => {
+    if (isLive && userId && supportsDeviceDrawings())
+      void forgetDeviceDrawing(userId, drawingId).catch(() => {})
+  }, [isLive, userId, drawingId])
   const [waitingToSync, setWaitingToSync] = useState(false)
   const waitingRef = useRef(false)
   waitingRef.current = waitingToSync
