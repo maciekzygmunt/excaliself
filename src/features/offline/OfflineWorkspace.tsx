@@ -71,6 +71,10 @@ function Canvas({
     buildInitialSceneData(drawing),
   )
   const draft = useDeviceDraft(isDataCorrupt ? null : owner, drawing.id)
+  const { base } = draft
+  useEffect(() => {
+    base.current = drawing.baseRevision
+  }, [base, drawing.baseRevision])
   useEffect(() => {
     flushRef.current = draft.flush
   }, [flushRef, draft.flush])

@@ -134,6 +134,14 @@ async function transact<T>(
 const filesOf = (owner: string, id: string) =>
   IDBKeyRange.bound([owner, id], [owner, id, []])
 
+async function storedFileIds(files: IDBObjectStore, owner: string, id: string) {
+  const keys = await done(files.getAllKeys(filesOf(owner, id)))
+  return new Set(keys.map((key) => (key as [string, string, string])[2]))
+}
+
+const sameIds = (a: ReadonlySet<string>, b: readonly string[]) =>
+  a.size === b.length && b.every((fileId) => a.has(fileId))
+
 function putFiles(
   files: IDBObjectStore,
   owner: string,
@@ -214,7 +222,16 @@ export function keepDeviceDrawing(
       drawings.get([owner, id]),
     )
     if (current?.status === "pending") return
-    if (current?.baseRevision === baseRevision && current.name === name) return
+    // Same version: rewrite only to repair missing images.
+    if (
+      current?.baseRevision === baseRevision &&
+      current.name === name &&
+      sameIds(
+        await storedFileIds(files, owner, id),
+        drawing.files.map((file) => file.fileId),
+      )
+    )
+      return
     drawings.put({
       owner,
       id,
@@ -228,27 +245,34 @@ export function keepDeviceDrawing(
   })
 }
 
-/** Stores an edit. False when the drawing isn't kept on this device. */
+/**
+ * Stores an edit. False when the drawing isn't kept on this device. A writer
+ * taking over from another brings `base`, the version its edits build on;
+ * its own later drafts keep the base its saves advanced.
+ */
 export function writeDeviceDraft(
   owner: string,
   id: string,
   scene: ScenePayload,
   writer: string,
+  base: string | null,
 ) {
   return transact("readwrite", async ({ drawings, files }) => {
     const current: DeviceDrawing | undefined = await done(
       drawings.get([owner, id]),
     )
     if (!current) return false
-    const storedIds = new Set(
-      (await done(files.getAllKeys(filesOf(owner, id)))).map(
-        (key) => (key as [string, string, string])[2],
-      ),
-    )
+    const storedIds = await storedFileIds(files, owner, id)
     const used = new Set(scene.files.map((file) => file.fileId))
     const added = scene.files.filter((file) => !storedIds.has(file.fileId))
     if (current.data !== scene.data || added.length > 0)
-      drawings.put({ ...current, data: scene.data, status: "pending", writer })
+      drawings.put({
+        ...current,
+        data: scene.data,
+        status: "pending",
+        writer,
+        baseRevision: current.writer === writer ? current.baseRevision : base,
+      })
     putFiles(files, owner, id, added)
     for (const fileId of storedIds)
       if (!used.has(fileId)) files.delete([owner, id, fileId])
@@ -273,13 +297,9 @@ export function markDeviceDrawingSaved(
       drawings.get([owner, id]),
     )
     if (!current) return
-    const savedIds = new Set(saved.fileIds)
-    const storedIds = await done(files.getAllKeys(filesOf(owner, id)))
     const same =
       current.data === saved.data &&
-      storedIds.every((key) =>
-        savedIds.has((key as [string, string, string])[2]),
-      )
+      sameIds(await storedFileIds(files, owner, id), saved.fileIds)
     if (!same && current.writer !== writer) return
     drawings.put({
       ...current,

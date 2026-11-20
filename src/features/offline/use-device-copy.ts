@@ -21,6 +21,8 @@ export function useDeviceCopy(
   const opened = useRef(drawing)
   opened.current = drawing
   const id = drawing?.id
+  const draft = useDeviceDraft(kept && owner ? owner : null, kept)
+  const { flush: flushDraft, writer, base } = draft
 
   // Keyed on the id: later saves update `drawing`, but the copy starts from
   // the version that opened.
@@ -30,10 +32,10 @@ export function useDeviceCopy(
     const { granted, release } = holdDeviceDrawing(owner, id)
     let active = true
     void granted
-      .then(async () =>
-        keepDeviceDrawing(owner, open, await sceneRevision(open.data)),
-      )
-      .then(() => {
+      .then(async () => {
+        const revision = await sceneRevision(open.data)
+        await keepDeviceDrawing(owner, open, revision)
+        base.current = revision
         if (active) setKept(id)
       })
       .catch(() => {})
@@ -42,30 +44,27 @@ export function useDeviceCopy(
       release()
       setKept(null)
     }
-  }, [enabled, owner, id])
+  }, [enabled, owner, id, base])
 
-  const draft = useDeviceDraft(kept && owner ? owner : null, kept)
-  const flushDraft = draft.flush
-
-  const writer = draft.writer
   const saved = useCallback(
     ({ data, files }: ScenePayload) => {
       if (!owner || !kept) return
       const fileIds = files.map((file) => file.fileId)
       void flushDraft()
         .then(() => sceneRevision(data))
-        .then((revision) =>
-          markDeviceDrawingSaved(
+        .then(async (revision) => {
+          await markDeviceDrawingSaved(
             owner,
             kept,
             { data, fileIds },
             revision,
             writer,
-          ),
-        )
+          )
+          base.current = revision
+        })
         .catch(() => {})
     },
-    [owner, kept, flushDraft, writer],
+    [owner, kept, flushDraft, writer, base],
   )
 
   /** Resolves whether this device holds every edit so far. */

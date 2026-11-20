@@ -5,18 +5,23 @@ import {
   type SceneData,
 } from "@/features/drawings/scene"
 import { useDebounceCallback } from "@/hooks/use-debounce-callback"
-import { writeDeviceDraft } from "./store"
+import { supportsDeviceDrawings, writeDeviceDraft } from "./store"
 
 /**
  * Writes an editor's changes to its device copy once they pause. The first
  * change is the scene as it opened, not an edit. `failed` means the last
- * write did not land.
+ * write did not land. `base` is the server version the edits build on: set
+ * it on open and after each save of this editor.
  */
 export function useDeviceDraft(owner: string | null, id: string | null) {
   // Starts as the scene as it opened, so returning to it writes it back.
   const writtenSig = useRef<string | null>(null)
   const writes = useRef(Promise.resolve(true))
-  const [writer] = useState(() => crypto.randomUUID())
+  const base = useRef<string | null>(null)
+  // randomUUID exists only in secure contexts, as do device drawings.
+  const [writer] = useState(() =>
+    supportsDeviceDrawings() ? crypto.randomUUID() : "",
+  )
   const [state, setState] = useState<"opened" | "written" | "failed">("opened")
 
   const write = useDebounceCallback((scene: SceneData) => {
@@ -26,7 +31,7 @@ export function useDeviceDraft(owner: string | null, id: string | null) {
     if (sig === writtenSig.current) return
     writtenSig.current = sig
     writes.current = writes.current
-      .then(() => writeDeviceDraft(owner, id, payload, writer))
+      .then(() => writeDeviceDraft(owner, id, payload, writer, base.current))
       .catch(() => false)
       .then((ok) => {
         // A failed write is retried by the next change.
@@ -57,5 +62,5 @@ export function useDeviceDraft(owner: string | null, id: string | null) {
 
   useEffect(() => () => write.flush(), [write])
 
-  return { onChange, flush, state, writer }
+  return { onChange, flush, state, writer, base }
 }
