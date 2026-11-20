@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { UserAvatar } from "@/components/user-avatar"
 import { userDisplayName, userInitials } from "@/features/account/display-name"
-import { setOfflineAccount } from "@/features/offline/store"
+import { setDeviceAccount } from "@/features/offline/store"
 import { authClient } from "@/lib/auth-client"
 
 export type SidebarUser = {
@@ -68,7 +68,7 @@ export function SidebarUserMenu({ user }: { user: SidebarUser }) {
         <DropdownMenuItem
           onClick={async () => {
             await authClient.signOut()
-            setOfflineAccount(null)
+            setDeviceAccount(null)
             window.location.href = "/login"
           }}
         >

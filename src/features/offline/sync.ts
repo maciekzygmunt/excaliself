@@ -1,98 +1,145 @@
+// Uploads device drawings with unsaved edits. An editor holds its drawing
+// while open, so a sync never uploads one underneath it: the online editor
+// saves its own edits, and the offline page's open drawing waits until it
+// closes.
+
 import { useEffect } from "react"
+import { toast } from "sonner"
+import { MAX_NAME_LENGTH } from "@/features/drawings/list-columns"
+import { sceneRevision } from "@/features/drawings/scene-revision"
+import { syncDeviceDrawing } from "./server"
 import {
-  beginSync,
-  finishSync,
-  listPendingDrawings,
-  offlineAccount,
-  subscribeToLocalDrawings,
+  deviceDrawingStatus,
+  listPendingDeviceDrawings,
+  markDeviceDrawingSaved,
+  moveToNewDeviceDrawing,
+  readDeviceDrawing,
 } from "./store"
-import type { SyncResult } from "./types"
 
-const inProgress = new Map<string, Promise<void>>()
+const lockName = (owner: string, id: string) =>
+  `excaliself:offline-drawing:${owner}:${id}`
 
-export function syncLocalDrawing(owner: string, id: string): Promise<void> {
-  const key = JSON.stringify([owner, id])
-  const existing = inProgress.get(key)
-  if (existing) return existing
-
-  const run = async () => {
-    while (offlineAccount() === owner && navigator.onLine) {
-      const drawing = await beginSync(owner, id)
-      const sending = drawing?.sending
-      if (drawing?.status !== "pending" || !sending) return
-      const { name, baseRevision, scene, serverFileIds } = sending
-      const sent = new Set(serverFileIds)
-      const newFiles = scene.files.filter((file) => !sent.has(file.fileId))
-      const send = async (files: typeof scene.files) => {
-        const body = JSON.stringify({
-          id,
-          name,
-          baseRevision,
-          scene: { data: scene.data, files },
-          owner,
-        })
-        // Allow time to upload the encoded image bytes on a slow connection.
-        const timeout = 30_000 + Math.ceil(body.length / 131_072) * 1000
-        const response = await fetch("/api/offline-drawings", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body,
-          signal: AbortSignal.timeout(timeout),
-        })
-        if (response.status === 413) return { status: "invalid" } as const
-        if (response.ok) return (await response.json()) as SyncResult
-      }
-      let result = await send(newFiles)
-      if (result?.status === "images" && result.missingFileIds?.length) {
-        const missing = new Set(result.missingFileIds)
-        const resend = scene.files.filter(
-          (file) => sent.has(file.fileId) && missing.has(file.fileId),
-        )
-        if (resend.length > 0) result = await send([...newFiles, ...resend])
-      }
-      if (!result) return
-      const updated = await finishSync(owner, id, sending.editId, result)
-      if (updated?.status !== "pending") return
-    }
-  }
-  // A persisted request still survives a tab crash. The lock also prevents an
-  // online tab and the offline workspace from submitting it simultaneously.
-  const sync = (navigator.locks ? navigator.locks.request(key, run) : run())
-    .catch(() => {})
-    .finally(() => inProgress.delete(key))
-  inProgress.set(key, sync)
-  return sync
+/** Marks a drawing open in an editor until `release`. */
+export function holdDeviceDrawing(owner: string, id: string) {
+  let release = () => {}
+  const held = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  const granted = new Promise<void>((resolve) => {
+    navigator.locks
+      .request(lockName(owner, id), { mode: "shared" }, () => {
+        resolve()
+        return held
+      })
+      .catch(() => {})
+  })
+  return { granted, release }
 }
 
-export function useOfflineSync(owner: string | null) {
+/**
+ * "failed": unreachable, signed out, or refused; the edits stay pending.
+ * "copied": the server version moved on, so the edits went up as `copyName`.
+ */
+export type SyncOutcome =
+  | { status: "synced" | "failed" | "busy" | "clean" }
+  | { status: "copied"; name: string; copyName: string }
+
+export function toastCopied(copied: { name: string; copyName: string }) {
+  toast(`“${copied.name}” changed elsewhere`, {
+    id: `offline-copy:${copied.copyName}`,
+    description: `Your offline edits are saved as “${copied.copyName}”.`,
+  })
+}
+
+async function upload(owner: string, id: string): Promise<SyncOutcome> {
+  const drawing = await readDeviceDrawing(owner, id)
+  if (drawing?.status !== "pending") return { status: "clean" }
+  const { name, baseRevision, data } = drawing
+  let result: Awaited<ReturnType<typeof syncDeviceDrawing>>
+  try {
+    result = await syncDeviceDrawing({
+      data: {
+        owner,
+        id,
+        name,
+        baseRevision,
+        data,
+        files: drawing.files.map(({ fileId, dataUrl }) => ({
+          fileId,
+          dataUrl,
+        })),
+      },
+    })
+  } catch {
+    return { status: "failed" }
+  }
+  if (result.status === "wrong-account") return { status: "failed" }
+  if (result.status === "saved") {
+    await markDeviceDrawingSaved(owner, id, data, await sceneRevision(data))
+    return { status: "synced" }
+  }
+  // Changed elsewhere, shared, moved to Team, or trashed: keep both versions.
+  const suffix = " (offline copy)"
+  const copyName = `${name.slice(0, MAX_NAME_LENGTH - suffix.length)}${suffix}`
+  const copy = await moveToNewDeviceDrawing(owner, id, copyName)
+  if (!copy) return { status: "clean" }
+  await upload(owner, copy.id)
+  return { status: "copied", name, copyName }
+}
+
+/**
+ * Uploads one drawing's pending edits unless an editor holds it. With
+ * `waitMs`, waits that long for the editor to let go.
+ */
+export async function syncDeviceDrawingNow(
+  owner: string,
+  id: string,
+  waitMs?: number,
+): Promise<SyncOutcome> {
+  try {
+    // Checked first, so an editor open in another tab costs no wait.
+    if ((await deviceDrawingStatus(owner, id)) !== "pending")
+      return { status: "clean" }
+    return await navigator.locks.request(
+      lockName(owner, id),
+      waitMs ? { signal: AbortSignal.timeout(waitMs) } : { ifAvailable: true },
+      (lock): Promise<SyncOutcome> | SyncOutcome =>
+        lock ? upload(owner, id) : { status: "busy" },
+    )
+  } catch {
+    return { status: "busy" }
+  }
+}
+
+let syncing: Promise<void> | undefined
+
+function syncAll(owner: string) {
+  syncing ??= listPendingDeviceDrawings(owner)
+    .then(async (ids) => {
+      for (const id of ids) {
+        const outcome = await syncDeviceDrawingNow(owner, id)
+        if (outcome.status === "copied") toastCopied(outcome)
+      }
+    })
+    .catch(() => {})
+    .finally(() => {
+      syncing = undefined
+    })
+  return syncing
+}
+
+/** Syncs on load, on reconnect, on focus, and every 10 seconds. */
+export function useDeviceSync(owner: string | null) {
   useEffect(() => {
     if (!owner) return
-    let timer: ReturnType<typeof setTimeout> | undefined
-    let running = false
-    const run = async () => {
-      if (running || !navigator.onLine || offlineAccount() !== owner) return
-      running = true
-      try {
-        const keys = await listPendingDrawings(owner)
-        for (const id of keys) await syncLocalDrawing(owner, id)
-      } catch {
-        // Storage errors are reported by the editor that initiated the write.
-      } finally {
-        running = false
-      }
+    const run = () => {
+      if (navigator.onLine) void syncAll(owner)
     }
-    const schedule = () => {
-      clearTimeout(timer)
-      timer = setTimeout(run, 500)
-    }
-    const unsubscribe = subscribeToLocalDrawings(schedule)
+    run()
     const interval = setInterval(run, 10_000)
     window.addEventListener("online", run)
     window.addEventListener("focus", run)
-    void run()
     return () => {
-      unsubscribe()
-      clearTimeout(timer)
       clearInterval(interval)
       window.removeEventListener("online", run)
       window.removeEventListener("focus", run)

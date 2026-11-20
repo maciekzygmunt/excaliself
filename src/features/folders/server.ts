@@ -96,7 +96,6 @@ export const trashFolder = createServerFn({ method: "POST" })
       userId,
       name: userDisplayName(context.session.user),
     })
-    return swept
   })
 
 /** Restores a folder trash unit; see restoreFolderUnit for the landing rules. */

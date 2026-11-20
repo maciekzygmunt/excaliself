@@ -4,15 +4,13 @@ import { createClientOnlyFn } from "@tanstack/react-start"
 import { lazy, Suspense, useEffect, useState } from "react"
 import { toast } from "sonner"
 import { Mark } from "@/components/identity"
+import { currentUserQueryOptions } from "@/features/account/queries"
 import {
   drawingQueryOptions,
   drawingsQueryOptions,
 } from "@/features/drawings/queries"
-import {
-  offlineAccount,
-  readLocalDrawing,
-  supportsOfflineDrawings,
-} from "@/features/offline/store"
+import { supportsDeviceDrawings } from "@/features/offline/store"
+import { syncDeviceDrawingNow, toastCopied } from "@/features/offline/sync"
 import { useDocumentTitle } from "@/lib/document-title"
 import { DrawingPaletteContext } from "../-components/DrawingPaletteContext"
 import { TrashedDrawingBanner } from "../-components/TrashedDrawingBanner"
@@ -37,22 +35,29 @@ const LoadingState = () => (
 export const Route = createFileRoute("/_app/draw/$id")({
   ssr: false,
   loader: async ({ params, context, preload }) => {
+    // Edits this device kept go up first, so the canvas opens on them. If
+    // they can't, the offline page opens this device's version.
+    let copied: { name: string; copyName: string } | undefined
+    if (!preload && supportsDeviceDrawings()) {
+      const { id: owner } = await context.queryClient.ensureQueryData(
+        currentUserQueryOptions(),
+      )
+      const outcome = await syncDeviceDrawingNow(owner, params.id, 3000)
+      if (outcome.status === "failed")
+        throw redirect({
+          href: `/offline?drawing=${encodeURIComponent(params.id)}`,
+          reloadDocument: true,
+        })
+      if (outcome.status === "synced")
+        context.queryClient.removeQueries({
+          queryKey: drawingQueryOptions(params.id).queryKey,
+          exact: true,
+        })
+      if (outcome.status === "copied") copied = outcome
+    }
     const drawing = await context.queryClient.ensureQueryData(
       drawingQueryOptions(params.id),
     )
-    if (!preload && supportsOfflineDrawings()) {
-      const owner = offlineAccount()
-      if (owner && (!drawing || drawing.createdBy === owner)) {
-        const local = await readLocalDrawing(owner, params.id).catch(
-          () => undefined,
-        )
-        if (local && local.status !== "clean")
-          throw redirect({
-            href: `/offline?drawing=${encodeURIComponent(params.id)}`,
-            reloadDocument: true,
-          })
-      }
-    }
     // The server returns null for hard-deleted drawings and drawings that
     // aren't yours (deliberately indistinguishable) — land on Home, not a
     // dead end. Trashed drawings load and render read-only (spec §5.11).
@@ -64,6 +69,7 @@ export const Route = createFileRoute("/_app/draw/$id")({
         toast.error("Drawing not found", { id: "drawing-not-found" })
       throw redirect({ to: "/draw" })
     }
+    return { copied }
   },
   component: DrawingPage,
   pendingComponent: LoadingState,
@@ -73,6 +79,15 @@ function DrawingPage() {
   const { id } = Route.useParams()
   const navigate = useNavigate()
   const { data: drawing } = useQuery(drawingQueryOptions(id))
+  const { copied } = Route.useLoaderData()
+
+  // Deferred: on a fresh page load the Toaster, a later sibling, subscribes
+  // after this effect runs.
+  useEffect(() => {
+    if (!copied) return
+    const timer = setTimeout(() => toastCopied(copied))
+    return () => clearTimeout(timer)
+  }, [copied])
 
   // Title from the sidebar list cache, not the detail query: renames patch
   // the list optimistically, so the tab tracks them without waiting for the

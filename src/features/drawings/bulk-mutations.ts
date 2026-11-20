@@ -1,6 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
-import { removeOfflineEligibility } from "@/features/offline/store"
 import { drawingShareQueryOptions } from "@/features/shares/queries"
 import { useOptimisticListMutation } from "@/hooks/use-optimistic-list-mutation"
 import {
@@ -85,13 +84,7 @@ export function useBulkTrash() {
   return (drawings: Drawing[]) => {
     const ids = drawings.map((d) => d.id)
     const trashed = trashMutation.mutateAsync({ data: ids })
-    trashed.then(
-      () => {
-        removeOfflineEligibility(ids)
-        return invalidateTrash()
-      },
-      () => {},
-    )
+    trashed.then(invalidateTrash, () => {})
     const toastId = toast(`Moved ${countDrawings(ids.length)} to trash`, {
       action: {
         label: "Undo",
@@ -122,7 +115,6 @@ export function useBulkMoveToTeam() {
   return useMutation({
     mutationFn: moveDrawingsToTeam,
     onSuccess: (_result, { data: ids }) => {
-      removeOfflineEligibility(ids)
       queryClient.setQueryData<Drawing[]>(
         queryKey,
         (list) =>

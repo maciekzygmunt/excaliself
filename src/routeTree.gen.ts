@@ -23,7 +23,6 @@ import { Route as AppSettingsRouteRouteImport } from './routes/_app/settings/rou
 import { Route as AppTrashRouteImport } from './routes/_app/trash'
 import { Route as ApiHealthRouteImport } from './routes/api/health'
 import { Route as ApiMcpRouteImport } from './routes/api/mcp'
-import { Route as ApiOfflineDrawingsRouteImport } from './routes/api/offline-drawings'
 import { Route as OauthAuthorizeRouteImport } from './routes/oauth/authorize'
 import { Route as PreviewLoginRouteImport } from './routes/preview/login'
 import { Route as ShareTokenRouteImport } from './routes/share/$token'
@@ -112,11 +111,6 @@ const ApiHealthRoute = ApiHealthRouteImport.update({
 const ApiMcpRoute = ApiMcpRouteImport.update({
   id: '/api/mcp',
   path: '/api/mcp',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiOfflineDrawingsRoute = ApiOfflineDrawingsRouteImport.update({
-  id: '/api/offline-drawings',
-  path: '/api/offline-drawings',
   getParentRoute: () => rootRouteImport,
 } as any)
 const OauthAuthorizeRoute = OauthAuthorizeRouteImport.update({
@@ -233,7 +227,6 @@ export interface FileRoutesByFullPath {
   '/trash': typeof AppTrashRoute
   '/api/health': typeof ApiHealthRoute
   '/api/mcp': typeof ApiMcpRoute
-  '/api/offline-drawings': typeof ApiOfflineDrawingsRoute
   '/oauth/authorize': typeof OauthAuthorizeRoute
   '/preview/login': typeof PreviewLoginRoute
   '/share/$token': typeof ShareTokenRoute
@@ -267,7 +260,6 @@ export interface FileRoutesByTo {
   '/trash': typeof AppTrashRoute
   '/api/health': typeof ApiHealthRoute
   '/api/mcp': typeof ApiMcpRoute
-  '/api/offline-drawings': typeof ApiOfflineDrawingsRoute
   '/oauth/authorize': typeof OauthAuthorizeRoute
   '/preview/login': typeof PreviewLoginRoute
   '/share/$token': typeof ShareTokenRoute
@@ -304,7 +296,6 @@ export interface FileRoutesById {
   '/_app/trash': typeof AppTrashRoute
   '/api/health': typeof ApiHealthRoute
   '/api/mcp': typeof ApiMcpRoute
-  '/api/offline-drawings': typeof ApiOfflineDrawingsRoute
   '/oauth/authorize': typeof OauthAuthorizeRoute
   '/preview/login': typeof PreviewLoginRoute
   '/share/$token': typeof ShareTokenRoute
@@ -341,7 +332,6 @@ export interface FileRouteTypes {
     | '/trash'
     | '/api/health'
     | '/api/mcp'
-    | '/api/offline-drawings'
     | '/oauth/authorize'
     | '/preview/login'
     | '/share/$token'
@@ -375,7 +365,6 @@ export interface FileRouteTypes {
     | '/trash'
     | '/api/health'
     | '/api/mcp'
-    | '/api/offline-drawings'
     | '/oauth/authorize'
     | '/preview/login'
     | '/share/$token'
@@ -411,7 +400,6 @@ export interface FileRouteTypes {
     | '/_app/trash'
     | '/api/health'
     | '/api/mcp'
-    | '/api/offline-drawings'
     | '/oauth/authorize'
     | '/preview/login'
     | '/share/$token'
@@ -445,7 +433,6 @@ export interface RootRouteChildren {
   DotwellKnownOauthAuthorizationServerRoute: typeof DotwellKnownOauthAuthorizationServerRoute
   ApiHealthRoute: typeof ApiHealthRoute
   ApiMcpRoute: typeof ApiMcpRoute
-  ApiOfflineDrawingsRoute: typeof ApiOfflineDrawingsRoute
   OauthAuthorizeRoute: typeof OauthAuthorizeRoute
   PreviewLoginRoute: typeof PreviewLoginRoute
   ShareTokenRoute: typeof ShareTokenRoute
@@ -556,13 +543,6 @@ declare module '@tanstack/react-router' {
       path: '/api/mcp'
       fullPath: '/api/mcp'
       preLoaderRoute: typeof ApiMcpRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/offline-drawings': {
-      id: '/api/offline-drawings'
-      path: '/api/offline-drawings'
-      fullPath: '/api/offline-drawings'
-      preLoaderRoute: typeof ApiOfflineDrawingsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/oauth/authorize': {
@@ -757,7 +737,6 @@ const rootRouteChildren: RootRouteChildren = {
     DotwellKnownOauthAuthorizationServerRoute,
   ApiHealthRoute: ApiHealthRoute,
   ApiMcpRoute: ApiMcpRoute,
-  ApiOfflineDrawingsRoute: ApiOfflineDrawingsRoute,
   OauthAuthorizeRoute: OauthAuthorizeRoute,
   PreviewLoginRoute: PreviewLoginRoute,
   ShareTokenRoute: ShareTokenRoute,

@@ -6,7 +6,6 @@ import {
 } from "@/features/drawings/queries"
 import { foldersQueryOptions } from "@/features/folders/queries"
 import { collectFolderSubtreeIds } from "@/features/folders/subtree"
-import { removeOfflineEligibility } from "@/features/offline/store"
 import { drawingShareQueryOptions } from "@/features/shares/queries"
 import type { MoveItem } from "./move-to-team"
 import { moveToTeam } from "./server"
@@ -27,7 +26,6 @@ export function useMoveToTeam() {
       return moveToTeam({ data: { item, folderId } })
     },
     onSuccess: (drawingIds, { item, folderId }) => {
-      removeOfflineEligibility(drawingIds)
       const moved = new Set(drawingIds)
       // The open canvas reads its space from here, so it joins the Room by
       // id before the share refetch below can drop its link.

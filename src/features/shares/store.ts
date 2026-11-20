@@ -11,7 +11,7 @@ import {
   shares,
 } from "@/db/schema"
 import { bytesToDataUrl } from "@/features/drawings/file-bytes"
-import { referencedFileIds } from "@/features/drawings/scene-files"
+import { referencedFileIds } from "@/features/drawings/scene-write"
 import { accessibleTo } from "@/features/spaces/access"
 import { resolveShareAccess, type ShareAudience } from "./access"
 

@@ -1,25 +1,36 @@
-import type { ScenePayload } from "@/features/drawings/scene"
-import { referencedFileIds } from "@/features/drawings/scene-files"
-import { parseSceneElements } from "@/features/drawings/search"
-import type { LocalDrawing, SyncResult } from "./types"
+// Private drawings kept in this browser's IndexedDB, so they open offline and
+// edits survive until the server stores them. Images live in their own store,
+// so a draft write only touches the bytes that changed.
 
+import type { PersistedFile, ScenePayload } from "@/features/drawings/scene"
+
+export type DeviceDrawing = {
+  owner: string
+  id: string
+  name: string
+  data: string
+  /** The server version this copy builds on. Null: made on this device. */
+  baseRevision: string | null
+  /** "pending": holds edits the server has not stored. */
+  status: "clean" | "pending"
+}
+
+type StoredFile = PersistedFile & { owner: string; drawingId: string }
+
+const DRAWINGS = "drawings"
+const FILES = "files"
 const accountKey = "excaliself:offline-account"
-const records = "drawings"
-const eligibility = "offlineEligibility"
-type EligibilityMarker = { owner: string; id: string; version: string }
-let database: Promise<IDBDatabase> | undefined
-let channel: BroadcastChannel | undefined
-const changes = new EventTarget()
 
-export function supportsOfflineDrawings() {
+export function supportsDeviceDrawings() {
   return (
     typeof window !== "undefined" &&
     window.isSecureContext &&
-    !!window.indexedDB
+    "indexedDB" in window
   )
 }
 
-export function offlineAccount() {
+/** The signed-in account, kept for the offline page, which can't ask the server. */
+export function deviceAccount() {
   try {
     return localStorage.getItem(accountKey)
   } catch {
@@ -27,50 +38,46 @@ export function offlineAccount() {
   }
 }
 
-export function setOfflineAccount(owner: string | null) {
+export function setDeviceAccount(owner: string | null) {
   try {
     if (owner) localStorage.setItem(accountKey, owner)
     else localStorage.removeItem(accountKey)
   } catch {
-    // Storage can be disabled. The online editor still works.
+    // Storage can be off. The online editor still works.
   }
 }
 
-export function subscribeToLocalDrawings(listener: () => void) {
-  if (!channel && typeof BroadcastChannel !== "undefined") {
-    channel = new BroadcastChannel("excaliself:offline-drawings")
-    channel.onmessage = () => changes.dispatchEvent(new Event("change"))
-  }
+const changes = new EventTarget()
+let channel: BroadcastChannel | undefined
+
+/** Calls `listener` after any tab changes the device drawings. */
+export function subscribeToDeviceDrawings(listener: () => void) {
+  channel ??= new BroadcastChannel("excaliself:offline-drawings")
+  channel.onmessage = () => changes.dispatchEvent(new Event("change"))
   changes.addEventListener("change", listener)
   return () => changes.removeEventListener("change", listener)
 }
 
-function notify() {
-  changes.dispatchEvent(new Event("change"))
-  channel?.postMessage("change")
-}
+let database: Promise<IDBDatabase> | undefined
 
-function openDatabase(): Promise<IDBDatabase> {
+function openDatabase() {
   database ??= new Promise<IDBDatabase>((resolve, reject) => {
-    const request = indexedDB.open("excaliself:offline", 2)
-    request.onupgradeneeded = ({ oldVersion }) => {
+    const request = indexedDB.open("excaliself:offline", 1)
+    request.onupgradeneeded = () => {
       const db = request.result
-      if (oldVersion === 0) {
-        const store = db.createObjectStore(records, {
-          keyPath: ["owner", "id"],
-        })
-        store.createIndex("drawingNames", ["owner", "name", "id"])
-        store.createIndex("queue", ["owner", "status"])
-      }
-      db.createObjectStore(eligibility, { keyPath: ["owner", "id"] })
+      const drawings = db.createObjectStore(DRAWINGS, {
+        keyPath: ["owner", "id"],
+      })
+      drawings.createIndex("names", ["owner", "name", "id"])
+      drawings.createIndex("status", ["owner", "status"])
+      db.createObjectStore(FILES, { keyPath: ["owner", "drawingId", "fileId"] })
     }
     request.onsuccess = () => {
-      const db = request.result
-      db.onversionchange = () => {
-        db.close()
+      request.result.onversionchange = () => {
+        request.result.close()
         database = undefined
       }
-      resolve(db)
+      resolve(request.result)
     }
     request.onerror = () => reject(request.error)
   }).catch((error) => {
@@ -80,306 +87,237 @@ function openDatabase(): Promise<IDBDatabase> {
   return database
 }
 
-async function read<T>(
-  lookup: (store: IDBObjectStore) => IDBRequest<T>,
-  storeName = records,
-): Promise<T> {
-  const db = await openDatabase()
-  return new Promise((resolve, reject) => {
-    const request = lookup(db.transaction(storeName).objectStore(storeName))
+const done = <T>(request: IDBRequest<T>) =>
+  new Promise<T>((resolve, reject) => {
     request.onsuccess = () => resolve(request.result)
     request.onerror = () => reject(request.error)
   })
-}
 
-export const readLocalDrawing = (owner: string, id: string) =>
-  read<LocalDrawing | undefined>((store) => store.get([owner, id]))
-
-export async function listLocalDrawings(owner: string) {
-  // Read the index keys so listing drawings never loads their image bytes.
-  const db = await openDatabase()
-  return new Promise<{ id: string; name: string }[]>((resolve, reject) => {
-    const index = db
-      .transaction(records)
-      .objectStore(records)
-      .index("drawingNames")
-    const request = index.openKeyCursor(IDBKeyRange.bound([owner], [owner, []]))
-    const drawings: { id: string; name: string }[] = []
-    request.onsuccess = () => {
-      const cursor = request.result
-      if (!cursor) {
-        resolve(drawings)
-        return
-      }
-      const [, name, id] = cursor.key as [string, string, string]
-      drawings.push({ id, name })
-      cursor.continue()
-    }
-    request.onerror = () => reject(request.error)
+/** Runs `body` in one transaction; resolves once it commits. */
+async function transact<T>(
+  mode: IDBTransactionMode,
+  body: (stores: {
+    drawings: IDBObjectStore
+    files: IDBObjectStore
+  }) => Promise<T>,
+): Promise<T> {
+  const tx = (await openDatabase()).transaction([DRAWINGS, FILES], mode)
+  const committed = new Promise<void>((resolve, reject) => {
+    tx.oncomplete = () => resolve()
+    tx.onabort = () => reject(tx.error ?? new Error("Device write aborted"))
   })
-}
-
-export async function listPendingDrawings(owner: string) {
-  const keys = await read((store) =>
-    store.index("queue").getAllKeys([owner, "pending"]),
-  )
-  return keys.map((key) => (key as [string, string])[1])
-}
-
-type EligibilityUpdate = { expected: string | undefined } | { revoke: true }
-
-async function update(
-  owner: string,
-  id: string,
-  apply: (
-    current: LocalDrawing | undefined,
-    store: IDBObjectStore,
-  ) => LocalDrawing | undefined,
-  check?: EligibilityUpdate,
-): Promise<LocalDrawing | undefined> {
-  const db = await openDatabase()
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(
-      check ? [records, eligibility] : records,
-      "readwrite",
-      { durability: "strict" },
-    )
-    const store = tx.objectStore(records)
-    const lookup: IDBRequest<LocalDrawing | undefined> = store.get([owner, id])
-    let result: LocalDrawing | undefined
-    let changed = false
-    const write = () => {
-      try {
-        result = apply(lookup.result, store)
-        changed = result !== lookup.result
-        if (changed) {
-          if (result) store.put(result)
-          else store.delete([owner, id])
-        }
-      } catch (error) {
-        tx.abort()
-        reject(error)
-      }
-    }
-    if (check && "expected" in check) {
-      const marker: IDBRequest<EligibilityMarker | undefined> = tx
-        .objectStore(eligibility)
-        .get([owner, id])
-      marker.onsuccess = () => {
-        if (marker.result?.version === check.expected) write()
-        else result = lookup.result
-      }
-    } else {
-      if (check)
-        tx.objectStore(eligibility).put({
-          owner,
-          id,
-          version: crypto.randomUUID(),
-        })
-      lookup.onsuccess = write
-    }
-    tx.oncomplete = () => {
-      if (changed) notify()
-      resolve(result)
-    }
-    tx.onabort = () =>
-      reject(tx.error ?? new Error("Local drawing write was interrupted"))
-  })
-}
-
-type ServerSnapshot = { id: string; name: string } & ScenePayload
-
-export async function rememberDrawing(
-  owner: string,
-  snapshot: ServerSnapshot,
-  signal: AbortSignal,
-  verify: () => Promise<ServerSnapshot | undefined>,
-) {
-  const { id } = snapshot
-  const marker = await read<EligibilityMarker | undefined>(
-    (store) => store.get([owner, id]),
-    eligibility,
-  )
-  // Once this browser learns a drawing was shared, moved, or trashed, an old
-  // copy of the server query cannot make it eligible again.
-  const confirmed = marker ? await verify() : snapshot
-  if (!confirmed || signal.aborted) return undefined
-  const { data, files, name } = confirmed
-  const bytes = await crypto.subtle.digest(
-    "SHA-256",
-    new TextEncoder().encode(data),
-  )
-  const revision = Array.from(new Uint8Array(bytes), (byte) =>
-    byte.toString(16).padStart(2, "0"),
-  ).join("")
-  const serverFileIds = new Set(files.map((file) => file.fileId))
-  return update(
-    owner,
-    id,
-    (current) => {
-      if (signal.aborted || (current && current.status !== "clean"))
-        return current
-      if (
-        current?.baseRevision === revision &&
-        current.name === name &&
-        current.serverFileIds.length === serverFileIds.size &&
-        current.serverFileIds.every((fileId) => serverFileIds.has(fileId))
-      )
-        return current
-
-      // If server image rows are missing, we may still have their bytes on this
-      // device. Recover only images that are still part of the server scene.
-      const referenced = referencedFileIds(parseSceneElements(data) ?? [])
-      const recovered =
-        current?.scene.files.filter(
-          (file) =>
-            referenced.has(file.fileId) && !serverFileIds.has(file.fileId),
-        ) ?? []
-      return {
-        owner,
-        id,
-        name,
-        baseRevision: revision,
-        scene: { data, files: [...files, ...recovered] },
-        serverFileIds: [...serverFileIds],
-        editId:
-          current?.baseRevision === revision
-            ? current.editId
-            : crypto.randomUUID(),
-        status: "clean",
-      }
-    },
-    { expected: marker?.version },
-  )
-}
-
-export function removeOfflineEligibility(ids: readonly string[]) {
-  if (!supportsOfflineDrawings()) return
-  const owner = offlineAccount()
-  if (!owner) return
-  for (const id of ids) {
-    void update(
-      owner,
-      id,
-      (drawing) => {
-        if (!drawing || drawing.status === "clean") return undefined
-        if (drawing.status === "conflict") return drawing
-        // Keep the latest draft, but disregard any acknowledgement for a write
-        // made before the server confirmed the drawing is no longer editable.
-        return { ...drawing, status: "conflict", sending: undefined }
-      },
-      { revoke: true },
-    ).catch(() => {})
+  let result: T
+  try {
+    result = await body({
+      drawings: tx.objectStore(DRAWINGS),
+      files: tx.objectStore(FILES),
+    })
+  } catch (error) {
+    tx.abort()
+    throw error
   }
-}
-
-export async function createLocalDrawing(owner: string, name: string) {
-  const id = crypto.randomUUID()
-  const drawing = await update(owner, id, () => ({
-    owner,
-    id,
-    name,
-    baseRevision: null,
-    serverFileIds: [],
-    editId: crypto.randomUUID(),
-    status: "pending",
-    scene: { data: '{"elements":[],"appState":{}}', files: [] },
-  }))
-  if (!drawing) throw new Error("Couldn't create a local drawing")
-  return drawing
-}
-
-/**
- * A second tab editing the same local version gets its own private copy if
- * another tab saved first. It must never replace that tab's queued work.
- */
-export async function saveLocalDrawing(
-  previous: LocalDrawing,
-  scene: ScenePayload,
-) {
-  const { owner, id } = previous
-  const editId = crypto.randomUUID()
-  const result = await update(owner, id, (current) => {
-    if (!current || current.editId !== previous.editId) {
-      return {
-        owner,
-        id: crypto.randomUUID(),
-        name: `${previous.name.slice(0, 980)} (offline copy)`,
-        baseRevision: null,
-        serverFileIds: [],
-        editId,
-        status: "pending" as const,
-        scene,
-      }
-    }
-    return {
-      ...current,
-      editId,
-      scene,
-      status: current.status === "conflict" ? "conflict" : "pending",
-      overCapFileIds: undefined,
-    }
-  })
-  if (!result) throw new Error("Couldn't save the local drawing")
+  await committed
+  if (mode === "readwrite") {
+    changes.dispatchEvent(new Event("change"))
+    channel?.postMessage("change")
+  }
   return result
 }
 
-export function retryAsCopy(drawing: LocalDrawing) {
-  return update(drawing.owner, drawing.id, (current, store) => {
-    if (current?.status !== "conflict") return current
-    store.delete([drawing.owner, drawing.id])
+const filesOf = (owner: string, id: string) =>
+  IDBKeyRange.bound([owner, id], [owner, id, []])
+
+function putFiles(
+  files: IDBObjectStore,
+  owner: string,
+  drawingId: string,
+  list: readonly PersistedFile[],
+) {
+  for (const { fileId, mimeType, dataUrl } of list)
+    files.put({ owner, drawingId, fileId, mimeType, dataUrl } as StoredFile)
+}
+
+export const readDeviceDrawing = (owner: string, id: string) =>
+  transact("readonly", async ({ drawings, files }) => {
+    const drawing: DeviceDrawing | undefined = await done(
+      drawings.get([owner, id]),
+    )
+    if (!drawing) return undefined
+    const stored: StoredFile[] = await done(files.getAll(filesOf(owner, id)))
     return {
-      ...current,
-      id: crypto.randomUUID(),
-      name: `${current.name.slice(0, 980)} (offline copy)`,
-      baseRevision: null,
-      serverFileIds: [],
-      status: "pending",
-      sending: undefined,
-      editId: crypto.randomUUID(),
+      ...drawing,
+      files: stored.map(({ fileId, mimeType, dataUrl }) => ({
+        fileId,
+        mimeType,
+        dataUrl,
+      })),
     }
+  })
+
+/** The record without its images. */
+export const deviceDrawingStatus = (owner: string, id: string) =>
+  transact("readonly", async ({ drawings }) => {
+    const drawing: DeviceDrawing | undefined = await done(
+      drawings.get([owner, id]),
+    )
+    return drawing?.status
+  })
+
+/** Names only: reading index keys never loads scenes or images. */
+export const listDeviceDrawings = (owner: string) =>
+  transact("readonly", async ({ drawings }) => {
+    const keys = await done(
+      drawings
+        .index("names")
+        .getAllKeys(IDBKeyRange.bound([owner], [owner, []])),
+    )
+    return keys.map((key) => {
+      const [, name, id] = key as [string, string, string]
+      return { id, name }
+    })
+  })
+
+export const listPendingDeviceDrawings = (owner: string) =>
+  transact("readonly", async ({ drawings }) => {
+    const keys = await done(
+      drawings.index("status").getAllKeys([owner, "pending"]),
+    )
+    return keys.map((key) => (key as [string, string])[1])
+  })
+
+/**
+ * Keeps the server's version of a drawing an editor opened. A copy with
+ * edits the server lacks stays as it is.
+ */
+export function keepDeviceDrawing(
+  owner: string,
+  drawing: { id: string; name: string; data: string; files: PersistedFile[] },
+  baseRevision: string,
+) {
+  const { id, name, data } = drawing
+  return transact("readwrite", async ({ drawings, files }) => {
+    const current: DeviceDrawing | undefined = await done(
+      drawings.get([owner, id]),
+    )
+    if (current?.status === "pending") return
+    if (current?.baseRevision === baseRevision && current.name === name) return
+    drawings.put({
+      owner,
+      id,
+      name,
+      data,
+      baseRevision,
+      status: "clean",
+    } satisfies DeviceDrawing)
+    files.delete(filesOf(owner, id))
+    putFiles(files, owner, id, drawing.files)
   })
 }
 
-export function beginSync(owner: string, id: string) {
-  return update(owner, id, (current) => {
-    if (current?.status !== "pending" || current.sending) return current
-    const { name, baseRevision, scene, editId, serverFileIds } = current
-    return {
-      ...current,
-      sending: { id, name, baseRevision, scene, editId, serverFileIds },
-    }
-  })
-}
-
-export function finishSync(
+/** Stores an edit. False when the drawing isn't kept on this device. */
+export function writeDeviceDraft(
   owner: string,
   id: string,
-  editId: string,
-  result: SyncResult,
+  scene: ScenePayload,
 ) {
-  return update(owner, id, (current) => {
-    if (!current || current.sending?.editId !== editId) return current
-    if (result.status === "saved") {
-      return {
-        ...current,
-        baseRevision: result.revision,
-        serverFileIds: current.sending.scene.files.map((file) => file.fileId),
-        status: current.editId === editId ? "clean" : "pending",
-        sending: undefined,
-      }
-    }
-    return {
+  return transact("readwrite", async ({ drawings, files }) => {
+    const current: DeviceDrawing | undefined = await done(
+      drawings.get([owner, id]),
+    )
+    if (!current) return false
+    if (current.data === scene.data) return true
+    const storedIds = new Set(
+      (await done(files.getAllKeys(filesOf(owner, id)))).map(
+        (key) => (key as [string, string, string])[2],
+      ),
+    )
+    const used = new Set(scene.files.map((file) => file.fileId))
+    drawings.put({ ...current, data: scene.data, status: "pending" })
+    putFiles(
+      files,
+      owner,
+      id,
+      scene.files.filter((file) => !storedIds.has(file.fileId)),
+    )
+    for (const fileId of storedIds)
+      if (!used.has(fileId)) files.delete([owner, id, fileId])
+    return true
+  })
+}
+
+/** The server stored `data` at `revision`. Clean if no later edit came. */
+export function markDeviceDrawingSaved(
+  owner: string,
+  id: string,
+  data: string,
+  revision: string,
+) {
+  return transact("readwrite", async ({ drawings }) => {
+    const current: DeviceDrawing | undefined = await done(
+      drawings.get([owner, id]),
+    )
+    if (!current) return
+    drawings.put({
       ...current,
-      status:
-        current.editId !== editId && result.status !== "conflict"
-          ? "pending"
-          : result.status,
-      sending: undefined,
-      overCapFileIds:
-        result.status === "images" && current.editId === editId
-          ? result.overCapFileIds
-          : undefined,
+      baseRevision: revision,
+      status: current.data === data ? "clean" : "pending",
+    })
+  })
+}
+
+export function createDeviceDrawing(owner: string, name: string) {
+  const drawing: DeviceDrawing = {
+    owner,
+    id: crypto.randomUUID(),
+    name,
+    data: JSON.stringify({ elements: [], appState: {} }),
+    baseRevision: null,
+    status: "pending",
+  }
+  return transact("readwrite", async ({ drawings }) => {
+    drawings.put(drawing)
+    return drawing
+  })
+}
+
+/**
+ * Turns a copy whose server version moved on into a new drawing, so the
+ * next sync uploads it beside the original instead of over it.
+ */
+export function moveToNewDeviceDrawing(
+  owner: string,
+  id: string,
+  name: string,
+) {
+  return transact("readwrite", async ({ drawings, files }) => {
+    const current: DeviceDrawing | undefined = await done(
+      drawings.get([owner, id]),
+    )
+    if (!current) return undefined
+    const stored: StoredFile[] = await done(files.getAll(filesOf(owner, id)))
+    const copy: DeviceDrawing = {
+      ...current,
+      id: crypto.randomUUID(),
+      name,
+      baseRevision: null,
+      status: "pending",
     }
+    drawings.delete([owner, id])
+    files.delete(filesOf(owner, id))
+    drawings.put(copy)
+    putFiles(files, owner, copy.id, stored)
+    return copy
+  })
+}
+
+/** Drops a copy that holds no unsaved edits. */
+export function forgetDeviceDrawing(owner: string, id: string) {
+  return transact("readwrite", async ({ drawings, files }) => {
+    const current: DeviceDrawing | undefined = await done(
+      drawings.get([owner, id]),
+    )
+    if (current?.status !== "clean") return
+    drawings.delete([owner, id])
+    files.delete(filesOf(owner, id))
   })
 }

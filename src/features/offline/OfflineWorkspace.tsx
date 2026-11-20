@@ -4,47 +4,61 @@ import { useEffect, useState } from "react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { MAX_NAME_LENGTH } from "@/features/drawings/list-columns"
 import { buildInitialSceneData } from "@/features/drawings/scene"
 import { useCanvasTheme, useStoredTheme } from "@/hooks/use-theme"
 import {
-  createLocalDrawing,
-  listLocalDrawings,
-  offlineAccount,
-  readLocalDrawing,
-  retryAsCopy,
-  subscribeToLocalDrawings,
-  supportsOfflineDrawings,
+  createDeviceDrawing,
+  deviceAccount,
+  listDeviceDrawings,
+  readDeviceDrawing,
+  subscribeToDeviceDrawings,
+  supportsDeviceDrawings,
 } from "./store"
-import { useOfflineSync } from "./sync"
-import { type LocalDrawing, localSaveLabel } from "./types"
-import { useLocalEditor } from "./use-local-editor"
+import { holdDeviceDrawing, useDeviceSync } from "./sync"
+import { useDeviceDraft } from "./use-device-draft"
 import "@excalidraw/excalidraw/index.css"
 
-function Editor({
-  initial,
-  onCopy,
-}: {
-  initial: LocalDrawing
-  onCopy: (id: string) => void
-}) {
-  const [opening] = useState(initial)
-  const local = useLocalEditor(opening)
+type Opened = NonNullable<Awaited<ReturnType<typeof readDeviceDrawing>>>
+
+/** Holds the drawing first, so no sync moves it while it opens. */
+function Editor({ owner, id }: { owner: string; id: string }) {
+  const [drawing, setDrawing] = useState<Opened | null>()
+  useEffect(() => {
+    const { granted, release } = holdDeviceDrawing(owner, id)
+    let active = true
+    void granted
+      .then(() => readDeviceDrawing(owner, id))
+      .then(
+        (found) => active && setDrawing(found ?? null),
+        () => active && setDrawing(null),
+      )
+    return () => {
+      active = false
+      release()
+    }
+  }, [owner, id])
+
+  if (drawing === undefined)
+    return <Notice>Reading this drawing on this device…</Notice>
+  if (drawing === null)
+    return <Notice>This drawing isn’t available on this device.</Notice>
+  return <Canvas owner={owner} drawing={drawing} />
+}
+
+function Canvas({ owner, drawing }: { owner: string; drawing: Opened }) {
   const theme = useCanvasTheme()
   const [{ initialData, isDataCorrupt }] = useState(() =>
-    buildInitialSceneData(initial.scene),
+    buildInitialSceneData(drawing),
   )
-  const drawing = local.drawing ?? initial
+  const draft = useDeviceDraft(isDataCorrupt ? null : owner, drawing.id)
   const status = isDataCorrupt
-    ? "This drawing could not be opened"
-    : local.failed
+    ? "This drawing couldn’t be opened"
+    : draft.state === "failed"
       ? "Couldn’t save on this device"
-      : local.saving
-        ? "Saving on this device…"
-        : localSaveLabel(drawing.status)
-
-  useEffect(() => {
-    if (drawing.id !== initial.id) onCopy(drawing.id)
-  }, [drawing.id, initial.id, onCopy])
+      : draft.state === "written" || drawing.status === "pending"
+        ? "Saved on this device · waiting to sync"
+        : "Synced"
 
   return (
     <section className="flex min-h-0 min-w-0 flex-1 flex-col border-t border-hairline sm:border-l sm:border-t-0">
@@ -53,32 +67,14 @@ function Editor({
         <span role="status" className="text-sm text-muted-foreground">
           {status}
         </span>
-        {drawing.status === "conflict" && (
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => {
-              void retryAsCopy(drawing)
-                .then((copy) => {
-                  if (copy) onCopy(copy.id)
-                })
-                .catch(() => toast.error("Couldn’t save a copy"))
-            }}
-          >
-            Sync as a new drawing
-          </Button>
-        )}
       </div>
       <div className="min-h-0 flex-1">
         <Excalidraw
           theme={theme}
           initialData={{ ...initialData, scrollToContent: true }}
           viewModeEnabled={isDataCorrupt || undefined}
-          onChange={
-            isDataCorrupt
-              ? undefined
-              : (elements, appState, files) =>
-                  local.onChange({ elements, appState, files })
+          onChange={(elements, appState, files) =>
+            draft.onChange({ elements, appState, files })
           }
           UIOptions={{
             canvasActions: { loadScene: false, toggleTheme: false },
@@ -97,46 +93,47 @@ function Editor({
   )
 }
 
+const Notice = ({ children }: { children: React.ReactNode }) => (
+  <p role="status" className="p-6 text-sm text-muted-foreground">
+    {children}
+  </p>
+)
+
+/**
+ * The page the service worker opens when the instance can't be reached:
+ * private drawings kept on this device, and new ones. Server-free.
+ */
 export default function OfflineWorkspace() {
   useStoredTheme()
-  const [owner, setOwner] = useState(offlineAccount)
+  const supported = supportsDeviceDrawings()
+  const [owner, setOwner] = useState(deviceAccount)
   const [drawings, setDrawings] = useState<{ id: string; name: string }[]>()
-  const [current, setCurrent] = useState<LocalDrawing>()
-  const supported = supportsOfflineDrawings()
   const [unavailable, setUnavailable] = useState(false)
   const [selected, setSelected] = useState(() =>
     new URLSearchParams(window.location.search).get("drawing"),
   )
   const [name, setName] = useState("")
   const [creating, setCreating] = useState(false)
-  useOfflineSync(owner)
+  useDeviceSync(supported ? owner : null)
 
+  // Signing in or out in another tab switches whose drawings these are.
   useEffect(() => {
-    const readAccount = () => {
-      const next = offlineAccount()
-      if (next === owner) return
-      setDrawings(undefined)
-      setCurrent(undefined)
-      setOwner(next)
-    }
+    const readAccount = () => setOwner(deviceAccount())
     window.addEventListener("storage", readAccount)
     return () => window.removeEventListener("storage", readAccount)
-  }, [owner])
+  }, [])
 
   useEffect(() => {
     if (!owner || !supported) return
     let active = true
-    setUnavailable(false)
+    setDrawings(undefined)
     const refresh = () => {
-      void listLocalDrawings(owner)
-        .then((list) => {
-          if (active) setDrawings(list)
-        })
-        .catch(() => {
-          if (active) setUnavailable(true)
-        })
+      listDeviceDrawings(owner).then(
+        (list) => active && setDrawings(list),
+        () => active && setUnavailable(true),
+      )
     }
-    const unsubscribe = subscribeToLocalDrawings(refresh)
+    const unsubscribe = subscribeToDeviceDrawings(refresh)
     refresh()
     return () => {
       active = false
@@ -153,27 +150,19 @@ export default function OfflineWorkspace() {
     )
   }
 
-  useEffect(() => {
-    if (!owner || !selected || !supported) return
-    let active = true
-    void readLocalDrawing(owner, selected)
+  const create = (event: React.FormEvent) => {
+    event.preventDefault()
+    const trimmed = name.trim()
+    if (!owner || !trimmed || creating) return
+    setCreating(true)
+    createDeviceDrawing(owner, trimmed)
       .then((drawing) => {
-        if (active) setCurrent(drawing)
+        select(drawing.id)
+        setName("")
       })
-      .catch(() => {
-        if (active) setUnavailable(true)
-      })
-    return () => {
-      active = false
-    }
-  }, [owner, selected, supported])
-
-  const selectedDrawing =
-    current?.owner === owner &&
-    current?.id === selected &&
-    drawings?.some(({ id }) => id === selected)
-      ? current
-      : undefined
+      .catch(() => toast.error("Couldn’t create a drawing on this device"))
+      .finally(() => setCreating(false))
+  }
 
   return (
     <main className="flex h-dvh min-h-0 flex-col overflow-hidden bg-background">
@@ -186,45 +175,35 @@ export default function OfflineWorkspace() {
           variant="ghost"
           size="sm"
           nativeButton={false}
-          render={<a href="/draw" />}
+          // Opening the drawing online uploads its edits first.
+          render={
+            <a
+              href={
+                selected ? `/draw/${encodeURIComponent(selected)}` : "/draw"
+              }
+            />
+          }
         >
           <ArrowLeft aria-hidden="true" className="size-4" />
           Back to Excaliself
         </Button>
       </header>
       {!supported || !owner || unavailable ? (
-        <p className="p-6 text-sm text-muted-foreground">
+        <Notice>
           {!supported
-            ? "Offline drawings require HTTPS or localhost with device storage enabled."
+            ? "Offline drawings need HTTPS or localhost."
             : owner
-              ? "Offline storage is unavailable in this browser."
-              : "Sign in and open Excaliself on this browser to use offline drawings."}
-        </p>
+              ? "This browser’s storage isn’t available."
+              : "Sign in and open Excaliself in this browser to use offline drawings."}
+        </Notice>
       ) : (
         <div className="flex min-h-0 flex-1 flex-col sm:flex-row">
           <aside className="max-h-[35%] w-full shrink-0 overflow-y-auto p-3 sm:max-h-none sm:w-64">
-            <form
-              className="flex gap-2"
-              onSubmit={(event) => {
-                event.preventDefault()
-                const trimmed = name.trim()
-                if (!trimmed || creating) return
-                setCreating(true)
-                void createLocalDrawing(owner, trimmed)
-                  .then((drawing) => {
-                    select(drawing.id)
-                    setName("")
-                  })
-                  .catch(() =>
-                    toast.error("Couldn’t create a drawing on this device"),
-                  )
-                  .finally(() => setCreating(false))
-              }}
-            >
+            <form className="flex gap-2" onSubmit={create}>
               <Input
                 value={name}
                 onChange={(event) => setName(event.target.value)}
-                maxLength={1000}
+                maxLength={MAX_NAME_LENGTH}
                 aria-label="New drawing name"
                 placeholder="New drawing name"
               />
@@ -255,20 +234,14 @@ export default function OfflineWorkspace() {
               ))}
             </nav>
           </aside>
-          {selectedDrawing ? (
-            <Editor
-              key={selectedDrawing.id}
-              initial={selectedDrawing}
-              onCopy={select}
-            />
+          {selected ? (
+            <Editor key={selected} owner={owner} id={selected} />
           ) : (
-            <p role="status" className="p-6 text-sm text-muted-foreground">
-              {!drawings
-                ? "Reading drawings on this device…"
-                : selected
-                  ? "This drawing isn’t available on this device."
-                  : "Open a drawing from this device or create one."}
-            </p>
+            <Notice>
+              {drawings
+                ? "Open a drawing kept on this device, or create one."
+                : "Reading drawings on this device…"}
+            </Notice>
           )}
         </div>
       )}
