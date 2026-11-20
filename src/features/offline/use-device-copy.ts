@@ -35,6 +35,8 @@ export function useDeviceCopy(
       .then(async () => {
         const revision = await sceneRevision(open.data)
         await keepDeviceDrawing(owner, open, revision)
+        // A new session: edits from here build on the scene that opened.
+        writer.current = crypto.randomUUID()
         base.current = revision
         if (active) setKept(id)
       })
@@ -44,7 +46,7 @@ export function useDeviceCopy(
       release()
       setKept(null)
     }
-  }, [enabled, owner, id, base])
+  }, [enabled, owner, id, base, writer])
 
   const saved = useCallback(
     ({ data, files }: ScenePayload) => {
@@ -58,7 +60,7 @@ export function useDeviceCopy(
             kept,
             { data, fileIds },
             revision,
-            writer,
+            writer.current,
           )
           base.current = revision
         })

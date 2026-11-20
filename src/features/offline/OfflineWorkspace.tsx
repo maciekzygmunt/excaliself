@@ -71,10 +71,11 @@ function Canvas({
     buildInitialSceneData(drawing),
   )
   const draft = useDeviceDraft(isDataCorrupt ? null : owner, drawing.id)
-  const { base } = draft
+  const { base, writer } = draft
   useEffect(() => {
+    writer.current = crypto.randomUUID()
     base.current = drawing.baseRevision
-  }, [base, drawing.baseRevision])
+  }, [base, writer, drawing.baseRevision])
   useEffect(() => {
     flushRef.current = draft.flush
   }, [flushRef, draft.flush])
