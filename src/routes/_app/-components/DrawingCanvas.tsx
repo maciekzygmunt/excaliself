@@ -54,7 +54,7 @@ import { useDrawingViewport } from "@/features/drawings/use-drawing-viewport"
 import { useTeamLibrary } from "@/features/library/use-team-library"
 import { drawingShareQueryOptions } from "@/features/shares/queries"
 import { useAutoSave } from "@/hooks/use-auto-save"
-import { useLanguage } from "@/hooks/use-language"
+import { useCanvasLanguage } from "@/hooks/use-language"
 import { usePreloadTextFont } from "@/hooks/use-preload-text-font"
 import { useCanvasTheme } from "@/hooks/use-theme"
 import { CommentsButton } from "./comments/CommentsButton"
@@ -103,7 +103,7 @@ export function DrawingCanvas({
 }: Props) {
   const { toggleSidebar } = useSidebar()
   const canvasTheme = useCanvasTheme()
-  const language = useLanguage()
+  const language = useCanvasLanguage()
 
   // The canvas opens fitted to its content, so it waits for its own size.
   const [fitTo, setFitTo] = useState<FitTo>()

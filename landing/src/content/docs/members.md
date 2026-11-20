@@ -54,8 +54,9 @@ light.
 **Language**, also under **Appearance**, sets the language of the drawing
 canvas for this browser: English, Français, Deutsch, Español, Polski, or
 简体中文. Until you pick one, the canvas uses your browser's language if it is
-on that list, and English if not. Guests on a share link get their browser's
-language the same way. The rest of Excaliself stays in English.
+on that list, also in a regional form (French (Canada) gets Français), and
+English if not. Guests on a share link get their browser's language the same
+way. The rest of Excaliself stays in English.
 
 ## Instance stats
 
