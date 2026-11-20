@@ -28,9 +28,11 @@ export function useDeviceDraft(owner: string | null, id: string | null) {
     const sig = getScenePayloadSignature(payload)
     if (sig === writtenSig.current) return
     writtenSig.current = sig
+    // The session at queue time: a new one may start before this lands.
+    const session = { writer: writer.current, base: base.current }
     writes.current = writes.current
       .then(() =>
-        writeDeviceDraft(owner, id, payload, writer.current, base.current),
+        writeDeviceDraft(owner, id, payload, session.writer, session.base),
       )
       .catch(() => false)
       .then((ok) => {

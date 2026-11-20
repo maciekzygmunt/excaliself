@@ -336,10 +336,11 @@ export function DrawingCanvas({
   const [waitingToSync, setWaitingToSync] = useState(false)
   const waitingRef = useRef(false)
   waitingRef.current = waitingToSync
-  const deviceSaved = device.saved
+  const deviceSaving = device.saving
   const flushDevice = device.flush
   const saveScene = useCallback(
     async (payload: ScenePayload) => {
+      const deviceSaved = deviceSaving()
       try {
         const result = await saveScenePayload(payload)
         if (result === "saved") {
@@ -353,7 +354,7 @@ export function DrawingCanvas({
         return "skipped" as const
       }
     },
-    [saveScenePayload, deviceSaved, flushDevice],
+    [saveScenePayload, deviceSaving, flushDevice],
   )
 
   const {

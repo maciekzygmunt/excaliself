@@ -10,7 +10,7 @@ type Opened = { id: string; name: string; data: string; files: PersistedFile[] }
 /**
  * Keeps a private drawing open in the online editor on this device: the
  * stored version on open, then each edit. Autosave still writes the server;
- * pass each save to `saved`, so the copy turns clean.
+ * report each save through `saving`, so the copy turns clean.
  */
 export function useDeviceCopy(
   owner: string | undefined,
@@ -48,8 +48,13 @@ export function useDeviceCopy(
     }
   }, [enabled, owner, id, base, writer])
 
-  const saved = useCallback(
-    ({ data, files }: ScenePayload) => {
+  /**
+   * Call as a save starts; call what it returns with the payload once the
+   * server stored it. Bound to the session the save started in.
+   */
+  const saving = useCallback(() => {
+    const session = writer.current
+    return ({ data, files }: ScenePayload) => {
       if (!owner || !kept) return
       const fileIds = files.map((file) => file.fileId)
       void flushDraft()
@@ -60,14 +65,13 @@ export function useDeviceCopy(
             kept,
             { data, fileIds },
             revision,
-            writer.current,
+            session,
           )
-          base.current = revision
+          if (writer.current === session) base.current = revision
         })
         .catch(() => {})
-    },
-    [owner, kept, flushDraft, writer, base],
-  )
+    }
+  }, [owner, kept, flushDraft, writer, base])
 
   /** Resolves whether this device holds every edit so far. */
   const flush = useCallback(
@@ -78,5 +82,5 @@ export function useDeviceCopy(
   /** Edits land on the device as they're made. */
   const keeping = kept !== null && draft.state !== "failed"
 
-  return { onChange: draft.onChange, flush, saved, keeping }
+  return { onChange: draft.onChange, flush, saving, keeping }
 }
