@@ -1,5 +1,8 @@
 import { Excalidraw, MainMenu, useDevice } from "@excalidraw/excalidraw"
-import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types"
+import type {
+  ExcalidrawImperativeAPI,
+  ExcalidrawProps,
+} from "@excalidraw/excalidraw/types"
 import { useNavigate } from "@tanstack/react-router"
 import { LogInIcon } from "lucide-react"
 import { useCallback, useMemo, useState } from "react"
@@ -22,6 +25,7 @@ import {
   buildInitialSceneData,
   type PersistedFile,
 } from "@/features/drawings/scene"
+import { useDrawingViewport } from "@/features/drawings/use-drawing-viewport"
 import { useBlockClearCanvasShortcut } from "@/hooks/use-block-clear-canvas-shortcut"
 import { usePreloadTextFont } from "@/hooks/use-preload-text-font"
 import { GuestAttribution } from "./GuestAttribution"
@@ -39,6 +43,7 @@ const PRESENCE_MENU_ROW_CLASS = "@min-[72rem]/canvas:hidden!"
 
 type Props = {
   drawing: { id: string; name: string; data: string }
+  userId: string | null
   files: PersistedFile[]
   token: string
   onRoomFull: () => void
@@ -48,13 +53,14 @@ type Props = {
 
 export function SharedCanvas({
   drawing,
+  userId,
   files,
   token,
   onRoomFull,
   onLinkDead,
   onSceneUnreadable,
 }: Props) {
-  // The owner's view doesn't fit a phone, so open on the content instead.
+  // Fit the content for visitors without a saved viewport.
   const initialData = useMemo(
     () =>
       buildInitialSceneData(
@@ -62,6 +68,11 @@ export function SharedCanvas({
         { width: window.innerWidth, height: window.innerHeight },
       ).initialData,
     [drawing.data, files],
+  )
+  const { getInitialData, observeViewport } = useDrawingViewport(
+    drawing.id,
+    userId,
+    initialData,
   )
   // Already stored, so this tab must not upload them again.
   const storedFileIds = useMemo(() => files.map((file) => file.fileId), [files])
@@ -81,6 +92,16 @@ export function SharedCanvas({
     onSceneUnreadable,
     storedFileIds,
   })
+  const roomChange = room.onChange
+  const handleSceneChange = useCallback<
+    NonNullable<ExcalidrawProps["onChange"]>
+  >(
+    (elements, appState, files) => {
+      observeViewport(appState)
+      roomChange(elements, appState, files)
+    },
+    [observeViewport, roomChange],
+  )
   // A reset would wipe the drawing for everyone in the room.
   useBlockClearCanvasShortcut()
 
@@ -98,10 +119,10 @@ export function SharedCanvas({
   return (
     <div className="@container/canvas relative h-dvh w-full">
       <Excalidraw
-        initialData={initialData}
+        initialData={getInitialData}
         excalidrawAPI={setExcalidrawAPI}
         theme="light"
-        onChange={room.onChange}
+        onChange={handleSceneChange}
         onPointerUpdate={room.onPointerUpdate}
         onScrollChange={room.onScrollChange}
         // In mobile layout this row starts off screen, so it all moves to the menu.

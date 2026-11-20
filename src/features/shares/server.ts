@@ -79,17 +79,23 @@ export const setShareAudience = createServerFn({ method: "POST" })
     return share
   })
 
-export type ShareVisit = ShareResolution | { status: "throttled" }
+export type ShareVisit =
+  | Exclude<ShareResolution, { status: "ok" }>
+  | (Extract<ShareResolution, { status: "ok" }> & { userId: string | null })
+  | { status: "throttled" }
 
 /** Public (pre-auth) share token lookup for the /share/$token loader. */
 export const resolveShareToken = createServerFn({ method: "GET" })
   .validator(z.string())
   .handler(async ({ data: token }): Promise<ShareVisit> => {
     const headers = getRequestHeaders()
+    const lookupSession = () => auth.api.getSession({ headers })
+    let session: ReturnType<typeof lookupSession> | undefined
+    const getSession = () => (session ??= lookupSession())
     const visit = await resolveShareVisit(
       db,
       token,
-      async () => (await auth.api.getSession({ headers })) !== null,
+      async () => (await getSession()) !== null,
     )
     if (
       visit.status === "dead" &&
@@ -97,6 +103,9 @@ export const resolveShareToken = createServerFn({ method: "GET" })
     ) {
       setResponseStatus(429)
       return { status: "throttled" }
+    }
+    if (visit.status === "ok") {
+      return { ...visit, userId: (await getSession())?.user.id ?? null }
     }
     return visit
   })

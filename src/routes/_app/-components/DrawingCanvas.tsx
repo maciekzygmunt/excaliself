@@ -50,6 +50,7 @@ import {
   useReloadSceneAfterRoom,
   useSaveScenePayload,
 } from "@/features/drawings/scene"
+import { useDrawingViewport } from "@/features/drawings/use-drawing-viewport"
 import { useTeamLibrary } from "@/features/library/use-team-library"
 import { drawingShareQueryOptions } from "@/features/shares/queries"
 import { useAutoSave } from "@/hooks/use-auto-save"
@@ -83,6 +84,7 @@ const FIT_OFFSETS = { top: 80, right: 16, bottom: 16, left: 16 }
 
 type Props = {
   drawingId: string
+  userId: string
   /**
    * Trashed drawings (spec §5.11): Excalidraw view mode, no autosave wiring,
    * no rename. The server refuses writes to trashed drawings regardless —
@@ -96,6 +98,7 @@ type Props = {
 
 export function DrawingCanvas({
   drawingId,
+  userId,
   readOnly = false,
   onLinkDead,
 }: Props) {
@@ -115,6 +118,11 @@ export function DrawingCanvas({
   const { drawing, initialData, isDataCorrupt } = useDrawingScene(
     drawingId,
     fitTo,
+  )
+  const { getInitialData, observeViewport } = useDrawingViewport(
+    drawingId,
+    userId,
+    initialData,
   )
   // `useRoom` needs a stable reference.
   const storedFileIds = useMemo(
@@ -328,6 +336,8 @@ export function DrawingCanvas({
       appState: AppState,
       files: BinaryFiles,
     ) => {
+      observeViewport(appState)
+      if (readOnly) return
       // A room flags these itself, from the upload's answer.
       if (!isLive && excalidrawAPI) {
         for (const fileId of selectOversizedImages(
@@ -343,7 +353,15 @@ export function DrawingCanvas({
       // No-op until the room is joined.
       roomChange(elements, appState, files)
     },
-    [handleChange, roomChange, isLive, excalidrawAPI, storedFileIdSet],
+    [
+      observeViewport,
+      readOnly,
+      handleChange,
+      roomChange,
+      isLive,
+      excalidrawAPI,
+      storedFileIdSet,
+    ],
   )
 
   const handleNameSubmit = (newName: string) => {
@@ -360,7 +378,7 @@ export function DrawingCanvas({
   return (
     <div className="@container/canvas relative size-full">
       <Excalidraw
-        initialData={initialData}
+        initialData={getInitialData}
         excalidrawAPI={setExcalidrawAPI}
         // Controlled: the canvas renders in the app theme, and a theme baked
         // into the saved scene state is ignored on load. With the prop set,
@@ -368,7 +386,7 @@ export function DrawingCanvas({
         // Shift+Alt+D shortcut; `toggleTheme: false` pins that down.
         theme={canvasTheme}
         viewModeEnabled={readOnly || undefined}
-        onChange={readOnly ? undefined : handleSceneChange}
+        onChange={handleSceneChange}
         onPointerUpdate={readOnly ? undefined : room.onPointerUpdate}
         onScrollChange={readOnly ? undefined : room.onScrollChange}
         onLibraryChange={handleLibraryChange}

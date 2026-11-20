@@ -1,5 +1,10 @@
 import { useQuery } from "@tanstack/react-query"
-import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router"
+import {
+  createFileRoute,
+  redirect,
+  useLoaderData,
+  useNavigate,
+} from "@tanstack/react-router"
 import { createClientOnlyFn } from "@tanstack/react-start"
 import { lazy, Suspense, useEffect, useState } from "react"
 import { toast } from "sonner"
@@ -53,6 +58,7 @@ export const Route = createFileRoute("/_app/draw/$id")({
 
 function DrawingPage() {
   const { id } = Route.useParams()
+  const { session } = useLoaderData({ from: "/_app" })
   const navigate = useNavigate()
   const { data: drawing } = useQuery(drawingQueryOptions(id))
 
@@ -108,8 +114,9 @@ function DrawingPage() {
       <div className="relative min-h-0 flex-1">
         <Suspense fallback={<LoadingState />}>
           <DrawingCanvas
-            key={`${id}:${isTrashed}`}
+            key={JSON.stringify([id, session.user.id, isTrashed])}
             drawingId={id}
+            userId={session.user.id}
             readOnly={isTrashed}
             onLinkDead={(name) => setTrashedBy({ drawingId: id, name })}
           />

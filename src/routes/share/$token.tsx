@@ -101,7 +101,9 @@ function SharePage() {
   return (
     <Suspense fallback={<LoadingState />}>
       <SharedCanvas
+        key={JSON.stringify([resolution.drawing.id, resolution.userId])}
         drawing={resolution.drawing}
+        userId={resolution.userId}
         files={resolution.files}
         token={token}
         onRoomFull={() => navigate({ search: { full: true }, replace: true })}

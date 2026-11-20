@@ -10,7 +10,6 @@ import type { ReactNode } from "react"
 import { afterEach, beforeEach, expect, test, vi } from "vitest"
 import type { ShareVisit } from "@/features/shares/server"
 import { resolveShareToken } from "@/features/shares/server"
-import type { ShareResolution } from "@/features/shares/store"
 import { isOpenAsTeam } from "@/features/spaces/server"
 
 const TOKEN = "a-share-token"
@@ -86,14 +85,15 @@ vi.mock("sonner", () => ({
   toast: Object.assign(vi.fn(), { error: vi.fn() }),
 }))
 
-const OK: ShareResolution = {
+const OK: ShareVisit = {
   status: "ok",
   audience: "anyone",
   drawing: { id: "d1", name: "Roadmap Q3", data: "{}" },
   files: [],
+  userId: null,
 }
-const SIGNIN: ShareResolution = { status: "signin", drawingName: "Roadmap Q3" }
-const DEAD: ShareResolution = { status: "dead" }
+const SIGNIN: ShareVisit = { status: "signin", drawingName: "Roadmap Q3" }
+const DEAD: ShareVisit = { status: "dead" }
 const THROTTLED: ShareVisit = { status: "throttled" }
 
 async function renderShare(resolution: ShareVisit) {
