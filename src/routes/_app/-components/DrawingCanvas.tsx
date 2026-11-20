@@ -84,7 +84,6 @@ const FIT_OFFSETS = { top: 80, right: 16, bottom: 16, left: 16 }
 
 type Props = {
   drawingId: string
-  userId: string
   /**
    * Trashed drawings (spec §5.11): Excalidraw view mode, no autosave wiring,
    * no rename. The server refuses writes to trashed drawings regardless —
@@ -98,7 +97,6 @@ type Props = {
 
 export function DrawingCanvas({
   drawingId,
-  userId,
   readOnly = false,
   onLinkDead,
 }: Props) {
@@ -121,7 +119,6 @@ export function DrawingCanvas({
   )
   const { getInitialData, observeViewport } = useDrawingViewport(
     drawingId,
-    userId,
     initialData,
   )
   // `useRoom` needs a stable reference.

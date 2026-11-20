@@ -4,6 +4,7 @@ import type {
 } from "@excalidraw/excalidraw/types"
 import { useCallback, useLayoutEffect, useRef } from "react"
 import { z } from "zod"
+import { useDebounceCallback } from "@/hooks/use-debounce-callback"
 
 const viewportSchema = z.object({
   scrollX: z.number(),
@@ -24,29 +25,24 @@ function readViewport(key: string) {
   }
 }
 
-/** The caller keys its canvas by drawing and viewer so each mount owns its view. */
+/**
+ * Remembers this browser's last pan and zoom for a drawing. The caller keys
+ * its canvas by drawing, passes `getInitialData` to Excalidraw, and calls
+ * `observeViewport` from `onChange`.
+ */
 export function useDrawingViewport(
   drawingId: string,
-  userId: string | null,
   initialData: ExcalidrawInitialDataState | null,
 ) {
-  const key = `excaliself:viewport:${JSON.stringify([userId, drawingId])}`
+  const key = `excaliself:viewport:${drawingId}`
   const lastObserved = useRef<Viewport | null>(null)
-  const pending = useRef<Viewport | null>(null)
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  const flush = useCallback(() => {
-    if (timer.current !== null) clearTimeout(timer.current)
-    timer.current = null
-    const viewport = pending.current
-    pending.current = null
-    if (!viewport) return
+  const { run: save, flush } = useDebounceCallback((viewport: Viewport) => {
     try {
       window.localStorage.setItem(key, JSON.stringify(viewport))
     } catch {
       // Storage can be full or blocked. Canvas use still works normally.
     }
-  }, [key])
+  }, SAVE_DELAY_MS)
 
   useLayoutEffect(() => {
     const flushWhenHidden = () => {
@@ -97,11 +93,9 @@ export function useDrawingViewport(
       // Excalidraw's first onChange is the initialized view. Followed views
       // update the baseline too, so merely unfollowing doesn't save them.
       if (!previous || userToFollow) return
-      pending.current = next
-      if (timer.current === null)
-        timer.current = setTimeout(flush, SAVE_DELAY_MS)
+      save(next)
     },
-    [flush],
+    [save],
   )
 
   return { getInitialData, observeViewport }

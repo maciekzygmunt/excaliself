@@ -30,30 +30,17 @@ vi.mock("@tanstack/react-start/server", () => ({
   },
 }))
 vi.mock("@/db", () => ({ db: {} }))
-const { getSession } = vi.hoisted(() => ({ getSession: vi.fn() }))
-vi.mock("@/lib/auth", () => ({ auth: { api: { getSession } } }))
+vi.mock("@/lib/auth", () => ({ auth: {} }))
 vi.mock("@/middleware/auth", () => ({ authMiddleware: {} }))
 vi.mock("@/features/collab/room-registry", () => ({ rooms: {} }))
 vi.mock("@/features/collab/room-session", () => ({}))
 
 const LIVE = "live-token"
-const ANYONE = "anyone-token"
 vi.mock("./store", () => ({
-  resolveShareVisit: async (
-    _db: unknown,
-    token: string,
-    hasSession: () => Promise<boolean>,
-  ): Promise<ShareResolution> => {
-    if (token !== LIVE && token !== ANYONE) return { status: "dead" }
-    if (token === LIVE && !(await hasSession()))
-      return { status: "signin", drawingName: "Plan" }
-    return {
-      status: "ok",
-      audience: token === LIVE ? "members" : "anyone",
-      drawing: { id: "d1", name: "Plan", data: "{}" },
-      files: [],
-    }
-  },
+  resolveShareVisit: async (_db: unknown, token: string) =>
+    (token === LIVE
+      ? { status: "signin", drawingName: "Plan" }
+      : { status: "dead" }) satisfies ShareResolution,
 }))
 
 const { resolveShareToken } = await import("./server")
@@ -70,27 +57,10 @@ const guess = async (ip: string, times: number) => {
 }
 
 test("a live link still opens from an IP that spent its budget", async () => {
-  getSession.mockResolvedValueOnce(null)
   const ip = "203.0.113.40"
   await guess(ip, FAILED_TOKEN_LOOKUPS_PER_MINUTE * 2)
 
   expect(await visit(ip, LIVE)).toEqual({ status: 200, visit: "signin" })
-})
-
-test("successful share visits return the current viewer for viewport storage", async () => {
-  getSession.mockClear()
-  getSession.mockResolvedValueOnce({ user: { id: "ada" } })
-  expect(await resolveShareToken({ data: LIVE })).toMatchObject({
-    status: "ok",
-    userId: "ada",
-  })
-  expect(getSession).toHaveBeenCalledTimes(1)
-
-  getSession.mockResolvedValueOnce(null)
-  expect(await resolveShareToken({ data: ANYONE })).toMatchObject({
-    status: "ok",
-    userId: null,
-  })
 })
 
 test("dead links are throttled once the budget is spent", async () => {

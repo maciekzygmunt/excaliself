@@ -21,8 +21,8 @@ has no stars and no share link.
 ## Pick up where you left off
 
 When you reopen a drawing, Excaliself restores your last canvas position and
-zoom in this browser, even if you only panned or zoomed. On shared drawings,
-each account has its own view, and guests keep a view in their browser.
+zoom, even if you only panned or zoomed. Each browser remembers its own view,
+also on shared drawings and share links.
 
 ## Select many drawings
 

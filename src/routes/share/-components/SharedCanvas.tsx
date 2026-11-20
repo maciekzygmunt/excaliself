@@ -43,7 +43,6 @@ const PRESENCE_MENU_ROW_CLASS = "@min-[72rem]/canvas:hidden!"
 
 type Props = {
   drawing: { id: string; name: string; data: string }
-  userId: string | null
   files: PersistedFile[]
   token: string
   onRoomFull: () => void
@@ -53,7 +52,6 @@ type Props = {
 
 export function SharedCanvas({
   drawing,
-  userId,
   files,
   token,
   onRoomFull,
@@ -71,7 +69,6 @@ export function SharedCanvas({
   )
   const { getInitialData, observeViewport } = useDrawingViewport(
     drawing.id,
-    userId,
     initialData,
   )
   // Already stored, so this tab must not upload them again.
