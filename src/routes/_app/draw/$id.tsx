@@ -8,6 +8,11 @@ import {
   drawingQueryOptions,
   drawingsQueryOptions,
 } from "@/features/drawings/queries"
+import {
+  offlineAccount,
+  readLocalDrawing,
+  supportsOfflineDrawings,
+} from "@/features/offline/store"
 import { useDocumentTitle } from "@/lib/document-title"
 import { DrawingPaletteContext } from "../-components/DrawingPaletteContext"
 import { TrashedDrawingBanner } from "../-components/TrashedDrawingBanner"
@@ -35,6 +40,19 @@ export const Route = createFileRoute("/_app/draw/$id")({
     const drawing = await context.queryClient.ensureQueryData(
       drawingQueryOptions(params.id),
     )
+    if (!preload && supportsOfflineDrawings()) {
+      const owner = offlineAccount()
+      if (owner && (!drawing || drawing.createdBy === owner)) {
+        const local = await readLocalDrawing(owner, params.id).catch(
+          () => undefined,
+        )
+        if (local && local.status !== "clean")
+          throw redirect({
+            href: `/offline?drawing=${encodeURIComponent(params.id)}`,
+            reloadDocument: true,
+          })
+      }
+    }
     // The server returns null for hard-deleted drawings and drawings that
     // aren't yours (deliberately indistinguishable) — land on Home, not a
     // dead end. Trashed drawings load and render read-only (spec §5.11).

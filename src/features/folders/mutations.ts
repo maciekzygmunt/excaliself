@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { type Drawing, drawingsQueryOptions } from "@/features/drawings/queries"
+import { removeOfflineEligibility } from "@/features/offline/store"
 import {
   patchById,
   useOptimisticListMutation,
@@ -97,6 +98,7 @@ export function useTrashFolder() {
     )
 
     const trashed = trashMutation.mutateAsync({ data: folder.id })
+    trashed.then(removeOfflineEligibility, () => {})
     const toastId = toast("Moved to trash", {
       action: {
         label: "Undo",

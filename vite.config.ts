@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto"
 import { readFileSync } from "node:fs"
 import { readdir, readFile } from "node:fs/promises"
 import { join, relative } from "node:path"
@@ -88,6 +89,42 @@ function excalidrawFonts(): Plugin {
   }
 }
 
+/** Precache the public offline shell and the client assets it can import. */
+function offlineWorker(): Plugin {
+  return {
+    name: "offline-worker",
+    apply: "build",
+    generateBundle: {
+      order: "post",
+      async handler(_, bundle) {
+        if (this.environment.config.consumer !== "client") return
+        const assets = Object.keys(bundle)
+          .filter(
+            (name) => name.startsWith("assets/") && !name.endsWith(".map"),
+          )
+          .sort()
+          .map((name) => `/${name}`)
+        const worker = await readFile(
+          new URL("./scripts/offline-worker.js", import.meta.url),
+          "utf8",
+        )
+        const version = createHash("sha256")
+          .update(worker)
+          .update(JSON.stringify(assets))
+          .digest("hex")
+          .slice(0, 16)
+        this.emitFile({
+          type: "asset",
+          fileName: "offline-worker.js",
+          source: `const OFFLINE_CACHE = "excaliself-offline-${version}"
+const OFFLINE_ASSETS = ${JSON.stringify(assets)}
+${worker}`,
+        })
+      },
+    },
+  }
+}
+
 const config = defineConfig({
   // roughjs uses extensionless imports that Node cannot resolve directly.
   ssr: { noExternal: ["roughjs"] },
@@ -144,6 +181,7 @@ const config = defineConfig({
     }),
     viteReact(),
     excalidrawFonts(),
+    offlineWorker(),
   ],
 })
 

@@ -14,6 +14,7 @@ import { Route as AppRouteRouteImport } from './routes/_app/route'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as InviteRouteImport } from './routes/invite'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as OfflineRouteImport } from './routes/offline'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as SetupRouteImport } from './routes/setup'
 import { Route as DotwellKnownOauthAuthorizationServerRouteImport } from './routes/[.]well-known/oauth-authorization-server'
@@ -22,6 +23,7 @@ import { Route as AppSettingsRouteRouteImport } from './routes/_app/settings/rou
 import { Route as AppTrashRouteImport } from './routes/_app/trash'
 import { Route as ApiHealthRouteImport } from './routes/api/health'
 import { Route as ApiMcpRouteImport } from './routes/api/mcp'
+import { Route as ApiOfflineDrawingsRouteImport } from './routes/api/offline-drawings'
 import { Route as OauthAuthorizeRouteImport } from './routes/oauth/authorize'
 import { Route as PreviewLoginRouteImport } from './routes/preview/login'
 import { Route as ShareTokenRouteImport } from './routes/share/$token'
@@ -66,6 +68,11 @@ const LoginRoute = LoginRouteImport.update({
   path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
+const OfflineRoute = OfflineRouteImport.update({
+  id: '/offline',
+  path: '/offline',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
   id: '/reset-password',
   path: '/reset-password',
@@ -105,6 +112,11 @@ const ApiHealthRoute = ApiHealthRouteImport.update({
 const ApiMcpRoute = ApiMcpRouteImport.update({
   id: '/api/mcp',
   path: '/api/mcp',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiOfflineDrawingsRoute = ApiOfflineDrawingsRouteImport.update({
+  id: '/api/offline-drawings',
+  path: '/api/offline-drawings',
   getParentRoute: () => rootRouteImport,
 } as any)
 const OauthAuthorizeRoute = OauthAuthorizeRouteImport.update({
@@ -212,6 +224,7 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AdminRoute
   '/invite': typeof InviteRoute
   '/login': typeof LoginRoute
+  '/offline': typeof OfflineRoute
   '/reset-password': typeof ResetPasswordRoute
   '/setup': typeof SetupRoute
   '/settings': typeof AppSettingsRouteRouteWithChildren
@@ -220,6 +233,7 @@ export interface FileRoutesByFullPath {
   '/trash': typeof AppTrashRoute
   '/api/health': typeof ApiHealthRoute
   '/api/mcp': typeof ApiMcpRoute
+  '/api/offline-drawings': typeof ApiOfflineDrawingsRoute
   '/oauth/authorize': typeof OauthAuthorizeRoute
   '/preview/login': typeof PreviewLoginRoute
   '/share/$token': typeof ShareTokenRoute
@@ -245,6 +259,7 @@ export interface FileRoutesByTo {
   '/admin': typeof AdminRoute
   '/invite': typeof InviteRoute
   '/login': typeof LoginRoute
+  '/offline': typeof OfflineRoute
   '/reset-password': typeof ResetPasswordRoute
   '/setup': typeof SetupRoute
   '/.well-known/oauth-authorization-server': typeof DotwellKnownOauthAuthorizationServerRoute
@@ -252,6 +267,7 @@ export interface FileRoutesByTo {
   '/trash': typeof AppTrashRoute
   '/api/health': typeof ApiHealthRoute
   '/api/mcp': typeof ApiMcpRoute
+  '/api/offline-drawings': typeof ApiOfflineDrawingsRoute
   '/oauth/authorize': typeof OauthAuthorizeRoute
   '/preview/login': typeof PreviewLoginRoute
   '/share/$token': typeof ShareTokenRoute
@@ -279,6 +295,7 @@ export interface FileRoutesById {
   '/admin': typeof AdminRoute
   '/invite': typeof InviteRoute
   '/login': typeof LoginRoute
+  '/offline': typeof OfflineRoute
   '/reset-password': typeof ResetPasswordRoute
   '/setup': typeof SetupRoute
   '/_app/settings': typeof AppSettingsRouteRouteWithChildren
@@ -287,6 +304,7 @@ export interface FileRoutesById {
   '/_app/trash': typeof AppTrashRoute
   '/api/health': typeof ApiHealthRoute
   '/api/mcp': typeof ApiMcpRoute
+  '/api/offline-drawings': typeof ApiOfflineDrawingsRoute
   '/oauth/authorize': typeof OauthAuthorizeRoute
   '/preview/login': typeof PreviewLoginRoute
   '/share/$token': typeof ShareTokenRoute
@@ -314,6 +332,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/invite'
     | '/login'
+    | '/offline'
     | '/reset-password'
     | '/setup'
     | '/settings'
@@ -322,6 +341,7 @@ export interface FileRouteTypes {
     | '/trash'
     | '/api/health'
     | '/api/mcp'
+    | '/api/offline-drawings'
     | '/oauth/authorize'
     | '/preview/login'
     | '/share/$token'
@@ -347,6 +367,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/invite'
     | '/login'
+    | '/offline'
     | '/reset-password'
     | '/setup'
     | '/.well-known/oauth-authorization-server'
@@ -354,6 +375,7 @@ export interface FileRouteTypes {
     | '/trash'
     | '/api/health'
     | '/api/mcp'
+    | '/api/offline-drawings'
     | '/oauth/authorize'
     | '/preview/login'
     | '/share/$token'
@@ -380,6 +402,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/invite'
     | '/login'
+    | '/offline'
     | '/reset-password'
     | '/setup'
     | '/_app/settings'
@@ -388,6 +411,7 @@ export interface FileRouteTypes {
     | '/_app/trash'
     | '/api/health'
     | '/api/mcp'
+    | '/api/offline-drawings'
     | '/oauth/authorize'
     | '/preview/login'
     | '/share/$token'
@@ -415,11 +439,13 @@ export interface RootRouteChildren {
   AdminRoute: typeof AdminRoute
   InviteRoute: typeof InviteRoute
   LoginRoute: typeof LoginRoute
+  OfflineRoute: typeof OfflineRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   SetupRoute: typeof SetupRoute
   DotwellKnownOauthAuthorizationServerRoute: typeof DotwellKnownOauthAuthorizationServerRoute
   ApiHealthRoute: typeof ApiHealthRoute
   ApiMcpRoute: typeof ApiMcpRoute
+  ApiOfflineDrawingsRoute: typeof ApiOfflineDrawingsRoute
   OauthAuthorizeRoute: typeof OauthAuthorizeRoute
   PreviewLoginRoute: typeof PreviewLoginRoute
   ShareTokenRoute: typeof ShareTokenRoute
@@ -467,6 +493,13 @@ declare module '@tanstack/react-router' {
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/offline': {
+      id: '/offline'
+      path: '/offline'
+      fullPath: '/offline'
+      preLoaderRoute: typeof OfflineRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/reset-password': {
@@ -523,6 +556,13 @@ declare module '@tanstack/react-router' {
       path: '/api/mcp'
       fullPath: '/api/mcp'
       preLoaderRoute: typeof ApiMcpRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/offline-drawings': {
+      id: '/api/offline-drawings'
+      path: '/api/offline-drawings'
+      fullPath: '/api/offline-drawings'
+      preLoaderRoute: typeof ApiOfflineDrawingsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/oauth/authorize': {
@@ -710,12 +750,14 @@ const rootRouteChildren: RootRouteChildren = {
   AdminRoute: AdminRoute,
   InviteRoute: InviteRoute,
   LoginRoute: LoginRoute,
+  OfflineRoute: OfflineRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   SetupRoute: SetupRoute,
   DotwellKnownOauthAuthorizationServerRoute:
     DotwellKnownOauthAuthorizationServerRoute,
   ApiHealthRoute: ApiHealthRoute,
   ApiMcpRoute: ApiMcpRoute,
+  ApiOfflineDrawingsRoute: ApiOfflineDrawingsRoute,
   OauthAuthorizeRoute: OauthAuthorizeRoute,
   PreviewLoginRoute: PreviewLoginRoute,
   ShareTokenRoute: ShareTokenRoute,

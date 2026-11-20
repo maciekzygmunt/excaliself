@@ -2,11 +2,18 @@ import { useQuery } from "@tanstack/react-query"
 import { createFileRoute, Outlet } from "@tanstack/react-router"
 import { createServerFn } from "@tanstack/react-start"
 import type React from "react"
+import { useEffect } from "react"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { currentUserQueryOptions } from "@/features/account/queries"
 import { drawingsQueryOptions } from "@/features/drawings/queries"
 import { foldersQueryOptions } from "@/features/folders/queries"
 import { useListUpdates } from "@/features/list-updates/use-list-updates"
+import { prepareOfflineApp } from "@/features/offline/register"
+import {
+  setOfflineAccount,
+  supportsOfflineDrawings,
+} from "@/features/offline/store"
+import { useOfflineSync } from "@/features/offline/sync"
 import { useSettingsShortcut } from "@/hooks/use-settings-shortcut"
 import { useStoredTheme } from "@/hooks/use-theme"
 import { authMiddleware } from "@/middleware/auth"
@@ -50,6 +57,13 @@ function AppShellLayout() {
   // The user card subscribes to the currentUser cache so an optimistic
   // profile save on /settings shows up in the sidebar in the same frame.
   const { data: currentUser } = useQuery(currentUserQueryOptions())
+  const owner = session.user.id
+  useEffect(() => {
+    if (!supportsOfflineDrawings()) return
+    setOfflineAccount(owner)
+    prepareOfflineApp()
+  }, [owner])
+  useOfflineSync(owner)
   useSettingsShortcut()
   // Applies this browser's stored theme choice (spec §4.4, device-scoped).
   useStoredTheme()

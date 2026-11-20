@@ -3,7 +3,7 @@
 import { and, eq, lt, notInArray } from "drizzle-orm"
 import type { Db } from "@/db"
 import { drawingFiles, drawings } from "@/db/schema"
-import { referencedFileIds } from "@/features/drawings/scene-write"
+import { referencedFileIds } from "@/features/drawings/scene-files"
 import { sceneText } from "@/features/drawings/search"
 import type { AccessRow } from "@/features/spaces/access"
 import type { SceneElement } from "./protocol"

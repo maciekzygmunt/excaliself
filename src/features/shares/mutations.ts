@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
+import { removeOfflineEligibility } from "@/features/offline/store"
 import type { ShareAudience } from "./access"
 import { drawingShareQueryOptions } from "./queries"
 import {
@@ -22,6 +23,7 @@ export function useCreateShare(
       return createShare({ data: { drawingId, audience } })
     },
     onSuccess: (share) => {
+      removeOfflineEligibility([drawingId])
       queryClient.setQueryData(
         drawingShareQueryOptions(drawingId).queryKey,
         share,

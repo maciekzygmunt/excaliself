@@ -12,7 +12,7 @@ import {
 import { assertFolderTarget } from "@/features/folders/ownership"
 import { lockFolderTree, type Tx } from "@/features/folders/tree-lock"
 import { dataUrlToBytes } from "./file-bytes"
-import { referencedFileIds } from "./scene-write"
+import { referencedFileIds } from "./scene-files"
 import { sceneText } from "./search"
 
 /** A scene in the .excalidraw file shape, images inline as data URLs. */

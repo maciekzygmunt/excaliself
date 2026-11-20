@@ -14,8 +14,8 @@ import {
   MAX_ROOM_SCENE_BYTES,
 } from "@/features/collab/room-session"
 import { dataUrlToBytes } from "@/features/drawings/file-bytes"
+import { referencedFileIds } from "@/features/drawings/scene-files"
 import type { SceneContent } from "@/features/drawings/scene-import"
-import { referencedFileIds } from "@/features/drawings/scene-write"
 import { newId, withIndices } from "./elements"
 import { ref, SceneInputError } from "./skeleton"
 

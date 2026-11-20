@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { useNavigate } from "@tanstack/react-router"
 import { toast } from "sonner"
+import { removeOfflineEligibility } from "@/features/offline/store"
 import {
   patchById,
   removeById,
@@ -130,7 +131,13 @@ export function useTrashDrawing() {
 
   return (drawing: Drawing) => {
     const trashed = trashMutation.mutateAsync({ data: drawing.id })
-    trashed.then(invalidateTrash, () => {})
+    trashed.then(
+      () => {
+        removeOfflineEligibility([drawing.id])
+        return invalidateTrash()
+      },
+      () => {},
+    )
     const toastId = toast("Moved to trash", {
       action: {
         label: "Undo",

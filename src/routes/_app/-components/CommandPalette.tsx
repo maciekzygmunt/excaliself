@@ -31,6 +31,7 @@ import { currentUserQueryOptions } from "@/features/account/queries"
 import { drawingsQueryOptions } from "@/features/drawings/queries"
 import { findInScene } from "@/features/drawings/search"
 import { foldersQueryOptions } from "@/features/folders/queries"
+import { setOfflineAccount } from "@/features/offline/store"
 import { useCommandPaletteShortcut } from "@/hooks/use-command-palette-shortcut"
 import { authClient } from "@/lib/auth-client"
 import { cn } from "@/lib/utils"
@@ -304,6 +305,7 @@ export function CommandPalette({
       openCreateFolderDialog()
     } else {
       await authClient.signOut()
+      setOfflineAccount(null)
       window.location.href = "/login"
     }
   }
