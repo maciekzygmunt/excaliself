@@ -14,6 +14,9 @@ afterEach(() => {
   document.documentElement.classList.remove("dark")
   window.localStorage.clear()
   vi.unstubAllGlobals()
+  vi.restoreAllMocks()
+  // biome-ignore lint/suspicious/noDocumentCookie: clears the cookie under test
+  document.cookie = "language=; path=/; max-age=0"
 })
 
 function group(name: string) {
@@ -114,4 +117,20 @@ test("changing the app theme leaves the canvas selection alone", () => {
   fireEvent.click(group("Theme").getByRole("radio", { name: "Dark" }))
   expect(checked("Canvas", "Light")).toBe("true")
   expect(window.localStorage.getItem("canvas-theme")).toBe("light")
+})
+
+test("Language follows the browser language until a language is picked", async () => {
+  vi.spyOn(navigator, "languages", "get").mockReturnValue(["de-AT", "en"])
+  render(<AppearanceSection />)
+  const trigger = screen.getByRole("combobox", { name: "Language" })
+  expect(trigger.textContent).toContain("Deutsch")
+
+  fireEvent.click(trigger)
+  // Base UI commits a selection on the full press-release-click sequence
+  const option = await screen.findByRole("option", { name: "Polski" })
+  fireEvent.pointerDown(option)
+  fireEvent.pointerUp(option)
+  fireEvent.click(option)
+  expect(document.cookie).toBe("language=pl-PL")
+  expect(trigger.textContent).toContain("Polski")
 })

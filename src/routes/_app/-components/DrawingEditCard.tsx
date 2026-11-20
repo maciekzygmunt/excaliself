@@ -40,6 +40,7 @@ import {
 import { drawingEditQueryOptions } from "@/features/drawing-edits/queries"
 import { decideDrawingEdit } from "@/features/drawing-edits/server"
 import type { Decision } from "@/features/drawing-edits/store"
+import type { LanguageCode } from "@/lib/language"
 
 const HIGHLIGHT = { added: "#2f9e44", changed: "#1971c2", removed: "#e03131" }
 
@@ -47,9 +48,15 @@ type Props = {
   drawingId: string
   excalidrawAPI: ExcalidrawImperativeAPI | null
   theme: "light" | "dark"
+  language: LanguageCode
 }
 
-export function DrawingEditCard({ drawingId, excalidrawAPI, theme }: Props) {
+export function DrawingEditCard({
+  drawingId,
+  excalidrawAPI,
+  theme,
+  language,
+}: Props) {
   const queryClient = useQueryClient()
   const { data: edit } = useQuery(drawingEditQueryOptions(drawingId))
   const [enlarged, setEnlarged] = useState(false)
@@ -195,6 +202,7 @@ export function DrawingEditCard({ drawingId, excalidrawAPI, theme }: Props) {
               // Look, zoom, and pan; nothing here can be edited or saved.
               viewModeEnabled
               theme={theme}
+              langCode={language}
               excalidrawAPI={(api) =>
                 requestAnimationFrame(() =>
                   api.scrollToContent(undefined, {

@@ -54,6 +54,7 @@ import { useDrawingViewport } from "@/features/drawings/use-drawing-viewport"
 import { useTeamLibrary } from "@/features/library/use-team-library"
 import { drawingShareQueryOptions } from "@/features/shares/queries"
 import { useAutoSave } from "@/hooks/use-auto-save"
+import { useLanguage } from "@/hooks/use-language"
 import { usePreloadTextFont } from "@/hooks/use-preload-text-font"
 import { useCanvasTheme } from "@/hooks/use-theme"
 import { CommentsButton } from "./comments/CommentsButton"
@@ -102,6 +103,7 @@ export function DrawingCanvas({
 }: Props) {
   const { toggleSidebar } = useSidebar()
   const canvasTheme = useCanvasTheme()
+  const language = useLanguage()
 
   // The canvas opens fitted to its content, so it waits for its own size.
   const [fitTo, setFitTo] = useState<FitTo>()
@@ -382,6 +384,7 @@ export function DrawingCanvas({
         // Excalidraw disables its toggleTheme action, which also retires the
         // Shift+Alt+D shortcut; `toggleTheme: false` pins that down.
         theme={canvasTheme}
+        langCode={language}
         viewModeEnabled={readOnly || undefined}
         onChange={handleSceneChange}
         onPointerUpdate={readOnly ? undefined : room.onPointerUpdate}
@@ -516,6 +519,7 @@ export function DrawingCanvas({
           drawingId={drawingId}
           excalidrawAPI={excalidrawAPI}
           theme={canvasTheme}
+          language={language}
         />
       )}
       {!readOnly && (

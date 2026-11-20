@@ -27,6 +27,7 @@ import {
 } from "@/features/drawings/scene"
 import { useDrawingViewport } from "@/features/drawings/use-drawing-viewport"
 import { useBlockClearCanvasShortcut } from "@/hooks/use-block-clear-canvas-shortcut"
+import { useLanguage } from "@/hooks/use-language"
 import { usePreloadTextFont } from "@/hooks/use-preload-text-font"
 import { GuestAttribution } from "./GuestAttribution"
 import { GuestNamePill } from "./GuestNamePill"
@@ -101,6 +102,7 @@ export function SharedCanvas({
   )
   // A reset would wipe the drawing for everyone in the room.
   useBlockClearCanvasShortcut()
+  const language = useLanguage()
 
   const handleNameChange = useCallback((next: string) => {
     const remembered = rememberGuestName(next)
@@ -119,6 +121,7 @@ export function SharedCanvas({
         initialData={getInitialData}
         excalidrawAPI={setExcalidrawAPI}
         theme="light"
+        langCode={language}
         onChange={handleSceneChange}
         onPointerUpdate={room.onPointerUpdate}
         onScrollChange={room.onScrollChange}

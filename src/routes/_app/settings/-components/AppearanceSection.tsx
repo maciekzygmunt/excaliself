@@ -1,5 +1,14 @@
 import { MonitorIcon, MoonIcon, SunIcon } from "lucide-react"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { useLanguage } from "@/hooks/use-language"
 import { useCanvasThemePreference, useThemePreference } from "@/hooks/use-theme"
+import { LANGUAGES, setLanguage } from "@/lib/language"
 import {
   type CanvasThemePreference,
   setCanvasThemePreference,
@@ -75,11 +84,42 @@ function ChoiceGroup<T extends string>({
   )
 }
 
+// Too many choices for a segmented control, so a select.
+function LanguageSelect() {
+  const language = useLanguage()
+  return (
+    <div>
+      <p className="mb-1.5 text-xs font-medium text-foreground">Language</p>
+      <Select
+        value={language}
+        // Base UI's Value renders the raw value unless items provides labels
+        items={LANGUAGES}
+        onValueChange={(code) => code && setLanguage(code)}
+      >
+        <SelectTrigger aria-label="Language" className="w-40">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {Object.entries(LANGUAGES).map(([code, label]) => (
+            <SelectItem key={code} value={code}>
+              {label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <p className="mt-1.5 text-xs text-muted-foreground">
+        Translates the drawing canvas
+      </p>
+    </div>
+  )
+}
+
 // Appearance block (spec §4.4): Theme picks Light / Dark for the app
 // chrome, or System to follow the OS setting live; Canvas either follows it
 // (Match app, the default) or pins the drawing canvas to a theme of its own
-// (#111). Both stored on this browser only — these are the sole theme
-// controls; the canvas has none of its own.
+// (#111). Language sets the canvas language (#302). All stored on this
+// browser only — these are the sole theme controls; the canvas has none of
+// its own.
 export function AppearanceSection() {
   const preference = useThemePreference()
   const canvasPreference = useCanvasThemePreference()
@@ -106,6 +146,7 @@ export function AppearanceSection() {
           value={canvasPreference}
           onSelect={setCanvasThemePreference}
         />
+        <LanguageSelect />
       </div>
     </section>
   )
