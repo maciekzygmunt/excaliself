@@ -3,13 +3,10 @@ import {
   patchById,
   useOptimisticListMutation,
 } from "@/hooks/use-optimistic-list-mutation"
+import { m } from "@/paraglide/messages"
 import { type AdminUser, usersQueryOptions } from "./queries"
 import type { Role } from "./roles"
 import { setUserRole } from "./server"
-
-// Shared with the pessimistic self-demote path in MembersSection so both
-// failure surfaces speak with one voice.
-export const ROLE_CHANGE_ERROR_TOAST = "Couldn't change role"
 
 /**
  * Change another member's role optimistically (spec §4.3): the row flips in
@@ -26,7 +23,7 @@ export function useSetRole() {
     mutationFn: setUserRole,
     optimisticUpdate: (previous, { data }) =>
       patchById(previous, data.userId, { role: data.role }),
-    onRollback: () => toast.error(ROLE_CHANGE_ERROR_TOAST),
+    onRollback: () => toast.error(m.settings_members_role_change_failed()),
   })
 
   return (userId: string, role: Role) =>

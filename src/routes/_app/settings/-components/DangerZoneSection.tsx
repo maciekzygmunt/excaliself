@@ -10,8 +10,8 @@ import {
 } from "@/features/account/queries"
 import { deleteMyAccount } from "@/features/account/server"
 import type { OwnedContentCounts } from "@/features/admin/delete-user"
-import { describeKeptTeamDrawings } from "@/features/admin/delete-user-copy"
 import { describeContents } from "@/features/trash/destroy-copy"
+import { m } from "@/paraglide/messages"
 
 // The Account danger zone (issue #67, spec §4.5 tier 3): one isolated card,
 // one action — hard-delete your own account and your private work (Team
@@ -36,27 +36,33 @@ export function DangerZoneSection({ user }: { user: CurrentUser }) {
       // client cache along with them.
       window.location.href = "/login"
     },
-    onError: () => toast.error("Couldn't delete your account"),
+    onError: () => toast.error(m.settings_danger_delete_failed()),
   })
 
   return (
     <section>
       <div className="mb-4">
-        <h2 className="text-sm font-medium text-destructive">Danger zone</h2>
+        <h2 className="text-sm font-medium text-destructive">
+          {m.settings_danger_title()}
+        </h2>
         <p className="text-xs text-muted-foreground">
           {user.teamEnabled
-            ? "Irreversible. Your private work goes with the account. Team drawings stay."
-            : "Irreversible. Everything you own goes with the account."}
+            ? m.settings_danger_description_team()
+            : m.settings_danger_description()}
         </p>
       </div>
 
       <div className="flex items-center justify-between gap-4 rounded-lg border border-destructive/30 p-4">
         <div className="min-w-0">
-          <p className="text-sm text-foreground">Delete account</p>
+          <p className="text-sm text-foreground">
+            {m.settings_danger_delete()}
+          </p>
           <p className="text-xs text-muted-foreground">
             {blocked
-              ? "You're the instance's only admin. Promote another member to admin before deleting your account."
-              : `Permanently delete your account and all of your ${user.teamEnabled ? "private " : ""}drawings and folders.`}
+              ? m.settings_danger_sole_admin()
+              : user.teamEnabled
+                ? m.settings_danger_delete_hint_team()
+                : m.settings_danger_delete_hint()}
           </p>
         </div>
         <Button
@@ -68,18 +74,18 @@ export function DangerZoneSection({ user }: { user: CurrentUser }) {
           disabled={!state || blocked}
           onClick={() => setConfirmOpen(true)}
         >
-          Delete account
+          {m.settings_danger_delete()}
         </Button>
       </div>
 
       <TypeToConfirmDialog
         open={confirmOpen}
         onOpenChange={setConfirmOpen}
-        title="Delete your account?"
+        title={m.settings_danger_confirm_title()}
         description={deleteDescription(counts, countsFailed)}
         challenge={user.email}
-        confirmLabel="Delete account"
-        pendingLabel="Deleting…"
+        confirmLabel={m.settings_danger_delete()}
+        pendingLabel={m.settings_deleting()}
         // No confirm until the copy can state real counts.
         confirmDisabled={!counts}
         onConfirm={() => deleteMutation.mutateAsync()}
@@ -92,14 +98,16 @@ function deleteDescription(
   counts: OwnedContentCounts | undefined,
   countsFailed: boolean,
 ) {
-  if (countsFailed)
-    return "Couldn't load your content counts. Close this dialog and try again."
-  if (!counts)
-    return "This will delete your account and permanently delete all of your content. This can't be undone."
+  if (countsFailed) return m.settings_danger_counts_failed()
+  if (!counts) return m.settings_danger_confirm_loading()
   const contents = describeContents(counts.drawings, counts.folders)
-  const kept = describeKeptTeamDrawings("Your", counts.teamDrawings)
+  const kept =
+    counts.teamDrawings > 0 &&
+    m.settings_danger_kept_team({ count: counts.teamDrawings })
   const destroyed = contents
-    ? `This will delete your account and permanently delete your ${contents}.`
-    : `This will delete your account. You have no ${kept ? "private " : ""}drawings or folders.`
-  return [destroyed, "This can't be undone.", kept].filter(Boolean).join(" ")
+    ? m.settings_danger_confirm_contents({ contents })
+    : kept
+      ? m.settings_danger_confirm_empty_team()
+      : m.settings_danger_confirm_empty()
+  return [destroyed, m.settings_cannot_undo(), kept].filter(Boolean).join(" ")
 }

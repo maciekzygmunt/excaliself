@@ -4,11 +4,6 @@
 
 export type Role = "admin" | "user"
 
-export const ROLE_LABELS: Record<Role, string> = {
-  admin: "Admin",
-  user: "Member",
-}
-
 export function adminIds(
   members: readonly { id: string; role: Role }[],
 ): string[] {

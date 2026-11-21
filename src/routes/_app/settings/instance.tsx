@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router"
 import { instanceStatsQueryOptions } from "@/features/instance/queries"
 import { useDocumentTitle } from "@/lib/document-title"
 import { adminMiddleware } from "@/middleware/admin"
+import { m } from "@/paraglide/messages"
 import { InstanceSection } from "./-components/InstanceSection"
 
 // Admin-only: the middleware guards document requests, and the loader's
@@ -17,6 +18,6 @@ export const Route = createFileRoute("/_app/settings/instance")({
 })
 
 function InstancePage() {
-  useDocumentTitle("Instance", { chrome: true })
+  useDocumentTitle(m.settings_nav_instance(), { chrome: true })
   return <InstanceSection />
 }

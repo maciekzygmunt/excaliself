@@ -1,3 +1,4 @@
+import { ParaglideMessage } from "@inlang/paraglide-js-react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { Link } from "@tanstack/react-router"
 import { useRef, useState } from "react"
@@ -12,6 +13,7 @@ import {
   scanExcalidrawPlus,
 } from "@/features/excalidraw-plus/server"
 import { foldersQueryOptions } from "@/features/folders/queries"
+import { m } from "@/paraglide/messages"
 
 const KEY_DOCS_URL = "https://plus.excalidraw.com/docs/api/authentication"
 
@@ -29,7 +31,7 @@ type Run = {
 }
 
 const errorMessage = (error: unknown) =>
-  error instanceof Error ? error.message : "Something went wrong"
+  error instanceof Error ? error.message : m.settings_import_error_generic()
 
 // Brings Excalidraw+ scenes over: scan with an API key, then import one scene
 // per request so progress shows and one bad scene can't sink the rest. Admins
@@ -86,7 +88,7 @@ export function ImportSection() {
         update({ stopped: true })
         break
       }
-      update({ current: scene.name || "Untitled" })
+      update({ current: scene.name || m.settings_import_untitled() })
       try {
         const result = await importExcalidrawPlusScene({
           data: {
@@ -111,7 +113,7 @@ export function ImportSection() {
         update({
           failures: [
             ...state.failures,
-            { name: scene.name || "Untitled", message },
+            { name: scene.name || m.settings_import_untitled(), message },
           ],
         })
         // A rejected key fails every scene the same way.
@@ -144,14 +146,16 @@ export function ImportSection() {
     <section className="animate-in fade-in-0 duration-200 motion-reduce:animate-none">
       <div className="mb-4">
         <h2 className="text-sm font-medium text-foreground">
-          Import from Excalidraw+{" "}
+          {m.settings_import_title()}{" "}
           {/* Built from the docs and Excalidraw's CLI, not yet run on a real account. */}
-          <span className="font-normal text-muted-foreground">(Beta)</span>
+          <span className="font-normal text-muted-foreground">
+            {m.settings_import_beta()}
+          </span>
         </h2>
         <p className="text-xs text-muted-foreground">
           {isAdmin
-            ? "Bring scenes and images over. Shared collections become folders in Team, and your private scenes go to Private."
-            : "Bring your private scenes and images over. They go to Private. An admin imports the shared collections."}
+            ? m.settings_import_description_admin()
+            : m.settings_import_description_member()}
         </p>
       </div>
 
@@ -166,7 +170,7 @@ export function ImportSection() {
               htmlFor="excalidraw-plus-key"
               className="text-sm text-muted-foreground"
             >
-              Excalidraw+ API key
+              {m.settings_import_key_label()}
             </FieldLabel>
             <Input
               id="excalidraw-plus-key"
@@ -179,21 +183,25 @@ export function ImportSection() {
               aria-invalid={scanError !== undefined}
             />
             <FieldDescription className="text-xs">
-              Create one in Excalidraw+ under workspace settings (
-              <a
-                href={KEY_DOCS_URL}
-                target="_blank"
-                rel="noreferrer"
-                className="underline underline-offset-2 hover:text-foreground"
-              >
-                how
-              </a>
-              ).{" "}
+              <ParaglideMessage
+                message={m.settings_import_key_hint_create}
+                markup={{
+                  link: ({ children }) => (
+                    <a
+                      href={KEY_DOCS_URL}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="underline underline-offset-2 hover:text-foreground"
+                    >
+                      {children}
+                    </a>
+                  ),
+                }}
+              />{" "}
               {isAdmin
-                ? "A personal key (starts with uk-) also brings your private scenes."
-                : "Use a personal key (starts with uk-)."}{" "}
-              Read access is enough. The key is used for this import only and is
-              not saved.
+                ? m.settings_import_key_hint_admin()
+                : m.settings_import_key_hint_member()}{" "}
+              {m.settings_import_key_hint_access()}
             </FieldDescription>
             {scanError && (
               <p role="alert" className="text-xs text-destructive">
@@ -207,7 +215,7 @@ export function ImportSection() {
             className="self-start"
             disabled={scanning || !apiKey.trim()}
           >
-            {scanning ? "Finding scenes..." : "Find scenes"}
+            {scanning ? m.settings_import_finding() : m.settings_import_find()}
           </Button>
         </form>
       )}
@@ -253,14 +261,20 @@ function ScanSummary({
     <div className="flex max-w-md flex-col gap-5">
       <div className="flex flex-col gap-1 text-sm">
         <p className="text-foreground">
-          Found {plural(scan.scenes.length, "scene")} in{" "}
-          {plural(collections.size, "collection")}.
-          {alreadyHere > 0 && ` ${alreadyHere} already imported.`}
+          {m.settings_import_found({
+            scenes: m.settings_import_found_scenes({
+              count: scan.scenes.length,
+            }),
+            collections: m.settings_import_found_collections({
+              count: collections.size,
+            }),
+          })}
+          {alreadyHere > 0 &&
+            ` ${m.settings_import_already_imported({ count: alreadyHere })}`}
         </p>
         {scan.keyType === "workspace" && (
           <p className="text-xs text-muted-foreground">
-            This is a workspace key, so your private scenes are not included.
-            Use a personal key to bring them too.
+            {m.settings_import_workspace_key()}
           </p>
         )}
       </div>
@@ -268,11 +282,11 @@ function ScanSummary({
       <div className="flex gap-2">
         <Button size="sm" disabled={toImport.length === 0} onClick={onImport}>
           {toImport.length === 0
-            ? "Nothing new to import"
-            : `Import ${plural(toImport.length, "scene")}`}
+            ? m.settings_import_nothing_new()
+            : m.settings_import_start({ count: toImport.length })}
         </Button>
         <Button size="sm" variant="ghost" onClick={onCancel}>
-          Use another key
+          {m.settings_import_use_another_key()}
         </Button>
       </div>
     </div>
@@ -300,7 +314,7 @@ function RunProgress({
           aria-valuemin={0}
           aria-valuemax={run.total}
           aria-valuenow={run.done}
-          aria-label="Import progress"
+          aria-label={m.settings_import_progress_label()}
           className="h-1.5 overflow-hidden rounded-full bg-well"
         >
           <div
@@ -310,10 +324,13 @@ function RunProgress({
         </div>
         <p className="text-sm tabular-nums text-foreground">
           {running
-            ? `Importing ${Math.min(run.done + 1, run.total)} of ${run.total}`
+            ? m.settings_import_importing({
+                current: Math.min(run.done + 1, run.total),
+                total: run.total,
+              })
             : run.stopped
-              ? `Stopped. Imported ${plural(run.imported, "scene")}.`
-              : `Imported ${plural(run.imported, "scene")}.`}
+              ? m.settings_import_stopped({ count: run.imported })
+              : m.settings_import_imported({ count: run.imported })}
         </p>
         {running && run.current && (
           <p className="truncate text-xs text-muted-foreground">
@@ -324,16 +341,14 @@ function RunProgress({
 
       {run.skippedImages > 0 && (
         <p className="text-xs text-muted-foreground">
-          {plural(run.skippedImages, "image")} could not be brought over (too
-          large, or missing in Excalidraw+). The drawings show a placeholder
-          instead.
+          {m.settings_import_skipped_images({ count: run.skippedImages })}
         </p>
       )}
 
       {run.failures.length > 0 && (
         <div className="flex flex-col gap-1">
           <p className="text-xs font-medium text-destructive">
-            {plural(run.failures.length, "scene")} failed:
+            {m.settings_import_failed({ count: run.failures.length })}
           </p>
           <ul className="flex max-h-48 flex-col gap-1 overflow-y-auto text-xs text-muted-foreground">
             {run.failures.map((failure, index) => (
@@ -349,15 +364,15 @@ function RunProgress({
       <div className="flex gap-2">
         {running ? (
           <Button size="sm" variant="outline" onClick={onStop}>
-            Stop
+            {m.settings_import_stop()}
           </Button>
         ) : (
           <>
             <Button size="sm" render={<Link to="/drawings" />}>
-              Open drawings
+              {m.settings_import_open_drawings()}
             </Button>
             <Button size="sm" variant="ghost" onClick={onDone}>
-              Import more
+              {m.settings_import_more()}
             </Button>
           </>
         )}
@@ -365,6 +380,3 @@ function RunProgress({
     </div>
   )
 }
-
-const plural = (count: number, noun: string) =>
-  `${count} ${noun}${count === 1 ? "" : "s"}`

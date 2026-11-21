@@ -1,3 +1,5 @@
+import { m } from "@/paraglide/messages"
+
 // Session rows label devices as "Browser on OS" (spec §5.12). Order matters
 // within each list: Chromium UAs also claim Safari, Edge/Opera also claim
 // Chrome, and Android UAs also claim Linux — the more specific token wins.
@@ -21,6 +23,6 @@ export function describeDevice(userAgent: string | null): string {
   const ua = userAgent ?? ""
   const browser = BROWSERS.find(([pattern]) => pattern.test(ua))?.[1]
   const system = OPERATING_SYSTEMS.find(([pattern]) => pattern.test(ua))?.[1]
-  if (browser && system) return `${browser} on ${system}`
-  return browser ?? system ?? "Unknown device"
+  if (browser && system) return m.settings_sessions_device({ browser, system })
+  return browser ?? system ?? m.settings_sessions_unknown_device()
 }

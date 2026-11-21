@@ -12,8 +12,11 @@ import { getRequest } from "@tanstack/react-start/server"
 import { Toaster } from "@/components/ui/sonner"
 import { env } from "@/env"
 import { PRODUCT_NAME, TAGLINE } from "@/lib/document-title"
+// Registers the locale strategies before anything calls getLocale().
+import "@/lib/language"
 import { resolveOrigin } from "@/lib/site-origin"
 import { THEME_COLORS, themeBootstrapScript } from "@/lib/theme"
+import { getLocale } from "@/paraglide/runtime"
 import appCss from "../styles.css?url"
 
 // Set by the excalidrawFonts plugin in vite.config.ts.
@@ -166,7 +169,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
   return (
     // The bootstrap script may add .dark before hydration; the class is
     // client-only state, so the mismatch with the SSR'd markup is expected.
-    <html lang="en" suppressHydrationWarning>
+    <html lang={getLocale()} suppressHydrationWarning>
       <head>
         <HeadContent />
         {/* After HeadContent so the theme-color meta it renders already

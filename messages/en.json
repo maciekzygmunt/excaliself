@@ -1,0 +1,330 @@
+{
+  "$schema": "https://inlang.com/schema/inlang-message-format",
+  "time_just_now": "just now",
+  "count_drawings": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "{count} drawing",
+        "countPlural=*": "{count} drawings"
+      }
+    }
+  ],
+  "count_folders": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "{count} folder",
+        "countPlural=*": "{count} folders"
+      }
+    }
+  ],
+  "settings_title": "Settings",
+  "settings_nav_label": "Settings sections",
+  "settings_nav_account": "Account",
+  "settings_nav_import": "Import",
+  "settings_nav_instance": "Instance",
+  "settings_nav_members": "Members",
+  "settings_nav_invites": "Invites",
+  "settings_cancel": "Cancel",
+  "settings_done": "Done",
+  "settings_revoke": "Revoke",
+  "settings_copy": "Copy",
+  "settings_copied": "Copied",
+  "settings_deleting": "Deleting…",
+  "settings_cannot_undo": "This can't be undone.",
+  "settings_last_used": "Last used {ago}",
+  "settings_never_used": "Never used",
+  "settings_signin_title": "Sign-in",
+  "settings_signin_sso": "You sign in as {#em}{email}{/em} with single sign-on. To also have a password, ask an admin for a password link.",
+  "settings_profile_title": "Profile",
+  "settings_profile_description": "How you appear to others on this instance",
+  "settings_profile_name_label": "Display name",
+  "settings_profile_name_hint": "Optional — when empty you go by your email prefix.",
+  "settings_email_title": "Email",
+  "settings_email_description": "You sign in as {#em}{email}{/em}. Changing it takes effect immediately.",
+  "settings_email_new_label": "New email",
+  "settings_email_invalid": "Enter a valid email",
+  "settings_email_taken": "That email is already in use",
+  "settings_email_updated": "Sign-in email updated",
+  "settings_email_submit": "Change email",
+  "settings_email_submitting": "Changing email...",
+  "settings_password_title": "Password",
+  "settings_password_description": "Changing it signs you out everywhere else.",
+  "settings_password_current_label": "Current password",
+  "settings_password_current_required": "Enter your current password",
+  "settings_password_incorrect": "Incorrect password",
+  "settings_password_new_label": "New password",
+  "settings_password_too_short": "Must be at least 8 characters",
+  "settings_password_change_failed": "Couldn't change password",
+  "settings_password_changed": "Password changed — other sessions are signed out",
+  "settings_password_submit": "Change password",
+  "settings_password_submitting": "Changing password...",
+  "settings_sessions_title": "Sessions",
+  "settings_sessions_description": "Devices currently signed in to your account",
+  "settings_sessions_current": "Current session",
+  "settings_sessions_device": "{browser} on {system}",
+  "settings_sessions_unknown_device": "Unknown device",
+  "settings_sessions_sign_out_others": "Sign out all other sessions",
+  "settings_appearance_title": "Appearance",
+  "settings_appearance_description": "Applies to this browser only",
+  "settings_appearance_theme": "Theme",
+  "settings_appearance_canvas": "Canvas",
+  "settings_appearance_light": "Light",
+  "settings_appearance_dark": "Dark",
+  "settings_appearance_system": "System",
+  "settings_appearance_match_app": "Match app",
+  "settings_appearance_language": "Language",
+  "settings_appearance_language_hint": "Translates Settings and the drawing canvas",
+  "settings_danger_title": "Danger zone",
+  "settings_danger_description": "Irreversible. Everything you own goes with the account.",
+  "settings_danger_description_team": "Irreversible. Your private work goes with the account. Team drawings stay.",
+  "settings_danger_delete": "Delete account",
+  "settings_danger_delete_hint": "Permanently delete your account and all of your drawings and folders.",
+  "settings_danger_delete_hint_team": "Permanently delete your account and all of your private drawings and folders.",
+  "settings_danger_sole_admin": "You're the instance's only admin. Promote another member to admin before deleting your account.",
+  "settings_danger_delete_failed": "Couldn't delete your account",
+  "settings_danger_confirm_title": "Delete your account?",
+  "settings_danger_counts_failed": "Couldn't load your content counts. Close this dialog and try again.",
+  "settings_danger_confirm_loading": "This will delete your account and permanently delete all of your content. This can't be undone.",
+  "settings_danger_confirm_contents": "This will delete your account and permanently delete your {contents}.",
+  "settings_danger_confirm_empty": "This will delete your account. You have no drawings or folders.",
+  "settings_danger_confirm_empty_team": "This will delete your account. You have no private drawings or folders.",
+  "settings_danger_kept_team": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "Your {count} Team drawing stays with the team.",
+        "countPlural=*": "Your {count} Team drawings stay with the team."
+      }
+    }
+  ],
+  "settings_import_title": "Import from Excalidraw+",
+  "settings_import_beta": "(Beta)",
+  "settings_import_description_admin": "Bring scenes and images over. Shared collections become folders in Team, and your private scenes go to Private.",
+  "settings_import_description_member": "Bring your private scenes and images over. They go to Private. An admin imports the shared collections.",
+  "settings_import_key_label": "Excalidraw+ API key",
+  "settings_import_key_hint_create": "Create one in Excalidraw+ under workspace settings ({#link}how{/link}).",
+  "settings_import_key_hint_admin": "A personal key (starts with uk-) also brings your private scenes.",
+  "settings_import_key_hint_member": "Use a personal key (starts with uk-).",
+  "settings_import_key_hint_access": "Read access is enough. The key is used for this import only and is not saved.",
+  "settings_import_find": "Find scenes",
+  "settings_import_finding": "Finding scenes...",
+  "settings_import_error_generic": "Something went wrong",
+  "settings_import_untitled": "Untitled",
+  "settings_import_found": "{scenes} {collections}.",
+  "settings_import_found_scenes": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "Found {count} scene",
+        "countPlural=*": "Found {count} scenes"
+      }
+    }
+  ],
+  "settings_import_found_collections": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "in {count} collection",
+        "countPlural=*": "in {count} collections"
+      }
+    }
+  ],
+  "settings_import_already_imported": "{count} already imported.",
+  "settings_import_workspace_key": "This is a workspace key, so your private scenes are not included. Use a personal key to bring them too.",
+  "settings_import_nothing_new": "Nothing new to import",
+  "settings_import_start": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "Import {count} scene",
+        "countPlural=*": "Import {count} scenes"
+      }
+    }
+  ],
+  "settings_import_use_another_key": "Use another key",
+  "settings_import_progress_label": "Import progress",
+  "settings_import_importing": "Importing {current} of {total}",
+  "settings_import_imported": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "Imported {count} scene.",
+        "countPlural=*": "Imported {count} scenes."
+      }
+    }
+  ],
+  "settings_import_stopped": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "Stopped. Imported {count} scene.",
+        "countPlural=*": "Stopped. Imported {count} scenes."
+      }
+    }
+  ],
+  "settings_import_skipped_images": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "{count} image could not be brought over (too large, or missing in Excalidraw+). The drawings show a placeholder instead.",
+        "countPlural=*": "{count} images could not be brought over (too large, or missing in Excalidraw+). The drawings show a placeholder instead."
+      }
+    }
+  ],
+  "settings_import_failed": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "{count} scene failed:",
+        "countPlural=*": "{count} scenes failed:"
+      }
+    }
+  ],
+  "settings_import_stop": "Stop",
+  "settings_import_open_drawings": "Open drawings",
+  "settings_import_more": "Import more",
+  "settings_import_files_title": "Import files",
+  "settings_import_files_description": "Add .excalidraw files from your computer. They go to Private. PNG and SVG exports that include the scene work too. To put files in a folder or in Team, open it and drop them on the drawings, or drop them on it in the sidebar.",
+  "settings_import_files_drop": "Drop files here, or click to choose",
+  "settings_tokens_title": "Access tokens",
+  "settings_tokens_description": "Connect an AI client such as Claude Code over MCP. A token sees what you see and can create and trash drawings as you.",
+  "settings_tokens_new": "New token",
+  "settings_tokens_empty": "No access tokens",
+  "settings_tokens_created": "Created {ago}",
+  "settings_tokens_revoke_failed": "Couldn't revoke token",
+  "settings_tokens_copy_title": "Copy your token",
+  "settings_tokens_copy_description": "You won't see it again. Anyone with it can read your drawings and create new ones as you, until you revoke it.",
+  "settings_tokens_token_label": "Token",
+  "settings_tokens_claude_code_label": "Add it to Claude Code",
+  "settings_tokens_new_title": "New access token",
+  "settings_tokens_new_description": "Name it after the client or device that will use it.",
+  "settings_tokens_name_label": "Name",
+  "settings_tokens_name_placeholder": "Claude Code on my laptop",
+  "settings_tokens_create_failed": "Couldn't create token",
+  "settings_tokens_create": "Create token",
+  "settings_tokens_creating": "Creating…",
+  "settings_apps_title": "Connected apps",
+  "settings_apps_description": "Apps you signed in to Excaliself, such as a Claude.ai connector. They have the same access as a token.",
+  "settings_apps_empty": "No connected apps",
+  "settings_apps_connected": "Connected {ago}",
+  "settings_apps_disconnect": "Disconnect",
+  "settings_apps_disconnect_failed": "Couldn't disconnect app",
+  "settings_instance_title": "About",
+  "settings_instance_description": "This instance at a glance.",
+  "settings_instance_version": "Version",
+  "settings_instance_users": "Users",
+  "settings_instance_drawings": "Drawings",
+  "settings_instance_storage": "Storage used",
+  "settings_instance_release_notes": "Release notes on GitHub",
+  "settings_instance_star": "Star on GitHub",
+  "settings_instance_follow": "Follow on X",
+  "settings_invites_description": "Single-use links that add a member. Each expires after 7 days — copy a pending link to send it again.",
+  "settings_invites_generate": "Generate link",
+  "settings_invites_generating": "Generating...",
+  "settings_invites_expires": "Expires {date}",
+  "settings_invites_empty": "No pending invite links",
+  "settings_members_count": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "{count} member",
+        "countPlural=*": "{count} members"
+      }
+    }
+  ],
+  "settings_members_joined": "Joined {date}",
+  "settings_members_role_admin": "Admin",
+  "settings_members_role_member": "Member",
+  "settings_members_role_label": "Role for {name}",
+  "settings_members_role_change_failed": "Couldn't change role",
+  "settings_members_last_admin": "The last admin can't be demoted.",
+  "settings_members_actions": "Actions for {name}",
+  "settings_members_reset_password": "Reset password",
+  "settings_members_reset_pending": "Reset link pending",
+  "settings_members_reset_copied": "Reset link copied — single-use, valid for 24 hours",
+  "settings_members_reset_copy_failed": "Couldn't copy the reset link — generate it again",
+  "settings_members_reset_create_failed": "Couldn't create reset link",
+  "settings_members_reset_revoke_failed": "Couldn't revoke the reset link",
+  "settings_members_delete": "Delete user",
+  "settings_members_delete_title": "Delete {name}?",
+  "settings_members_delete_failed": "Couldn't delete {name}",
+  "settings_members_counts_failed": "Couldn't load {name}'s content counts. Close this dialog and try again.",
+  "settings_members_confirm_loading": "This will delete {name}'s account and permanently delete all of their content. This can't be undone.",
+  "settings_members_confirm_contents": "This will delete {name}'s account and permanently delete their {contents}.",
+  "settings_members_confirm_empty": "This will delete {name}'s account. They have no drawings or folders.",
+  "settings_members_confirm_empty_team": "This will delete {name}'s account. They have no private drawings or folders.",
+  "settings_members_kept_team": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "Their {count} Team drawing stays with the team.",
+        "countPlural=*": "Their {count} Team drawings stay with the team."
+      }
+    }
+  ],
+  "settings_members_demote_title": "Leave the admin role?",
+  "settings_members_demote_description": "You'll immediately lose access to instance settings like members and invites. Another admin would have to promote you back.",
+  "settings_members_demote": "Demote me",
+  "settings_members_demoting": "Demoting…",
+  "settings_profile_save_failed": "Couldn't save display name",
+  "settings_sessions_revoke_failed": "Couldn't revoke session",
+  "settings_sessions_sign_out_others_failed": "Couldn't sign out all other sessions",
+  "drawings_import_files": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "Importing {count} file",
+        "countPlural=*": "Importing {count} files"
+      }
+    }
+  ],
+  "drawings_import_progress": "Importing {current} of {total}",
+  "drawings_import_failed_one": "Couldn't import {name}",
+  "drawings_import_failed": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "Couldn't import {count} file",
+        "countPlural=*": "Couldn't import {count} files"
+      }
+    }
+  ],
+  "drawings_import_supported": "Drop .excalidraw files, or .png and .svg exports that include the scene.",
+  "drawings_import_failed_names": "Couldn't import {names}.",
+  "drawings_import_skipped_images": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "{count} image could not be brought over. The drawings show a placeholder.",
+        "countPlural=*": "{count} images could not be brought over. The drawings show a placeholder."
+      }
+    }
+  ],
+  "drawings_import_imported": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "Imported {count} drawing",
+        "countPlural=*": "Imported {count} drawings"
+      }
+    }
+  ]
+}
