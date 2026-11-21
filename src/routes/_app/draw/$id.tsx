@@ -55,8 +55,9 @@ export const Route = createFileRoute("/_app/draw/$id")({
       owner = (await queryClient.ensureQueryData(currentUserQueryOptions())).id
       const outcome = await syncDeviceDrawingNow(owner, params.id, 3000)
       if (outcome.status === "failed") throw offlinePage
-      // Either way the stored scene changed: a cached one is stale.
-      if (outcome.status === "synced" || outcome.status === "copied")
+      // Changed, or another tab holds edits the server may lack: a cached
+      // scene can't be trusted. Unreachable, the fetch opens the device copy.
+      if (outcome.status !== "clean")
         queryClient.removeQueries({ queryKey: detail.queryKey, exact: true })
       if (outcome.status === "copied") copied = outcome
     }

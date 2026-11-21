@@ -52,10 +52,18 @@ export function setDeviceAccount(owner: string | null) {
 const changes = new EventTarget()
 let channel: BroadcastChannel | undefined
 
+// Opened by writers too, so other tabs hear their writes.
+function openChannel() {
+  if (!channel) {
+    channel = new BroadcastChannel("excaliself:offline-drawings")
+    channel.onmessage = () => changes.dispatchEvent(new Event("change"))
+  }
+  return channel
+}
+
 /** Calls `listener` after any tab changes the device drawings. */
 export function subscribeToDeviceDrawings(listener: () => void) {
-  channel ??= new BroadcastChannel("excaliself:offline-drawings")
-  channel.onmessage = () => changes.dispatchEvent(new Event("change"))
+  openChannel()
   changes.addEventListener("change", listener)
   return () => changes.removeEventListener("change", listener)
 }
@@ -126,7 +134,7 @@ async function transact<T>(
   await committed
   if (mode === "readwrite") {
     changes.dispatchEvent(new Event("change"))
-    channel?.postMessage("change")
+    openChannel().postMessage("change")
   }
   return result
 }

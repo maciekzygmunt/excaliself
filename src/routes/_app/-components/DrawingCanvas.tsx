@@ -334,6 +334,9 @@ export function DrawingCanvas({
       void forgetDeviceDrawing(userId, drawingId).catch(() => {})
   }, [isLive, userId, drawingId])
   const [waitingToSync, setWaitingToSync] = useState(false)
+  // A save failed. Retried once the device copy holds the edits, even if it
+  // wasn't ready when the save failed.
+  const [saveFailed, setSaveFailed] = useState(false)
   const waitingRef = useRef(false)
   waitingRef.current = waitingToSync
   const deviceSaving = device.saving
@@ -346,11 +349,13 @@ export function DrawingCanvas({
         if (result === "saved") {
           deviceSaved(payload)
           setWaitingToSync(false)
+          setSaveFailed(false)
         }
         return result
       } catch (error) {
         // The latest edits are on neither: stop claiming the device has them.
         const kept = await flushDevice()
+        setSaveFailed(true)
         setWaitingToSync(kept)
         if (!kept) throw error
         return "skipped" as const
@@ -389,8 +394,9 @@ export function DrawingCanvas({
   const onDevice = waitingToSync || (!online && device.keeping)
 
   // Edits kept on the device go up with the next save that gets through.
+  const retrying = waitingToSync || (saveFailed && device.keeping)
   useEffect(() => {
-    if (!waitingToSync) return
+    if (!retrying) return
     const retry = () => void flushAutoSave().catch(() => {})
     const interval = setInterval(retry, 10_000)
     window.addEventListener("online", retry)
@@ -398,7 +404,7 @@ export function DrawingCanvas({
       clearInterval(interval)
       window.removeEventListener("online", retry)
     }
-  }, [waitingToSync, flushAutoSave])
+  }, [retrying, flushAutoSave])
 
   // Rejects while edits only sit on the device, so a share or a move to
   // Team never starts from a stale stored scene.
