@@ -337,8 +337,12 @@ export function DrawingCanvas({
   // A save failed. Retried once the device copy holds the edits, even if it
   // wasn't ready when the save failed.
   const [saveFailed, setSaveFailed] = useState(false)
+  // Set with the state, so a flush that just failed is seen before a render.
   const waitingRef = useRef(false)
-  waitingRef.current = waitingToSync
+  const setWaiting = useCallback((waiting: boolean) => {
+    waitingRef.current = waiting
+    setWaitingToSync(waiting)
+  }, [])
   const deviceSaving = device.saving
   const flushDevice = device.flush
   const saveScene = useCallback(
@@ -348,7 +352,7 @@ export function DrawingCanvas({
         const result = await saveScenePayload(payload)
         if (result === "saved") {
           deviceSaved(payload)
-          setWaitingToSync(false)
+          setWaiting(false)
           setSaveFailed(false)
         }
         return result
@@ -356,12 +360,12 @@ export function DrawingCanvas({
         // The latest edits are on neither: stop claiming the device has them.
         const kept = await flushDevice()
         setSaveFailed(true)
-        setWaitingToSync(kept)
+        setWaiting(kept)
         if (!kept) throw error
         return "skipped" as const
       }
     },
-    [saveScenePayload, deviceSaving, flushDevice],
+    [saveScenePayload, deviceSaving, flushDevice, setWaiting],
   )
 
   const {
