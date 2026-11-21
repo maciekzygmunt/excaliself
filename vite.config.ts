@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto"
 import { readFileSync } from "node:fs"
 import { readdir, readFile } from "node:fs/promises"
 import { join, relative } from "node:path"
@@ -88,6 +89,61 @@ function excalidrawFonts(): Plugin {
   }
 }
 
+/**
+ * Emits the service worker with the offline page's chunks, found from the
+ * bundle graph. The list also versions the worker, so a release replaces it.
+ */
+function offlineWorker(): Plugin {
+  return {
+    name: "offline-worker",
+    apply: "build",
+    generateBundle: {
+      order: "post",
+      async handler(_, bundle) {
+        if (this.environment.config.consumer !== "client") return
+        const assets = new Set<string>()
+        const visit = (fileName: string) => {
+          const chunk = bundle[fileName]
+          if (assets.has(fileName) || chunk?.type !== "chunk") return
+          assets.add(fileName)
+          for (const css of chunk.viteMetadata?.importedCss ?? [])
+            assets.add(css)
+          chunk.imports.forEach(visit)
+        }
+        for (const chunk of Object.values(bundle))
+          if (
+            chunk.type === "chunk" &&
+            chunk.moduleIds.some(
+              (id) =>
+                id.includes("/src/routes/offline.tsx") ||
+                id.endsWith("/src/features/offline/OfflineWorkspace.tsx"),
+            )
+          )
+            visit(chunk.fileName)
+        if (assets.size === 0)
+          this.error("The offline page's chunks are missing")
+        const list = [...assets].sort().map((name) => `/${name}`)
+        const worker = await readFile(
+          new URL("./scripts/offline-worker.js", import.meta.url),
+          "utf8",
+        )
+        const version = createHash("sha256")
+          .update(worker)
+          .update(JSON.stringify(list))
+          .digest("hex")
+          .slice(0, 16)
+        this.emitFile({
+          type: "asset",
+          fileName: "offline-worker.js",
+          source: `const OFFLINE_VERSION = "${version}"
+const OFFLINE_ASSETS = ${JSON.stringify(list)}
+${worker}`,
+        })
+      },
+    },
+  }
+}
+
 const config = defineConfig({
   // roughjs uses extensionless imports that Node cannot resolve directly.
   ssr: { noExternal: ["roughjs"] },
@@ -144,6 +200,7 @@ const config = defineConfig({
     }),
     viteReact(),
     excalidrawFonts(),
+    offlineWorker(),
   ],
 })
 

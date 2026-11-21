@@ -12,6 +12,7 @@ import {
 } from "@/features/collab/room-files"
 import { accessibleTo } from "@/features/spaces/access"
 import { dataUrlToBytes } from "./file-bytes"
+import { sceneRevision, storedSceneRevision } from "./scene-revision"
 import { parseSceneElements, sceneText } from "./search"
 
 export type SceneWriteResult =
@@ -30,6 +31,11 @@ export type SceneWriteResult =
    * an error; the client joins it.
    */
   | { status: "shared" }
+  /**
+   * Refused: a `baseRevision` was given, and the stored scene is neither that
+   * version nor this one, or the drawing is gone.
+   */
+  | { status: "conflict" }
 
 /**
  * Persist a solo edit. Inaccessible and missing ids both throw "Drawing not
@@ -43,7 +49,13 @@ export type SceneWriteResult =
 export async function writeDrawingScene(
   db: Db,
   userId: string,
-  input: { id: string; data: string; files: RoomFileUpload[] },
+  input: {
+    id: string
+    data: string
+    files: RoomFileUpload[]
+    /** Write only over this stored version. Device copies sync with it. */
+    baseRevision?: string
+  },
 ): Promise<SceneWriteResult> {
   const { id, data: sceneData } = input
   const files = input.files.flatMap((upload) => {
@@ -51,6 +63,10 @@ export async function writeDrawingScene(
     return parsed.status === "ok" ? [parsed.file] : []
   })
   const elements = parseSceneElements(sceneData)
+  // A retry of a committed write finds its own version stored.
+  const revisions = input.baseRevision
+    ? [input.baseRevision, await sceneRevision(sceneData)]
+    : null
 
   return db.transaction(async (tx) => {
     const now = new Date()
@@ -68,11 +84,14 @@ export async function writeDrawingScene(
           isNull(drawings.deletedAt),
         ),
       )
-    if (!target) throw new Error("Drawing not found")
+    if (!target) {
+      if (revisions) return { status: "conflict" as const }
+      throw new Error("Drawing not found")
+    }
     if (target.shareId || target.space === "team")
       return { status: "shared" as const }
 
-    // Re-check on the UPDATE: another tab may share the drawing or move it to
+    // Re-check on the UPDATE: another tab may share, trash, or move it to
     // Team in between. The join-time reconcile covers what still slips through.
     const written = await tx
       .update(drawings)
@@ -85,16 +104,21 @@ export async function writeDrawingScene(
         and(
           eq(drawings.id, id),
           eq(drawings.space, "private"),
+          isNull(drawings.deletedAt),
           notExists(
             tx
               .select({ one: sql`1` })
               .from(shares)
               .where(eq(shares.drawingId, id)),
           ),
+          revisions
+            ? inArray(storedSceneRevision(drawings.data), revisions)
+            : undefined,
         ),
       )
       .returning({ id: drawings.id })
-    if (written.length === 0) return { status: "shared" as const }
+    if (written.length === 0)
+      return { status: revisions ? "conflict" : "shared" } as const
 
     const existing = await tx
       .select({ fileId: drawingFiles.fileId })

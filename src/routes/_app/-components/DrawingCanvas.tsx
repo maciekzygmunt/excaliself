@@ -5,14 +5,21 @@ import type {
   BinaryFiles,
   ExcalidrawImperativeAPI,
 } from "@excalidraw/excalidraw/types"
-import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { onlineManager, useQuery, useQueryClient } from "@tanstack/react-query"
 import {
   MessageSquareIcon,
   PanelLeftIcon,
   Share2Icon,
   Users,
 } from "lucide-react"
-import { useCallback, useEffect, useMemo, useState } from "react"
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react"
 import { toast } from "sonner"
 import {
   FooterRightPortal,
@@ -25,6 +32,7 @@ import { PresenceAvatars } from "@/components/presence-avatars"
 import { ReconnectingIndicator } from "@/components/reconnecting-indicator"
 import { Button } from "@/components/ui/button"
 import { useSidebar } from "@/components/ui/sidebar"
+import { currentUserQueryOptions } from "@/features/account/queries"
 import { useRefreshLiveOnRoster } from "@/features/collab/queries"
 import {
   roomPathForDrawing,
@@ -45,6 +53,7 @@ import {
   buildScenePayload,
   type FitTo,
   getScenePayloadSignature,
+  type ScenePayload,
   selectOversizedImages,
   useDrawingScene,
   useReloadSceneAfterRoom,
@@ -52,6 +61,9 @@ import {
 } from "@/features/drawings/scene"
 import { useDrawingViewport } from "@/features/drawings/use-drawing-viewport"
 import { useTeamLibrary } from "@/features/library/use-team-library"
+import { supportsDeviceDrawings } from "@/features/offline/store"
+import { forgetDeviceDrawingWhenFree } from "@/features/offline/sync"
+import { useDeviceCopy } from "@/features/offline/use-device-copy"
 import { drawingShareQueryOptions } from "@/features/shares/queries"
 import { useAutoSave } from "@/hooks/use-auto-save"
 import { useCanvasLanguage } from "@/hooks/use-language"
@@ -296,6 +308,65 @@ export function DrawingCanvas({
     }
   }, [isDataCorrupt, corruptAcknowledged, drawingId, readOnly, isTeam, share])
 
+  // A solo private drawing is also kept on this device, so it opens offline
+  // and a failed save waits there instead of being lost.
+  const { data: userId } = useQuery({
+    ...currentUserQueryOptions(),
+    select: (user) => user.id,
+  })
+  const device = useDeviceCopy(
+    userId,
+    drawing,
+    supportsDeviceDrawings() &&
+      drawing?.space === "private" &&
+      share === null &&
+      !readOnly &&
+      !isLive &&
+      !isDataCorrupt &&
+      !reloadingScene,
+  )
+  // Shared or moved to Team: the Room owns it now. Unsent edits stay, and
+  // sync as a new drawing.
+  useEffect(() => {
+    if (isLive && userId && supportsDeviceDrawings())
+      // Waits for every editor, here and in other tabs, to let go first.
+      void forgetDeviceDrawingWhenFree(userId, drawingId).catch(() => {})
+  }, [isLive, userId, drawingId])
+  const [waitingToSync, setWaitingToSync] = useState(false)
+  // A save failed. Retried once the device copy holds the edits, even if it
+  // wasn't ready when the save failed.
+  const [saveFailed, setSaveFailed] = useState(false)
+  // Set with the state, so a flush that just failed is seen before a render.
+  const waitingRef = useRef(false)
+  const setWaiting = useCallback((waiting: boolean) => {
+    waitingRef.current = waiting
+    setWaitingToSync(waiting)
+  }, [])
+  const deviceSaving = device.saving
+  const flushDevice = device.flush
+  const saveScene = useCallback(
+    async (payload: ScenePayload) => {
+      const deviceSaved = deviceSaving()
+      try {
+        const result = await saveScenePayload(payload)
+        if (result === "saved") {
+          deviceSaved(payload)
+          setWaiting(false)
+          setSaveFailed(false)
+        }
+        return result
+      } catch (error) {
+        // The latest edits are on neither: stop claiming the device has them.
+        const kept = await flushDevice()
+        setSaveFailed(true)
+        setWaiting(kept)
+        if (!kept) throw error
+        return "skipped" as const
+      }
+    },
+    [saveScenePayload, deviceSaving, flushDevice, setWaiting],
+  )
+
   const {
     saving,
     saved,
@@ -304,7 +375,7 @@ export function DrawingCanvas({
   } = useAutoSave({
     toPayload: buildScenePayload,
     getSignature: getScenePayloadSignature,
-    onSave: saveScenePayload,
+    onSave: saveScene,
     scopeId: `save-drawing:${drawingId}`,
     skipInitialChange: true,
     // `readOnly` also unwires onChange below; pausing here is belt and
@@ -317,6 +388,37 @@ export function DrawingCanvas({
     },
   })
 
+  // Offline, react-query holds saves until the browser reconnects.
+  const online = useSyncExternalStore(
+    onlineManager.subscribe.bind(onlineManager),
+    () => onlineManager.isOnline(),
+    () => true,
+  )
+  const onDevice = waitingToSync || (!online && device.keeping)
+
+  // Edits kept on the device go up with the next save that gets through.
+  const retrying = waitingToSync || (saveFailed && device.keeping)
+  useEffect(() => {
+    if (!retrying) return
+    // Resent even if unchanged: an undo may have returned to the last saved
+    // scene, and the failed request may have landed or not.
+    const retry = () => void flushAutoSave({ resend: true }).catch(() => {})
+    const interval = setInterval(retry, 10_000)
+    window.addEventListener("online", retry)
+    return () => {
+      clearInterval(interval)
+      window.removeEventListener("online", retry)
+    }
+  }, [retrying, flushAutoSave])
+
+  // Rejects while edits only sit on the device, so a share or a move to
+  // Team never starts from a stale stored scene.
+  const flushToServer = useCallback(async () => {
+    await flushAutoSave()
+    if (waitingRef.current)
+      throw new Error("Changes are saved only on this device")
+  }, [flushAutoSave])
+
   // Any move to Team or Duplicate flushes this canvas first, whichever menu
   // started it: the solo save, and the live Room's image uploads.
   const { requestMoveToTeam, registerFlush } = useMoveToTeamDialog()
@@ -324,11 +426,12 @@ export function DrawingCanvas({
   useEffect(() => {
     if (readOnly) return
     return registerFlush(async () => {
-      await Promise.all([flushAutoSave(), flushRoomUploads()])
+      await Promise.all([flushToServer(), flushRoomUploads()])
     })
-  }, [readOnly, registerFlush, flushAutoSave, flushRoomUploads])
+  }, [readOnly, registerFlush, flushToServer, flushRoomUploads])
 
   const roomChange = room.onChange
+  const deviceChange = device.onChange
   const handleSceneChange = useCallback(
     (
       elements: readonly OrderedExcalidrawElement[],
@@ -349,6 +452,8 @@ export function DrawingCanvas({
         }
       }
       handleChange({ elements, appState, files })
+      // No-op until the device copy is kept.
+      deviceChange({ elements, appState, files })
       // No-op until the room is joined.
       roomChange(elements, appState, files)
     },
@@ -356,6 +461,7 @@ export function DrawingCanvas({
       observeViewport,
       readOnly,
       handleChange,
+      deviceChange,
       roomChange,
       isLive,
       excalidrawAPI,
@@ -491,7 +597,11 @@ export function DrawingCanvas({
               status={room.connectionStatus}
               className="order-first mr-2 h-auto self-stretch"
             />
-            <SaveStatusPill saving={saving} saved={saved} />
+            <SaveStatusPill
+              saving={saving && !onDevice}
+              saved={saved}
+              onDevice={onDevice}
+            />
           </FooterRightPortal>
         )}
         <TopLeftPortal>
@@ -528,7 +638,7 @@ export function DrawingCanvas({
           isTeam={isTeam}
           open={shareOpen}
           onOpenChange={setShareOpen}
-          onBeforeCreate={flushAutoSave}
+          onBeforeCreate={flushToServer}
         />
       )}
     </div>

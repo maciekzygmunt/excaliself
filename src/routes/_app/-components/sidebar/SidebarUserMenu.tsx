@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router"
-import { LogOut, Settings, Users } from "lucide-react"
+import { CloudOff, LogOut, Settings, Users } from "lucide-react"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { UserAvatar } from "@/components/user-avatar"
 import { userDisplayName, userInitials } from "@/features/account/display-name"
+import { setDeviceAccount } from "@/features/offline/store"
 import { authClient } from "@/lib/auth-client"
 
 export type SidebarUser = {
@@ -56,6 +57,11 @@ export function SidebarUserMenu({ user }: { user: SidebarUser }) {
             <DropdownMenuSeparator />
           </>
         )}
+        {/* Client-side, so the open canvas unmounts and flushes its edits. */}
+        <DropdownMenuItem render={<Link to="/offline" />}>
+          <CloudOff className="mr-2 h-4 w-4" />
+          Offline drawings
+        </DropdownMenuItem>
         <DropdownMenuItem render={<Link to="/settings" />}>
           <Settings className="mr-2 h-4 w-4" />
           Settings
@@ -63,6 +69,7 @@ export function SidebarUserMenu({ user }: { user: SidebarUser }) {
         <DropdownMenuItem
           onClick={async () => {
             await authClient.signOut()
+            setDeviceAccount(null)
             window.location.href = "/login"
           }}
         >

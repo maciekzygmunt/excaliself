@@ -101,20 +101,27 @@ export function useAutoSave<TData, TPayload>({
   const { run: runDebouncedSave, flush: flushDebouncedSave } =
     useDebounceCallback(performSave, DEBOUNCE_MS)
 
-  /** Saves all pending changes. Rejects on failure, so a share handoff stops. */
-  const flush = useCallback(async () => {
-    flushDebouncedSave()
-    const latest = latestDataRef.current
-    if (latest != null && initializedRef.current && !pausedRef.current) {
-      performSave(latest)
-    }
-    // A save can chain another from onSuccess, so wait until none is new.
-    let awaited: Promise<unknown> | null = null
-    while (inFlightRef.current && inFlightRef.current !== awaited) {
-      awaited = inFlightRef.current
-      await awaited
-    }
-  }, [flushDebouncedSave, performSave])
+  /**
+   * Saves all pending changes. Rejects on failure, so a share handoff stops.
+   * `resend` saves the latest state even if it matches the last save.
+   */
+  const flush = useCallback(
+    async ({ resend = false }: { resend?: boolean } = {}) => {
+      flushDebouncedSave()
+      const latest = latestDataRef.current
+      if (latest != null && initializedRef.current && !pausedRef.current) {
+        if (resend) lastSavedSigRef.current = null
+        performSave(latest)
+      }
+      // A save can chain another from onSuccess, so wait until none is new.
+      let awaited: Promise<unknown> | null = null
+      while (inFlightRef.current && inFlightRef.current !== awaited) {
+        awaited = inFlightRef.current
+        await awaited
+      }
+    },
+    [flushDebouncedSave, performSave],
+  )
 
   const handleChange = useCallback(
     (data: TData) => {
