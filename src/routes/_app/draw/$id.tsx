@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query"
+import { onlineManager, useQuery } from "@tanstack/react-query"
 import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router"
 import { createClientOnlyFn } from "@tanstack/react-start"
 import { lazy, Suspense, useEffect, useState } from "react"
@@ -9,7 +9,10 @@ import {
   drawingQueryOptions,
   drawingsQueryOptions,
 } from "@/features/drawings/queries"
-import { supportsDeviceDrawings } from "@/features/offline/store"
+import {
+  deviceDrawingStatus,
+  supportsDeviceDrawings,
+} from "@/features/offline/store"
 import { syncDeviceDrawingNow, toastCopied } from "@/features/offline/sync"
 import { useDocumentTitle } from "@/lib/document-title"
 import { DrawingPaletteContext } from "../-components/DrawingPaletteContext"
@@ -34,40 +37,52 @@ const LoadingState = () => (
 
 export const Route = createFileRoute("/_app/draw/$id")({
   ssr: false,
-  loader: async ({ params, context, preload }) => {
+  // A hover preload would skip the device sync below, and the click would
+  // reuse it: the editor would open over edits this device still holds.
+  preload: false,
+  loader: async ({ params, context }) => {
+    const { queryClient } = context
+    const detail = drawingQueryOptions(params.id)
     // Edits this device kept go up first, so the canvas opens on them. If
     // they can't, the offline page opens this device's version.
+    const offlinePage = redirect({
+      href: `/offline?drawing=${encodeURIComponent(params.id)}`,
+      reloadDocument: true,
+    })
+    let owner: string | undefined
     let copied: { name: string; copyName: string } | undefined
-    if (!preload && supportsDeviceDrawings()) {
-      const { id: owner } = await context.queryClient.ensureQueryData(
-        currentUserQueryOptions(),
-      )
+    if (supportsDeviceDrawings()) {
+      owner = (await queryClient.ensureQueryData(currentUserQueryOptions())).id
       const outcome = await syncDeviceDrawingNow(owner, params.id, 3000)
-      if (outcome.status === "failed")
-        throw redirect({
-          href: `/offline?drawing=${encodeURIComponent(params.id)}`,
-          reloadDocument: true,
-        })
+      if (outcome.status === "failed") throw offlinePage
       // Either way the stored scene changed: a cached one is stale.
       if (outcome.status === "synced" || outcome.status === "copied")
-        context.queryClient.removeQueries({
-          queryKey: drawingQueryOptions(params.id).queryKey,
-          exact: true,
-        })
+        queryClient.removeQueries({ queryKey: detail.queryKey, exact: true })
       if (outcome.status === "copied") copied = outcome
     }
-    const drawing = await context.queryClient.ensureQueryData(
-      drawingQueryOptions(params.id),
+    // Unreachable and not cached: open the copy kept on this device, if any.
+    // Offline, the fetch would wait for the network instead of failing.
+    const keptHere = () =>
+      owner
+        ? deviceDrawingStatus(owner, params.id).catch(() => undefined)
+        : undefined
+    if (
+      !onlineManager.isOnline() &&
+      queryClient.getQueryData(detail.queryKey) === undefined &&
+      (await keptHere())
     )
+      throw offlinePage
+    const drawing = await queryClient
+      .ensureQueryData(detail)
+      .catch(async (error) => {
+        throw (await keptHere()) ? offlinePage : error
+      })
     // The server returns null for hard-deleted drawings and drawings that
     // aren't yours (deliberately indistinguishable) — land on Home, not a
     // dead end. Trashed drawings load and render read-only (spec §5.11).
     // ssr is off, so this loader (and the toast) always runs on the client.
-    // Hover-intent preloads also run it; they swallow the redirect, so they
-    // must not toast either.
     if (!drawing) {
-      if (!preload)
-        toast.error("Drawing not found", { id: "drawing-not-found" })
+      toast.error("Drawing not found", { id: "drawing-not-found" })
       throw redirect({ to: "/draw" })
     }
     return { copied }

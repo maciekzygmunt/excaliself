@@ -349,8 +349,10 @@ export function DrawingCanvas({
         }
         return result
       } catch (error) {
-        if (!(await flushDevice())) throw error
-        setWaitingToSync(true)
+        // The latest edits are on neither: stop claiming the device has them.
+        const kept = await flushDevice()
+        setWaitingToSync(kept)
+        if (!kept) throw error
         return "skipped" as const
       }
     },

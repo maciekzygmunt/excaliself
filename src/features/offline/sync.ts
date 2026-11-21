@@ -82,6 +82,12 @@ async function upload(owner: string, id: string): Promise<SyncOutcome> {
       await sceneRevision(data),
       drawing.writer,
     )
+    // As online: refused images aren't kept, so say so.
+    if (result.missingFileIds.length + result.overCapFileIds.length > 0)
+      toast.error(`Some images in “${name}” weren’t saved`, {
+        id: `offline-images:${id}`,
+        description: "They were too large to store with the drawing.",
+      })
     return { status: "synced" }
   }
   // Changed elsewhere, shared, moved to Team, or trashed: keep both versions.

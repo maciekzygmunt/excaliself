@@ -48,21 +48,16 @@ export function useDeviceCopy(
     }
   }, [enabled, owner, id, base, writer])
 
-  /**
-   * Call as a save starts; call what it returns with the payload once the
-   * server stored it. Bound to the session the save started in.
-   */
-  const saving = useCallback(() => {
-    const session = writer.current
-    return ({ data, files }: ScenePayload) => {
-      if (!owner || !kept) return
+  const acknowledge = useCallback(
+    (copy: string, { data, files }: ScenePayload, session: string) => {
+      if (!owner) return
       const fileIds = files.map((file) => file.fileId)
       void flushDraft()
         .then(() => sceneRevision(data))
         .then(async (revision) => {
           await markDeviceDrawingSaved(
             owner,
-            kept,
+            copy,
             { data, fileIds },
             revision,
             session,
@@ -70,8 +65,35 @@ export function useDeviceCopy(
           if (writer.current === session) base.current = revision
         })
         .catch(() => {})
+    },
+    [owner, flushDraft, writer, base],
+  )
+
+  // A save that lands while the copy is still being kept: applied once it is.
+  const early = useRef<ScenePayload | null>(null)
+  useEffect(() => {
+    const payload = early.current
+    if (!kept || !payload) return
+    early.current = null
+    acknowledge(kept, payload, writer.current)
+  }, [kept, acknowledge, writer])
+  // Read when a save lands, which can be after the copy got ready.
+  const latest = useRef({ kept, acknowledge })
+  latest.current = { kept, acknowledge }
+
+  /**
+   * Call as a save starts; call what it returns with the payload once the
+   * server stored it. Bound to the session the save started in, or, if it
+   * started before the copy was ready, to the session the copy began.
+   */
+  const saving = useCallback(() => {
+    const session = latest.current.kept ? writer.current : null
+    return (payload: ScenePayload) => {
+      const { kept, acknowledge } = latest.current
+      if (kept) acknowledge(kept, payload, session ?? writer.current)
+      else early.current = payload
     }
-  }, [owner, kept, flushDraft, writer, base])
+  }, [writer])
 
   /** Resolves whether this device holds every edit so far. */
   const flush = useCallback(
