@@ -1,0 +1,330 @@
+{
+  "$schema": "https://inlang.com/schema/inlang-message-format",
+  "time_just_now": "gerade eben",
+  "count_drawings": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "{count} Zeichnung",
+        "countPlural=*": "{count} Zeichnungen"
+      }
+    }
+  ],
+  "count_folders": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "{count} Ordner",
+        "countPlural=*": "{count} Ordner"
+      }
+    }
+  ],
+  "settings_title": "Einstellungen",
+  "settings_nav_label": "Bereiche der Einstellungen",
+  "settings_nav_account": "Konto",
+  "settings_nav_import": "Import",
+  "settings_nav_instance": "Instanz",
+  "settings_nav_members": "Mitglieder",
+  "settings_nav_invites": "Einladungen",
+  "settings_cancel": "Abbrechen",
+  "settings_done": "Fertig",
+  "settings_revoke": "Widerrufen",
+  "settings_copy": "Kopieren",
+  "settings_copied": "Kopiert",
+  "settings_deleting": "Wird gelöscht…",
+  "settings_cannot_undo": "Das lässt sich nicht rückgängig machen.",
+  "settings_last_used": "Zuletzt verwendet {ago}",
+  "settings_never_used": "Nie verwendet",
+  "settings_signin_title": "Anmeldung",
+  "settings_signin_sso": "Du meldest dich als {#em}{email}{/em} per Single Sign-on an. Wenn du zusätzlich ein Passwort möchtest, bitte einen Admin um einen Passwort-Link.",
+  "settings_profile_title": "Profil",
+  "settings_profile_description": "So sehen dich andere auf dieser Instanz",
+  "settings_profile_name_label": "Anzeigename",
+  "settings_profile_name_hint": "Optional — ohne Namen wirst du mit dem Anfang deiner E-Mail-Adresse angezeigt.",
+  "settings_email_title": "E-Mail",
+  "settings_email_description": "Du meldest dich mit {#em}{email}{/em} an. Eine Änderung gilt sofort.",
+  "settings_email_new_label": "Neue E-Mail-Adresse",
+  "settings_email_invalid": "Gib eine gültige E-Mail-Adresse ein",
+  "settings_email_taken": "Diese E-Mail-Adresse wird bereits verwendet",
+  "settings_email_updated": "Anmelde-E-Mail aktualisiert",
+  "settings_email_submit": "E-Mail ändern",
+  "settings_email_submitting": "E-Mail wird geändert...",
+  "settings_password_title": "Passwort",
+  "settings_password_description": "Eine Änderung meldet dich überall sonst ab.",
+  "settings_password_current_label": "Aktuelles Passwort",
+  "settings_password_current_required": "Gib dein aktuelles Passwort ein",
+  "settings_password_incorrect": "Falsches Passwort",
+  "settings_password_new_label": "Neues Passwort",
+  "settings_password_too_short": "Mindestens 8 Zeichen",
+  "settings_password_change_failed": "Passwort konnte nicht geändert werden",
+  "settings_password_changed": "Passwort geändert — andere Sitzungen wurden abgemeldet",
+  "settings_password_submit": "Passwort ändern",
+  "settings_password_submitting": "Passwort wird geändert...",
+  "settings_sessions_title": "Sitzungen",
+  "settings_sessions_description": "Geräte, die gerade bei deinem Konto angemeldet sind",
+  "settings_sessions_current": "Aktuelle Sitzung",
+  "settings_sessions_device": "{browser} auf {system}",
+  "settings_sessions_unknown_device": "Unbekanntes Gerät",
+  "settings_sessions_sign_out_others": "Alle anderen Sitzungen abmelden",
+  "settings_appearance_title": "Darstellung",
+  "settings_appearance_description": "Gilt nur für diesen Browser",
+  "settings_appearance_theme": "Design",
+  "settings_appearance_canvas": "Zeichenfläche",
+  "settings_appearance_light": "Hell",
+  "settings_appearance_dark": "Dunkel",
+  "settings_appearance_system": "System",
+  "settings_appearance_match_app": "Wie App",
+  "settings_appearance_language": "Sprache",
+  "settings_appearance_language_hint": "Übersetzt die Einstellungen und die Zeichenfläche",
+  "settings_danger_title": "Gefahrenzone",
+  "settings_danger_description": "Unwiderruflich. Alles, was dir gehört, wird mit dem Konto gelöscht.",
+  "settings_danger_description_team": "Unwiderruflich. Deine privaten Inhalte werden mit dem Konto gelöscht. Team-Zeichnungen bleiben erhalten.",
+  "settings_danger_delete": "Konto löschen",
+  "settings_danger_delete_hint": "Lösche dein Konto und alle deine Zeichnungen und Ordner endgültig.",
+  "settings_danger_delete_hint_team": "Lösche dein Konto und alle deine privaten Zeichnungen und Ordner endgültig.",
+  "settings_danger_sole_admin": "Du bist der einzige Admin dieser Instanz. Mache ein anderes Mitglied zum Admin, bevor du dein Konto löschst.",
+  "settings_danger_delete_failed": "Dein Konto konnte nicht gelöscht werden",
+  "settings_danger_confirm_title": "Dein Konto löschen?",
+  "settings_danger_counts_failed": "Die Anzahl deiner Inhalte konnte nicht geladen werden. Schließe diesen Dialog und versuche es erneut.",
+  "settings_danger_confirm_loading": "Dadurch werden dein Konto und alle deine Inhalte endgültig gelöscht. Das lässt sich nicht rückgängig machen.",
+  "settings_danger_confirm_contents": "Dadurch wird dein Konto gelöscht. Endgültig gelöscht werden außerdem: {contents}.",
+  "settings_danger_confirm_empty": "Dadurch wird dein Konto gelöscht. Du hast keine Zeichnungen oder Ordner.",
+  "settings_danger_confirm_empty_team": "Dadurch wird dein Konto gelöscht. Du hast keine privaten Zeichnungen oder Ordner.",
+  "settings_danger_kept_team": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "Deine 1 Team-Zeichnung bleibt beim Team.",
+        "countPlural=*": "Deine {count} Team-Zeichnungen bleiben beim Team."
+      }
+    }
+  ],
+  "settings_import_title": "Aus Excalidraw+ importieren",
+  "settings_import_beta": "(Beta)",
+  "settings_import_description_admin": "Übernimm Szenen und Bilder. Geteilte Sammlungen werden zu Ordnern in Team, deine privaten Szenen landen in Privat.",
+  "settings_import_description_member": "Übernimm deine privaten Szenen und Bilder. Sie landen in Privat. Geteilte Sammlungen importiert ein Admin.",
+  "settings_import_key_label": "Excalidraw+-API-Schlüssel",
+  "settings_import_key_hint_create": "Erstelle einen in Excalidraw+ in den Workspace-Einstellungen ({#link}so geht's{/link}).",
+  "settings_import_key_hint_admin": "Ein persönlicher Schlüssel (beginnt mit uk-) übernimmt auch deine privaten Szenen.",
+  "settings_import_key_hint_member": "Verwende einen persönlichen Schlüssel (beginnt mit uk-).",
+  "settings_import_key_hint_access": "Lesezugriff genügt. Der Schlüssel wird nur für diesen Import verwendet und nicht gespeichert.",
+  "settings_import_find": "Szenen suchen",
+  "settings_import_finding": "Szenen werden gesucht...",
+  "settings_import_error_generic": "Etwas ist schiefgelaufen",
+  "settings_import_untitled": "Ohne Titel",
+  "settings_import_found": "{scenes} {collections} gefunden.",
+  "settings_import_found_scenes": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "{count} Szene",
+        "countPlural=*": "{count} Szenen"
+      }
+    }
+  ],
+  "settings_import_found_collections": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "in {count} Sammlung",
+        "countPlural=*": "in {count} Sammlungen"
+      }
+    }
+  ],
+  "settings_import_already_imported": "{count} davon schon importiert.",
+  "settings_import_workspace_key": "Das ist ein Workspace-Schlüssel, deine privaten Szenen sind also nicht dabei. Verwende einen persönlichen Schlüssel, um sie auch zu übernehmen.",
+  "settings_import_nothing_new": "Nichts Neues zu importieren",
+  "settings_import_start": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "{count} Szene importieren",
+        "countPlural=*": "{count} Szenen importieren"
+      }
+    }
+  ],
+  "settings_import_use_another_key": "Anderen Schlüssel verwenden",
+  "settings_import_progress_label": "Importfortschritt",
+  "settings_import_importing": "Importiere {current} von {total}",
+  "settings_import_imported": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "{count} Szene importiert.",
+        "countPlural=*": "{count} Szenen importiert."
+      }
+    }
+  ],
+  "settings_import_stopped": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "Angehalten. {count} Szene importiert.",
+        "countPlural=*": "Angehalten. {count} Szenen importiert."
+      }
+    }
+  ],
+  "settings_import_skipped_images": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "{count} Bild konnte nicht übernommen werden (zu groß oder in Excalidraw+ nicht vorhanden). Die Zeichnungen zeigen stattdessen einen Platzhalter.",
+        "countPlural=*": "{count} Bilder konnten nicht übernommen werden (zu groß oder in Excalidraw+ nicht vorhanden). Die Zeichnungen zeigen stattdessen einen Platzhalter."
+      }
+    }
+  ],
+  "settings_import_failed": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "{count} Szene fehlgeschlagen:",
+        "countPlural=*": "{count} Szenen fehlgeschlagen:"
+      }
+    }
+  ],
+  "settings_import_stop": "Anhalten",
+  "settings_import_open_drawings": "Zeichnungen öffnen",
+  "settings_import_more": "Weitere importieren",
+  "settings_import_files_title": "Dateien importieren",
+  "settings_import_files_description": "Füge .excalidraw-Dateien von deinem Computer hinzu. Sie landen in Privat. PNG- und SVG-Exporte, die die Szene enthalten, funktionieren auch. Um Dateien in einen Ordner oder in Team zu legen, öffne ihn und zieh sie auf die Zeichnungen – oder zieh sie in der Seitenleiste darauf.",
+  "settings_import_files_drop": "Dateien hier ablegen oder zum Auswählen klicken",
+  "settings_tokens_title": "Zugriffstoken",
+  "settings_tokens_description": "Verbinde einen KI-Client wie Claude Code über MCP. Ein Token sieht, was du siehst, und kann in deinem Namen Zeichnungen erstellen und in den Papierkorb verschieben.",
+  "settings_tokens_new": "Neues Token",
+  "settings_tokens_empty": "Keine Zugriffstoken",
+  "settings_tokens_created": "Erstellt {ago}",
+  "settings_tokens_revoke_failed": "Token konnte nicht widerrufen werden",
+  "settings_tokens_copy_title": "Kopiere dein Token",
+  "settings_tokens_copy_description": "Du siehst es kein zweites Mal. Wer es hat, kann deine Zeichnungen lesen und in deinem Namen neue erstellen, bis du es widerrufst.",
+  "settings_tokens_token_label": "Token",
+  "settings_tokens_claude_code_label": "Zu Claude Code hinzufügen",
+  "settings_tokens_new_title": "Neues Zugriffstoken",
+  "settings_tokens_new_description": "Benenne es nach dem Client oder Gerät, das es verwenden wird.",
+  "settings_tokens_name_label": "Name",
+  "settings_tokens_name_placeholder": "Claude Code auf meinem Laptop",
+  "settings_tokens_create_failed": "Token konnte nicht erstellt werden",
+  "settings_tokens_create": "Token erstellen",
+  "settings_tokens_creating": "Wird erstellt…",
+  "settings_apps_title": "Verbundene Apps",
+  "settings_apps_description": "Apps, bei denen du dich mit Excaliself angemeldet hast, etwa ein Claude.ai-Connector. Sie haben denselben Zugriff wie ein Token.",
+  "settings_apps_empty": "Keine verbundenen Apps",
+  "settings_apps_connected": "Verbunden {ago}",
+  "settings_apps_disconnect": "Trennen",
+  "settings_apps_disconnect_failed": "App konnte nicht getrennt werden",
+  "settings_instance_title": "Über",
+  "settings_instance_description": "Diese Instanz auf einen Blick.",
+  "settings_instance_version": "Version",
+  "settings_instance_users": "Benutzer",
+  "settings_instance_drawings": "Zeichnungen",
+  "settings_instance_storage": "Belegter Speicher",
+  "settings_instance_release_notes": "Versionshinweise auf GitHub",
+  "settings_instance_star": "Auf GitHub einen Stern geben",
+  "settings_instance_follow": "Auf X folgen",
+  "settings_invites_description": "Einmal-Links, die ein Mitglied hinzufügen. Jeder läuft nach 7 Tagen ab — kopiere einen offenen Link, um ihn noch einmal zu senden.",
+  "settings_invites_generate": "Link erstellen",
+  "settings_invites_generating": "Wird erstellt...",
+  "settings_invites_expires": "Läuft am {date} ab",
+  "settings_invites_empty": "Keine offenen Einladungslinks",
+  "settings_members_count": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "{count} Mitglied",
+        "countPlural=*": "{count} Mitglieder"
+      }
+    }
+  ],
+  "settings_members_joined": "Beigetreten am {date}",
+  "settings_members_role_admin": "Admin",
+  "settings_members_role_member": "Mitglied",
+  "settings_members_role_label": "Rolle von {name}",
+  "settings_members_role_change_failed": "Rolle konnte nicht geändert werden",
+  "settings_members_last_admin": "Der letzte Admin kann nicht herabgestuft werden.",
+  "settings_members_actions": "Aktionen für {name}",
+  "settings_members_reset_password": "Passwort zurücksetzen",
+  "settings_members_reset_pending": "Link zum Zurücksetzen offen",
+  "settings_members_reset_copied": "Link zum Zurücksetzen kopiert — einmalig, 24 Stunden gültig",
+  "settings_members_reset_copy_failed": "Link zum Zurücksetzen konnte nicht kopiert werden — erstelle ihn erneut",
+  "settings_members_reset_create_failed": "Link zum Zurücksetzen konnte nicht erstellt werden",
+  "settings_members_reset_revoke_failed": "Link zum Zurücksetzen konnte nicht widerrufen werden",
+  "settings_members_delete": "Benutzer löschen",
+  "settings_members_delete_title": "{name} löschen?",
+  "settings_members_delete_failed": "{name} konnte nicht gelöscht werden",
+  "settings_members_counts_failed": "Die Anzahl der Inhalte von {name} konnte nicht geladen werden. Schließe diesen Dialog und versuche es erneut.",
+  "settings_members_confirm_loading": "Dadurch werden das Konto von {name} und alle zugehörigen Inhalte endgültig gelöscht. Das lässt sich nicht rückgängig machen.",
+  "settings_members_confirm_contents": "Dadurch wird das Konto von {name} gelöscht. Endgültig gelöscht werden außerdem: {contents}.",
+  "settings_members_confirm_empty": "Dadurch wird das Konto von {name} gelöscht. Es enthält keine Zeichnungen oder Ordner.",
+  "settings_members_confirm_empty_team": "Dadurch wird das Konto von {name} gelöscht. Es enthält keine privaten Zeichnungen oder Ordner.",
+  "settings_members_kept_team": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "1 Team-Zeichnung bleibt beim Team.",
+        "countPlural=*": "{count} Team-Zeichnungen bleiben beim Team."
+      }
+    }
+  ],
+  "settings_members_demote_title": "Admin-Rolle abgeben?",
+  "settings_members_demote_description": "Du verlierst sofort den Zugriff auf Instanzeinstellungen wie Mitglieder und Einladungen. Nur ein anderer Admin kann dich wieder zum Admin machen.",
+  "settings_members_demote": "Mich herabstufen",
+  "settings_members_demoting": "Wird herabgestuft…",
+  "settings_profile_save_failed": "Anzeigename konnte nicht gespeichert werden",
+  "settings_sessions_revoke_failed": "Sitzung konnte nicht widerrufen werden",
+  "settings_sessions_sign_out_others_failed": "Andere Sitzungen konnten nicht abgemeldet werden",
+  "drawings_import_files": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "{count} Datei wird importiert",
+        "countPlural=*": "{count} Dateien werden importiert"
+      }
+    }
+  ],
+  "drawings_import_progress": "Importiere {current} von {total}",
+  "drawings_import_failed_one": "{name} konnte nicht importiert werden",
+  "drawings_import_failed": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "{count} Datei konnte nicht importiert werden",
+        "countPlural=*": "{count} Dateien konnten nicht importiert werden"
+      }
+    }
+  ],
+  "drawings_import_supported": "Lege .excalidraw-Dateien ab oder .png- und .svg-Exporte, die die Szene enthalten.",
+  "drawings_import_failed_names": "Nicht importiert: {names}.",
+  "drawings_import_skipped_images": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "{count} Bild konnte nicht übernommen werden. Die Zeichnungen zeigen einen Platzhalter.",
+        "countPlural=*": "{count} Bilder konnten nicht übernommen werden. Die Zeichnungen zeigen einen Platzhalter."
+      }
+    }
+  ],
+  "drawings_import_imported": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "{count} Zeichnung importiert",
+        "countPlural=*": "{count} Zeichnungen importiert"
+      }
+    }
+  ]
+}

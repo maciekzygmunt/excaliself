@@ -3,6 +3,7 @@ import { usersQueryOptions } from "@/features/admin/queries"
 import { pendingPasswordResetsQueryOptions } from "@/features/password-resets/queries"
 import { useDocumentTitle } from "@/lib/document-title"
 import { adminMiddleware } from "@/middleware/admin"
+import { m } from "@/paraglide/messages"
 import { MembersSection } from "./-components/MembersSection"
 
 // Admin-only: the middleware guards document requests, and the loader's
@@ -21,6 +22,6 @@ export const Route = createFileRoute("/_app/settings/members")({
 })
 
 function MembersPage() {
-  useDocumentTitle("Members", { chrome: true })
+  useDocumentTitle(m.settings_nav_members(), { chrome: true })
   return <MembersSection />
 }

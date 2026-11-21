@@ -9,6 +9,7 @@ import {
 import { disconnectApp } from "@/features/oauth/server"
 import { useDelayedVisible } from "@/hooks/use-delayed-visible"
 import { formatAgo } from "@/lib/relative-time"
+import { m } from "@/paraglide/messages"
 
 // Apps a member connected over OAuth, such as a Claude.ai connector. Each
 // row is one consent; Disconnect ends its tokens at once.
@@ -19,10 +20,11 @@ export function ConnectedAppsSection() {
   return (
     <section>
       <div className="mb-4">
-        <h2 className="text-sm font-medium text-foreground">Connected apps</h2>
+        <h2 className="text-sm font-medium text-foreground">
+          {m.settings_apps_title()}
+        </h2>
         <p className="text-xs text-muted-foreground">
-          Apps you signed in to Excaliself, such as a Claude.ai connector. They
-          have the same access as a token.
+          {m.settings_apps_description()}
         </p>
       </div>
 
@@ -48,14 +50,14 @@ function AppList({ apps }: { apps: ConnectedApp[] }) {
         list?.filter((app) => app.id !== data.id),
       )
     },
-    onError: () => toast.error("Couldn't disconnect app"),
+    onError: () => toast.error(m.settings_apps_disconnect_failed()),
     onSettled: () => queryClient.invalidateQueries({ queryKey: appsKey }),
   })
 
   if (apps.length === 0) {
     return (
       <p className="py-6 text-center text-sm text-muted-foreground/60">
-        No connected apps
+        {m.settings_apps_empty()}
       </p>
     )
   }
@@ -77,10 +79,10 @@ function AppList({ apps }: { apps: ConnectedApp[] }) {
               suppressHydrationWarning
               className="truncate text-xs text-muted-foreground"
             >
-              Connected {formatAgo(app.createdAt)} ·{" "}
+              {m.settings_apps_connected({ ago: formatAgo(app.createdAt) })} ·{" "}
               {app.lastUsedAt
-                ? `Last used ${formatAgo(app.lastUsedAt)}`
-                : "Never used"}
+                ? m.settings_last_used({ ago: formatAgo(app.lastUsedAt) })
+                : m.settings_never_used()}
             </p>
           </div>
           <Button
@@ -89,7 +91,7 @@ function AppList({ apps }: { apps: ConnectedApp[] }) {
             className="shrink-0 text-muted-foreground hover:text-destructive"
             onClick={() => disconnect({ data: { id: app.id } })}
           >
-            Disconnect
+            {m.settings_apps_disconnect()}
           </Button>
         </li>
       ))}

@@ -5,11 +5,17 @@ import { FormTextField } from "@/components/form-text-field"
 import { Button } from "@/components/ui/button"
 import { FieldGroup } from "@/components/ui/field"
 import { authClient } from "@/lib/auth-client"
+import { m } from "@/paraglide/messages"
 
 // Matches better-auth's default minPasswordLength, same floor as signup.
+// Errors are functions, so they read the language when they show.
 const formSchema = z.object({
-  currentPassword: z.string().min(1, "Enter your current password"),
-  newPassword: z.string().min(8, "Must be at least 8 characters"),
+  currentPassword: z
+    .string()
+    .min(1, { error: () => m.settings_password_current_required() }),
+  newPassword: z
+    .string()
+    .min(8, { error: () => m.settings_password_too_short() }),
 })
 
 // Password change (spec §5.12, #62): better-auth verifies the current
@@ -34,25 +40,29 @@ export function PasswordSection() {
         ) {
           formApi.setErrorMap({
             onSubmit: {
-              fields: { currentPassword: { message: "Incorrect password" } },
+              fields: {
+                currentPassword: { message: m.settings_password_incorrect() },
+              },
             },
           })
         } else {
-          toast.error(error.message ?? "Couldn't change password")
+          toast.error(error.message ?? m.settings_password_change_failed())
         }
         return
       }
       formApi.reset()
-      toast.success("Password changed — other sessions are signed out")
+      toast.success(m.settings_password_changed())
     },
   })
 
   return (
     <section>
       <div className="mb-4">
-        <h2 className="text-sm font-medium text-foreground">Password</h2>
+        <h2 className="text-sm font-medium text-foreground">
+          {m.settings_password_title()}
+        </h2>
         <p className="text-xs text-muted-foreground">
-          Changing it signs you out everywhere else.
+          {m.settings_password_description()}
         </p>
       </div>
 
@@ -74,7 +84,7 @@ export function PasswordSection() {
                 field={field}
                 // The Email section has a same-named field on this page.
                 id="password-current-password"
-                label="Current password"
+                label={m.settings_password_current_label()}
                 type="password"
                 placeholder="••••••••••"
                 autoComplete="current-password"
@@ -87,7 +97,7 @@ export function PasswordSection() {
             children={(field) => (
               <FormTextField
                 field={field}
-                label="New password"
+                label={m.settings_password_new_label()}
                 type="password"
                 placeholder="••••••••••"
                 autoComplete="new-password"
@@ -106,7 +116,9 @@ export function PasswordSection() {
               className="self-start"
               disabled={isSubmitting}
             >
-              {isSubmitting ? "Changing password..." : "Change password"}
+              {isSubmitting
+                ? m.settings_password_submitting()
+                : m.settings_password_submit()}
             </Button>
           )}
         </form.Subscribe>

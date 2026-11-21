@@ -1,0 +1,362 @@
+{
+  "$schema": "https://inlang.com/schema/inlang-message-format",
+  "time_just_now": "przed chwilą",
+  "count_drawings": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "{count} rysunek",
+        "countPlural=few": "{count} rysunki",
+        "countPlural=many": "{count} rysunków",
+        "countPlural=*": "{count} rysunku"
+      }
+    }
+  ],
+  "count_folders": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "{count} folder",
+        "countPlural=few": "{count} foldery",
+        "countPlural=many": "{count} folderów",
+        "countPlural=*": "{count} folderu"
+      }
+    }
+  ],
+  "settings_title": "Ustawienia",
+  "settings_nav_label": "Sekcje ustawień",
+  "settings_nav_account": "Konto",
+  "settings_nav_import": "Import",
+  "settings_nav_instance": "Instancja",
+  "settings_nav_members": "Członkowie",
+  "settings_nav_invites": "Zaproszenia",
+  "settings_cancel": "Anuluj",
+  "settings_done": "Gotowe",
+  "settings_revoke": "Unieważnij",
+  "settings_copy": "Kopiuj",
+  "settings_copied": "Skopiowano",
+  "settings_deleting": "Usuwanie…",
+  "settings_cannot_undo": "Tej operacji nie można cofnąć.",
+  "settings_last_used": "Ostatnie użycie: {ago}",
+  "settings_never_used": "Jeszcze nieużywane",
+  "settings_signin_title": "Logowanie",
+  "settings_signin_sso": "Logujesz się jako {#em}{email}{/em} przez logowanie jednokrotne (SSO). Jeśli chcesz mieć też hasło, poproś administratora o link do ustawienia hasła.",
+  "settings_profile_title": "Profil",
+  "settings_profile_description": "Jak widzą Cię inni na tej instancji",
+  "settings_profile_name_label": "Wyświetlana nazwa",
+  "settings_profile_name_hint": "Opcjonalnie — jeśli zostawisz puste, użyjemy początku Twojego adresu e-mail.",
+  "settings_email_title": "E-mail",
+  "settings_email_description": "Logujesz się jako {#em}{email}{/em}. Zmiana działa od razu.",
+  "settings_email_new_label": "Nowy adres e-mail",
+  "settings_email_invalid": "Podaj prawidłowy adres e-mail",
+  "settings_email_taken": "Ten adres e-mail jest już używany",
+  "settings_email_updated": "Zmieniono adres e-mail do logowania",
+  "settings_email_submit": "Zmień e-mail",
+  "settings_email_submitting": "Zmienianie e-maila...",
+  "settings_password_title": "Hasło",
+  "settings_password_description": "Zmiana hasła wyloguje Cię na wszystkich innych urządzeniach.",
+  "settings_password_current_label": "Obecne hasło",
+  "settings_password_current_required": "Podaj obecne hasło",
+  "settings_password_incorrect": "Nieprawidłowe hasło",
+  "settings_password_new_label": "Nowe hasło",
+  "settings_password_too_short": "Hasło musi mieć co najmniej 8 znaków",
+  "settings_password_change_failed": "Nie udało się zmienić hasła",
+  "settings_password_changed": "Zmieniono hasło — inne sesje zostały wylogowane",
+  "settings_password_submit": "Zmień hasło",
+  "settings_password_submitting": "Zmienianie hasła...",
+  "settings_sessions_title": "Sesje",
+  "settings_sessions_description": "Urządzenia, na których Twoje konto jest teraz zalogowane",
+  "settings_sessions_current": "Bieżąca sesja",
+  "settings_sessions_device": "{browser} na {system}",
+  "settings_sessions_unknown_device": "Nieznane urządzenie",
+  "settings_sessions_sign_out_others": "Wyloguj wszystkie inne sesje",
+  "settings_appearance_title": "Wygląd",
+  "settings_appearance_description": "Dotyczy tylko tej przeglądarki",
+  "settings_appearance_theme": "Motyw",
+  "settings_appearance_canvas": "Płótno",
+  "settings_appearance_light": "Jasny",
+  "settings_appearance_dark": "Ciemny",
+  "settings_appearance_system": "Systemowy",
+  "settings_appearance_match_app": "Jak aplikacja",
+  "settings_appearance_language": "Język",
+  "settings_appearance_language_hint": "Tłumaczy ustawienia i płótno do rysowania",
+  "settings_danger_title": "Strefa zagrożenia",
+  "settings_danger_description": "Nieodwracalne. Wszystko, co do Ciebie należy, zniknie razem z kontem.",
+  "settings_danger_description_team": "Nieodwracalne. Twoje prywatne prace znikną razem z kontem. Rysunki zespołu zostaną.",
+  "settings_danger_delete": "Usuń konto",
+  "settings_danger_delete_hint": "Trwale usuń swoje konto oraz wszystkie swoje rysunki i foldery.",
+  "settings_danger_delete_hint_team": "Trwale usuń swoje konto oraz wszystkie swoje prywatne rysunki i foldery.",
+  "settings_danger_sole_admin": "Jesteś jedynym administratorem tej instancji. Zanim usuniesz konto, nadaj innemu członkowi rolę administratora.",
+  "settings_danger_delete_failed": "Nie udało się usunąć Twojego konta",
+  "settings_danger_confirm_title": "Usunąć Twoje konto?",
+  "settings_danger_counts_failed": "Nie udało się wczytać liczby Twoich treści. Zamknij to okno i spróbuj ponownie.",
+  "settings_danger_confirm_loading": "Spowoduje to usunięcie Twojego konta i trwałe usunięcie wszystkich Twoich treści. Tej operacji nie można cofnąć.",
+  "settings_danger_confirm_contents": "Spowoduje to usunięcie Twojego konta. Trwale usunięte zostaną też: {contents}.",
+  "settings_danger_confirm_empty": "Spowoduje to usunięcie Twojego konta. Nie masz żadnych rysunków ani folderów.",
+  "settings_danger_confirm_empty_team": "Spowoduje to usunięcie Twojego konta. Nie masz żadnych prywatnych rysunków ani folderów.",
+  "settings_danger_kept_team": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "Twój 1 rysunek zespołu pozostanie w zespole.",
+        "countPlural=few": "Twoje {count} rysunki zespołu pozostaną w zespole.",
+        "countPlural=many": "Twoich {count} rysunków zespołu pozostanie w zespole.",
+        "countPlural=*": "Twoich {count} rysunków zespołu pozostanie w zespole."
+      }
+    }
+  ],
+  "settings_import_title": "Import z Excalidraw+",
+  "settings_import_beta": "(Beta)",
+  "settings_import_description_admin": "Przenieś sceny i obrazy. Udostępnione kolekcje staną się folderami w Zespole, a Twoje prywatne sceny trafią do Prywatnych.",
+  "settings_import_description_member": "Przenieś swoje prywatne sceny i obrazy. Trafią do Prywatnych. Udostępnione kolekcje importuje administrator.",
+  "settings_import_key_label": "Klucz API Excalidraw+",
+  "settings_import_key_hint_create": "Utwórz go w Excalidraw+ w ustawieniach przestrzeni roboczej ({#link}jak to zrobić{/link}).",
+  "settings_import_key_hint_admin": "Klucz osobisty (zaczyna się od uk-) przeniesie też Twoje prywatne sceny.",
+  "settings_import_key_hint_member": "Użyj klucza osobistego (zaczyna się od uk-).",
+  "settings_import_key_hint_access": "Wystarczy dostęp do odczytu. Klucz służy tylko do tego importu i nie jest zapisywany.",
+  "settings_import_find": "Znajdź sceny",
+  "settings_import_finding": "Szukanie scen...",
+  "settings_import_error_generic": "Coś poszło nie tak",
+  "settings_import_untitled": "Bez tytułu",
+  "settings_import_found": "{scenes} {collections}.",
+  "settings_import_found_scenes": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "Znaleziono {count} scenę",
+        "countPlural=few": "Znaleziono {count} sceny",
+        "countPlural=many": "Znaleziono {count} scen",
+        "countPlural=*": "Znaleziono {count} sceny"
+      }
+    }
+  ],
+  "settings_import_found_collections": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "w {count} kolekcji",
+        "countPlural=few": "w {count} kolekcjach",
+        "countPlural=many": "w {count} kolekcjach",
+        "countPlural=*": "w {count} kolekcji"
+      }
+    }
+  ],
+  "settings_import_already_imported": "Już zaimportowane: {count}.",
+  "settings_import_workspace_key": "To klucz przestrzeni roboczej, więc Twoje prywatne sceny nie są uwzględnione. Użyj klucza osobistego, aby przenieść także je.",
+  "settings_import_nothing_new": "Nic nowego do zaimportowania",
+  "settings_import_start": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "Importuj {count} scenę",
+        "countPlural=few": "Importuj {count} sceny",
+        "countPlural=many": "Importuj {count} scen",
+        "countPlural=*": "Importuj {count} sceny"
+      }
+    }
+  ],
+  "settings_import_use_another_key": "Użyj innego klucza",
+  "settings_import_progress_label": "Postęp importu",
+  "settings_import_importing": "Importowanie {current} z {total}",
+  "settings_import_imported": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "Zaimportowano {count} scenę.",
+        "countPlural=few": "Zaimportowano {count} sceny.",
+        "countPlural=many": "Zaimportowano {count} scen.",
+        "countPlural=*": "Zaimportowano {count} sceny."
+      }
+    }
+  ],
+  "settings_import_stopped": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "Zatrzymano. Zaimportowano {count} scenę.",
+        "countPlural=few": "Zatrzymano. Zaimportowano {count} sceny.",
+        "countPlural=many": "Zatrzymano. Zaimportowano {count} scen.",
+        "countPlural=*": "Zatrzymano. Zaimportowano {count} sceny."
+      }
+    }
+  ],
+  "settings_import_skipped_images": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "Nie udało się przenieść {count} obrazu (jest za duży albo brakuje go w Excalidraw+). Rysunki pokazują w zamian symbol zastępczy.",
+        "countPlural=few": "Nie udało się przenieść {count} obrazów (są za duże albo brakuje ich w Excalidraw+). Rysunki pokazują w zamian symbole zastępcze.",
+        "countPlural=many": "Nie udało się przenieść {count} obrazów (są za duże albo brakuje ich w Excalidraw+). Rysunki pokazują w zamian symbole zastępcze.",
+        "countPlural=*": "Nie udało się przenieść {count} obrazu (są za duże albo brakuje ich w Excalidraw+). Rysunki pokazują w zamian symbole zastępcze."
+      }
+    }
+  ],
+  "settings_import_failed": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "Nie udało się zaimportować {count} sceny:",
+        "countPlural=few": "Nie udało się zaimportować {count} scen:",
+        "countPlural=many": "Nie udało się zaimportować {count} scen:",
+        "countPlural=*": "Nie udało się zaimportować {count} sceny:"
+      }
+    }
+  ],
+  "settings_import_stop": "Zatrzymaj",
+  "settings_import_open_drawings": "Otwórz rysunki",
+  "settings_import_more": "Importuj więcej",
+  "settings_import_files_title": "Importuj pliki",
+  "settings_import_files_description": "Dodaj pliki .excalidraw ze swojego komputera. Trafią do Prywatnych. Działają też eksporty PNG i SVG, które zawierają scenę. Aby umieścić pliki w folderze lub w Zespole, otwórz go i upuść je na rysunki albo upuść je na niego na pasku bocznym.",
+  "settings_import_files_drop": "Upuść pliki tutaj lub kliknij, aby je wybrać",
+  "settings_tokens_title": "Tokeny dostępu",
+  "settings_tokens_description": "Połącz klienta AI, np. Claude Code, przez MCP. Token widzi to, co Ty, i może w Twoim imieniu tworzyć rysunki i przenosić je do kosza.",
+  "settings_tokens_new": "Nowy token",
+  "settings_tokens_empty": "Brak tokenów dostępu",
+  "settings_tokens_created": "Utworzony {ago}",
+  "settings_tokens_revoke_failed": "Nie udało się unieważnić tokenu",
+  "settings_tokens_copy_title": "Skopiuj swój token",
+  "settings_tokens_copy_description": "Nie zobaczysz go ponownie. Każdy, kto go ma, może czytać Twoje rysunki i tworzyć nowe w Twoim imieniu, dopóki go nie unieważnisz.",
+  "settings_tokens_token_label": "Token",
+  "settings_tokens_claude_code_label": "Dodaj go do Claude Code",
+  "settings_tokens_new_title": "Nowy token dostępu",
+  "settings_tokens_new_description": "Nazwij go od klienta lub urządzenia, które będzie go używać.",
+  "settings_tokens_name_label": "Nazwa",
+  "settings_tokens_name_placeholder": "Claude Code na moim laptopie",
+  "settings_tokens_create_failed": "Nie udało się utworzyć tokenu",
+  "settings_tokens_create": "Utwórz token",
+  "settings_tokens_creating": "Tworzenie…",
+  "settings_apps_title": "Połączone aplikacje",
+  "settings_apps_description": "Aplikacje, w których logujesz się przez Excaliself, np. konektor Claude.ai. Mają taki sam dostęp jak token.",
+  "settings_apps_empty": "Brak połączonych aplikacji",
+  "settings_apps_connected": "Połączona {ago}",
+  "settings_apps_disconnect": "Odłącz",
+  "settings_apps_disconnect_failed": "Nie udało się odłączyć aplikacji",
+  "settings_instance_title": "Informacje",
+  "settings_instance_description": "Ta instancja w skrócie.",
+  "settings_instance_version": "Wersja",
+  "settings_instance_users": "Użytkownicy",
+  "settings_instance_drawings": "Rysunki",
+  "settings_instance_storage": "Zajęte miejsce",
+  "settings_instance_release_notes": "Informacje o wydaniach na GitHubie",
+  "settings_instance_star": "Daj gwiazdkę na GitHubie",
+  "settings_instance_follow": "Obserwuj na X",
+  "settings_invites_description": "Jednorazowe linki, które dodają członka. Każdy wygasa po 7 dniach — skopiuj oczekujący link, aby wysłać go ponownie.",
+  "settings_invites_generate": "Wygeneruj link",
+  "settings_invites_generating": "Generowanie...",
+  "settings_invites_expires": "Wygasa {date}",
+  "settings_invites_empty": "Brak oczekujących linków z zaproszeniem",
+  "settings_members_count": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "{count} osoba",
+        "countPlural=few": "{count} osoby",
+        "countPlural=many": "{count} osób",
+        "countPlural=*": "{count} osoby"
+      }
+    }
+  ],
+  "settings_members_joined": "Data dołączenia: {date}",
+  "settings_members_role_admin": "Admin",
+  "settings_members_role_member": "Członek",
+  "settings_members_role_label": "Rola: {name}",
+  "settings_members_role_change_failed": "Nie udało się zmienić roli",
+  "settings_members_last_admin": "Ostatniemu administratorowi nie można odebrać roli.",
+  "settings_members_actions": "Akcje: {name}",
+  "settings_members_reset_password": "Zresetuj hasło",
+  "settings_members_reset_pending": "Link do resetu czeka",
+  "settings_members_reset_copied": "Skopiowano link do resetu — jednorazowy, ważny 24 godziny",
+  "settings_members_reset_copy_failed": "Nie udało się skopiować linku do resetu — wygeneruj go ponownie",
+  "settings_members_reset_create_failed": "Nie udało się utworzyć linku do resetu",
+  "settings_members_reset_revoke_failed": "Nie udało się unieważnić linku do resetu",
+  "settings_members_delete": "Usuń użytkownika",
+  "settings_members_delete_title": "Usunąć użytkownika {name}?",
+  "settings_members_delete_failed": "Nie udało się usunąć użytkownika {name}",
+  "settings_members_counts_failed": "Nie udało się wczytać liczby treści użytkownika {name}. Zamknij to okno i spróbuj ponownie.",
+  "settings_members_confirm_loading": "Spowoduje to usunięcie konta użytkownika {name} i trwałe usunięcie wszystkich jego treści. Tej operacji nie można cofnąć.",
+  "settings_members_confirm_contents": "Spowoduje to usunięcie konta użytkownika {name}. Trwale usunięte zostaną też: {contents}.",
+  "settings_members_confirm_empty": "Spowoduje to usunięcie konta użytkownika {name}. To konto nie ma żadnych rysunków ani folderów.",
+  "settings_members_confirm_empty_team": "Spowoduje to usunięcie konta użytkownika {name}. To konto nie ma żadnych prywatnych rysunków ani folderów.",
+  "settings_members_kept_team": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "{count} rysunek zespołu pozostanie w zespole.",
+        "countPlural=few": "{count} rysunki zespołu pozostaną w zespole.",
+        "countPlural=many": "{count} rysunków zespołu pozostanie w zespole.",
+        "countPlural=*": "{count} rysunku zespołu pozostanie w zespole."
+      }
+    }
+  ],
+  "settings_members_demote_title": "Zrezygnować z roli administratora?",
+  "settings_members_demote_description": "Od razu stracisz dostęp do ustawień instancji, takich jak członkowie i zaproszenia. Przywrócić Ci tę rolę może tylko inny administrator.",
+  "settings_members_demote": "Odbierz mi rolę",
+  "settings_members_demoting": "Odbieranie roli…",
+  "settings_profile_save_failed": "Nie udało się zapisać wyświetlanej nazwy",
+  "settings_sessions_revoke_failed": "Nie udało się unieważnić sesji",
+  "settings_sessions_sign_out_others_failed": "Nie udało się wylogować innych sesji",
+  "drawings_import_files": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "Importowanie {count} pliku",
+        "countPlural=few": "Importowanie {count} plików",
+        "countPlural=many": "Importowanie {count} plików",
+        "countPlural=*": "Importowanie {count} pliku"
+      }
+    }
+  ],
+  "drawings_import_progress": "Importowanie {current} z {total}",
+  "drawings_import_failed_one": "Nie udało się zaimportować pliku {name}",
+  "drawings_import_failed": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "Nie udało się zaimportować {count} pliku",
+        "countPlural=few": "Nie udało się zaimportować {count} plików",
+        "countPlural=many": "Nie udało się zaimportować {count} plików",
+        "countPlural=*": "Nie udało się zaimportować {count} pliku"
+      }
+    }
+  ],
+  "drawings_import_supported": "Upuść pliki .excalidraw albo eksporty .png i .svg, które zawierają scenę.",
+  "drawings_import_failed_names": "Nie udało się zaimportować: {names}.",
+  "drawings_import_skipped_images": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "Nie udało się przenieść {count} obrazu. Rysunki pokazują symbol zastępczy.",
+        "countPlural=few": "Nie udało się przenieść {count} obrazów. Rysunki pokazują symbole zastępcze.",
+        "countPlural=many": "Nie udało się przenieść {count} obrazów. Rysunki pokazują symbole zastępcze.",
+        "countPlural=*": "Nie udało się przenieść {count} obrazu. Rysunki pokazują symbole zastępcze."
+      }
+    }
+  ],
+  "drawings_import_imported": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "Zaimportowano {count} rysunek",
+        "countPlural=few": "Zaimportowano {count} rysunki",
+        "countPlural=many": "Zaimportowano {count} rysunków",
+        "countPlural=*": "Zaimportowano {count} rysunku"
+      }
+    }
+  ]
+}

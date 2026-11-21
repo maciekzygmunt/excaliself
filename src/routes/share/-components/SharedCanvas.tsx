@@ -27,8 +27,8 @@ import {
 } from "@/features/drawings/scene"
 import { useDrawingViewport } from "@/features/drawings/use-drawing-viewport"
 import { useBlockClearCanvasShortcut } from "@/hooks/use-block-clear-canvas-shortcut"
-import { useCanvasLanguage } from "@/hooks/use-language"
 import { usePreloadTextFont } from "@/hooks/use-preload-text-font"
+import { getLocale } from "@/paraglide/runtime"
 import { GuestAttribution } from "./GuestAttribution"
 import { GuestNamePill } from "./GuestNamePill"
 import { GuestTitle } from "./GuestTitle"
@@ -102,7 +102,6 @@ export function SharedCanvas({
   )
   // A reset would wipe the drawing for everyone in the room.
   useBlockClearCanvasShortcut()
-  const language = useCanvasLanguage()
 
   const handleNameChange = useCallback((next: string) => {
     const remembered = rememberGuestName(next)
@@ -121,7 +120,7 @@ export function SharedCanvas({
         initialData={getInitialData}
         excalidrawAPI={setExcalidrawAPI}
         theme="light"
-        langCode={language}
+        langCode={getLocale()}
         onChange={handleSceneChange}
         onPointerUpdate={room.onPointerUpdate}
         onScrollChange={room.onScrollChange}

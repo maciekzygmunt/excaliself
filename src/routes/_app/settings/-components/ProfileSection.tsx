@@ -3,6 +3,7 @@ import { Input } from "@/components/ui/input"
 import { emailPrefix } from "@/features/account/display-name"
 import { useUpdateProfile } from "@/features/account/mutations"
 import type { CurrentUser } from "@/features/account/queries"
+import { m } from "@/paraglide/messages"
 
 // Profile block (spec §5.12): optional display name with optimistic save.
 // The sign-in email lives in the Email section below, with its change flow.
@@ -19,9 +20,11 @@ export function ProfileSection({ user }: { user: CurrentUser }) {
   return (
     <section>
       <div className="mb-4">
-        <h2 className="text-sm font-medium text-foreground">Profile</h2>
+        <h2 className="text-sm font-medium text-foreground">
+          {m.settings_profile_title()}
+        </h2>
         <p className="text-xs text-muted-foreground">
-          How you appear to others on this instance
+          {m.settings_profile_description()}
         </p>
       </div>
 
@@ -30,7 +33,9 @@ export function ProfileSection({ user }: { user: CurrentUser }) {
             from elsewhere) remounts the input with the authoritative value
             without fighting in-progress typing. */}
         <Field>
-          <FieldLabel htmlFor="display-name">Display name</FieldLabel>
+          <FieldLabel htmlFor="display-name">
+            {m.settings_profile_name_label()}
+          </FieldLabel>
           <Input
             key={currentName}
             id="display-name"
@@ -44,9 +49,7 @@ export function ProfileSection({ user }: { user: CurrentUser }) {
               if (e.key === "Escape") e.currentTarget.value = currentName
             }}
           />
-          <FieldDescription>
-            Optional — when empty you go by your email prefix.
-          </FieldDescription>
+          <FieldDescription>{m.settings_profile_name_hint()}</FieldDescription>
         </Field>
       </div>
     </section>
