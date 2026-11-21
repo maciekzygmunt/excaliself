@@ -21,7 +21,9 @@ function Harness({
   /** Anything but "skipped" counts as "saved". */
   onSave: (payload: string) => Promise<unknown>
   onChangeRef: { current: ((data: string) => void) | null }
-  flushRef?: { current: (() => Promise<void>) | null }
+  flushRef?: {
+    current: ((options?: { resend?: boolean }) => Promise<void>) | null
+  }
   savedRef?: { current: boolean }
   onError?: (error: unknown) => void
   paused?: boolean
@@ -409,4 +411,32 @@ test("flush retries a failed save instead of rethrowing the old failure", async 
   })
   expect(onSave).toHaveBeenCalledTimes(2)
   expect(onSave).toHaveBeenLastCalledWith("edit")
+})
+
+test("flush with resend saves a state that matches the last save", async () => {
+  const onSave = vi.fn(() => Promise.resolve())
+  const onChangeRef = { current: null as ((data: string) => void) | null }
+  const flushRef = {
+    current: null as ((options?: { resend?: boolean }) => Promise<void>) | null,
+  }
+
+  render(
+    <Harness onSave={onSave} onChangeRef={onChangeRef} flushRef={flushRef} />,
+    { wrapper },
+  )
+
+  act(() => onChangeRef.current?.("scene"))
+  await act(async () => {
+    await flushRef.current?.()
+  })
+  await act(async () => {
+    await flushRef.current?.()
+  })
+  expect(onSave).toHaveBeenCalledTimes(1)
+
+  await act(async () => {
+    await flushRef.current?.({ resend: true })
+  })
+  expect(onSave).toHaveBeenCalledTimes(2)
+  expect(onSave).toHaveBeenLastCalledWith("scene")
 })

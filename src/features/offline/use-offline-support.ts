@@ -5,12 +5,11 @@ import {
   drawingsQueryOptions,
 } from "@/features/drawings/queries"
 import {
-  forgetDeviceDrawing,
   listDeviceDrawings,
   setDeviceAccount,
   supportsDeviceDrawings,
 } from "./store"
-import { useDeviceSync } from "./sync"
+import { forgetUnheldDeviceDrawing, useDeviceSync } from "./sync"
 
 /**
  * The signed-in app's side of offline drawings: installs the offline page,
@@ -45,7 +44,8 @@ export function useOfflineSupport(owner: string) {
       .then((kept) =>
         Promise.all(
           kept.flatMap(({ id }) =>
-            inPrivate.has(id) ? [] : [forgetDeviceDrawing(owner, id)],
+            // An open editor keeps its copy; a later list change retries.
+            inPrivate.has(id) ? [] : [forgetUnheldDeviceDrawing(owner, id)],
           ),
         ),
       )

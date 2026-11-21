@@ -10,6 +10,7 @@ import { sceneRevision } from "@/features/drawings/scene-revision"
 import { syncDeviceDrawing } from "./server"
 import {
   deviceDrawingStatus,
+  forgetDeviceDrawing,
   listPendingDeviceDrawings,
   markDeviceDrawingSaved,
   moveToNewDeviceDrawing,
@@ -35,6 +36,12 @@ export function holdDeviceDrawing(owner: string, id: string) {
   })
   return { granted, release }
 }
+
+/** Drops a clean copy, unless an editor has it open. */
+export const forgetUnheldDeviceDrawing = (owner: string, id: string) =>
+  navigator.locks.request(lockName(owner, id), { ifAvailable: true }, (lock) =>
+    lock ? forgetDeviceDrawing(owner, id) : undefined,
+  )
 
 /**
  * "failed": unreachable, signed out, or refused; the edits stay pending.

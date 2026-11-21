@@ -401,7 +401,9 @@ export function DrawingCanvas({
   const retrying = waitingToSync || (saveFailed && device.keeping)
   useEffect(() => {
     if (!retrying) return
-    const retry = () => void flushAutoSave().catch(() => {})
+    // Resent even if unchanged: an undo may have returned to the last saved
+    // scene, and the failed request may have landed or not.
+    const retry = () => void flushAutoSave({ resend: true }).catch(() => {})
     const interval = setInterval(retry, 10_000)
     window.addEventListener("online", retry)
     return () => {

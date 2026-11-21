@@ -193,7 +193,7 @@ export default function OfflineWorkspace() {
     }
   }, [owner, supported])
 
-  const select = (id: string) => {
+  const open = (id: string) => {
     setSelected(id)
     window.history.replaceState(
       window.history.state,
@@ -202,15 +202,28 @@ export default function OfflineWorkspace() {
     )
   }
 
+  // The open drawing's last edit lands first. If it can't, stay on it.
+  const select = async (id: string) => {
+    if (flushEditor.current && !(await flushEditor.current())) {
+      toast.error("Couldn’t save this drawing on this device", {
+        id: "offline-switch",
+        description: "Your latest edit is only in this tab.",
+        action: { label: "Switch anyway", onClick: () => open(id) },
+      })
+      return
+    }
+    open(id)
+  }
+
   const create = (event: React.FormEvent) => {
     event.preventDefault()
     const trimmed = name.trim()
     if (!owner || !trimmed || creating) return
     setCreating(true)
     createDeviceDrawing(owner, trimmed)
-      .then((drawing) => {
-        select(drawing.id)
+      .then(async (drawing) => {
         setName("")
+        await select(drawing.id)
       })
       .catch(() => toast.error("Couldn’t create a drawing on this device"))
       .finally(() => setCreating(false))
@@ -289,7 +302,7 @@ export default function OfflineWorkspace() {
                   variant={drawing.id === selected ? "secondary" : "ghost"}
                   aria-current={drawing.id === selected ? "page" : undefined}
                   className="justify-start"
-                  onClick={() => select(drawing.id)}
+                  onClick={() => void select(drawing.id)}
                 >
                   <span className="truncate">{drawing.name}</span>
                 </Button>
