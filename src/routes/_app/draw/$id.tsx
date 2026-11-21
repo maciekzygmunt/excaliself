@@ -48,7 +48,8 @@ export const Route = createFileRoute("/_app/draw/$id")({
           href: `/offline?drawing=${encodeURIComponent(params.id)}`,
           reloadDocument: true,
         })
-      if (outcome.status === "synced")
+      // Either way the stored scene changed: a cached one is stale.
+      if (outcome.status === "synced" || outcome.status === "copied")
         context.queryClient.removeQueries({
           queryKey: drawingQueryOptions(params.id).queryKey,
           exact: true,

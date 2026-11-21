@@ -1,11 +1,19 @@
 import { Excalidraw, MainMenu } from "@excalidraw/excalidraw"
+import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types"
 import { ArrowLeft, CloudOff, Plus } from "lucide-react"
 import { type RefObject, useEffect, useRef, useState } from "react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import {
+  markImageStatus,
+  toastImageTooLarge,
+} from "@/features/collab/use-room-files"
 import { MAX_NAME_LENGTH } from "@/features/drawings/list-columns"
-import { buildInitialSceneData } from "@/features/drawings/scene"
+import {
+  buildInitialSceneData,
+  selectOversizedImages,
+} from "@/features/drawings/scene"
 import { useCanvasTheme, useStoredTheme } from "@/hooks/use-theme"
 import {
   createDeviceDrawing,
@@ -70,6 +78,10 @@ function Canvas({
   const [{ initialData, isDataCorrupt }] = useState(() =>
     buildInitialSceneData(drawing),
   )
+  const [api, setApi] = useState<ExcalidrawImperativeAPI | null>(null)
+  const [stored] = useState(
+    () => new Set(drawing.files.map((file) => file.fileId)),
+  )
   const draft = useDeviceDraft(isDataCorrupt ? null : owner, drawing.id)
   const { base, writer } = draft
   useEffect(() => {
@@ -100,9 +112,21 @@ function Canvas({
           theme={theme}
           initialData={{ ...initialData, scrollToContent: true }}
           viewModeEnabled={isDataCorrupt || undefined}
-          onChange={(elements, appState, files) =>
+          excalidrawAPI={setApi}
+          onChange={(elements, appState, files) => {
+            // The server would refuse these, so flag them as the online
+            // editor does.
+            if (api)
+              for (const fileId of selectOversizedImages(
+                elements,
+                files,
+                stored,
+              )) {
+                markImageStatus(api, fileId, "error")
+                toastImageTooLarge()
+              }
             draft.onChange({ elements, appState, files })
-          }
+          }}
           UIOptions={{
             canvasActions: { loadScene: false, toggleTheme: false },
           }}

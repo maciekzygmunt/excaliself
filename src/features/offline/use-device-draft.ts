@@ -22,8 +22,13 @@ export function useDeviceDraft(owner: string | null, id: string | null) {
   const writer = useRef("")
   const [state, setState] = useState<"opened" | "written" | "failed">("opened")
 
+  // A change made before the copy is ready, written once it is.
+  const missed = useRef<SceneData | null>(null)
   const write = useDebounceCallback((scene: SceneData) => {
-    if (!owner || !id) return
+    if (!owner || !id) {
+      missed.current = scene
+      return
+    }
     const payload = buildScenePayload(scene)
     const sig = getScenePayloadSignature(payload)
     if (sig === writtenSig.current) return
@@ -61,6 +66,13 @@ export function useDeviceDraft(owner: string | null, id: string | null) {
     write.flush()
     return writes.current
   }, [write])
+
+  useEffect(() => {
+    const scene = missed.current
+    if (!owner || !id || !scene) return
+    missed.current = null
+    write.run(scene)
+  }, [owner, id, write])
 
   useEffect(() => () => write.flush(), [write])
 

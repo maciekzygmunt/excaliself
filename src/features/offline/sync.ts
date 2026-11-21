@@ -125,7 +125,8 @@ function syncAll(owner: string, onSynced?: (id: string) => void) {
     .then(async (ids) => {
       for (const id of ids) {
         const outcome = await syncDeviceDrawingNow(owner, id)
-        if (outcome.status === "synced") onSynced?.(id)
+        if (outcome.status === "synced" || outcome.status === "copied")
+          onSynced?.(id)
         if (outcome.status === "copied") toastCopied(outcome)
       }
     })
@@ -138,7 +139,8 @@ function syncAll(owner: string, onSynced?: (id: string) => void) {
 
 /**
  * Syncs on load, on reconnect, on focus, and every 10 seconds. `onSynced`
- * gets each drawing whose stored scene the sync replaced.
+ * gets each drawing whose stored scene changed: replaced, or changed
+ * elsewhere so the edits went up as a copy.
  */
 export function useDeviceSync(
   owner: string | null,
