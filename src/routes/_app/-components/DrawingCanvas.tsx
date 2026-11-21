@@ -61,10 +61,8 @@ import {
 } from "@/features/drawings/scene"
 import { useDrawingViewport } from "@/features/drawings/use-drawing-viewport"
 import { useTeamLibrary } from "@/features/library/use-team-library"
-import {
-  forgetDeviceDrawing,
-  supportsDeviceDrawings,
-} from "@/features/offline/store"
+import { supportsDeviceDrawings } from "@/features/offline/store"
+import { forgetDeviceDrawingWhenFree } from "@/features/offline/sync"
 import { useDeviceCopy } from "@/features/offline/use-device-copy"
 import { drawingShareQueryOptions } from "@/features/shares/queries"
 import { useAutoSave } from "@/hooks/use-auto-save"
@@ -331,7 +329,8 @@ export function DrawingCanvas({
   // sync as a new drawing.
   useEffect(() => {
     if (isLive && userId && supportsDeviceDrawings())
-      void forgetDeviceDrawing(userId, drawingId).catch(() => {})
+      // Waits for every editor, here and in other tabs, to let go first.
+      void forgetDeviceDrawingWhenFree(userId, drawingId).catch(() => {})
   }, [isLive, userId, drawingId])
   const [waitingToSync, setWaitingToSync] = useState(false)
   // A save failed. Retried once the device copy holds the edits, even if it

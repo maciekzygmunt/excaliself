@@ -5,7 +5,9 @@
 
 import { useEffect, useRef } from "react"
 import { toast } from "sonner"
+import { MAX_DRAWING_IMAGE_BYTES } from "@/features/collab/room-files"
 import { MAX_NAME_LENGTH } from "@/features/drawings/list-columns"
+import type { PersistedFile } from "@/features/drawings/scene"
 import { sceneRevision } from "@/features/drawings/scene-revision"
 import { syncDeviceDrawing } from "./server"
 import {
@@ -37,6 +39,12 @@ export function holdDeviceDrawing(owner: string, id: string) {
   return { granted, release }
 }
 
+/** Drops a clean copy once no editor has it open. */
+export const forgetDeviceDrawingWhenFree = (owner: string, id: string) =>
+  navigator.locks.request(lockName(owner, id), () =>
+    forgetDeviceDrawing(owner, id),
+  )
+
 /** Drops a clean copy, unless an editor has it open. */
 export const forgetUnheldDeviceDrawing = (owner: string, id: string) =>
   navigator.locks.request(lockName(owner, id), { ifAvailable: true }, (lock) =>
@@ -58,6 +66,18 @@ export function toastCopied(copied: { name: string; copyName: string }) {
   })
 }
 
+// More than the server keeps per drawing, well under the request body cap.
+// The rest come back as refused and get reported.
+const UPLOAD_BUDGET = 2 * MAX_DRAWING_IMAGE_BYTES
+
+function withinUploadBudget(files: readonly PersistedFile[]) {
+  let total = 0
+  return files.flatMap(({ fileId, dataUrl }) => {
+    total += dataUrl.length
+    return total <= UPLOAD_BUDGET ? [{ fileId, dataUrl }] : []
+  })
+}
+
 async function upload(owner: string, id: string): Promise<SyncOutcome> {
   const drawing = await readDeviceDrawing(owner, id)
   if (drawing?.status !== "pending") return { status: "clean" }
@@ -71,10 +91,7 @@ async function upload(owner: string, id: string): Promise<SyncOutcome> {
         name,
         baseRevision,
         data,
-        files: drawing.files.map(({ fileId, dataUrl }) => ({
-          fileId,
-          dataUrl,
-        })),
+        files: withinUploadBudget(drawing.files),
       },
     })
   } catch {

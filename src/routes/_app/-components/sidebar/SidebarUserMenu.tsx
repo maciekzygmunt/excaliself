@@ -57,7 +57,8 @@ export function SidebarUserMenu({ user }: { user: SidebarUser }) {
             <DropdownMenuSeparator />
           </>
         )}
-        <DropdownMenuItem render={<a href="/offline" />}>
+        {/* Client-side, so the open canvas unmounts and flushes its edits. */}
+        <DropdownMenuItem render={<Link to="/offline" />}>
           <CloudOff className="mr-2 h-4 w-4" />
           Offline drawings
         </DropdownMenuItem>
