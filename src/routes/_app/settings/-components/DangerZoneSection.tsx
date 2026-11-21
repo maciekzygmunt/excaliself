@@ -11,7 +11,11 @@ import {
 import { deleteMyAccount } from "@/features/account/server"
 import type { OwnedContentCounts } from "@/features/admin/delete-user"
 import { describeKeptTeamDrawings } from "@/features/admin/delete-user-copy"
-import { setDeviceAccount } from "@/features/offline/store"
+import {
+  purgeDeviceDrawings,
+  setDeviceAccount,
+  supportsDeviceDrawings,
+} from "@/features/offline/store"
 import { describeContents } from "@/features/trash/destroy-copy"
 
 // The Account danger zone (issue #67, spec §4.5 tier 3): one isolated card,
@@ -32,10 +36,12 @@ export function DangerZoneSection({ user }: { user: CurrentUser }) {
 
   const deleteMutation = useMutation({
     mutationFn: () => deleteMyAccount(),
-    onSuccess: () => {
+    onSuccess: async () => {
       // The account and its sessions are gone; a hard navigation drops every
-      // client cache along with them.
+      // client cache along with them. Its drawings on this device go too.
       setDeviceAccount(null)
+      if (supportsDeviceDrawings())
+        await purgeDeviceDrawings(user.id).catch(() => {})
       window.location.href = "/login"
     },
     onError: () => toast.error("Couldn't delete your account"),

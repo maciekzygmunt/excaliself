@@ -10,7 +10,7 @@ import {
   drawingsQueryOptions,
 } from "@/features/drawings/queries"
 import {
-  deviceDrawingStatus,
+  deviceDrawingRecord,
   supportsDeviceDrawings,
 } from "@/features/offline/store"
 import { syncDeviceDrawingNow, toastCopied } from "@/features/offline/sync"
@@ -37,9 +37,11 @@ const LoadingState = () => (
 
 export const Route = createFileRoute("/_app/draw/$id")({
   ssr: false,
-  // A hover preload would skip the device sync below, and the click would
-  // reuse it: the editor would open over edits this device still holds.
+  // The device sync below must finish before each open. A hover preload or
+  // a kept match would let the canvas open first, over edits this device or
+  // another tab still holds.
   preload: false,
+  gcTime: 0,
   loader: async ({ params, context }) => {
     const { queryClient } = context
     const detail = drawingQueryOptions(params.id)
@@ -65,8 +67,16 @@ export const Route = createFileRoute("/_app/draw/$id")({
     // Offline, the fetch would wait for the network instead of failing.
     const keptHere = () =>
       owner
-        ? deviceDrawingStatus(owner, params.id).catch(() => undefined)
+        ? deviceDrawingRecord(owner, params.id).catch(() => undefined)
         : undefined
+    // Another tab may have uploaded this device's edits: a cached scene that
+    // differs from the clean copy is stale.
+    const cached = queryClient.getQueryData(detail.queryKey)
+    if (cached) {
+      const kept = await keptHere()
+      if (kept?.status === "clean" && kept.data !== cached.data)
+        queryClient.removeQueries({ queryKey: detail.queryKey, exact: true })
+    }
     if (
       !onlineManager.isOnline() &&
       queryClient.getQueryData(detail.queryKey) === undefined &&

@@ -51,6 +51,10 @@ const cached = async (request) => {
   return response
 }
 
+// What a proxy answers for an origin it can't reach. 521-524: Cloudflare.
+const unreachable = (status) =>
+  (status >= 502 && status <= 504) || (status >= 521 && status <= 524)
+
 self.addEventListener("fetch", (event) => {
   const { request } = event
   const url = new URL(request.url)
@@ -65,9 +69,7 @@ self.addEventListener("fetch", (event) => {
     event.respondWith(
       fetch(request, { signal: AbortSignal.timeout(10_000) })
         .then((response) =>
-          response.status >= 502 && response.status <= 504
-            ? offlinePage(url)
-            : response,
+          unreachable(response.status) ? offlinePage(url) : response,
         )
         .catch(() => offlinePage(url)),
     )

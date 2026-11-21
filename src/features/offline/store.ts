@@ -178,13 +178,12 @@ export const readDeviceDrawing = (owner: string, id: string) =>
   })
 
 /** The record without its images. */
-export const deviceDrawingStatus = (owner: string, id: string) =>
-  transact("readonly", async ({ drawings }) => {
-    const drawing: DeviceDrawing | undefined = await done(
-      drawings.get([owner, id]),
-    )
-    return drawing?.status
-  })
+export const deviceDrawingRecord = (owner: string, id: string) =>
+  transact(
+    "readonly",
+    ({ drawings }): Promise<DeviceDrawing | undefined> =>
+      done(drawings.get([owner, id])),
+  )
 
 /** Names only: a key cursor on the names index never loads scenes or images. */
 export const listDeviceDrawings = (owner: string) =>
@@ -371,5 +370,14 @@ export function forgetDeviceDrawing(owner: string, id: string) {
     if (current?.status !== "clean") return
     drawings.delete([owner, id])
     files.delete(filesOf(owner, id))
+  })
+}
+
+/** Drops every copy an account kept. For an account that was deleted. */
+export function purgeDeviceDrawings(owner: string) {
+  const all = IDBKeyRange.bound([owner], [owner, []])
+  return transact("readwrite", async ({ drawings, files }) => {
+    drawings.delete(all)
+    files.delete(all)
   })
 }

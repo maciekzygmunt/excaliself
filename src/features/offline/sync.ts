@@ -11,7 +11,7 @@ import type { PersistedFile } from "@/features/drawings/scene"
 import { sceneRevision } from "@/features/drawings/scene-revision"
 import { syncDeviceDrawing } from "./server"
 import {
-  deviceDrawingStatus,
+  deviceDrawingRecord,
   forgetDeviceDrawing,
   listPendingDeviceDrawings,
   markDeviceDrawingSaved,
@@ -135,7 +135,7 @@ export async function syncDeviceDrawingNow(
 ): Promise<SyncOutcome> {
   try {
     // Checked first, so an editor open in another tab costs no wait.
-    if ((await deviceDrawingStatus(owner, id)) !== "pending")
+    if ((await deviceDrawingRecord(owner, id))?.status !== "pending")
       return { status: "clean" }
     return await navigator.locks.request(
       lockName(owner, id),
