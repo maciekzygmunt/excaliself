@@ -44,7 +44,11 @@ export const signInFormSchema = z.object({
 /** Set-new-password form for the password-reset page. */
 export const newPasswordFormSchema = z
   .object({
-    password: z.string().min(8, { error: () => m.auth_password_too_short() }),
+    // The reset server function takes at most 128, as Better Auth does.
+    password: z
+      .string()
+      .min(8, { error: () => m.auth_password_too_short() })
+      .max(128, { error: () => m.auth_error_password_too_long() }),
     confirmPassword: z
       .string()
       .min(8, { error: () => m.auth_password_too_short() }),

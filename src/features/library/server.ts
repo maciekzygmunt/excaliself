@@ -10,6 +10,7 @@ import { listUpdates } from "@/features/list-updates/hub"
 import { LIBRARY_CHANGED } from "@/features/list-updates/protocol"
 import { createRateLimiter } from "@/lib/rate-limit"
 import { authMiddleware } from "@/middleware/auth"
+import { m } from "@/paraglide/messages"
 import {
   LIBRARY_CHANGES_PER_MINUTE,
   MAX_LIBRARY_BYTES,
@@ -44,7 +45,7 @@ const libraryResponse = (json: string) =>
 
 const MiB = 1024 * 1024
 
-/** Why a change was not saved, for the editor to show. */
+/** Why a change was not saved, for the editor to show, in the member's language. */
 const refusal = (status: 413 | 429, message: string) =>
   new Response(message, { status })
 
@@ -77,7 +78,7 @@ export const changeLibrary = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     if (!changeBudget.allow(context.session.user.id, Date.now()))
-      return refusal(429, "Too many library changes. Try again in a minute.")
+      return refusal(429, m.library_error_rate_limited())
     if (
       data.add.some(
         (item) =>
@@ -86,7 +87,7 @@ export const changeLibrary = createServerFn({ method: "POST" })
     )
       return refusal(
         413,
-        `This item is too large for the team library. Each item can be up to ${MAX_LIBRARY_ITEM_BYTES / MiB} MB.`,
+        m.library_error_item_too_large({ max: MAX_LIBRARY_ITEM_BYTES / MiB }),
       )
 
     let json: string
@@ -124,7 +125,7 @@ export const changeLibrary = createServerFn({ method: "POST" })
       if (!(error instanceof LibraryFull)) throw error
       return refusal(
         413,
-        `The team library is full (${MAX_LIBRARY_BYTES / MiB} MB). Remove some items to add more.`,
+        m.library_error_full({ max: MAX_LIBRARY_BYTES / MiB }),
       )
     }
     listUpdates.notify(LIBRARY_CHANGED)

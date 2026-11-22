@@ -4,6 +4,7 @@ import { toast } from "sonner"
 import { FormTextField } from "@/components/form-text-field"
 import { Button } from "@/components/ui/button"
 import { FieldGroup } from "@/components/ui/field"
+import { authErrorMessage } from "@/features/auth/errors"
 import { signInFormSchema } from "@/features/auth/schema"
 import { authClient } from "@/lib/auth-client"
 import { m } from "@/paraglide/messages"
@@ -22,7 +23,7 @@ export function SignInForm({ onSignedIn, children }: Props) {
     onSubmit: async ({ value }) => {
       const result = await authClient.signIn.email(value)
       if (result.error) {
-        toast.error(result.error.message)
+        toast.error(authErrorMessage(result.error, m.auth_login_failed()))
         return
       }
       await onSignedIn()

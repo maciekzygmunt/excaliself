@@ -37,6 +37,21 @@ export function matchLanguage(preferred: readonly string[]): Locale {
   return baseLocale
 }
 
+// An Accept-Language header's tags, most preferred first. Sorts by q (a
+// stable sort keeps header order for ties) and drops q=0, "not this one".
+function preferredLanguages(header: string): string[] {
+  return header
+    .split(",")
+    .map((part) => {
+      const [tag, ...params] = part.split(";").map((item) => item.trim())
+      const q = params.find((param) => param.startsWith("q="))
+      return { tag, q: q ? Number(q.slice(2)) : 1 }
+    })
+    .filter(({ tag, q }) => tag && q > 0)
+    .sort((a, b) => b.q - a.q)
+    .map(({ tag }) => tag)
+}
+
 // The chosen language from a Cookie header, if valid.
 export function readLanguageCookie(cookies: string): Locale | undefined {
   for (const pair of cookies.split(";")) {
@@ -51,9 +66,7 @@ defineCustomServerStrategy("custom-request", {
     request &&
     (readLanguageCookie(request.headers.get("cookie") ?? "") ??
       matchLanguage(
-        (request.headers.get("accept-language") ?? "")
-          .split(",")
-          .map((tag) => tag.split(";")[0].trim()),
+        preferredLanguages(request.headers.get("accept-language") ?? ""),
       )),
 })
 

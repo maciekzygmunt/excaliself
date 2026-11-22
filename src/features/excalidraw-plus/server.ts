@@ -13,7 +13,12 @@ import { env } from "@/env"
 import { accessibleTo } from "@/features/spaces/access"
 import { authMiddleware } from "@/middleware/auth"
 import { listsChangedMiddleware } from "@/middleware/lists-changed"
-import { excalidrawPlusApi, PRIVATE_COLLECTION } from "./api"
+import { m } from "@/paraglide/messages"
+import {
+  ExcalidrawPlusError,
+  excalidrawPlusApi,
+  PRIVATE_COLLECTION,
+} from "./api"
 import { canImportShared, type ImportScene, importScene } from "./import"
 
 const apiKey = z.string().trim().min(1).max(1000)
@@ -33,9 +38,7 @@ export const scanExcalidrawPlus = createServerFn({ method: "POST" })
       const api = excalidrawPlusApi(env.EXCALIDRAW_PLUS_API_URL, data.apiKey)
       const shared = await canImportShared(db, userId)
       if (!shared && api.keyType === "workspace")
-        throw new Error(
-          "A workspace key can't read your private scenes. Use a personal key (uk-…).",
-        )
+        throw new Error(m.settings_import_error_workspace_key())
       const collections = shared
         ? (await api.collections()).filter(
             (collection) => collection.id !== PRIVATE_COLLECTION,
@@ -101,7 +104,16 @@ export const importExcalidrawPlusScene = createServerFn({ method: "POST" })
       const content = await excalidrawPlusApi(
         env.EXCALIDRAW_PLUS_API_URL,
         data.apiKey,
-      ).sceneContent(data.scene.id)
+      )
+        .sceneContent(data.scene.id)
+        .catch((error: unknown) => {
+          // Only an error's message reaches the client, so the import page
+          // gets a rejected key as a result it can stop on.
+          if (error instanceof ExcalidrawPlusError && error.status === 401)
+            return null
+          throw error
+        })
+      if (!content) return { status: "key-rejected" as const }
       return importScene(db, context.session.user.id, {
         scene: data.scene,
         content,
@@ -115,7 +127,7 @@ async function readableErrors<T>(run: () => Promise<T>): Promise<T> {
     return await run()
   } catch (error) {
     if (error instanceof z.ZodError)
-      throw new Error("Excalidraw+ sent data this import can't read")
+      throw new Error(m.settings_import_error_unreadable())
     throw error
   }
 }

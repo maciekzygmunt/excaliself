@@ -57,8 +57,8 @@ applies to the whole app, the drawing canvas, and the sign-in pages. The page
 reloads when you pick one. Until you pick one, Excaliself uses your browser's
 language if it is on that list, also in a regional form (French (Canada) gets
 Français), and English if not. Guests on a share link get their browser's
-language the same way. Some error messages from the server are still in
-English.
+language the same way. Error messages from the server use the same language.
+A few rare sign-in errors stay in English.
 
 ## Instance stats
 

@@ -14,6 +14,7 @@ import { clientIpKey, socketIpOf } from "@/lib/client-ip"
 import { processSingleton } from "@/lib/process-singleton"
 import { createRateLimiter } from "@/lib/rate-limit"
 import { adminMiddleware } from "@/middleware/admin"
+import { m } from "@/paraglide/messages"
 
 const usableReset = (token: string) =>
   and(
@@ -131,7 +132,7 @@ export const resetPasswordWithToken = createServerFn({ method: "POST" })
       socketIp: socketIpOf(request),
     })
     if (failedResets.exhausted(ip, Date.now()))
-      throw new Error("Too many attempts. Try again in a minute.")
+      throw new Error(m.auth_error_rate_limited())
 
     // A cheap read first: the hash below costs 32 MiB of scrypt.
     const [usable] = await db
@@ -140,7 +141,7 @@ export const resetPasswordWithToken = createServerFn({ method: "POST" })
       .where(usableReset(data.token))
     if (!usable) {
       failedResets.allow(ip, Date.now())
-      throw new Error("Invalid or expired reset link")
+      throw new Error(m.auth_reset_error_invalid_link())
     }
 
     // Hash with better-auth's own hasher so signInEmail verifies against it;
@@ -160,7 +161,7 @@ export const resetPasswordWithToken = createServerFn({ method: "POST" })
         .where(usableReset(data.token))
         .returning({ userId: passwordResets.userId })
       if (consumed.length === 0) {
-        throw new Error("Invalid or expired reset link")
+        throw new Error(m.auth_reset_error_invalid_link())
       }
       const userId = consumed[0].userId
 
@@ -168,7 +169,7 @@ export const resetPasswordWithToken = createServerFn({ method: "POST" })
         .select({ email: users.email })
         .from(users)
         .where(eq(users.id, userId))
-      if (!user) throw new Error("Invalid or expired reset link")
+      if (!user) throw new Error(m.auth_reset_error_invalid_link())
 
       const updated = await tx
         .update(accounts)
