@@ -28,6 +28,7 @@ import {
 import { useDrawingViewport } from "@/features/drawings/use-drawing-viewport"
 import { useBlockClearCanvasShortcut } from "@/hooks/use-block-clear-canvas-shortcut"
 import { usePreloadTextFont } from "@/hooks/use-preload-text-font"
+import { m } from "@/paraglide/messages"
 import { getLocale } from "@/paraglide/runtime"
 import { GuestAttribution } from "./GuestAttribution"
 import { GuestNamePill } from "./GuestNamePill"
@@ -180,7 +181,7 @@ export function SharedCanvas({
           <MainMenu.DefaultItems.SearchMenu />
           <MainMenu.DefaultItems.Help />
           <MainMenu.Separator />
-          <MainMenu.Group title="Excalidraw links">
+          <MainMenu.Group title={m.guest_excalidraw_links()}>
             <MainMenu.DefaultItems.Socials />
           </MainMenu.Group>
         </MainMenu>
@@ -208,7 +209,7 @@ function MenuSignIn({ token }: { token: string }) {
         navigate({ to: "/login", search: { redirect: `/share/${token}` } })
       }
     >
-      Sign in
+      {m.guest_sign_in()}
     </MainMenu.Item>
   )
 }

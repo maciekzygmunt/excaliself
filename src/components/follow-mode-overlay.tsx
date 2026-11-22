@@ -2,6 +2,7 @@
 // so every canvas that joins a room must mount this.
 
 import type { RoomPresence } from "@/features/collab/use-room"
+import { m } from "@/paraglide/messages"
 
 export function FollowModeOverlay({ room }: { room: RoomPresence }) {
   const participant = room.followedParticipant
@@ -18,7 +19,7 @@ export function FollowModeOverlay({ room }: { room: RoomPresence }) {
         className="pointer-events-auto mb-4 cursor-pointer rounded-full px-3 py-1.5 text-xs font-medium text-white shadow-sm transition-opacity hover:opacity-90"
         style={{ backgroundColor: participant.color.background }}
       >
-        Following {participant.name} — click to stop
+        {m.collab_following({ name: participant.name })}
       </button>
     </div>
   )

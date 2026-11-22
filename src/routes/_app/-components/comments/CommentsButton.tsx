@@ -6,6 +6,7 @@ import { MessageSquareIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { commentThreadsQueryOptions } from "@/features/comments/queries"
 import { cn } from "@/lib/utils"
+import { m } from "@/paraglide/messages"
 
 export function useCommentCounts(drawingId: string) {
   const { data: threads = [] } = useQuery(commentThreadsQueryOptions(drawingId))
@@ -32,16 +33,16 @@ export function CommentsButton({
   const count = unread || open
   const label =
     unread > 0
-      ? `Comments, ${unread} unread`
+      ? m.comments_button_unread({ count: unread })
       : open > 0
-        ? `Comments, ${open} open`
-        : "Comments"
+        ? m.comments_button_open({ count: open })
+        : m.comments_title()
   return (
     <Button
       onClick={onClick}
       aria-label={label}
       aria-pressed={active}
-      title="Comments"
+      title={m.comments_title()}
       className={cn("relative gap-1.5 px-2.5", className)}
     >
       <MessageSquareIcon className="h-3.5 w-3.5" />

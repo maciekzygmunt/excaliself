@@ -24,6 +24,7 @@ import { drawingsQueryOptions } from "@/features/drawings/queries"
 import { foldersQueryOptions } from "@/features/folders/queries"
 import { useIsApplePlatform } from "@/hooks/use-is-apple-platform"
 import { cn } from "@/lib/utils"
+import { m } from "@/paraglide/messages"
 import { useActiveSpace } from "../ActiveSpace"
 import { useCommandPalette } from "../CommandPalette"
 import { useCreateDialog } from "../CreateDialog"
@@ -115,7 +116,7 @@ export function DrawSidebar({ user }: { user: SidebarUser }) {
             )}
           >
             <Plus className="h-3 w-3 text-iris" strokeWidth={2.5} />
-            New drawing
+            {m.sidebar_new_drawing()}
             <Kbd>N</Kbd>
           </button>
         </div>
@@ -133,7 +134,9 @@ export function DrawSidebar({ user }: { user: SidebarUser }) {
               className="h-3.25 w-3.25 shrink-0 text-muted-foreground/50"
               strokeWidth={2.5}
             />
-            <span className="flex-1 truncate text-left">Search</span>
+            <span className="flex-1 truncate text-left">
+              {m.sidebar_search()}
+            </span>
             <Kbd>{isApplePlatform ? "⌘K" : "Ctrl K"}</Kbd>
           </button>
         </div>
@@ -166,7 +169,11 @@ export function DrawSidebar({ user }: { user: SidebarUser }) {
           {/* Pinned below the scroll region — Trash stays reachable no
               matter how tall the tree grows (spec §2.3). */}
           <SidebarMenu className="gap-0">
-            <SidebarNavItem to="/trash" label="Trash" icon={Trash2} />
+            <SidebarNavItem
+              to="/trash"
+              label={m.sidebar_trash()}
+              icon={Trash2}
+            />
           </SidebarMenu>
           <SidebarUserMenu user={user} />
         </SidebarFooter>
@@ -181,7 +188,7 @@ function SidebarToggle() {
     <button
       type="button"
       onClick={toggleSidebar}
-      aria-label="Toggle Sidebar"
+      aria-label={m.sidebar_toggle()}
       className="-m-1.5 ml-auto rounded-md p-1.5 text-muted-foreground/70 transition-colors hover:bg-sidebar-accent hover:text-muted-foreground focus-visible:bg-sidebar-accent focus-visible:outline-none"
     >
       <PanelLeft className="h-3.5 w-3.5" />
@@ -255,7 +262,7 @@ function SpaceBody({
 
       <div className="flex items-center justify-between pt-2 pb-0.5 pr-3 pl-4">
         <span className="text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground/60">
-          Drawings
+          {m.sidebar_drawings()}
         </span>
         <div className="flex items-center gap-1">
           <span className="font-mono text-[10px] tabular-nums text-muted-foreground/70">
@@ -313,11 +320,11 @@ function CreateMenu({
       <DropdownMenuContent align="end" className="w-48" finalFocus={false}>
         <DropdownMenuItem onClick={onCreateDrawing}>
           <File className="mr-2 h-4 w-4" />
-          New drawing
+          {m.sidebar_new_drawing()}
         </DropdownMenuItem>
         <DropdownMenuItem onClick={onCreateFolder}>
           <Folder className="mr-2 h-4 w-4" />
-          New folder
+          {m.sidebar_new_folder()}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

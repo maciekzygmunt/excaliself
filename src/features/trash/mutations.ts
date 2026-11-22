@@ -5,6 +5,7 @@ import { drawingsQueryOptions } from "@/features/drawings/queries"
 import { restoreDrawing } from "@/features/drawings/server"
 import { foldersQueryOptions } from "@/features/folders/queries"
 import { restoreFolder } from "@/features/folders/server"
+import { m } from "@/paraglide/messages"
 import {
   type TrashedDrawing,
   type TrashedFolder,
@@ -14,8 +15,6 @@ import {
 import { deleteTrashUnitForever, emptyTrash } from "./server"
 
 const isTeam = (unit: { space: Space }) => unit.space === "team"
-
-const RESTORED_TO_ROOT_TOAST = "Restored to root — its folder no longer exists"
 
 /**
  * Restore a trashed drawing (spec §5.11): the trash card vanishes
@@ -47,10 +46,10 @@ export function useRestoreTrashedDrawing() {
     },
     onError: (_err, _vars, context) => {
       queryClient.setQueryData(trashKey, context?.previous)
-      toast.error("Couldn't restore drawing")
+      toast.error(m.drawings_restore_failed())
     },
     onSuccess: (result) => {
-      if (result.originalFolderGone) toast(RESTORED_TO_ROOT_TOAST)
+      if (result.originalFolderGone) toast(m.trash_restored_to_root())
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: trashKey })
@@ -86,10 +85,10 @@ export function useRestoreTrashedFolder() {
     },
     onError: (_err, _vars, context) => {
       queryClient.setQueryData(trashKey, context?.previous)
-      toast.error("Couldn't restore folder")
+      toast.error(m.folder_restore_failed())
     },
     onSuccess: (result) => {
-      if (result.originalParentGone) toast(RESTORED_TO_ROOT_TOAST)
+      if (result.originalParentGone) toast(m.trash_restored_to_root())
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: trashKey })
@@ -114,7 +113,7 @@ export function useDeleteTrashUnitForever() {
 
   const mutation = useMutation({
     mutationFn: deleteTrashUnitForever,
-    onError: () => toast.error("Couldn't delete — nothing was removed"),
+    onError: () => toast.error(m.trash_delete_failed()),
     onSuccess: (_result, { data: id }) => {
       queryClient.setQueryData<TrashItems>(trashKey, (current) =>
         current
@@ -143,7 +142,7 @@ export function useEmptyTrash() {
 
   const mutation = useMutation({
     mutationFn: () => emptyTrash(),
-    onError: () => toast.error("Couldn't empty trash"),
+    onError: () => toast.error(m.trash_empty_failed()),
     onSuccess: () => {
       queryClient.setQueryData<TrashItems>(trashKey, (current) =>
         current

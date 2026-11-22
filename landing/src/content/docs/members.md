@@ -51,13 +51,14 @@ dark setting and switches along with it. The drawing canvas follows the theme
 unless you pin it to Light or Dark there. Sign-in pages and share links stay
 light.
 
-**Language**, also under **Appearance**, sets the language of the drawing
-canvas and of the **Settings** pages for this browser: English, Français,
-Deutsch, Español, Polski, or 简体中文. The page reloads when you pick one.
-Until you pick one, Excaliself uses your browser's language if it is on that
-list, also in a regional form (French (Canada) gets Français), and English if
-not. Guests on a share link get their browser's language the same way. The
-rest of Excaliself is still in English.
+**Language**, also under **Appearance**, sets the language of Excaliself for
+this browser: English, Français, Deutsch, Español, Polski, or 简体中文. It
+applies to the whole app, the drawing canvas, and the sign-in pages. The page
+reloads when you pick one. Until you pick one, Excaliself uses your browser's
+language if it is on that list, also in a regional form (French (Canada) gets
+Français), and English if not. Guests on a share link get their browser's
+language the same way. Some error messages from the server are still in
+English.
 
 ## Instance stats
 

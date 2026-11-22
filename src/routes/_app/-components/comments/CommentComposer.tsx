@@ -5,6 +5,7 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { MAX_COMMENT_LENGTH } from "@/features/comments/limits"
 import { cn } from "@/lib/utils"
+import { m } from "@/paraglide/messages"
 
 const SHOW_COUNT_FROM = MAX_COMMENT_LENGTH - 200
 
@@ -74,7 +75,7 @@ export function CommentComposer({
         <div className="ml-auto flex gap-2">
           {onCancel && (
             <Button type="button" variant="ghost" size="sm" onClick={onCancel}>
-              Cancel
+              {m.comments_cancel()}
             </Button>
           )}
           <Button

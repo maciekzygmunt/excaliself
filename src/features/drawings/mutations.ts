@@ -6,6 +6,7 @@ import {
   removeById,
   useOptimisticListMutation,
 } from "@/hooks/use-optimistic-list-mutation"
+import { m } from "@/paraglide/messages"
 import { type Drawing, drawingsQueryOptions } from "./queries"
 import {
   createDrawing,
@@ -49,13 +50,13 @@ export function useDuplicateDrawing() {
       return duplicateDrawing({ data: id })
     },
     onSuccess: (copy) =>
-      toast(`Created "${copy.name}"`, {
+      toast(m.drawings_duplicated({ name: copy.name }), {
         action: {
-          label: "Open",
+          label: m.drawings_open(),
           onClick: () => navigate({ to: "/draw/$id", params: { id: copy.id } }),
         },
       }),
-    onError: () => toast.error("Couldn't duplicate drawing"),
+    onError: () => toast.error(m.drawings_duplicate_failed()),
     onSettled: () => queryClient.invalidateQueries(drawingsQueryOptions()),
   })
 }
@@ -66,7 +67,7 @@ export function useRenameDrawing() {
     mutationFn: updateDrawing,
     optimisticUpdate: (drawings, { data }) =>
       patchById(drawings, data.id, { name: data.updateData.name }),
-    onRollback: () => toast.error("Failed to rename"),
+    onRollback: () => toast.error(m.drawings_rename_failed()),
   })
 }
 
@@ -78,7 +79,7 @@ export function useMoveDrawingToFolder() {
       patchById(drawings, data.id, {
         folderId: data.updateData.folderId ?? null,
       }),
-    onRollback: () => toast.error("Failed to move"),
+    onRollback: () => toast.error(m.drawings_move_failed()),
   })
 }
 
@@ -92,7 +93,9 @@ export function useToggleStarDrawing() {
     optimisticUpdate: (drawings, { data }) =>
       patchById(drawings, data.id, { starred: data.starred }),
     onRollback: ({ data }) =>
-      toast.error(data.starred ? "Failed to star" : "Failed to unstar"),
+      toast.error(
+        data.starred ? m.drawings_star_failed() : m.drawings_unstar_failed(),
+      ),
   })
 }
 
@@ -112,7 +115,7 @@ export function useTrashDrawing() {
 
   const restoreMutation = useMutation({
     mutationFn: restoreDrawing,
-    onError: () => toast.error("Couldn't restore drawing"),
+    onError: () => toast.error(m.drawings_restore_failed()),
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey })
       invalidateTrash()
@@ -131,9 +134,9 @@ export function useTrashDrawing() {
   return (drawing: Drawing) => {
     const trashed = trashMutation.mutateAsync({ data: drawing.id })
     trashed.then(invalidateTrash, () => {})
-    const toastId = toast("Moved to trash", {
+    const toastId = toast(m.trash_moved(), {
       action: {
-        label: "Undo",
+        label: m.trash_undo(),
         onClick: () => {
           // Wait out the in-flight trash call so restore can't race it
           // server-side; if trashing failed there is nothing to restore.
@@ -150,7 +153,7 @@ export function useTrashDrawing() {
     })
     trashed.catch(() => {
       toast.dismiss(toastId)
-      toast.error("Couldn't move to trash")
+      toast.error(m.trash_move_failed())
     })
   }
 }

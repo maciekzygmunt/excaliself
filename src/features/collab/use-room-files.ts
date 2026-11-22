@@ -11,6 +11,7 @@ import type {
 } from "@excalidraw/excalidraw/types"
 import { useCallback, useEffect, useRef } from "react"
 import { toast } from "sonner"
+import { m } from "@/paraglide/messages"
 import {
   type ImageStatus,
   selectMissingFileIds,
@@ -34,39 +35,43 @@ const MAX_UPLOAD_ATTEMPTS = 3
  * Room keeps removed images for undo (see `saveRoomScene`), so they still count.
  */
 export function toastImageCapFull() {
-  toast.error("This drawing can't hold more images", {
+  toast.error(m.collab_image_cap_title(), {
     // One toast for a batch of refusals.
     id: "image-cap-full",
-    description: `A drawing saves up to ${MAX_DRAWING_IMAGE_BYTES / 1024 / 1024} MB of images. Remove some to add more. While shared, removed images can take up to a day to free their space.`,
+    description: m.collab_image_cap_description({
+      size: MAX_DRAWING_IMAGE_BYTES / 1024 / 1024,
+    }),
   })
 }
 
 // One toast per kind, so a batch of refusals shows it once.
 export function toastImageTooLarge() {
-  toast.error("This image is too large to save", {
+  toast.error(m.collab_image_too_large_title(), {
     id: "image-too-large",
-    description: `Images up to ${MAX_IMAGE_BYTES / 1024 / 1024} MB are saved with the drawing.`,
+    description: m.collab_image_too_large_description({
+      size: MAX_IMAGE_BYTES / 1024 / 1024,
+    }),
   })
 }
 
 export function toastImageRateLimited() {
-  toast.error("Too many images at once", {
+  toast.error(m.collab_image_rate_limited_title(), {
     id: "image-rate-limited",
-    description: "Wait a minute, then add the image again.",
+    description: m.collab_image_rate_limited_description(),
   })
 }
 
 export function toastImageInvalid() {
-  toast.error("This image can't be saved", {
+  toast.error(m.collab_image_invalid_title(), {
     id: "image-invalid",
-    description: "Its file type or data is not supported.",
+    description: m.collab_image_invalid_description(),
   })
 }
 
 export function toastImageUploadFailed() {
-  toast.error("Couldn't save this image", {
+  toast.error(m.collab_image_upload_failed_title(), {
     id: "image-upload-failed",
-    description: "Check your connection, then add the image again.",
+    description: m.collab_image_upload_failed_description(),
   })
 }
 

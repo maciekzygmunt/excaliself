@@ -592,7 +592,8 @@ test("with Team enabled, Team units sit in their own section with who trashed th
   const team = within(region("Team trash"))
   expect(team.getByText("Roadmap")).toBeTruthy()
   // The icon carries "Trashed by" visually; screen readers get the words
-  expect(team.getAllByText("Trashed by")).toHaveLength(2)
+  expect(team.getByText("Trashed by Grace")).toBeTruthy()
+  expect(team.getByText("Trashed by Former member")).toBeTruthy()
   expect(team.getByText("Grace")).toBeTruthy()
   expect(team.getByText("3d ago")).toBeTruthy()
   // A deleted member's attribution stays honest
@@ -602,7 +603,7 @@ test("with Team enabled, Team units sit in their own section with who trashed th
   const personal = within(region("Private trash"))
   expect(personal.getByText("Old sketch")).toBeTruthy()
   expect(personal.getByText("Archive")).toBeTruthy()
-  expect(personal.queryByText("Trashed by")).toBeNull()
+  expect(personal.queryByText(/^Trashed by/)).toBeNull()
 })
 
 test("any member can restore or delete forever a Team unit someone else created", async () => {

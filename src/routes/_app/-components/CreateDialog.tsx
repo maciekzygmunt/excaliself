@@ -1,3 +1,4 @@
+import { ParaglideMessage } from "@inlang/paraglide-js-react"
 import { useNavigate } from "@tanstack/react-router"
 import { Folder, Lock, Plus, Users } from "lucide-react"
 import {
@@ -10,12 +11,13 @@ import {
   useState,
 } from "react"
 import { toast } from "sonner"
+import { HintKey } from "@/components/key-hint"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
-import { Kbd } from "@/components/ui/kbd"
 import type { Space } from "@/db/schema"
 import { useCreateDrawing } from "@/features/drawings/mutations"
 import { useCreateFolder } from "@/features/folders/mutations"
 import { useBrowsedSpace } from "@/features/spaces/browse"
+import { m } from "@/paraglide/messages"
 import { useActiveSpace } from "./ActiveSpace"
 
 export type FolderScope = { id: string; name: string }
@@ -78,8 +80,8 @@ export function CreateDialog({
       // Keep the dialog open so the typed name isn't lost
       toast.error(
         target.kind === "drawing"
-          ? "Failed to create drawing"
-          : "Failed to create folder",
+          ? m.create_drawing_failed()
+          : m.create_folder_failed(),
       )
     } finally {
       submittedRef.current = false
@@ -95,7 +97,9 @@ export function CreateDialog({
         className="top-[30%] translate-y-0 gap-0 overflow-hidden p-0 sm:max-w-sm"
       >
         <DialogTitle className="sr-only">
-          {target.kind === "drawing" ? "Create drawing" : "Create folder"}
+          {target.kind === "drawing"
+            ? m.create_drawing_title()
+            : m.create_folder_title()}
         </DialogTitle>
         <div className="m-2 flex items-center gap-2.5 rounded-md bg-well px-3 py-2.5 shadow-well">
           <Plus className="h-4 w-4 shrink-0 text-iris" strokeWidth={2.5} />
@@ -112,7 +116,9 @@ export function CreateDialog({
             }}
             disabled={isPending}
             placeholder={
-              target.kind === "drawing" ? "Drawing name…" : "Folder name…"
+              target.kind === "drawing"
+                ? m.create_drawing_placeholder()
+                : m.create_folder_placeholder()
             }
             className="flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground/60 disabled:opacity-50"
           />
@@ -121,7 +127,7 @@ export function CreateDialog({
           {folder ? (
             <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <Folder className="h-3 w-3 shrink-0 fill-iris/70 text-iris" />
-              in {folder.name}
+              {m.create_in_folder({ name: folder.name })}
             </span>
           ) : shownSpace ? (
             <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -130,15 +136,22 @@ export function CreateDialog({
               ) : (
                 <Lock className="h-3 w-3 shrink-0 text-iris" />
               )}
-              in {shownSpace === "team" ? "Team" : "Private"}
+              {shownSpace === "team"
+                ? m.create_in_team()
+                : m.create_in_private()}
             </span>
           ) : (
             <span className="text-xs text-muted-foreground/60">
-              {target.kind === "drawing" ? "New drawing" : "New folder"}
+              {target.kind === "drawing"
+                ? m.create_new_drawing()
+                : m.create_new_folder()}
             </span>
           )}
           <span className="flex items-center gap-1 text-xs text-muted-foreground/60">
-            <Kbd className="h-4 min-w-4 text-[10px]">↵</Kbd> to create
+            <ParaglideMessage
+              message={m.create_hint}
+              markup={{ key: HintKey }}
+            />
           </span>
         </div>
       </DialogContent>

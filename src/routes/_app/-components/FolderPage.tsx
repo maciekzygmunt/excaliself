@@ -17,6 +17,7 @@ import { useTrashDrawing } from "@/features/drawings/mutations"
 import { drawingsQueryOptions } from "@/features/drawings/queries"
 import { foldersQueryOptions } from "@/features/folders/queries"
 import { useDocumentTitle } from "@/lib/document-title"
+import { m } from "@/paraglide/messages"
 import { useCreateDialog } from "./CreateDialog"
 import { useMoveToTeamDialog } from "./MoveToTeamDialog"
 
@@ -88,7 +89,7 @@ export function FolderPage({ folderId }: { folderId: string }) {
           isPending={isPending}
           sort={sort}
           query={query}
-          loadingLabel="Loading drawings"
+          loadingLabel={m.gallery_loading()}
           onTrash={trashDrawing}
           onMoveToTeam={requestMoveToTeam}
           selectable

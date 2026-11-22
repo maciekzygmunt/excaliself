@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { FieldGroup } from "@/components/ui/field"
 import { registerFormSchema } from "@/features/auth/schema"
 import { registerWithInvite, validateInvite } from "@/features/invites/server"
+import { m } from "@/paraglide/messages"
 
 export const Route = createFileRoute("/invite")({
   validateSearch: (search: Record<string, unknown>) => ({
@@ -32,15 +33,15 @@ function InvitePage() {
 function DeadInvitePage() {
   return (
     <AuthPage
-      title="This invite link isn't active"
-      subtitle="This invite link has expired or was already used. Ask the person who invited you for a new link."
+      title={m.auth_invite_dead_title()}
+      subtitle={m.auth_invite_dead_subtitle()}
     >
       <Button
         render={<Link to="/login" />}
         nativeButton={false}
         className="w-full"
       >
-        Go to sign in
+        {m.auth_go_to_sign_in()}
       </Button>
     </AuthPage>
   )
@@ -56,7 +57,7 @@ function RegisterPage({ inviterName }: { inviterName: string | null }) {
     mutationFn: registerWithInvite,
     onSuccess: () => navigate({ to: "/" }),
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Registration failed")
+      toast.error(err instanceof Error ? err.message : m.auth_invite_failed())
     },
   })
 
@@ -78,8 +79,12 @@ function RegisterPage({ inviterName }: { inviterName: string | null }) {
 
   return (
     <AuthPage
-      title={inviterName ? `${inviterName} invited you` : "You're invited"}
-      subtitle="Create your account"
+      title={
+        inviterName
+          ? m.auth_invite_title_named({ name: inviterName })
+          : m.auth_invite_title()
+      }
+      subtitle={m.auth_invite_subtitle()}
     >
       <form
         onSubmit={(e) => {
@@ -94,7 +99,7 @@ function RegisterPage({ inviterName }: { inviterName: string | null }) {
             children={(field) => (
               <FormTextField
                 field={field}
-                label="Email"
+                label={m.auth_email_label()}
                 type="email"
                 placeholder="you@example.com"
                 autoComplete="email"
@@ -107,7 +112,7 @@ function RegisterPage({ inviterName }: { inviterName: string | null }) {
             children={(field) => (
               <FormTextField
                 field={field}
-                label="Password"
+                label={m.auth_password_label()}
                 type="password"
                 placeholder="••••••••••"
                 autoComplete="new-password"
@@ -120,7 +125,7 @@ function RegisterPage({ inviterName }: { inviterName: string | null }) {
             children={(field) => (
               <FormTextField
                 field={field}
-                label="Confirm password"
+                label={m.auth_confirm_password_label()}
                 type="password"
                 placeholder="••••••••••"
                 autoComplete="new-password"
@@ -134,7 +139,9 @@ function RegisterPage({ inviterName }: { inviterName: string | null }) {
         >
           {([canSubmit, isSubmitting]) => (
             <Button type="submit" className="w-full" disabled={!canSubmit}>
-              {isSubmitting ? "Creating account..." : "Create account"}
+              {isSubmitting
+                ? m.auth_invite_submitting()
+                : m.auth_invite_submit()}
             </Button>
           )}
         </form.Subscribe>

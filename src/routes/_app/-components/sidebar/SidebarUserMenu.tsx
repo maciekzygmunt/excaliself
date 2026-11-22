@@ -10,6 +10,7 @@ import {
 import { UserAvatar } from "@/components/user-avatar"
 import { userDisplayName, userInitials } from "@/features/account/display-name"
 import { authClient } from "@/lib/auth-client"
+import { m } from "@/paraglide/messages"
 
 export type SidebarUser = {
   id: string
@@ -51,14 +52,14 @@ export function SidebarUserMenu({ user }: { user: SidebarUser }) {
           <>
             <DropdownMenuItem render={<Link to="/settings/members" />}>
               <Users className="mr-2 h-4 w-4" />
-              Members
+              {m.settings_nav_members()}
             </DropdownMenuItem>
             <DropdownMenuSeparator />
           </>
         )}
         <DropdownMenuItem render={<Link to="/settings" />}>
           <Settings className="mr-2 h-4 w-4" />
-          Settings
+          {m.settings_title()}
         </DropdownMenuItem>
         <DropdownMenuItem
           onClick={async () => {
@@ -67,7 +68,7 @@ export function SidebarUserMenu({ user }: { user: SidebarUser }) {
           }}
         >
           <LogOut className="mr-2 h-4 w-4" />
-          Sign out
+          {m.sidebar_sign_out()}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

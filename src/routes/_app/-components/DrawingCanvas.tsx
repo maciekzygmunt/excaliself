@@ -56,6 +56,7 @@ import { drawingShareQueryOptions } from "@/features/shares/queries"
 import { useAutoSave } from "@/hooks/use-auto-save"
 import { usePreloadTextFont } from "@/hooks/use-preload-text-font"
 import { useCanvasTheme } from "@/hooks/use-theme"
+import { m } from "@/paraglide/messages"
 import { getLocale } from "@/paraglide/runtime"
 import { CommentsButton } from "./comments/CommentsButton"
 import { CommentsLayer } from "./comments/CommentsLayer"
@@ -158,11 +159,10 @@ export function DrawingCanvas({
   // Only a first join hits this (rejoins retry), so nothing recovers on its
   // own: the tab is offline until reload.
   const handleRoomFull = useCallback(() => {
-    toast.error("This drawing has too many people in it right now", {
+    toast.error(m.drawing_room_full_title(), {
       id: `room-full:${drawingId}`,
       duration: Number.POSITIVE_INFINITY,
-      description:
-        "Your changes aren't being saved. Reload the page to try joining again.",
+      description: m.drawing_room_full_description(),
     })
   }, [drawingId])
 
@@ -238,11 +238,10 @@ export function DrawingCanvas({
   useEffect(() => {
     if (!roomRefused) return
     const toastId = `room-refused:${drawingId}`
-    toast.error("Live editing stopped", {
+    toast.error(m.drawing_room_refused_title(), {
       id: toastId,
       duration: Number.POSITIVE_INFINITY,
-      description:
-        "Your changes aren't being saved. Reload the page to try again.",
+      description: m.drawing_room_refused_description(),
     })
     return () => {
       toast.dismiss(toastId)
@@ -253,12 +252,12 @@ export function DrawingCanvas({
   useEffect(() => {
     if (!sceneUnreadable) return
     const toastId = `scene-unreadable:${drawingId}`
-    toast.error("This drawing can't be opened for live editing", {
+    toast.error(m.drawing_scene_unreadable_title(), {
       id: toastId,
       duration: Number.POSITIVE_INFINITY,
       description: isTeam
-        ? "Its saved data is damaged, so your changes aren't being saved."
-        : "Its saved data is damaged, so your changes aren't being saved. Stop sharing to edit it on your own.",
+        ? m.drawing_scene_unreadable_team()
+        : m.drawing_scene_unreadable_shared(),
     })
     return () => {
       toast.dismiss(toastId)
@@ -280,13 +279,12 @@ export function DrawingCanvas({
     if (isTeam || share !== null) return
     if (!isDataCorrupt || corruptAcknowledged) return
     const toastId = `corrupt-scene:${drawingId}`
-    toast.error("This drawing's saved data couldn't be read", {
+    toast.error(m.drawing_corrupt_title(), {
       id: toastId,
       duration: Number.POSITIVE_INFINITY,
-      description:
-        "It opened as an empty canvas. Auto-save is paused so the stored data isn't overwritten.",
+      description: m.drawing_corrupt_description(),
       action: {
-        label: "Edit anyway",
+        label: m.drawing_corrupt_edit_anyway(),
         onClick: () => setCorruptAcknowledged(true),
       },
     })
@@ -312,7 +310,7 @@ export function DrawingCanvas({
     // stops. After it stops, the stored scene replaces them first.
     paused: autoSavePaused || readOnly || isLive || reloadingScene,
     onError: () => {
-      toast.error("Failed to save drawing", { id: "drawing-save-error" })
+      toast.error(m.drawing_save_failed(), { id: "drawing-save-error" })
     },
   })
 
@@ -404,12 +402,14 @@ export function DrawingCanvas({
                   <Button
                     data-tour="share"
                     onClick={() => setShareOpen(true)}
-                    aria-label="Share"
-                    title="Share"
+                    aria-label={m.drawing_share()}
+                    title={m.drawing_share()}
                     className={SHARE_BUTTON_CLASS}
                   >
                     <Share2Icon className="h-3.5 w-3.5" />
-                    <span className={SHARE_LABEL_CLASS}>Share</span>
+                    <span className={SHARE_LABEL_CLASS}>
+                      {m.drawing_share()}
+                    </span>
                     {share && <SharingDot />}
                   </Button>
                 </>
@@ -433,7 +433,7 @@ export function DrawingCanvas({
             icon={<PanelLeftIcon className="h-4 w-4" />}
             onSelect={toggleSidebar}
           >
-            Drawings
+            {m.drawing_menu_drawings()}
           </MainMenu.Item>
           {!readOnly && (
             <MainMenu.Item
@@ -442,7 +442,7 @@ export function DrawingCanvas({
               onSelect={() => setShareOpen(true)}
             >
               <span className="inline-flex items-center gap-1.5">
-                Share
+                {m.drawing_share()}
                 {share != null && <SharingDot />}
               </span>
             </MainMenu.Item>
@@ -453,7 +453,7 @@ export function DrawingCanvas({
             icon={<MessageSquareIcon className="h-4 w-4" />}
             onSelect={toggleComments}
           >
-            Comments
+            {m.comments_title()}
           </MainMenu.Item>
           {!readOnly && !isTeam && requestMoveToTeam && (
             <MainMenu.Item
@@ -465,7 +465,7 @@ export function DrawingCanvas({
                 )
               }
             >
-              Move to Team
+              {m.drawing_menu_move_to_team()}
             </MainMenu.Item>
           )}
           <MainMenu.Separator />
@@ -477,7 +477,7 @@ export function DrawingCanvas({
           <MainMenu.DefaultItems.Help />
           <MainMenu.DefaultItems.ClearCanvas />
           <MainMenu.Separator />
-          <MainMenu.Group title="Excalidraw links">
+          <MainMenu.Group title={m.drawing_menu_excalidraw_links()}>
             <MainMenu.DefaultItems.Socials />
           </MainMenu.Group>
           <MainMenu.Separator />

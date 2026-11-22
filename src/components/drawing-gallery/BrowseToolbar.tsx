@@ -10,6 +10,7 @@ import {
 import { Input } from "@/components/ui/input"
 import type { Folder } from "@/features/folders/queries"
 import { cn } from "@/lib/utils"
+import { m } from "@/paraglide/messages"
 import {
   type GalleryScope,
   SORT_LABELS,
@@ -41,7 +42,7 @@ export function BrowseToolbar({
   sort: SortOrder
   onSortChange: (sort: SortOrder) => void
 }) {
-  const sortLabel = SORT_LABELS[sort]
+  const sortLabel = SORT_LABELS[sort]()
 
   return (
     <div className="flex flex-col gap-3">
@@ -52,8 +53,8 @@ export function BrowseToolbar({
             type="search"
             value={query}
             onChange={(event) => onQueryChange(event.target.value)}
-            placeholder="Search drawings…"
-            aria-label="Search drawings"
+            placeholder={m.gallery_search_placeholder()}
+            aria-label={m.gallery_search_label()}
             className="h-8 pl-8 text-sm"
           />
         </div>
@@ -64,7 +65,7 @@ export function BrowseToolbar({
               <Button
                 variant="ghost"
                 size="sm"
-                aria-label={`Sort: ${sortLabel}`}
+                aria-label={m.gallery_sort_label({ order: sortLabel })}
                 className="ml-auto text-muted-foreground hover:text-foreground"
               />
             }
@@ -81,7 +82,7 @@ export function BrowseToolbar({
                 // closeOnClick: Base UI radio items keep the menu open by
                 // default; picking a sort order should dismiss it
                 <DropdownMenuRadioItem key={order} value={order} closeOnClick>
-                  {SORT_LABELS[order]}
+                  {SORT_LABELS[order]()}
                 </DropdownMenuRadioItem>
               ))}
             </DropdownMenuRadioGroup>
@@ -92,11 +93,11 @@ export function BrowseToolbar({
       {chips && chips.folders.length > 0 && (
         <div
           role="group"
-          aria-label="Filter by folder"
+          aria-label={m.gallery_filter_label()}
           className="flex flex-wrap gap-1.5"
         >
           <FolderChip
-            label="All"
+            label={m.gallery_filter_all()}
             selected={chips.scope === "all"}
             onClick={() => chips.onScopeChange("all")}
           />
@@ -109,7 +110,7 @@ export function BrowseToolbar({
             />
           ))}
           <FolderChip
-            label="Unfiled"
+            label={m.gallery_filter_unfiled()}
             selected={chips.scope === "unfiled"}
             onClick={() => chips.onScopeChange("unfiled")}
           />

@@ -2,6 +2,7 @@ import { UserAvatar } from "@/components/user-avatar"
 import { initialsOf } from "@/features/collab/identity"
 import type { RoomPresence } from "@/features/collab/use-room"
 import { cn } from "@/lib/utils"
+import { m } from "@/paraglide/messages"
 
 const MAX_AVATARS = 4
 
@@ -22,7 +23,7 @@ export function PresenceAvatars({
   return (
     <div
       className={cn("flex items-center -space-x-1.5", className)}
-      aria-label={`${participants.length} other ${participants.length === 1 ? "person" : "people"} here`}
+      aria-label={m.collab_others_here({ count: participants.length })}
     >
       {shown.map((participant) => {
         const followed = participant.connectionId === followedConnectionId
@@ -34,8 +35,8 @@ export function PresenceAvatars({
             aria-pressed={followed}
             aria-label={
               followed
-                ? `Stop following ${participant.name}`
-                : `Follow ${participant.name}`
+                ? m.collab_stop_following({ name: participant.name })
+                : m.collab_follow({ name: participant.name })
             }
             onClick={() => room.toggleFollow(participant)}
             className="h-7 w-7 cursor-pointer rounded-full ring-2 ring-(--island-bg-color) transition-transform hover:scale-110"

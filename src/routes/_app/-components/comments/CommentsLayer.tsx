@@ -26,6 +26,7 @@ import {
 } from "@/features/comments/queries"
 import { formatAgo } from "@/lib/relative-time"
 import { cn } from "@/lib/utils"
+import { m } from "@/paraglide/messages"
 import { CommentComposer } from "./CommentComposer"
 import {
   authorName,
@@ -300,7 +301,7 @@ export function CommentsLayer({
       {placing && (
         <div className="pointer-events-none absolute inset-x-0 top-16 z-10 flex justify-center">
           <p className="rounded-full bg-popover px-3 py-1.5 text-xs shadow-md ring-1 ring-border">
-            Click a spot or a shape to comment. Esc to cancel.
+            {m.comments_placing_hint()}
           </p>
         </div>
       )}
@@ -331,8 +332,8 @@ export function CommentsLayer({
           style={cardStyle(draftPin)}
         >
           <CommentComposer
-            placeholder="Add a comment"
-            submitLabel="Comment"
+            placeholder={m.comments_add_placeholder()}
+            submitLabel={m.comments_submit()}
             autoFocus
             pending={start.isPending}
             onCancel={() => setDraft(null)}
@@ -399,7 +400,16 @@ function ThreadPin({
     <button
       type="button"
       onClick={onClick}
-      aria-label={`Comment by ${first ? authorName(first) : "Former member"}, ${count} ${count === 1 ? "comment" : "comments"}${resolved ? ", resolved" : ""}${thread.unread ? ", unread" : ""}`}
+      aria-label={[
+        m.comments_pin_label({
+          name: first ? authorName(first) : m.comments_former_member(),
+          count,
+        }),
+        resolved && m.comments_pin_resolved(),
+        thread.unread && m.comments_pin_unread(),
+      ]
+        .filter(Boolean)
+        .join(", ")}
       aria-expanded={active}
       className={cn(
         // The bottom-left corner points at the anchor.
@@ -448,15 +458,15 @@ function CommentsPanel({
 }) {
   return (
     <aside
-      aria-label="Comments"
+      aria-label={m.comments_title()}
       className="absolute top-16 right-3 bottom-16 z-10 flex w-80 max-w-[calc(100%-1.5rem)] flex-col overflow-hidden rounded-lg bg-popover shadow-lg ring-1 ring-border"
     >
       <div className="flex items-center gap-1 border-b border-border px-3 py-2">
-        <h2 className="flex-1 text-sm font-medium">Comments</h2>
+        <h2 className="flex-1 text-sm font-medium">{m.comments_title()}</h2>
         <Button
           variant="ghost"
           size="icon-sm"
-          aria-label="Close comments"
+          aria-label={m.comments_close_panel()}
           onClick={onClose}
         >
           <XIcon />
@@ -466,7 +476,7 @@ function CommentsPanel({
         {!readOnly && (
           <Button size="sm" disabled={placing} onClick={onAdd}>
             <MessageSquarePlusIcon />
-            Add comment
+            {m.comments_add()}
           </Button>
         )}
         <label className="ml-auto flex cursor-pointer items-center gap-1.5 text-xs text-muted-foreground">
@@ -476,14 +486,12 @@ function CommentsPanel({
             onChange={(event) => onShowResolvedChange(event.target.checked)}
             className="accent-iris"
           />
-          Show resolved
+          {m.comments_show_resolved()}
         </label>
       </div>
       {threads.length === 0 ? (
         <p className="px-3 py-6 text-center text-sm text-muted-foreground">
-          {readOnly
-            ? "No comments."
-            : "No comments yet. Add one to point at a spot or a shape."}
+          {readOnly ? m.comments_empty_readonly() : m.comments_empty()}
         </p>
       ) : (
         <ul className="min-h-0 flex-1 overflow-y-auto">
@@ -505,7 +513,7 @@ function CommentsPanel({
                   <span className="min-w-0 flex-1">
                     <span className="flex items-center gap-1.5 text-xs">
                       <span className="truncate font-medium">
-                        {first ? authorName(first) : "Former member"}
+                        {first ? authorName(first) : m.comments_former_member()}
                       </span>
                       <span className="shrink-0 text-muted-foreground">
                         {formatAgo(thread.lastActivityAt)}
@@ -513,7 +521,7 @@ function CommentsPanel({
                       {thread.unread && (
                         <span
                           role="img"
-                          aria-label="Unread"
+                          aria-label={m.comments_unread()}
                           className="ml-auto size-2 shrink-0 rounded-full bg-iris"
                         />
                       )}
@@ -525,18 +533,17 @@ function CommentsPanel({
                       thread.resolvedAt ||
                       detachedIds.has(thread.id)) && (
                       <span className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
-                        {replies > 0 &&
-                          `${replies} ${replies === 1 ? "reply" : "replies"}`}
+                        {replies > 0 && m.comments_replies({ count: replies })}
                         {thread.resolvedAt && (
                           <span className="flex items-center gap-1">
                             <CheckIcon className="size-3" />
-                            Resolved
+                            {m.comments_resolved()}
                           </span>
                         )}
                         {detachedIds.has(thread.id) && (
                           <span className="flex items-center gap-1">
                             <UnlinkIcon className="size-3" />
-                            Shape deleted
+                            {m.comments_shape_deleted()}
                           </span>
                         )}
                       </span>

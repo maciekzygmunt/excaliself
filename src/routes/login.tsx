@@ -6,6 +6,8 @@ import { demoAdmin } from "@/db/demo-content"
 import { getSignInOptions } from "@/features/auth/server"
 import { resolveRedirect } from "@/lib/redirects"
 import { setupMiddleware } from "@/middleware/setup"
+import { m } from "@/paraglide/messages"
+import { getLocale } from "@/paraglide/runtime"
 
 type LoginSearch = { redirect?: string; error?: string }
 
@@ -20,11 +22,10 @@ export const Route = createFileRoute("/login")({
   component: LoginPage,
 })
 
-const SSO_ERRORS: Record<string, string> = {
-  signup_not_allowed:
-    "There is no account for this email. Ask your admin for an invite.",
-  account_not_linked:
-    "An account with this email already exists. Sign in with your password.",
+// Better Auth's ?error= codes we explain; others get the generic line.
+const SSO_ERRORS: Record<string, () => string> = {
+  signup_not_allowed: m.auth_login_sso_no_account,
+  account_not_linked: m.auth_login_sso_not_linked,
 }
 
 function LoginPage() {
@@ -33,13 +34,10 @@ function LoginPage() {
   const { previewMode, ssoProviders, ssoAllowedDomains } = Route.useLoaderData()
 
   return (
-    <AuthPage
-      title="Welcome back"
-      subtitle="Sign in to your Excaliself account"
-    >
+    <AuthPage title={m.auth_login_title()} subtitle={m.auth_login_subtitle()}>
       {error && (
         <p role="alert" className="mb-4 text-center text-sm text-destructive">
-          {SSO_ERRORS[error] ?? "Sign-in failed. Try again."}
+          {SSO_ERRORS[error]?.() ?? m.auth_login_failed()}
         </p>
       )}
       <SsoButtons
@@ -55,10 +53,14 @@ function LoginPage() {
         <div className="space-y-1 pt-2 text-center text-xs text-muted-foreground">
           <p>
             {ssoAllowedDomains.length > 0
-              ? `New here? Continue with your ${ssoAllowedDomains.join(" or ")} account, or ask for an invite.`
-              : "Registration is invite-only on this instance"}
+              ? m.auth_login_new_sso({
+                  domains: new Intl.ListFormat(getLocale(), {
+                    type: "disjunction",
+                  }).format(ssoAllowedDomains),
+                })
+              : m.auth_login_invite_only()}
           </p>
-          <p>Forgot your password? Ask your admin to reset it.</p>
+          <p>{m.auth_login_forgot()}</p>
         </div>
       </SignInForm>
       {previewMode && <PreviewShortcuts redirect={redirect} />}

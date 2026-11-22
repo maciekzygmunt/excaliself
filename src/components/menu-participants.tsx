@@ -2,6 +2,7 @@
 
 import { MainMenu } from "@excalidraw/excalidraw"
 import type { RoomPresence } from "@/features/collab/use-room"
+import { m } from "@/paraglide/messages"
 
 export function MenuParticipants({
   room,
@@ -17,7 +18,7 @@ export function MenuParticipants({
   return (
     <div className={className}>
       <MainMenu.Group
-        title={`${participants.length} other ${participants.length === 1 ? "person" : "people"} here`}
+        title={m.collab_others_here({ count: participants.length })}
       >
         {participants.map((participant) => {
           const followed = participant.connectionId === followedConnectionId
@@ -34,7 +35,7 @@ export function MenuParticipants({
               }
             >
               {followed
-                ? `Stop following ${participant.name}`
+                ? m.collab_stop_following({ name: participant.name })
                 : participant.name}
             </MainMenu.Item>
           )

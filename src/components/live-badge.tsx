@@ -5,13 +5,14 @@ import { UserAvatar } from "@/components/user-avatar"
 import { initialsOf } from "@/features/collab/identity"
 import type { LiveDrawing } from "@/features/collab/live"
 import { cn } from "@/lib/utils"
+import { m } from "@/paraglide/messages"
 
 function liveLabel(live: LiveDrawing): string {
   const [first] = live.participants
-  if (live.count > 1) return `${live.count} people are in this drawing`
+  if (live.count > 1) return m.collab_live_count({ count: live.count })
   return first
-    ? `${first.name} is in this drawing`
-    : "1 person is in this drawing"
+    ? m.collab_live_named({ name: first.name })
+    : m.collab_live_count({ count: 1 })
 }
 
 /** Gallery card corner stack: overlapping faces, then a "+N" tail. */

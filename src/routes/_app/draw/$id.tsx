@@ -9,6 +9,7 @@ import {
   drawingsQueryOptions,
 } from "@/features/drawings/queries"
 import { useDocumentTitle } from "@/lib/document-title"
+import { m } from "@/paraglide/messages"
 import { DrawingPaletteContext } from "../-components/DrawingPaletteContext"
 import { TrashedDrawingBanner } from "../-components/TrashedDrawingBanner"
 
@@ -22,7 +23,7 @@ const DrawingCanvas = lazy(
 const LoadingState = () => (
   <div
     role="status"
-    aria-label="Loading drawing"
+    aria-label={m.drawing_loading()}
     className="absolute inset-0 z-10 flex items-center justify-center bg-card"
   >
     <Mark className="h-8 w-8 animate-pulse text-iris motion-reduce:animate-none" />
@@ -43,7 +44,7 @@ export const Route = createFileRoute("/_app/draw/$id")({
     // must not toast either.
     if (!drawing) {
       if (!preload)
-        toast.error("Drawing not found", { id: "drawing-not-found" })
+        toast.error(m.drawing_not_found(), { id: "drawing-not-found" })
       throw redirect({ to: "/draw" })
     }
   },
@@ -74,7 +75,7 @@ function DrawingPage() {
   const isGone = drawing === null
   useEffect(() => {
     if (!isGone) return
-    toast.error("Drawing not found", { id: "drawing-not-found" })
+    toast.error(m.drawing_not_found(), { id: "drawing-not-found" })
     navigate({ to: "/draw", replace: true })
   }, [isGone, navigate])
 

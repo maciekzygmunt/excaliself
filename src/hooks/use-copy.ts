@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react"
 import { toast } from "sonner"
+import { m } from "@/paraglide/messages"
 
 /** Clipboard fallback for insecure origins (self-hosted over plain HTTP). */
 function legacyCopy(text: string): boolean {
@@ -38,7 +39,7 @@ export function useCopy() {
 
   const copy = async (text: string, key = text) => {
     if (!(await copyText(text))) {
-      toast.error("Couldn't copy — select the text and copy it manually")
+      toast.error(m.copy_failed())
       return
     }
     setCopied(key)

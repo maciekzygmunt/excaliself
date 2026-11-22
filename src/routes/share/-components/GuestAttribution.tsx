@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router"
 import { Mark } from "@/components/identity"
+import { m } from "@/paraglide/messages"
 
 type Props = {
   token: string
@@ -10,7 +11,7 @@ export function GuestAttribution({ token, showSignIn = true }: Props) {
   return (
     <div className="order-first mr-2 flex items-center gap-1.5 self-center text-xs font-(--ui-font) text-(--color-gray-60)">
       <Mark className="h-3 w-3 shrink-0 text-(--color-gray-50)" />
-      <span>Made with Excaliself</span>
+      <span>{m.guest_made_with()}</span>
       {showSignIn && (
         <>
           <span aria-hidden="true">·</span>
@@ -19,7 +20,7 @@ export function GuestAttribution({ token, showSignIn = true }: Props) {
             search={{ redirect: `/share/${token}` }}
             className="font-medium text-(--color-primary) hover:underline"
           >
-            Sign in
+            {m.guest_sign_in()}
           </Link>
         </>
       )}

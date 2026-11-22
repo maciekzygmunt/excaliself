@@ -3,6 +3,7 @@ import { AuthPage } from "@/components/auth-page"
 import { SignInForm } from "@/components/sign-in-form"
 import { SsoButtons } from "@/components/sso-buttons"
 import { getSignInOptions } from "@/features/auth/server"
+import { m } from "@/paraglide/messages"
 
 type Props = {
   drawingName: string
@@ -20,8 +21,8 @@ export function SignInGate({ drawingName, onSignedIn }: Props) {
 
   return (
     <AuthPage
-      title="Sign in to open this drawing"
-      subtitle={`“${drawingName}” is shared with members of this instance`}
+      title={m.guest_gate_title()}
+      subtitle={m.guest_gate_subtitle({ name: drawingName })}
     >
       <SsoButtons
         providers={data?.ssoProviders ?? []}
@@ -31,7 +32,7 @@ export function SignInGate({ drawingName, onSignedIn }: Props) {
       />
       <SignInForm onSignedIn={onSignedIn}>
         <p className="pt-2 text-center text-xs text-muted-foreground">
-          You'll return to the drawing right after signing in.
+          {m.guest_gate_return()}
         </p>
       </SignInForm>
     </AuthPage>

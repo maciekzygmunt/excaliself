@@ -3,6 +3,7 @@ import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { useEffect, useMemo } from "react"
 import { toast } from "sonner"
+import { m } from "@/paraglide/messages"
 import {
   LibraryChangeRefused,
   libraryQueryOptions,
@@ -31,7 +32,7 @@ export function useTeamLibrary(excalidrawAPI: ExcalidrawImperativeAPI | null) {
           void excalidrawAPI.updateLibrary({ libraryItems })
         },
         onSaveError: (error) =>
-          toast.error("Couldn't save the library change", {
+          toast.error(m.library_save_failed(), {
             id: "library-save-error",
             description:
               error instanceof LibraryChangeRefused ? error.message : undefined,

@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { RenameDialog } from "@/components/rename-dialog"
 import { useTrashFolder } from "@/features/folders/mutations"
 import { foldersQueryOptions } from "@/features/folders/queries"
+import { m } from "@/paraglide/messages"
 import {
   type PaletteContextSection,
   usePaletteContextSection,
@@ -46,24 +47,24 @@ export function FolderPaletteContext({ folderId }: FolderPaletteContextProps) {
   const section = useMemo<PaletteContextSection | null>(() => {
     if (!folder) return null
     return {
-      title: "This folder",
+      title: m.palette_folder_section(),
       rows: [
         {
           id: "folder:new-drawing",
-          label: "New drawing in this folder",
+          label: m.palette_folder_new_drawing(),
           icon: File,
           onSelect: () =>
             openCreateDrawingDialog({ id: folder.id, name: folder.name }),
         },
         {
           id: "folder:rename",
-          label: "Rename folder",
+          label: m.palette_folder_rename(),
           icon: Pencil,
           onSelect: () => setRenameOpen(true),
         },
         {
           id: "folder:trash",
-          label: "Move folder to trash",
+          label: m.palette_folder_trash(),
           icon: Trash2,
           destructive: true,
           onSelect: async () => {

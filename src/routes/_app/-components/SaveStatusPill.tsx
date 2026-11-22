@@ -1,4 +1,5 @@
 import { Cloud, Loader2 } from "lucide-react"
+import { m } from "@/paraglide/messages"
 
 type Props = {
   saving: boolean
@@ -12,12 +13,12 @@ export function SaveStatusPill({ saving, saved }: Props) {
       {saving ? (
         <>
           <Loader2 className="h-3.5 w-3.5 animate-spin" />
-          <span>Saving...</span>
+          <span>{m.drawing_saving()}</span>
         </>
       ) : (
         <>
           <Cloud className="h-3.5 w-3.5" />
-          <span>Saved</span>
+          <span>{m.drawing_saved()}</span>
         </>
       )}
     </div>
