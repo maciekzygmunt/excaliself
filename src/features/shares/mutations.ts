@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
+import { m } from "@/paraglide/messages"
 import type { ShareAudience } from "./access"
 import { drawingShareQueryOptions } from "./queries"
 import {
@@ -27,7 +28,7 @@ export function useCreateShare(
         share,
       )
     },
-    onError: () => toast.error("Failed to create share link"),
+    onError: () => toast.error(m.share_create_failed()),
   })
 }
 
@@ -47,13 +48,13 @@ export function useStopSharing(
         drawingShareQueryOptions(drawingId).queryKey,
         null,
       )
-      toast("Sharing stopped", {
+      toast(m.share_stopped(), {
         description: isTeam
-          ? "The link is dead. Guests can no longer open it."
-          : "The link is dead and the drawing is private again.",
+          ? m.share_stopped_team()
+          : m.share_stopped_private(),
       })
     },
-    onError: () => toast.error("Failed to stop sharing"),
+    onError: () => toast.error(m.share_stop_failed()),
   })
 }
 
@@ -66,11 +67,11 @@ export function useRegenerateShare(drawingId: string) {
         drawingShareQueryOptions(drawingId).queryKey,
         share,
       )
-      toast("Link regenerated", {
-        description: "The old link no longer works.",
+      toast(m.share_regenerated(), {
+        description: m.share_regenerated_description(),
       })
     },
-    onError: () => toast.error("Failed to regenerate link"),
+    onError: () => toast.error(m.share_regenerate_failed()),
   })
 }
 
@@ -90,7 +91,7 @@ export function useSetShareAudience(drawingId: string) {
     },
     onError: (_error, _audience, context) => {
       if (context) queryClient.setQueryData(queryKey, context.previous)
-      toast.error("Failed to change who can open the link")
+      toast.error(m.share_audience_failed())
     },
     onSuccess: (share) => {
       queryClient.setQueryData(queryKey, share)

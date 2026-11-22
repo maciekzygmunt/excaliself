@@ -1,8 +1,9 @@
 // The single source of truth for the 30-day retention window (spec §5.11).
 // The server purge job (purge.ts) and every surface that discloses when a
 // trashed item will be purged must derive from these helpers so the promised
-// countdown matches the real horizon. Deliberately dependency-free so client
-// code can import it safely.
+// countdown matches the real horizon. Safe for client code to import.
+
+import { m } from "@/paraglide/messages"
 
 export const TRASH_RETENTION_DAYS = 30
 
@@ -41,7 +42,6 @@ export function purgeCountdownLabel(
   now: number = Date.now(),
 ): string {
   const days = daysUntilPurge(deletedAt, now)
-  if (days <= 0) return "Purges today"
-  if (days === 1) return "Purges in 1 day"
-  return `Purges in ${days} days`
+  if (days <= 0) return m.trash_purges_today()
+  return m.trash_purges_in({ count: days })
 }

@@ -1,4 +1,5 @@
-import { useEffect, useId, useState } from "react"
+import { ParaglideMessage } from "@inlang/paraglide-js-react"
+import { type ReactNode, useEffect, useId, useState } from "react"
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -10,6 +11,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { m } from "@/paraglide/messages"
 
 /**
  * Tier-3 danger dialog (spec §4.5): the tier-2 count-aware confirm plus a
@@ -90,9 +92,11 @@ export function TypeToConfirmDialog({
             htmlFor={inputId}
             className="block text-sm text-muted-foreground"
           >
-            To confirm, type{" "}
-            <span className="font-medium text-foreground">{challenge}</span>{" "}
-            below
+            <ParaglideMessage
+              message={m.dialog_type_to_confirm}
+              inputs={{ challenge }}
+              markup={{ em: Challenge }}
+            />
           </label>
           <Input
             id={inputId}
@@ -104,7 +108,9 @@ export function TypeToConfirmDialog({
           />
         </div>
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={pending}>Cancel</AlertDialogCancel>
+          <AlertDialogCancel disabled={pending}>
+            {m.dialog_cancel()}
+          </AlertDialogCancel>
           <Button
             variant="destructive"
             disabled={pending || confirmDisabled || typed !== challenge}
@@ -116,4 +122,9 @@ export function TypeToConfirmDialog({
       </AlertDialogContent>
     </AlertDialog>
   )
+}
+
+// Renders {#em}…{/em}: the string to type.
+function Challenge({ children }: { children?: ReactNode }) {
+  return <span className="font-medium text-foreground">{children}</span>
 }

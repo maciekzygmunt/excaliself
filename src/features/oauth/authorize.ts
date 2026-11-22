@@ -3,6 +3,7 @@
 // Cancel actions all run it, so a tampered form gets the same answer.
 
 import type { Db } from "@/db"
+import { m } from "@/paraglide/messages"
 import { findClient, isOurResource, redirectUriMatches } from "./grants"
 
 export type AuthorizeParams = {
@@ -58,14 +59,14 @@ export async function checkAuthorizeRequest(
   if (!client) {
     return {
       kind: "invalid",
-      message: "This app isn't registered with Excaliself. Add it again.",
+      message: m.oauth_unknown_client(),
     }
   }
   const redirectUri = params.redirect_uri
   if (!redirectUri || !redirectUriMatches(client.redirectUris, redirectUri)) {
     return {
       kind: "invalid",
-      message: "This app asked to return to an address it didn't register.",
+      message: m.oauth_unknown_redirect(),
     }
   }
 

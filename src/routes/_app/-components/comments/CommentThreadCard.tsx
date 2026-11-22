@@ -27,12 +27,11 @@ import {
 } from "@/features/comments/mutations"
 import type { CommentThread } from "@/features/comments/queries"
 import { formatAgo } from "@/lib/relative-time"
+import { m } from "@/paraglide/messages"
 import { CommentComposer } from "./CommentComposer"
 
 type Comment = CommentThread["comments"][number]
 type Person = NonNullable<Comment["author"]>
-
-const FORMER_MEMBER = "Former member"
 
 export function PersonAvatar({ person }: { person: Person | null }) {
   if (person)
@@ -78,9 +77,12 @@ export function CommentText({ body }: { body: string }) {
   )
 }
 
-export const authorName = (comment: Comment) =>
-  (comment.author?.name ?? FORMER_MEMBER) +
-  (comment.via ? ` via ${comment.via}` : "")
+export function authorName(comment: Comment) {
+  const name = comment.author?.name ?? m.comments_former_member()
+  return comment.via
+    ? m.comments_author_via({ name, client: comment.via })
+    : name
+}
 
 function CommentRow({
   drawingId,
@@ -107,7 +109,7 @@ function CommentRow({
           </span>
           <span className="shrink-0 text-xs text-muted-foreground">
             {formatAgo(comment.createdAt)}
-            {comment.editedAt && " · edited"}
+            {comment.editedAt && ` · ${m.comments_edited()}`}
           </span>
           {canChange && !editing && (
             <DropdownMenu>
@@ -116,7 +118,7 @@ function CommentRow({
                   <Button
                     variant="ghost"
                     size="icon-sm"
-                    aria-label="Comment actions"
+                    aria-label={m.comments_actions()}
                     className="ml-auto size-6"
                   />
                 }
@@ -125,13 +127,13 @@ function CommentRow({
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem onClick={() => setEditing(true)}>
-                  Edit
+                  {m.comments_edit()}
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   variant="destructive"
                   onClick={() => setConfirmDelete(true)}
                 >
-                  Delete
+                  {m.comments_delete()}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -140,7 +142,7 @@ function CommentRow({
         {editing ? (
           <CommentComposer
             initialBody={comment.body}
-            submitLabel="Save"
+            submitLabel={m.comments_save()}
             pending={edit.isPending}
             autoFocus
             onCancel={() => setEditing(false)}
@@ -158,10 +160,10 @@ function CommentRow({
       <DangerConfirmDialog
         open={confirmDelete}
         onOpenChange={setConfirmDelete}
-        title="Delete comment"
-        description="This comment is deleted for everyone. You can't undo this."
-        confirmLabel="Delete comment"
-        pendingLabel="Deleting…"
+        title={m.comments_delete_comment()}
+        description={m.comments_delete_description()}
+        confirmLabel={m.comments_delete_comment()}
+        pendingLabel={m.comments_deleting()}
         onConfirm={() => remove.mutateAsync(comment.id)}
       />
     </li>
@@ -188,19 +190,21 @@ export function CommentThreadCard({
   const [replies, setReplies] = useState(0)
 
   let status: ReactNode = null
-  if (resolved)
+  if (thread.resolvedAt)
     status = (
       <>
         <CheckIcon className="size-3.5" />
-        Resolved by {thread.resolvedBy?.name ?? FORMER_MEMBER}
-        {thread.resolvedAt && `, ${formatAgo(thread.resolvedAt)}`}
+        {m.comments_resolved_by({
+          name: thread.resolvedBy?.name ?? m.comments_former_member(),
+          ago: formatAgo(thread.resolvedAt),
+        })}
       </>
     )
   else if (detached)
     status = (
       <>
         <UnlinkIcon className="size-3.5" />
-        Shape deleted
+        {m.comments_shape_deleted()}
       </>
     )
 
@@ -208,14 +212,18 @@ export function CommentThreadCard({
     <div className="flex max-h-full flex-col">
       <div className="flex items-center gap-1 border-b border-border px-3 py-2">
         <p className="flex min-w-0 flex-1 items-center gap-1.5 text-xs text-muted-foreground">
-          {status ?? "Comment"}
+          {status ?? m.comments_thread_label()}
         </p>
         {!readOnly && (
           <Button
             variant="ghost"
             size="icon-sm"
-            aria-label={resolved ? "Reopen thread" : "Resolve thread"}
-            title={resolved ? "Reopen" : "Resolve"}
+            aria-label={
+              resolved
+                ? m.comments_reopen_thread()
+                : m.comments_resolve_thread()
+            }
+            title={resolved ? m.comments_reopen() : m.comments_resolve()}
             disabled={resolve.isPending}
             onClick={() =>
               resolve.mutate(
@@ -230,7 +238,7 @@ export function CommentThreadCard({
         <Button
           variant="ghost"
           size="icon-sm"
-          aria-label="Close thread"
+          aria-label={m.comments_close_thread()}
           onClick={onClose}
         >
           <XIcon />
@@ -251,7 +259,7 @@ export function CommentThreadCard({
           {resolved ? (
             <div className="flex items-center justify-between gap-2">
               <span className="text-xs text-muted-foreground">
-                Reopen to reply
+                {m.comments_reopen_to_reply()}
               </span>
               <Button
                 size="sm"
@@ -260,14 +268,14 @@ export function CommentThreadCard({
                   resolve.mutate({ threadId: thread.id, resolved: false })
                 }
               >
-                Reopen
+                {m.comments_reopen()}
               </Button>
             </div>
           ) : (
             <CommentComposer
               key={replies}
-              placeholder="Reply"
-              submitLabel="Reply"
+              placeholder={m.comments_reply()}
+              submitLabel={m.comments_reply()}
               pending={reply.isPending}
               onSubmit={(body) =>
                 reply.mutate(

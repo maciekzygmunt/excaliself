@@ -1,21 +1,19 @@
 import { Link } from "@tanstack/react-router"
 import { AuthPage } from "@/components/auth-page"
 import { Button } from "@/components/ui/button"
+import { m } from "@/paraglide/messages"
 
 /** One page for every dead token, so nothing leaks about whether it existed. */
 export function DeadLink() {
   return (
-    <AuthPage
-      title="This link is no longer active"
-      subtitle="It may have been turned off or replaced by the drawing's owner."
-    >
+    <AuthPage title={m.guest_dead_title()} subtitle={m.guest_dead_subtitle()}>
       <Button
         render={<Link to="/" />}
         nativeButton={false}
         variant="outline"
         className="w-full"
       >
-        Go to Excaliself
+        {m.guest_go_home()}
       </Button>
     </AuthPage>
   )

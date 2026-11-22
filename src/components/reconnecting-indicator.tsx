@@ -3,6 +3,7 @@
 
 import type { ConnectionStatus } from "@/features/collab/use-room"
 import { cn } from "@/lib/utils"
+import { m } from "@/paraglide/messages"
 
 export function ReconnectingIndicator({
   status,
@@ -26,7 +27,7 @@ export function ReconnectingIndicator({
         className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-amber-500 motion-reduce:animate-none"
       />
       <span className="text-[0.8125rem] font-medium text-(--color-gray-60)">
-        Reconnecting…
+        {m.collab_reconnecting()}
       </span>
     </div>
   )

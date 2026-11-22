@@ -1,4 +1,5 @@
 import { Cloud, CloudOff, Loader2 } from "lucide-react"
+import { m } from "@/paraglide/messages"
 
 type Props = {
   saving: boolean
@@ -14,17 +15,17 @@ export function SaveStatusPill({ saving, saved, onDevice }: Props) {
       {saving ? (
         <>
           <Loader2 className="h-3.5 w-3.5 animate-spin" />
-          <span>Saving...</span>
+          <span>{m.drawing_saving()}</span>
         </>
       ) : onDevice ? (
         <>
           <CloudOff className="h-3.5 w-3.5" />
-          <span>Saved on this device · waiting to sync</span>
+          <span>{m.offline_status_waiting()}</span>
         </>
       ) : (
         <>
           <Cloud className="h-3.5 w-3.5" />
-          <span>Saved</span>
+          <span>{m.drawing_saved()}</span>
         </>
       )}
     </div>

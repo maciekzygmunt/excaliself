@@ -10,6 +10,7 @@ import {
   useTrashDrawing,
 } from "@/features/drawings/mutations"
 import { drawingsQueryOptions } from "@/features/drawings/queries"
+import { m } from "@/paraglide/messages"
 import {
   type PaletteContextSection,
   usePaletteContextSection,
@@ -58,17 +59,19 @@ export function DrawingPaletteContext({
   const section = useMemo<PaletteContextSection | null>(() => {
     if (!drawing) return null
     return {
-      title: "This drawing",
+      title: m.palette_drawing_section(),
       rows: [
         {
           id: "drawing:rename",
-          label: "Rename",
+          label: m.palette_drawing_rename(),
           icon: Pencil,
           onSelect: () => setRenameOpen(true),
         },
         {
           id: "drawing:star",
-          label: drawing.starred ? "Unstar" : "Star",
+          label: drawing.starred
+            ? m.palette_drawing_unstar()
+            : m.palette_drawing_star(),
           icon: drawing.starred ? StarOff : Star,
           onSelect: () =>
             starMutate({
@@ -77,7 +80,7 @@ export function DrawingPaletteContext({
         },
         {
           id: "drawing:duplicate",
-          label: "Duplicate",
+          label: m.palette_drawing_duplicate(),
           icon: Copy,
           // The open canvas is this drawing: save its last edits first
           onSelect: () =>
@@ -85,7 +88,7 @@ export function DrawingPaletteContext({
         },
         {
           id: "drawing:move-folder",
-          label: "Move to folder…",
+          label: m.palette_drawing_move_folder(),
           icon: FolderInput,
           // Reversible mutation, so no confirm: the move lands optimistically
           // and rolls back with an error toast on failure (spec §4.3)
@@ -99,7 +102,7 @@ export function DrawingPaletteContext({
         },
         {
           id: "drawing:trash",
-          label: "Move to trash",
+          label: m.palette_drawing_trash(),
           icon: Trash2,
           destructive: true,
           onSelect: () => {

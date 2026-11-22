@@ -9,6 +9,7 @@ import { MAX_DRAWING_IMAGE_BYTES } from "@/features/collab/room-files"
 import { MAX_NAME_LENGTH } from "@/features/drawings/list-columns"
 import type { PersistedFile } from "@/features/drawings/scene"
 import { sceneRevision } from "@/features/drawings/scene-revision"
+import { m } from "@/paraglide/messages"
 import { syncDeviceDrawing } from "./server"
 import {
   deviceDrawingRecord,
@@ -16,6 +17,7 @@ import {
   listPendingDeviceDrawings,
   markDeviceDrawingSaved,
   moveToNewDeviceDrawing,
+  purgeDeviceDrawings,
   readDeviceDrawing,
 } from "./store"
 
@@ -60,9 +62,9 @@ export type SyncOutcome =
   | { status: "copied"; name: string; copyName: string }
 
 export function toastCopied(copied: { name: string; copyName: string }) {
-  toast(`“${copied.name}” changed elsewhere`, {
+  toast(m.offline_copied_title({ name: copied.name }), {
     id: `offline-copy:${copied.copyName}`,
-    description: `Your offline edits are saved as “${copied.copyName}”.`,
+    description: m.offline_copied_description({ copyName: copied.copyName }),
   })
 }
 
@@ -108,14 +110,14 @@ async function upload(owner: string, id: string): Promise<SyncOutcome> {
     )
     // As online: refused images aren't kept, so say so.
     if (result.missingFileIds.length + result.overCapFileIds.length > 0)
-      toast.error(`Some images in “${name}” weren’t saved`, {
+      toast.error(m.offline_images_refused_title({ name }), {
         id: `offline-images:${id}`,
-        description: "They were too large to store with the drawing.",
+        description: m.offline_images_refused_description(),
       })
     return { status: "synced" }
   }
   // Changed elsewhere, shared, moved to Team, or trashed: keep both versions.
-  const suffix = " (offline copy)"
+  const suffix = ` (${m.offline_copy_label()})`
   const copyName = `${name.slice(0, MAX_NAME_LENGTH - suffix.length)}${suffix}`
   const copy = await moveToNewDeviceDrawing(owner, id, copyName)
   if (!copy) return { status: "clean" }
@@ -146,6 +148,20 @@ export async function syncDeviceDrawingNow(
   } catch {
     return { status: "busy" }
   }
+}
+
+/**
+ * For turning offline drawings off: uploads pending edits, then drops every
+ * copy. False, with the copies kept, if edits remain.
+ */
+export async function drainDeviceDrawings(owner: string) {
+  for (const id of await listPendingDeviceDrawings(owner)) {
+    const outcome = await syncDeviceDrawingNow(owner, id)
+    if (outcome.status === "copied") toastCopied(outcome)
+  }
+  if ((await listPendingDeviceDrawings(owner)).length > 0) return false
+  await purgeDeviceDrawings(owner)
+  return true
 }
 
 let syncing: Promise<void> | undefined

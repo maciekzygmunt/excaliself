@@ -18,15 +18,20 @@ import {
 import { drawingShareQueryOptions } from "@/features/shares/queries"
 import { useCopy } from "@/hooks/use-copy"
 import { cn } from "@/lib/utils"
+import { m } from "@/paraglide/messages"
 
-const AUDIENCE_COPY: Record<ShareAudience, { label: string; hint: string }> = {
+// Message functions, called at render so they follow the locale.
+const AUDIENCE_COPY: Record<
+  ShareAudience,
+  { label: () => string; hint: () => string }
+> = {
   members: {
-    label: "Members of this instance",
-    hint: "Visitors must sign in before they can open it.",
+    label: m.share_audience_members_label,
+    hint: m.share_audience_members_hint,
   },
   anyone: {
-    label: "Anyone with the link",
-    hint: "No account needed — guests pick a display name.",
+    label: m.share_audience_anyone_label,
+    hint: m.share_audience_anyone_hint,
   },
 }
 
@@ -49,7 +54,7 @@ function LinkRow({ url }: { url: string }) {
         ) : (
           <Copy className="h-3.5 w-3.5" />
         )}
-        {copied ? "Copied" : "Copy"}
+        {copied ? m.share_copied() : m.share_copy()}
       </Button>
     </div>
   )
@@ -63,10 +68,10 @@ function MemberLinkRow({ url }: { url: string }) {
       <Users className="h-4 w-4 shrink-0 text-muted-foreground" />
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
         <span className="text-[13px] font-medium text-foreground">
-          Members already have access
+          {m.share_members_have_access()}
         </span>
         <span className="text-xs text-muted-foreground">
-          They find it in Team.
+          {m.share_members_find_in_team()}
         </span>
       </span>
       <Button
@@ -80,7 +85,7 @@ function MemberLinkRow({ url }: { url: string }) {
         ) : (
           <Copy className="h-3.5 w-3.5" />
         )}
-        {copied ? "Copied" : "Copy member link"}
+        {copied ? m.share_copied() : m.share_copy_member_link()}
       </Button>
     </div>
   )
@@ -129,10 +134,10 @@ function AudienceCards({
           </span>
           <span className="flex flex-col gap-0.5">
             <span className="text-[13px] font-medium text-foreground">
-              {AUDIENCE_COPY[audience].label}
+              {AUDIENCE_COPY[audience].label()}
             </span>
             <span className="text-xs text-muted-foreground">
-              {AUDIENCE_COPY[audience].hint}
+              {AUDIENCE_COPY[audience].hint()}
             </span>
           </span>
         </label>
@@ -187,11 +192,11 @@ export function ShareDialog({
   const url = shared ? `${window.location.origin}/share/${share.token}` : null
   const description = isTeam
     ? shared
-      ? "Anyone with this link can edit, live. No account needed."
-      : "Create a guest link that lets people outside this instance edit this drawing with you, live."
+      ? m.share_description_team_shared()
+      : m.share_description_team()
     : shared
-      ? "Everyone with this link can edit, live."
-      : "Create a link that lets others edit this drawing with you, live."
+      ? m.share_description_shared()
+      : m.share_description()
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -199,7 +204,7 @@ export function ShareDialog({
         {/* min-w-0 on every section: DialogContent is a grid, so the long
             URL would otherwise widen the panel instead of truncating. */}
         <div className="min-w-0 px-5 pt-5 pb-1">
-          <DialogTitle>Share drawing</DialogTitle>
+          <DialogTitle>{m.share_title()}</DialogTitle>
           <DialogDescription className="mt-1">{description}</DialogDescription>
         </div>
         <div className="min-w-0 space-y-4 px-5 py-4">
@@ -225,10 +230,10 @@ export function ShareDialog({
             >
               <Link2 className="h-4 w-4" />
               {createMutation.isPending
-                ? "Creating…"
+                ? m.share_creating()
                 : isTeam
-                  ? "Create guest link"
-                  : "Create share link"}
+                  ? m.share_create_guest_link()
+                  : m.share_create_link()}
             </Button>
           )}
           {isTeam && (
@@ -246,7 +251,7 @@ export function ShareDialog({
               disabled={busy}
               className="text-destructive hover:text-destructive"
             >
-              {stopMutation.isPending ? "Stopping…" : "Stop sharing"}
+              {stopMutation.isPending ? m.share_stopping() : m.share_stop()}
             </Button>
             <Button
               variant="outline"
@@ -257,8 +262,8 @@ export function ShareDialog({
             >
               <RefreshCw className="h-3.5 w-3.5" />
               {regenerateMutation.isPending
-                ? "Regenerating…"
-                : "Regenerate link"}
+                ? m.share_regenerating()
+                : m.share_regenerate()}
             </Button>
           </div>
         )}

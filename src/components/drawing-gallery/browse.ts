@@ -1,5 +1,6 @@
 import type { Drawing } from "@/features/drawings/queries"
 import { findInScene } from "@/features/drawings/search"
+import { m } from "@/paraglide/messages"
 
 /** Sort orders offered by the browse toolbar (spec §5.2). */
 export type SortOrder = "last-edited" | "date-created" | "name"
@@ -7,10 +8,10 @@ export type SortOrder = "last-edited" | "date-created" | "name"
 export const DEFAULT_SORT: SortOrder = "last-edited"
 
 /** Single source for the dropdown's rows and the trigger's label. */
-export const SORT_LABELS: Record<SortOrder, string> = {
-  "last-edited": "Last edited",
-  "date-created": "Date created",
-  name: "Name",
+export const SORT_LABELS: Record<SortOrder, () => string> = {
+  "last-edited": m.gallery_sort_last_edited,
+  "date-created": m.gallery_sort_date_created,
+  name: m.gallery_sort_name,
 }
 
 export const SORT_ORDERS = Object.keys(SORT_LABELS) as SortOrder[]

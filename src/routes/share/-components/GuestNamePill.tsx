@@ -7,6 +7,7 @@ import {
 } from "@/features/collab/protocol"
 import { useDebounceCallback } from "@/hooks/use-debounce-callback"
 import { cn } from "@/lib/utils"
+import { m } from "@/paraglide/messages"
 
 const NAME_COMMIT_DELAY_MS = 400
 
@@ -98,7 +99,7 @@ function NameField({
       data-value={draft}
     >
       <input
-        aria-label="Your name"
+        aria-label={m.guest_your_name()}
         value={draft}
         maxLength={MAX_NAME_LENGTH}
         spellCheck={false}

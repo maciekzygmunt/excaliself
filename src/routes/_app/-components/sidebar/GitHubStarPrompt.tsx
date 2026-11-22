@@ -1,6 +1,7 @@
 import { X } from "lucide-react"
 import { useEffect, useState } from "react"
 import { GitHubMark, REPO_URL } from "@/components/github-mark"
+import { m } from "@/paraglide/messages"
 
 const MIN_ACCOUNT_AGE_MS = 7 * 24 * 60 * 60 * 1000
 const MIN_DRAWINGS = 10
@@ -65,17 +66,17 @@ export function GitHubStarPrompt({
     <div className="relative mb-1.5 rounded-md border border-sidebar-border px-2.5 py-2">
       <button
         type="button"
-        aria-label="Dismiss"
+        aria-label={m.sidebar_star_dismiss()}
         onClick={dismiss}
         className="absolute top-1.5 right-1.5 rounded p-0.5 text-muted-foreground/50 transition-colors hover:text-muted-foreground focus-visible:text-muted-foreground focus-visible:outline-none"
       >
         <X className="h-3 w-3" />
       </button>
       <p className="pr-4 text-[12px] font-medium text-foreground">
-        Enjoying Excaliself?
+        {m.sidebar_star_title()}
       </p>
       <p className="mt-0.5 text-[12px] leading-snug text-muted-foreground">
-        A star on GitHub helps other people find it.
+        {m.sidebar_star_body()}
       </p>
       <a
         href={REPO_URL}
@@ -85,7 +86,7 @@ export function GitHubStarPrompt({
         className="mt-2 inline-flex items-center gap-1.5 text-[12px] font-medium text-iris transition-colors hover:text-iris-strong"
       >
         <GitHubMark className="h-3 w-3" />
-        Star on GitHub
+        {m.sidebar_star_link()}
       </a>
     </div>
   )

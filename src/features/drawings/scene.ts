@@ -19,6 +19,7 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
 import { parseFileUpload } from "@/features/collab/room-files"
 import { drawingShareQueryOptions } from "@/features/shares/queries"
+import { m } from "@/paraglide/messages"
 import { drawingQueryOptions, drawingsQueryOptions } from "./queries"
 import { extractSceneText } from "./search"
 import { saveDrawingScene } from "./server"
@@ -262,11 +263,10 @@ export function useReloadSceneAfterRoom(
         },
         () => {
           if (cancelled) return
-          toast.error("Couldn't load the latest version of this drawing", {
+          toast.error(m.drawings_reload_failed(), {
             id: `scene-reload:${drawingId}`,
             duration: Number.POSITIVE_INFINITY,
-            description:
-              "Your changes aren't being saved. Reload the page to continue.",
+            description: m.drawings_reload_failed_hint(),
           })
         },
       )

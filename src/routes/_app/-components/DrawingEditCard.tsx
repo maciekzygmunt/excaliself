@@ -40,6 +40,7 @@ import {
 import { drawingEditQueryOptions } from "@/features/drawing-edits/queries"
 import { decideDrawingEdit } from "@/features/drawing-edits/server"
 import type { Decision } from "@/features/drawing-edits/store"
+import { m } from "@/paraglide/messages"
 import { getLocale } from "@/paraglide/runtime"
 
 const HIGHLIGHT = { added: "#2f9e44", changed: "#1971c2", removed: "#e03131" }
@@ -90,8 +91,8 @@ export function DrawingEditCard({ drawingId, excalidrawAPI, theme }: Props) {
     // Claimed first: a proposal another tab decided, or one replaced or
     // expired, never reaches the canvas.
     if (!(await decide.mutateAsync({ id: edit.id, decision: "applying" }))) {
-      toast.error("This proposal is no longer open", {
-        description: "Nothing was changed.",
+      toast.error(m.drawing_edit_not_open(), {
+        description: m.drawing_edit_nothing_changed(),
       })
       return
     }
@@ -108,8 +109,8 @@ export function DrawingEditCard({ drawingId, excalidrawAPI, theme }: Props) {
       decision: stale ? "stale" : "applied",
     })
     if (stale)
-      toast.error("The drawing changed before you applied this", {
-        description: "Nothing was changed. Ask your AI client to try again.",
+      toast.error(m.drawing_edit_stale(), {
+        description: m.drawing_edit_stale_description(),
       })
   }
   const discard = () => {
@@ -125,7 +126,7 @@ export function DrawingEditCard({ drawingId, excalidrawAPI, theme }: Props) {
         disabled={decide.isPending}
         onClick={discard}
       >
-        Discard
+        {m.drawing_edit_discard()}
       </Button>
       <Button
         variant="primary"
@@ -134,18 +135,18 @@ export function DrawingEditCard({ drawingId, excalidrawAPI, theme }: Props) {
         onClick={() => void apply()}
       >
         {decide.isPending && decide.variables?.decision !== "discarded"
-          ? "Applying…"
-          : "Apply"}
+          ? m.drawing_edit_applying()
+          : m.drawing_edit_apply()}
       </Button>
     </>
   )
-  const title = `${edit.client} proposes a change`
+  const title = m.drawing_edit_title({ client: edit.client })
 
   return (
     <div className="pointer-events-none absolute inset-x-4 top-16 z-10 flex justify-end">
       <Card
         role="dialog"
-        aria-label="Proposed change"
+        aria-label={m.drawing_edit_label()}
         // Opaque: the card's gradient fades to half-transparent over the canvas.
         className="pointer-events-auto flex w-[22rem] max-w-full flex-col gap-3 bg-popover p-4"
       >
@@ -159,7 +160,7 @@ export function DrawingEditCard({ drawingId, excalidrawAPI, theme }: Props) {
         <button
           type="button"
           onClick={() => setEnlarged(true)}
-          aria-label="View the change larger"
+          aria-label={m.drawing_edit_view_larger_label()}
           className="group flex cursor-zoom-in flex-col gap-1 rounded-md border border-border bg-background p-2"
         >
           <PreviewImage
@@ -169,12 +170,10 @@ export function DrawingEditCard({ drawingId, excalidrawAPI, theme }: Props) {
           />
           <span className="flex items-center justify-end gap-1 text-[11px] text-muted-foreground transition-colors group-hover:text-foreground">
             <Maximize2Icon className="size-3" />
-            View larger
+            {m.drawing_edit_view_larger()}
           </span>
         </button>
-        <p className="text-xs text-muted-foreground">
-          Nothing changes until you apply it, and you can undo it.
-        </p>
+        <p className="text-xs text-muted-foreground">{m.drawing_edit_hint()}</p>
         <div className="flex justify-end gap-2">{actions}</div>
       </Card>
 
@@ -230,9 +229,9 @@ export function DrawingEditCard({ drawingId, excalidrawAPI, theme }: Props) {
 
 function Legend() {
   const items = [
-    ["New", HIGHLIGHT.added],
-    ["Changed", HIGHLIGHT.changed],
-    ["Removed", HIGHLIGHT.removed],
+    [m.drawing_edit_legend_new(), HIGHLIGHT.added],
+    [m.drawing_edit_legend_changed(), HIGHLIGHT.changed],
+    [m.drawing_edit_legend_removed(), HIGHLIGHT.removed],
   ] as const
   return (
     <ul className="flex gap-4 text-xs text-muted-foreground">

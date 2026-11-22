@@ -1,5 +1,6 @@
 import { PanelLeftIcon } from "lucide-react"
 import { useState } from "react"
+import { m } from "@/paraglide/messages"
 
 // The title hides on narrow canvases (sidebar open, or a small window), where
 // it would push Excalidraw's Library button off screen.
@@ -24,8 +25,8 @@ export function TopLeftControls({
         type="button"
         onClick={onToggleSidebar}
         className="dropdown-menu-button [--button-bg:var(--color-surface-low)] [--button-width:var(--lg-button-size)] [--button-height:var(--lg-button-size)] ring-1 ring-(--color-surface-lowest) active:ring-(--color-brand-active)"
-        aria-label="Toggle Sidebar"
-        title="Toggle Sidebar"
+        aria-label={m.sidebar_toggle()}
+        title={m.sidebar_toggle()}
       >
         <PanelLeftIcon className="h-(--lg-icon-size) w-(--lg-icon-size)" />
       </button>
@@ -34,7 +35,7 @@ export function TopLeftControls({
           className="hidden max-w-45 truncate text-[0.95rem] font-semibold text-(--text-primary-color) @min-[67rem]/canvas:block"
           title={initialName}
         >
-          {initialName || "Untitled Drawing"}
+          {initialName || m.drawings_untitled()}
         </span>
       ) : (
         <RenameField initialName={initialName} onSubmit={onSubmit} />
@@ -58,7 +59,7 @@ function RenameField({
     <div className="relative max-w-45 min-w-0 overflow-hidden hidden @min-[67rem]/canvas:block">
       <div
         className="relative h-(--lg-button-size) border-b border-transparent bg-transparent font-semibold after:block after:w-full after:min-w-16 after:whitespace-pre after:invisible after:content-[attr(data-value)] focus-within:border-(--color-primary)"
-        data-value={value || "Untitled Drawing"}
+        data-value={value || m.drawings_untitled()}
       >
         <input
           value={value}
@@ -72,8 +73,8 @@ function RenameField({
             onSubmit(trimmed)
           }}
           className="absolute inset-0 h-full w-full truncate bg-transparent p-0 text-[0.95rem] font-semibold text-(--text-primary-color) shadow-none outline-none focus:cursor-text focus:ring-0 hover:text-(--color-primary)"
-          placeholder="Untitled Drawing"
-          title="Click to rename scene"
+          placeholder={m.drawings_untitled()}
+          title={m.drawings_rename_hint()}
           spellCheck={false}
           autoComplete="off"
         />

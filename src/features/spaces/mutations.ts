@@ -7,6 +7,7 @@ import {
 import { foldersQueryOptions } from "@/features/folders/queries"
 import { collectFolderSubtreeIds } from "@/features/folders/subtree"
 import { drawingShareQueryOptions } from "@/features/shares/queries"
+import { m } from "@/paraglide/messages"
 import type { MoveItem } from "./move-to-team"
 import { moveToTeam } from "./server"
 
@@ -68,8 +69,8 @@ export function useMoveToTeam() {
         exact: true,
       })
       void queryClient.invalidateQueries(foldersQueryOptions())
-      toast("Moved to Team")
+      toast(m.spaces_moved())
     },
-    onError: () => toast.error("Failed to move to Team"),
+    onError: () => toast.error(m.spaces_move_failed()),
   })
 }

@@ -1,5 +1,6 @@
 import { AuthPage } from "@/components/auth-page"
 import { Button } from "@/components/ui/button"
+import { m } from "@/paraglide/messages"
 
 type Props = {
   onRetry: () => void
@@ -9,11 +10,11 @@ type Props = {
 export function TooManyAttempts({ onRetry }: Props) {
   return (
     <AuthPage
-      title="Too many attempts"
-      subtitle="This network has opened a lot of links just now. Try again in a minute."
+      title={m.guest_throttled_title()}
+      subtitle={m.guest_throttled_subtitle()}
     >
       <Button type="button" className="w-full" onClick={onRetry}>
-        Try again
+        {m.guest_try_again()}
       </Button>
     </AuthPage>
   )

@@ -29,7 +29,6 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { currentUserQueryOptions } from "@/features/account/queries"
 import {
-  countDrawings,
   useBulkMoveToFolder,
   useBulkMoveToTeam,
   useBulkStar,
@@ -40,6 +39,7 @@ import type { Drawing } from "@/features/drawings/queries"
 import { foldersQueryOptions } from "@/features/folders/queries"
 import { folderPaths } from "@/features/folders/subtree"
 import { cn } from "@/lib/utils"
+import { m } from "@/paraglide/messages"
 
 /**
  * The bulk action bar over a gallery with a selection: the count, Select
@@ -80,12 +80,12 @@ export function SelectionBar({
 
   const onExport = async () => {
     setExporting(true)
-    const toastId = toast.loading(`Exporting ${countDrawings(count)}`)
+    const toastId = toast.loading(m.gallery_selection_exporting({ count }))
     try {
       await exportDrawings(selected)
       toast.dismiss(toastId)
     } catch {
-      toast.error("Couldn't export", { id: toastId })
+      toast.error(m.gallery_selection_export_failed(), { id: toastId })
     } finally {
       setExporting(false)
     }
@@ -100,13 +100,13 @@ export function SelectionBar({
       <div className="pointer-events-none fixed inset-x-0 bottom-6 z-20 flex justify-center px-4 md:pl-[calc(var(--sidebar-width)+1rem)] md:group-has-[[data-collapsible=offcanvas]]/sidebar-wrapper:pl-4">
         <div
           role="region"
-          aria-label="Selected drawings"
+          aria-label={m.gallery_selection_label()}
           className="pointer-events-auto flex max-w-full items-center gap-0.5 rounded-xl border border-border bg-panel p-1 shadow-panel animate-in fade-in-0 slide-in-from-bottom-2 duration-150"
         >
           <Button
             variant="ghost"
             size="icon-sm"
-            aria-label="Clear selection"
+            aria-label={m.gallery_selection_clear()}
             onClick={onClear}
             className="text-muted-foreground hover:text-foreground"
           >
@@ -116,8 +116,12 @@ export function SelectionBar({
             aria-live="polite"
             className="px-1.5 text-[13px] font-medium whitespace-nowrap text-foreground tabular-nums"
           >
-            {count}
-            <span className="max-sm:sr-only"> selected</span>
+            <span aria-hidden className="sm:hidden">
+              {count}
+            </span>
+            <span className="max-sm:sr-only">
+              {m.gallery_selection_count({ count })}
+            </span>
           </span>
           {count < total && (
             <Button
@@ -126,7 +130,7 @@ export function SelectionBar({
               onClick={onSelectAll}
               className="text-muted-foreground hover:text-foreground max-sm:px-2"
             >
-              Select all
+              {m.gallery_selection_select_all()}
             </Button>
           )}
           <span
@@ -135,7 +139,9 @@ export function SelectionBar({
           />
 
           <BarButton
-            label={allStarred ? "Unstar" : "Star"}
+            label={
+              allStarred ? m.drawings_action_unstar() : m.drawings_action_star()
+            }
             onClick={() => star.mutate({ data: { ids, starred: !allStarred } })}
           >
             {allStarred ? <StarOff /> : <Star />}
@@ -160,19 +166,23 @@ export function SelectionBar({
 
           {teamEnabled && space === "private" && (
             <BarButton
-              label="Move to Team"
+              label={m.drawings_action_move_to_team()}
               onClick={() => setConfirmTeam(true)}
             >
               <Users />
             </BarButton>
           )}
 
-          <BarButton label="Export" onClick={onExport} disabled={exporting}>
+          <BarButton
+            label={m.gallery_selection_export()}
+            onClick={onExport}
+            disabled={exporting}
+          >
             <Download />
           </BarButton>
 
           <BarButton
-            label="Move to trash"
+            label={m.drawings_action_trash()}
             onClick={() => {
               trash(selected)
               onClear()
@@ -186,15 +196,14 @@ export function SelectionBar({
             <AlertDialogContent>
               <AlertDialogHeader>
                 <AlertDialogTitle>
-                  Move {countDrawings(count)} to Team?
+                  {m.gallery_selection_team_title({ count })}
                 </AlertDialogTitle>
                 <AlertDialogDescription>
-                  All members can see and edit them. You can't move them back to
-                  Private.
+                  {m.gallery_selection_team_description()}
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogCancel>{m.gallery_cancel()}</AlertDialogCancel>
                 <Button
                   variant="primary"
                   onClick={() => {
@@ -203,7 +212,7 @@ export function SelectionBar({
                     onClear()
                   }}
                 >
-                  Move to Team
+                  {m.drawings_action_move_to_team()}
                 </Button>
               </AlertDialogFooter>
             </AlertDialogContent>
@@ -269,7 +278,9 @@ function MoveToFolderMenu({
         }
       >
         <FolderInput />
-        <span className="sr-only sm:not-sr-only">Move to folder</span>
+        <span className="sr-only sm:not-sr-only">
+          {m.gallery_selection_move_to_folder()}
+        </span>
       </DropdownMenuTrigger>
       <DropdownMenuContent
         side="top"
@@ -280,7 +291,7 @@ function MoveToFolderMenu({
           disabled={current === null}
           onClick={() => onMove(null)}
         >
-          No folder
+          {m.gallery_selection_no_folder()}
         </DropdownMenuItem>
         {options.length > 0 && <DropdownMenuSeparator />}
         {options.map((option) => (

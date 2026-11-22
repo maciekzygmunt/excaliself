@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
+import { m } from "@/paraglide/messages"
 import { commentThreadsQueryOptions } from "./queries"
 import {
   deleteOwnComment,
@@ -22,7 +23,7 @@ function useCommentMutation<Variables, Result>(
     onError: quiet
       ? undefined
       : (error) =>
-          toast.error("Your comment wasn't saved", {
+          toast.error(m.comments_save_failed(), {
             description: error.message,
           }),
     onSettled: () =>

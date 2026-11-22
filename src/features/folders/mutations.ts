@@ -5,6 +5,7 @@ import {
   patchById,
   useOptimisticListMutation,
 } from "@/hooks/use-optimistic-list-mutation"
+import { m } from "@/paraglide/messages"
 import { type Folder, foldersQueryOptions } from "./queries"
 import {
   createFolder,
@@ -54,7 +55,7 @@ export function useTrashFolder() {
 
   const restoreMutation = useMutation({
     mutationFn: restoreFolder,
-    onError: () => toast.error("Couldn't restore folder"),
+    onError: () => toast.error(m.folder_restore_failed()),
     onSettled: invalidateBoth,
   })
 
@@ -97,9 +98,9 @@ export function useTrashFolder() {
     )
 
     const trashed = trashMutation.mutateAsync({ data: folder.id })
-    const toastId = toast("Moved to trash", {
+    const toastId = toast(m.trash_moved(), {
       action: {
-        label: "Undo",
+        label: m.trash_undo(),
         onClick: () => {
           // Wait out the in-flight trash call so restore can't race it
           // server-side; if trashing failed there is nothing to restore.
@@ -131,7 +132,7 @@ export function useTrashFolder() {
     })
     trashed.catch(() => {
       toast.dismiss(toastId)
-      toast.error("Couldn't move to trash")
+      toast.error(m.trash_move_failed())
     })
   }
 }

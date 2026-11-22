@@ -4,16 +4,18 @@ import { useEffect, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { useSidebar } from "@/components/ui/sidebar"
 import { useIsApplePlatform } from "@/hooks/use-is-apple-platform"
+import { m } from "@/paraglide/messages"
 import { useActiveSpace } from "./ActiveSpace"
 
 type Step = {
   id: "spaces" | "search" | "new-drawing" | "share"
   /** Home steps point into the sidebar; the Share step waits for a drawing. */
   home: boolean
-  title: string
+  // Message functions, called at render so they follow the locale.
+  title: () => string
   body: (keys: { palette: string }) => string
   /** Label of a main button that clicks the target, in place of Next. */
-  tryLabel?: string
+  tryLabel?: () => string
   side: "right" | "bottom"
 }
 
@@ -21,34 +23,30 @@ export const TOUR_STEPS: Step[] = [
   {
     id: "spaces",
     home: true,
-    title: "Private and Team",
-    body: () =>
-      "Private drawings are only yours. Team drawings are shared with every member, and edits show up live.",
+    title: m.tour_spaces_title,
+    body: () => m.tour_spaces_body(),
     side: "right",
   },
   {
     id: "search",
     home: true,
-    title: "Find anything",
-    body: ({ palette }) =>
-      `Search drawing names and the text inside them, or run a command. Press ${palette} from anywhere.`,
+    title: m.tour_search_title,
+    body: ({ palette }) => m.tour_search_body({ palette }),
     side: "right",
   },
   {
     id: "new-drawing",
     home: true,
-    title: "Make a drawing",
-    body: () =>
-      "Start one here, or press N from anywhere. The last tip is inside the drawing.",
-    tryLabel: "Make a drawing",
+    title: m.tour_new_drawing_title,
+    body: () => m.tour_new_drawing_body(),
+    tryLabel: m.tour_new_drawing_try,
     side: "right",
   },
   {
     id: "share",
     home: false,
-    title: "Draw together",
-    body: () =>
-      "Share sends a link to draw together, live. Members of this instance can join, and guests too if you allow it.",
+    title: m.tour_share_title,
+    body: () => m.tour_share_body(),
     side: "bottom",
   },
 ]
@@ -145,10 +143,10 @@ export function FirstVisitTour({ userId }: { userId: string }) {
             <Popover.Arrow className="size-2.5 rotate-45 border-border bg-popover data-[side=bottom]:-top-[5.5px] data-[side=bottom]:border-t data-[side=bottom]:border-l data-[side=right]:-left-[5.5px] data-[side=right]:border-b data-[side=right]:border-l" />
             <div className="flex items-baseline justify-between gap-3">
               <Popover.Title className="text-sm font-medium">
-                {step.title}
+                {step.title()}
               </Popover.Title>
               <span className="font-mono text-[10px] whitespace-nowrap tabular-nums text-muted-foreground/70">
-                {index + 1} of {steps.length}
+                {m.tour_progress({ step: index + 1, total: steps.length })}
               </span>
             </div>
             <Popover.Description className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
@@ -163,7 +161,7 @@ export function FirstVisitTour({ userId }: { userId: string }) {
                   className="-ml-3 text-muted-foreground"
                   onClick={() => save("done")}
                 >
-                  Skip tour
+                  {m.tour_skip()}
                 </Button>
               )}
               <Button
@@ -176,7 +174,7 @@ export function FirstVisitTour({ userId }: { userId: string }) {
                     : advance()
                 }
               >
-                {step.tryLabel ?? (last ? "Done" : "Next")}
+                {step.tryLabel?.() ?? (last ? m.tour_done() : m.tour_next())}
               </Button>
             </div>
           </Popover.Popup>

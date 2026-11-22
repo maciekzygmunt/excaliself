@@ -1,5 +1,6 @@
 import { AuthPage } from "@/components/auth-page"
 import { Button } from "@/components/ui/button"
+import { m } from "@/paraglide/messages"
 
 type Props = {
   onRetry: () => void
@@ -8,12 +9,9 @@ type Props = {
 /** The room hit its participant cap; unlike a dead link, worth retrying. */
 export function DrawingFull({ onRetry }: Props) {
   return (
-    <AuthPage
-      title="This drawing is full"
-      subtitle="Too many people are editing it right now. Try again in a few minutes."
-    >
+    <AuthPage title={m.guest_full_title()} subtitle={m.guest_full_subtitle()}>
       <Button type="button" className="w-full" onClick={onRetry}>
-        Try again
+        {m.guest_try_again()}
       </Button>
     </AuthPage>
   )

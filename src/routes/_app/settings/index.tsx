@@ -11,6 +11,7 @@ import { AppearanceSection } from "./-components/AppearanceSection"
 import { DangerZoneSection } from "./-components/DangerZoneSection"
 import { EmailSection } from "./-components/EmailSection"
 import { Emphasis } from "./-components/Emphasis"
+import { OfflineSection } from "./-components/OfflineSection"
 import { PasswordSection } from "./-components/PasswordSection"
 import { ProfileSection } from "./-components/ProfileSection"
 import { SessionsSection } from "./-components/SessionsSection"
@@ -47,6 +48,8 @@ function AccountPage() {
       <SessionsSection />
       <Separator />
       <AppearanceSection />
+      <Separator />
+      <OfflineSection user={user} />
       <Separator />
       <DangerZoneSection user={user} />
     </div>

@@ -11,6 +11,7 @@ import { resolveShareToken } from "@/features/shares/server"
 import { isOpenAsTeam } from "@/features/spaces/server"
 import { useApplyTheme } from "@/hooks/use-theme"
 import { useDocumentTitle } from "@/lib/document-title"
+import { m } from "@/paraglide/messages"
 import { DeadLink } from "./-components/DeadLink"
 import { DrawingDamaged } from "./-components/DrawingDamaged"
 import { DrawingFull } from "./-components/DrawingFull"
@@ -25,7 +26,7 @@ const SharedCanvas = lazy(
 const LoadingState = () => (
   <div
     role="status"
-    aria-label="Loading drawing"
+    aria-label={m.guest_loading()}
     className="flex h-dvh items-center justify-center bg-card"
   >
     <Mark className="h-8 w-8 animate-pulse text-iris motion-reduce:animate-none" />

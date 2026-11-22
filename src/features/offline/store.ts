@@ -22,13 +22,37 @@ type StoredFile = PersistedFile & { owner: string; drawingId: string }
 const DRAWINGS = "drawings"
 const FILES = "files"
 const accountKey = "excaliself:offline-account"
+const enabledKey = "excaliself:offline-enabled"
 
-export function supportsDeviceDrawings() {
+/** HTTPS or localhost, with IndexedDB. */
+export function canKeepDeviceDrawings() {
   return (
     typeof window !== "undefined" &&
     window.isSecureContext &&
     "indexedDB" in window
   )
+}
+
+// Read once per page load: the Settings switch reloads the page.
+let enabled: boolean | undefined
+
+/** Offline drawings are opt-in per browser, in Settings. */
+export function supportsDeviceDrawings() {
+  if (!canKeepDeviceDrawings()) return false
+  if (enabled === undefined) {
+    try {
+      enabled = localStorage.getItem(enabledKey) === "1"
+    } catch {
+      enabled = false
+    }
+  }
+  return enabled
+}
+
+/** Takes effect on the next page load. */
+export function setDeviceDrawingsEnabled(on: boolean) {
+  if (on) localStorage.setItem(enabledKey, "1")
+  else localStorage.removeItem(enabledKey)
 }
 
 /** The signed-in account, kept for the offline page, which can't ask the server. */

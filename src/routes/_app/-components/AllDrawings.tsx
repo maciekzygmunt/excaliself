@@ -22,6 +22,7 @@ import type { Folder } from "@/features/folders/queries"
 import { foldersQueryOptions } from "@/features/folders/queries"
 import { inBrowsedSpace, useBrowsedSpace } from "@/features/spaces/browse"
 import { useDocumentTitle } from "@/lib/document-title"
+import { m } from "@/paraglide/messages"
 import { useCreateDialog } from "./CreateDialog"
 import { useMoveToTeamDialog } from "./MoveToTeamDialog"
 
@@ -43,7 +44,7 @@ export function AllDrawings({ isAdmin }: { isAdmin: boolean }) {
   const { openCreateDrawingDialog } = useCreateDialog()
   const trashDrawing = useTrashDrawing()
   const { requestMoveToTeam } = useMoveToTeamDialog()
-  useDocumentTitle("All drawings", { chrome: true })
+  useDocumentTitle(m.sidebar_all_drawings(), { chrome: true })
 
   const [query, setQuery] = useState("")
   const [scope, setScope] = useState<GalleryScope>("all")
@@ -78,7 +79,7 @@ export function AllDrawings({ isAdmin }: { isAdmin: boolean }) {
       <div className="mx-auto flex min-h-full w-full max-w-4xl flex-col px-6 py-8">
         <div className="flex items-center pb-5">
           <h1 className="text-sm font-semibold tracking-[-0.01em] text-foreground">
-            All drawings
+            {m.sidebar_all_drawings()}
           </h1>
         </div>
 
@@ -103,7 +104,7 @@ export function AllDrawings({ isAdmin }: { isAdmin: boolean }) {
           sort={sort}
           query={query}
           spaceLabels={searchesBothSpaces}
-          loadingLabel="Loading drawings"
+          loadingLabel={m.gallery_loading()}
           onTrash={trashDrawing}
           onMoveToTeam={requestMoveToTeam}
           selectable
@@ -150,7 +151,7 @@ function FilteredEmpty({
     return <NoMatches query={trimmed} />
   }
   if (scope === "unfiled") {
-    return <QuietLine>No unfiled drawings</QuietLine>
+    return <QuietLine>{m.gallery_unfiled_empty()}</QuietLine>
   }
 
   return (

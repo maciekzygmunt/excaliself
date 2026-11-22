@@ -26,9 +26,13 @@ also on shared drawings and share links.
 
 ## Offline drawings
 
-Each Private drawing you open is also kept in this browser. When your
-instance can't be reached, opening Excaliself shows **Offline drawings**
-instead. There you can open the drawings this browser keeps, and make new
+Offline drawings are in beta and off by default. To turn them on, open
+**Settings** and choose **Turn on** under **Offline drawings (beta)**. The
+setting applies to this browser only.
+
+When they are on, each Private drawing you open is also kept in this browser.
+When your instance can't be reached, opening Excaliself shows **Offline
+drawings** instead. There you can open the drawings this browser keeps, and make new
 ones. You can also choose **Offline drawings** from your account menu.
 
 Edits made offline stay in this browser, also after a reload or a browser
@@ -43,6 +47,10 @@ If the drawing changed somewhere else while you were offline, Excaliself does
 not overwrite it. It saves your version as a new drawing with " (offline
 copy)" at the end of its name. This also happens if the drawing was moved to
 Team, shared, or moved to the trash.
+
+To turn offline drawings off, choose **Turn off** in the same place. This
+sends the edits that wait in this browser, and then deletes the offline
+copies. If the edits can't be sent, offline drawings stay on.
 
 Offline drawings need HTTPS or `localhost`. Team drawings and drawings with a
 share link are not kept offline. Clearing this site's data in the browser

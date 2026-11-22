@@ -10,6 +10,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
+import { m } from "@/paraglide/messages"
 
 /**
  * Tier-2 danger dialog (spec §4.5): a count-aware, danger-styled confirm —
@@ -91,7 +92,9 @@ export function DangerConfirmDialog({
           <AlertDialogDescription>{description}</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={pending}>Cancel</AlertDialogCancel>
+          <AlertDialogCancel disabled={pending}>
+            {m.dialog_cancel()}
+          </AlertDialogCancel>
           <Button
             variant="destructive"
             disabled={pending || confirmDisabled}

@@ -11,6 +11,7 @@ import {
 } from "@/features/trash/mutations"
 import { trashQueryOptions } from "@/features/trash/queries"
 import { daysUntilPurge } from "@/features/trash/retention"
+import { m } from "@/paraglide/messages"
 import {
   type PaletteContextSection,
   usePaletteContextSection,
@@ -25,9 +26,8 @@ type TrashedDrawingInfo = {
 
 function purgeSentence(deletedAt: Date | string): string {
   const days = daysUntilPurge(deletedAt)
-  if (days <= 0) return "This drawing will be permanently deleted today."
-  if (days === 1) return "This drawing will be permanently deleted in 1 day."
-  return `This drawing will be permanently deleted in ${days} days.`
+  if (days <= 0) return m.drawing_trashed_purge_today()
+  return m.drawing_trashed_purge_in({ count: days })
 }
 
 /**
@@ -64,17 +64,17 @@ export function TrashedDrawingBanner({
   const drawingId = drawing.id
   const section = useMemo<PaletteContextSection>(
     () => ({
-      title: "This drawing",
+      title: m.drawing_palette_title(),
       rows: [
         {
           id: "trashed-drawing:restore",
-          label: "Restore",
+          label: m.drawing_trashed_restore(),
           icon: RotateCcw,
           onSelect: () => restoreDrawingRef.current({ id: drawingId }),
         },
         {
           id: "trashed-drawing:delete-forever",
-          label: "Delete forever",
+          label: m.drawing_trashed_delete_forever(),
           icon: Trash2,
           destructive: true,
           onSelect: () => setDeleteForeverOpen(true),
@@ -102,7 +102,7 @@ export function TrashedDrawingBanner({
   // counts query mustn't be able to wedge Delete forever shut.
   const countsLoading = isFolderUnit && trashPending
 
-  let description = `"${drawing.name}" will be permanently deleted. This can't be undone.`
+  let description = m.drawing_trashed_delete_description({ name: drawing.name })
   if (isFolderUnit) {
     const unitFolder = trashItems?.folders.find((f) => f.id === unitId)
     const contents = unitFolder
@@ -113,8 +113,11 @@ export function TrashedDrawingBanner({
       : null
     description =
       unitFolder && contents
-        ? `This drawing was trashed with its folder. "${unitFolder.name}" and the ${contents} inside will be permanently deleted. This can't be undone.`
-        : "This drawing was trashed with its folder, which will be permanently deleted along with everything inside. This can't be undone."
+        ? m.drawing_trashed_delete_folder_contents({
+            folder: unitFolder.name,
+            contents,
+          })
+        : m.drawing_trashed_delete_folder()
   }
 
   return (
@@ -125,7 +128,7 @@ export function TrashedDrawingBanner({
       <span className="inline-flex items-center gap-2 text-[13px] text-foreground">
         <Trash2 aria-hidden className="h-3.5 w-3.5 text-destructive/70" />
         {trashedBy
-          ? `Moved to trash by ${trashedBy}`
+          ? m.drawing_trashed_by({ name: trashedBy })
           : purgeSentence(drawing.deletedAt)}
       </span>
       <span className="flex shrink-0 items-center gap-2">
@@ -135,7 +138,7 @@ export function TrashedDrawingBanner({
           className="text-iris hover:text-iris-strong"
           onClick={() => restoreDrawing(drawing)}
         >
-          Restore
+          {m.drawing_trashed_restore()}
         </Button>
         <DangerConfirmDialog
           open={deleteForeverOpen}
@@ -146,13 +149,13 @@ export function TrashedDrawingBanner({
               size="sm"
               className="text-destructive hover:bg-destructive/5 hover:text-destructive"
             >
-              Delete forever
+              {m.drawing_trashed_delete_forever()}
             </Button>
           }
-          title="Delete forever?"
+          title={m.drawing_trashed_delete_title()}
           description={description}
-          confirmLabel="Delete forever"
-          pendingLabel="Deleting…"
+          confirmLabel={m.drawing_trashed_delete_forever()}
+          pendingLabel={m.drawing_trashed_deleting()}
           confirmDisabled={countsLoading}
           onConfirm={async () => {
             await deleteForever(unitId)

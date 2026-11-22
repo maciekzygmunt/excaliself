@@ -1,5 +1,6 @@
 import { createClientOnlyFn } from "@tanstack/react-start"
 import { toast } from "sonner"
+import { m } from "@/paraglide/messages"
 import { getDrawingWithFiles } from "./server"
 
 // Lazy: keeps Excalidraw out of the SSR bundle and the Home chunk
@@ -33,8 +34,8 @@ export async function exportDrawing(drawing: { id: string; name: string }) {
   try {
     downloadFile(await fetchDrawingFile(drawing.id))
   } catch {
-    toast.error(`Couldn't export "${drawing.name}"`, {
-      description: "Try again, or open the drawing and save it from its menu.",
+    toast.error(m.drawings_export_failed({ name: drawing.name }), {
+      description: m.drawings_export_failed_hint(),
     })
   }
 }

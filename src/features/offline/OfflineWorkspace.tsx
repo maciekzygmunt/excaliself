@@ -15,7 +15,9 @@ import {
   selectOversizedImages,
 } from "@/features/drawings/scene"
 import { useCanvasTheme, useStoredTheme } from "@/hooks/use-theme"
+import { m } from "@/paraglide/messages"
 import {
+  canKeepDeviceDrawings,
   createDeviceDrawing,
   deviceAccount,
   listDeviceDrawings,
@@ -59,9 +61,8 @@ function Editor({
   }, [owner, id, flushRef])
 
   if (drawing === undefined)
-    return <Notice>Reading this drawing on this device…</Notice>
-  if (drawing === null)
-    return <Notice>This drawing isn’t available on this device.</Notice>
+    return <Notice>{m.offline_reading_drawing()}</Notice>
+  if (drawing === null) return <Notice>{m.offline_not_here()}</Notice>
   return <Canvas owner={owner} drawing={drawing} flushRef={flushRef} />
 }
 
@@ -92,12 +93,12 @@ function Canvas({
     flushRef.current = draft.flush
   }, [flushRef, draft.flush])
   const status = isDataCorrupt
-    ? "This drawing couldn’t be opened"
+    ? m.offline_status_corrupt()
     : draft.state === "failed"
-      ? "Couldn’t save on this device"
+      ? m.offline_status_write_failed()
       : draft.state === "written" || drawing.status === "pending"
-        ? "Saved on this device · waiting to sync"
-        : "Synced"
+        ? m.offline_status_waiting()
+        : m.offline_status_synced()
 
   return (
     <section className="flex min-h-0 min-w-0 flex-1 flex-col border-t border-hairline sm:border-l sm:border-t-0">
@@ -205,10 +206,10 @@ export default function OfflineWorkspace() {
   // The open drawing's last edit lands first. If it can't, stay on it.
   const select = async (id: string) => {
     if (flushEditor.current && !(await flushEditor.current())) {
-      toast.error("Couldn’t save this drawing on this device", {
+      toast.error(m.offline_switch_failed_title(), {
         id: "offline-switch",
-        description: "Your latest edit is only in this tab.",
-        action: { label: "Switch anyway", onClick: () => open(id) },
+        description: m.offline_switch_failed_description(),
+        action: { label: m.offline_switch_anyway(), onClick: () => open(id) },
       })
       return
     }
@@ -225,7 +226,7 @@ export default function OfflineWorkspace() {
         setName("")
         await select(drawing.id)
       })
-      .catch(() => toast.error("Couldn’t create a drawing on this device"))
+      .catch(() => toast.error(m.offline_create_failed()))
       .finally(() => setCreating(false))
   }
 
@@ -234,7 +235,7 @@ export default function OfflineWorkspace() {
       <header className="flex flex-wrap items-center justify-between gap-2 border-b border-hairline px-4 py-3">
         <h1 className="flex items-center gap-2 text-base font-semibold">
           <CloudOff aria-hidden="true" className="size-4 text-iris" />
-          Offline drawings
+          {m.offline_title()}
         </h1>
         <Button
           variant="ghost"
@@ -260,16 +261,18 @@ export default function OfflineWorkspace() {
           }
         >
           <ArrowLeft aria-hidden="true" className="size-4" />
-          Back to Excaliself
+          {m.offline_back()}
         </Button>
       </header>
       {!supported || !owner || unavailable ? (
         <Notice>
-          {!supported
-            ? "Offline drawings need HTTPS or localhost."
-            : owner
-              ? "This browser’s storage isn’t available."
-              : "Sign in and open Excaliself in this browser to use offline drawings."}
+          {!canKeepDeviceDrawings()
+            ? m.offline_needs_https()
+            : !supported
+              ? m.offline_turned_off()
+              : owner
+                ? m.offline_storage_unavailable()
+                : m.offline_sign_in_first()}
         </Notice>
       ) : (
         <div className="flex min-h-0 flex-1 flex-col sm:flex-row">
@@ -279,20 +282,20 @@ export default function OfflineWorkspace() {
                 value={name}
                 onChange={(event) => setName(event.target.value)}
                 maxLength={MAX_NAME_LENGTH}
-                aria-label="New drawing name"
-                placeholder="New drawing name"
+                aria-label={m.offline_new_name()}
+                placeholder={m.offline_new_name()}
               />
               <Button
                 type="submit"
                 size="icon"
-                aria-label="Create drawing"
+                aria-label={m.offline_create()}
                 disabled={!name.trim() || creating}
               >
                 <Plus aria-hidden="true" />
               </Button>
             </form>
             <nav
-              aria-label="Drawings on this device"
+              aria-label={m.offline_list_label()}
               className="mt-3 flex flex-col gap-1"
             >
               {drawings?.map((drawing) => (
@@ -318,9 +321,7 @@ export default function OfflineWorkspace() {
             />
           ) : (
             <Notice>
-              {drawings
-                ? "Open a drawing kept on this device, or create one."
-                : "Reading drawings on this device…"}
+              {drawings ? m.offline_pick() : m.offline_reading_list()}
             </Notice>
           )}
         </div>

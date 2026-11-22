@@ -8,6 +8,7 @@ import { purgeCountdownLabel } from "@/features/trash/retention"
 import { useDelayedVisible } from "@/hooks/use-delayed-visible"
 import { formatAgo } from "@/lib/relative-time"
 import { cn } from "@/lib/utils"
+import { m } from "@/paraglide/messages"
 import {
   CARD_FRAME_CLASS,
   CARD_HOVER_CLASS,
@@ -129,7 +130,7 @@ function TrashedDrawingCard({
       <Link
         to="/draw/$id"
         params={{ id: drawing.id }}
-        aria-label={`View ${drawing.name}`}
+        aria-label={m.trash_view({ name: drawing.name })}
         className="absolute inset-0 rounded-card"
       />
       <div className="aspect-[4/3] overflow-hidden border-b border-hairline">
@@ -144,15 +145,17 @@ function TrashedDrawingCard({
           </span>
         }
         byline={drawing.space === "team" && <TrashedBy unit={drawing} />}
-        restoreLabel={`Restore ${drawing.name}`}
+        restoreLabel={m.trash_restore_named({ name: drawing.name })}
         onRestore={onRestore}
         deleteDialog={
           <DangerConfirmDialog
             trigger={<DeleteForeverTrigger label={drawing.name} />}
-            title="Delete forever?"
-            description={`"${drawing.name}" will be permanently deleted. This can't be undone.`}
-            confirmLabel="Delete forever"
-            pendingLabel="Deleting…"
+            title={m.trash_delete_forever_title()}
+            description={m.trash_delete_forever_description({
+              name: drawing.name,
+            })}
+            confirmLabel={m.trash_delete_forever()}
+            pendingLabel={m.trash_deleting()}
             onConfirm={onDeleteForever}
           />
         }
@@ -170,7 +173,7 @@ function TrashedFolderCard({
   onRestore: () => void
   onDeleteForever: () => Promise<unknown>
 }) {
-  const count = folder.itemCount === 1 ? "1 item" : `${folder.itemCount} items`
+  const count = m.trash_item_count({ count: folder.itemCount })
   // Count-aware danger copy (spec §4.5): "…and the 8 drawings inside".
   // itemCount minus the drawings slice is the swept subfolders.
   const contents = describeContents(
@@ -203,19 +206,22 @@ function TrashedFolderCard({
           </>
         }
         byline={folder.space === "team" && <TrashedBy unit={folder} />}
-        restoreLabel={`Restore ${folder.name}`}
+        restoreLabel={m.trash_restore_named({ name: folder.name })}
         onRestore={onRestore}
         deleteDialog={
           <DangerConfirmDialog
             trigger={<DeleteForeverTrigger label={folder.name} />}
-            title="Delete forever?"
+            title={m.trash_delete_forever_title()}
             description={
               contents
-                ? `"${folder.name}" and the ${contents} inside will be permanently deleted. This can't be undone.`
-                : `"${folder.name}" will be permanently deleted. This can't be undone.`
+                ? m.trash_delete_forever_folder_description({
+                    name: folder.name,
+                    contents,
+                  })
+                : m.trash_delete_forever_description({ name: folder.name })
             }
-            confirmLabel="Delete forever"
-            pendingLabel="Deleting…"
+            confirmLabel={m.trash_delete_forever()}
+            pendingLabel={m.trash_deleting()}
             onConfirm={onDeleteForever}
           />
         }
@@ -232,7 +238,7 @@ function DeleteForeverTrigger({
   return (
     <button
       type="button"
-      aria-label={`Delete forever ${label}`}
+      aria-label={m.trash_delete_forever_named({ name: label })}
       className="shrink-0 rounded-md p-1.5 text-muted-foreground/40 transition-colors duration-150 hover:bg-destructive/10 hover:text-destructive focus-visible:bg-destructive/10 focus-visible:text-destructive focus-visible:outline-none"
       {...props}
     >
@@ -250,6 +256,7 @@ function TrashedBy({
 }: {
   unit: Pick<TrashedDrawing, "deletedByName" | "deletedAt">
 }) {
+  const name = unit.deletedByName ?? m.gallery_former_member()
   return (
     // The name truncates first, so "when" always stays readable
     <>
@@ -258,8 +265,8 @@ function TrashedBy({
         className="mr-1 h-3 w-3 shrink-0 self-center text-muted-foreground/60"
       />
       <span className="truncate">
-        <span className="sr-only">Trashed by </span>
-        {unit.deletedByName ?? "Former member"}
+        <span className="sr-only">{m.trash_trashed_by({ name })}</span>
+        <span aria-hidden>{name}</span>
       </span>
       {unit.deletedAt && (
         <span className="shrink-0">
@@ -314,7 +321,7 @@ function CardFooter({
             onClick={onRestore}
             className="shrink-0 rounded-md px-2 py-1 text-xs font-medium text-iris transition-colors duration-150 hover:bg-iris-muted hover:text-iris-strong focus-visible:bg-iris-muted focus-visible:outline-none"
           >
-            Restore
+            {m.trash_restore()}
           </button>
           {deleteDialog}
         </div>

@@ -15,6 +15,7 @@ import {
 } from "@/features/offline/store"
 import { syncDeviceDrawingNow, toastCopied } from "@/features/offline/sync"
 import { useDocumentTitle } from "@/lib/document-title"
+import { m } from "@/paraglide/messages"
 import { DrawingPaletteContext } from "../-components/DrawingPaletteContext"
 import { TrashedDrawingBanner } from "../-components/TrashedDrawingBanner"
 
@@ -28,7 +29,7 @@ const DrawingCanvas = lazy(
 const LoadingState = () => (
   <div
     role="status"
-    aria-label="Loading drawing"
+    aria-label={m.drawing_loading()}
     className="absolute inset-0 z-10 flex items-center justify-center bg-card"
   >
     <Mark className="h-8 w-8 animate-pulse text-iris motion-reduce:animate-none" />
@@ -37,12 +38,11 @@ const LoadingState = () => (
 
 export const Route = createFileRoute("/_app/draw/$id")({
   ssr: false,
-  // The device sync below must finish before each open. A hover preload or
-  // a kept match would let the canvas open first, over edits this device or
-  // another tab still holds.
-  preload: false,
-  gcTime: 0,
-  loader: async ({ params, context }) => {
+  // With offline drawings on, the device sync below must finish before each
+  // open. A hover preload or a kept match would let the canvas open first,
+  // over edits this device or another tab still holds.
+  ...(supportsDeviceDrawings() && { preload: false, gcTime: 0 }),
+  loader: async ({ params, context, preload }) => {
     const { queryClient } = context
     const detail = drawingQueryOptions(params.id)
     // Edits this device kept go up first, so the canvas opens on them. If
@@ -93,7 +93,9 @@ export const Route = createFileRoute("/_app/draw/$id")({
     // dead end. Trashed drawings load and render read-only (spec §5.11).
     // ssr is off, so this loader (and the toast) always runs on the client.
     if (!drawing) {
-      toast.error("Drawing not found", { id: "drawing-not-found" })
+      // Hover-intent preloads swallow the redirect, so they must not toast.
+      if (!preload)
+        toast.error(m.drawing_not_found(), { id: "drawing-not-found" })
       throw redirect({ to: "/draw" })
     }
     return { copied }
@@ -134,7 +136,7 @@ function DrawingPage() {
   const isGone = drawing === null
   useEffect(() => {
     if (!isGone) return
-    toast.error("Drawing not found", { id: "drawing-not-found" })
+    toast.error(m.drawing_not_found(), { id: "drawing-not-found" })
     navigate({ to: "/draw", replace: true })
   }, [isGone, navigate])
 

@@ -1,10 +1,12 @@
+import { ParaglideMessage } from "@inlang/paraglide-js-react"
 import { Pencil } from "lucide-react"
 import { useEffect, useRef, useState } from "react"
+import { HintKey } from "@/components/key-hint"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
-import { Kbd } from "@/components/ui/kbd"
 import { useRenameDrawing } from "@/features/drawings/mutations"
 import { useRenameFolder } from "@/features/folders/mutations"
 import { useDeferredFocusSelect } from "@/hooks/use-deferred-focus-select"
+import { m } from "@/paraglide/messages"
 
 export type RenameTarget = {
   kind: "drawing" | "folder"
@@ -59,7 +61,10 @@ export function RenameDialog({
     onOpenChange(false)
   }
 
-  const title = target.kind === "drawing" ? "Rename drawing" : "Rename folder"
+  const title =
+    target.kind === "drawing"
+      ? m.rename_drawing_title()
+      : m.rename_folder_title()
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -81,7 +86,9 @@ export function RenameDialog({
               }
             }}
             placeholder={
-              target.kind === "drawing" ? "Drawing name…" : "Folder name…"
+              target.kind === "drawing"
+                ? m.rename_drawing_placeholder()
+                : m.rename_folder_placeholder()
             }
             className="flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground/60"
           />
@@ -89,7 +96,10 @@ export function RenameDialog({
         <div className="flex items-center justify-between border-t border-hairline bg-muted/40 px-4 py-2">
           <span className="text-xs text-muted-foreground/60">{title}</span>
           <span className="flex items-center gap-1 text-xs text-muted-foreground/60">
-            <Kbd className="h-4 min-w-4 text-[10px]">↵</Kbd> to rename
+            <ParaglideMessage
+              message={m.rename_hint}
+              markup={{ key: HintKey }}
+            />
           </span>
         </div>
       </DialogContent>
