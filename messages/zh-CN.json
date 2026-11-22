@@ -791,6 +791,8 @@
   "auth_reset_failed": "密码重置失败",
   "oauth_page_title": "连接应用",
   "oauth_invalid_title": "无法连接此应用",
+  "oauth_unknown_client": "此应用未在 Excaliself 中注册。请重新添加。",
+  "oauth_unknown_redirect": "此应用请求返回到一个未注册的地址。",
   "oauth_go_home": "前往 Excaliself",
   "oauth_title": "连接 {client}",
   "oauth_subtitle": "到你的 Excaliself 账户",

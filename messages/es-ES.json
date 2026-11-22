@@ -851,6 +851,8 @@
   "auth_reset_failed": "No se pudo restablecer la contraseña",
   "oauth_page_title": "Conectar una aplicación",
   "oauth_invalid_title": "No se puede conectar esta aplicación",
+  "oauth_unknown_client": "Esta aplicación no está registrada en Excaliself. Vuelve a añadirla.",
+  "oauth_unknown_redirect": "Esta aplicación pidió volver a una dirección que no registró.",
   "oauth_go_home": "Ir a Excaliself",
   "oauth_title": "Conectar {client}",
   "oauth_subtitle": "a tu cuenta de Excaliself",

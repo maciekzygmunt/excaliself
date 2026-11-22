@@ -821,6 +821,8 @@
   "auth_reset_failed": "Password reset failed",
   "oauth_page_title": "Connect an app",
   "oauth_invalid_title": "Can't connect this app",
+  "oauth_unknown_client": "This app isn't registered with Excaliself. Add it again.",
+  "oauth_unknown_redirect": "This app asked to return to an address it didn't register.",
   "oauth_go_home": "Go to Excaliself",
   "oauth_title": "Connect {client}",
   "oauth_subtitle": "to your Excaliself account",

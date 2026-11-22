@@ -881,6 +881,8 @@
   "auth_reset_failed": "Nie udało się zresetować hasła",
   "oauth_page_title": "Połącz aplikację",
   "oauth_invalid_title": "Nie można połączyć tej aplikacji",
+  "oauth_unknown_client": "Ta aplikacja nie jest zarejestrowana w Excaliself. Dodaj ją ponownie.",
+  "oauth_unknown_redirect": "Ta aplikacja chce wrócić pod adres, którego nie zarejestrowała.",
   "oauth_go_home": "Przejdź do Excaliself",
   "oauth_title": "Połącz {client}",
   "oauth_subtitle": "z kontem Excaliself",

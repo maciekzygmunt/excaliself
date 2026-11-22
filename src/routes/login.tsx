@@ -37,7 +37,9 @@ function LoginPage() {
     <AuthPage title={m.auth_login_title()} subtitle={m.auth_login_subtitle()}>
       {error && (
         <p role="alert" className="mb-4 text-center text-sm text-destructive">
-          {SSO_ERRORS[error]?.() ?? m.auth_login_failed()}
+          {Object.hasOwn(SSO_ERRORS, error)
+            ? SSO_ERRORS[error]()
+            : m.auth_login_failed()}
         </p>
       )}
       <SsoButtons

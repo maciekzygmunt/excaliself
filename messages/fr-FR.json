@@ -851,6 +851,8 @@
   "auth_reset_failed": "La réinitialisation du mot de passe a échoué",
   "oauth_page_title": "Connecter une application",
   "oauth_invalid_title": "Impossible de connecter cette application",
+  "oauth_unknown_client": "Cette application n'est pas enregistrée dans Excaliself. Ajoutez-la à nouveau.",
+  "oauth_unknown_redirect": "Cette application demande à revenir vers une adresse qu'elle n'a pas enregistrée.",
   "oauth_go_home": "Aller sur Excaliself",
   "oauth_title": "Connecter {client}",
   "oauth_subtitle": "à votre compte Excaliself",

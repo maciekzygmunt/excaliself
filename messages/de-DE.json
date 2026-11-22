@@ -821,6 +821,8 @@
   "auth_reset_failed": "Passwort konnte nicht zurückgesetzt werden",
   "oauth_page_title": "App verbinden",
   "oauth_invalid_title": "Diese App kann nicht verbunden werden",
+  "oauth_unknown_client": "Diese App ist nicht bei Excaliself registriert. Füge sie erneut hinzu.",
+  "oauth_unknown_redirect": "Diese App möchte zu einer Adresse zurückkehren, die sie nicht registriert hat.",
   "oauth_go_home": "Zu Excaliself",
   "oauth_title": "{client} verbinden",
   "oauth_subtitle": "mit deinem Excaliself-Konto",
