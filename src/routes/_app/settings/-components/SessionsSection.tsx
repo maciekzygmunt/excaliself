@@ -12,6 +12,7 @@ import {
 import { describeDevice } from "@/features/account/user-agent"
 import { useDelayedVisible } from "@/hooks/use-delayed-visible"
 import { formatAgo } from "@/lib/relative-time"
+import { m } from "@/paraglide/messages"
 
 // Sessions block (spec §5.12): every signed-in device with a per-row revoke.
 // The current session is marked and can only end via sign-out — never from
@@ -23,9 +24,11 @@ export function SessionsSection() {
   return (
     <section>
       <div className="mb-4">
-        <h2 className="text-sm font-medium text-foreground">Sessions</h2>
+        <h2 className="text-sm font-medium text-foreground">
+          {m.settings_sessions_title()}
+        </h2>
         <p className="text-xs text-muted-foreground">
-          Devices currently signed in to your account
+          {m.settings_sessions_description()}
         </p>
       </div>
 
@@ -60,7 +63,7 @@ function SessionList({ sessions }: { sessions: ActiveSession[] }) {
                 </span>
                 {session.current && (
                   <span className="shrink-0 rounded-full bg-iris-muted px-2 py-0.5 text-[11px] font-medium text-iris-strong">
-                    Current session
+                    {m.settings_sessions_current()}
                   </span>
                 )}
               </div>
@@ -81,7 +84,7 @@ function SessionList({ sessions }: { sessions: ActiveSession[] }) {
                 className="shrink-0 text-muted-foreground hover:text-destructive"
                 onClick={() => revokeSession(session.id)}
               >
-                Revoke
+                {m.settings_revoke()}
               </Button>
             )}
           </li>
@@ -91,7 +94,7 @@ function SessionList({ sessions }: { sessions: ActiveSession[] }) {
       {hasOthers && (
         <div>
           <Button variant="outline" size="sm" onClick={() => revokeOthers()}>
-            Sign out all other sessions
+            {m.settings_sessions_sign_out_others()}
           </Button>
         </div>
       )}

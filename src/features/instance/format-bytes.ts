@@ -1,3 +1,5 @@
+import { getLocale } from "@/paraglide/runtime"
+
 const UNITS = ["B", "KB", "MB", "GB", "TB"] as const
 
 export function formatBytes(bytes: number): string {
@@ -7,6 +9,9 @@ export function formatBytes(bytes: number): string {
     value /= 1024
     unit++
   }
-  const rounded = unit === 0 ? value : Math.round(value * 10) / 10
+  // The number takes the language's decimal sign ("1,5 MB" in German).
+  const rounded = new Intl.NumberFormat(getLocale(), {
+    maximumFractionDigits: 1,
+  }).format(value)
   return `${rounded} ${UNITS[unit]}`
 }

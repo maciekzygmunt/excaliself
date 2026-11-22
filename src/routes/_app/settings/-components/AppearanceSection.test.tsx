@@ -17,6 +17,7 @@ afterEach(() => {
   vi.restoreAllMocks()
   // biome-ignore lint/suspicious/noDocumentCookie: clears the cookie under test
   document.cookie = "language=; path=/; max-age=0"
+  document.documentElement.lang = ""
 })
 
 function group(name: string) {
@@ -119,10 +120,13 @@ test("changing the app theme leaves the canvas selection alone", () => {
   expect(window.localStorage.getItem("canvas-theme")).toBe("light")
 })
 
-test("Language follows the browser language until a language is picked", async () => {
-  vi.spyOn(navigator, "languages", "get").mockReturnValue(["de-AT", "en"])
+test("Language shows the page language, and a pick stores it and reloads", async () => {
+  document.documentElement.lang = "de-DE"
+  const reload = vi.fn()
+  vi.stubGlobal("location", { ...window.location, reload })
   render(<AppearanceSection />)
-  const trigger = screen.getByRole("combobox", { name: "Language" })
+  // The section renders in the page language too.
+  const trigger = screen.getByRole("combobox", { name: "Sprache" })
   expect(trigger.textContent).toContain("Deutsch")
 
   fireEvent.click(trigger)
@@ -132,5 +136,5 @@ test("Language follows the browser language until a language is picked", async (
   fireEvent.pointerUp(option)
   fireEvent.click(option)
   expect(document.cookie).toBe("language=pl-PL")
-  expect(trigger.textContent).toContain("Polski")
+  expect(reload).toHaveBeenCalledOnce()
 })

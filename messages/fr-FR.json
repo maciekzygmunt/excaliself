@@ -1,0 +1,346 @@
+{
+  "$schema": "https://inlang.com/schema/inlang-message-format",
+  "time_just_now": "à l'instant",
+  "count_drawings": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "{count} dessin",
+        "countPlural=many": "{count} dessins",
+        "countPlural=*": "{count} dessins"
+      }
+    }
+  ],
+  "count_folders": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "{count} dossier",
+        "countPlural=many": "{count} dossiers",
+        "countPlural=*": "{count} dossiers"
+      }
+    }
+  ],
+  "settings_title": "Paramètres",
+  "settings_nav_label": "Sections des paramètres",
+  "settings_nav_account": "Compte",
+  "settings_nav_import": "Importer",
+  "settings_nav_instance": "Instance",
+  "settings_nav_members": "Membres",
+  "settings_nav_invites": "Invitations",
+  "settings_cancel": "Annuler",
+  "settings_done": "Terminé",
+  "settings_revoke": "Révoquer",
+  "settings_copy": "Copier",
+  "settings_copied": "Copié",
+  "settings_deleting": "Suppression…",
+  "settings_cannot_undo": "Cette action est irréversible.",
+  "settings_last_used": "Dernière utilisation {ago}",
+  "settings_never_used": "Jamais utilisé",
+  "settings_signin_title": "Connexion",
+  "settings_signin_sso": "Vous vous connectez en tant que {#em}{email}{/em} via l'authentification unique (SSO). Pour avoir aussi un mot de passe, demandez un lien de mot de passe à un administrateur.",
+  "settings_profile_title": "Profil",
+  "settings_profile_description": "Comment les autres vous voient sur cette instance",
+  "settings_profile_name_label": "Nom d'affichage",
+  "settings_profile_name_hint": "Facultatif — s'il est vide, vous apparaissez sous le début de votre adresse e-mail.",
+  "settings_email_title": "E-mail",
+  "settings_email_description": "Vous vous connectez avec {#em}{email}{/em}. Une modification prend effet immédiatement.",
+  "settings_email_new_label": "Nouvelle adresse e-mail",
+  "settings_email_invalid": "Saisissez une adresse e-mail valide",
+  "settings_email_taken": "Cette adresse e-mail est déjà utilisée",
+  "settings_email_updated": "Adresse e-mail de connexion mise à jour",
+  "settings_email_submit": "Modifier l'e-mail",
+  "settings_email_submitting": "Modification de l'e-mail...",
+  "settings_password_title": "Mot de passe",
+  "settings_password_description": "Le modifier vous déconnecte partout ailleurs.",
+  "settings_password_current_label": "Mot de passe actuel",
+  "settings_password_current_required": "Saisissez votre mot de passe actuel",
+  "settings_password_incorrect": "Mot de passe incorrect",
+  "settings_password_new_label": "Nouveau mot de passe",
+  "settings_password_too_short": "8 caractères minimum",
+  "settings_password_change_failed": "Impossible de modifier le mot de passe",
+  "settings_password_changed": "Mot de passe modifié — les autres sessions sont déconnectées",
+  "settings_password_submit": "Modifier le mot de passe",
+  "settings_password_submitting": "Modification du mot de passe...",
+  "settings_sessions_title": "Sessions",
+  "settings_sessions_description": "Appareils actuellement connectés à votre compte",
+  "settings_sessions_current": "Session actuelle",
+  "settings_sessions_device": "{browser} sur {system}",
+  "settings_sessions_unknown_device": "Appareil inconnu",
+  "settings_sessions_sign_out_others": "Déconnecter toutes les autres sessions",
+  "settings_appearance_title": "Apparence",
+  "settings_appearance_description": "S'applique uniquement à ce navigateur",
+  "settings_appearance_theme": "Thème",
+  "settings_appearance_canvas": "Canevas",
+  "settings_appearance_light": "Clair",
+  "settings_appearance_dark": "Sombre",
+  "settings_appearance_system": "Système",
+  "settings_appearance_match_app": "Comme l'app",
+  "settings_appearance_language": "Langue",
+  "settings_appearance_language_hint": "Traduit les paramètres et le canevas de dessin",
+  "settings_danger_title": "Zone de danger",
+  "settings_danger_description": "Irréversible. Tout ce qui vous appartient disparaît avec le compte.",
+  "settings_danger_description_team": "Irréversible. Votre travail privé disparaît avec le compte. Les dessins de l'équipe restent.",
+  "settings_danger_delete": "Supprimer le compte",
+  "settings_danger_delete_hint": "Supprimer définitivement votre compte et tous vos dessins et dossiers.",
+  "settings_danger_delete_hint_team": "Supprimer définitivement votre compte et tous vos dessins et dossiers privés.",
+  "settings_danger_sole_admin": "Vous êtes le seul administrateur de l'instance. Nommez un autre membre administrateur avant de supprimer votre compte.",
+  "settings_danger_delete_failed": "Impossible de supprimer votre compte",
+  "settings_danger_confirm_title": "Supprimer votre compte ?",
+  "settings_danger_counts_failed": "Impossible de charger le nombre de vos contenus. Fermez cette fenêtre et réessayez.",
+  "settings_danger_confirm_loading": "Votre compte sera supprimé, ainsi que tout votre contenu, définitivement. Cette action est irréversible.",
+  "settings_danger_confirm_contents": "Votre compte sera supprimé, ainsi que définitivement : {contents}.",
+  "settings_danger_confirm_empty": "Votre compte sera supprimé. Vous n'avez aucun dessin ni dossier.",
+  "settings_danger_confirm_empty_team": "Votre compte sera supprimé. Vous n'avez aucun dessin ni dossier privé.",
+  "settings_danger_kept_team": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "Votre dessin d'équipe reste dans l'équipe ({count}).",
+        "countPlural=many": "Vos dessins d'équipe restent dans l'équipe ({count}).",
+        "countPlural=*": "Vos dessins d'équipe restent dans l'équipe ({count})."
+      }
+    }
+  ],
+  "settings_import_title": "Importer depuis Excalidraw+",
+  "settings_import_beta": "(Bêta)",
+  "settings_import_description_admin": "Récupérez vos scènes et images. Les collections partagées deviennent des dossiers dans Équipe, et vos scènes privées vont dans Privé.",
+  "settings_import_description_member": "Récupérez vos scènes privées et vos images. Elles vont dans Privé. Un administrateur importe les collections partagées.",
+  "settings_import_key_label": "Clé API Excalidraw+",
+  "settings_import_key_hint_create": "Créez-en une dans Excalidraw+, dans les paramètres de l'espace de travail ({#link}comment faire{/link}).",
+  "settings_import_key_hint_admin": "Une clé personnelle (qui commence par uk-) récupère aussi vos scènes privées.",
+  "settings_import_key_hint_member": "Utilisez une clé personnelle (qui commence par uk-).",
+  "settings_import_key_hint_access": "Un accès en lecture suffit. La clé sert uniquement à cet import et n'est pas enregistrée.",
+  "settings_import_find": "Rechercher les scènes",
+  "settings_import_finding": "Recherche des scènes...",
+  "settings_import_error_generic": "Une erreur s'est produite",
+  "settings_import_untitled": "Sans titre",
+  "settings_import_found": "{scenes} {collections}.",
+  "settings_import_found_scenes": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "{count} scène trouvée",
+        "countPlural=many": "{count} scènes trouvées",
+        "countPlural=*": "{count} scènes trouvées"
+      }
+    }
+  ],
+  "settings_import_found_collections": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "dans {count} collection",
+        "countPlural=many": "dans {count} collections",
+        "countPlural=*": "dans {count} collections"
+      }
+    }
+  ],
+  "settings_import_already_imported": "Déjà importées : {count}.",
+  "settings_import_workspace_key": "C'est une clé d'espace de travail : vos scènes privées ne sont donc pas incluses. Utilisez une clé personnelle pour les récupérer aussi.",
+  "settings_import_nothing_new": "Rien de nouveau à importer",
+  "settings_import_start": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "Importer {count} scène",
+        "countPlural=many": "Importer {count} scènes",
+        "countPlural=*": "Importer {count} scènes"
+      }
+    }
+  ],
+  "settings_import_use_another_key": "Utiliser une autre clé",
+  "settings_import_progress_label": "Progression de l'import",
+  "settings_import_importing": "Import {current} sur {total}",
+  "settings_import_imported": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "{count} scène importée.",
+        "countPlural=many": "{count} scènes importées.",
+        "countPlural=*": "{count} scènes importées."
+      }
+    }
+  ],
+  "settings_import_stopped": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "Arrêté. {count} scène importée.",
+        "countPlural=many": "Arrêté. {count} scènes importées.",
+        "countPlural=*": "Arrêté. {count} scènes importées."
+      }
+    }
+  ],
+  "settings_import_skipped_images": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "{count} image n'a pas pu être récupérée (trop volumineuse, ou absente d'Excalidraw+). Les dessins affichent un espace réservé à la place.",
+        "countPlural=many": "{count} images n'ont pas pu être récupérées (trop volumineuses, ou absentes d'Excalidraw+). Les dessins affichent un espace réservé à la place.",
+        "countPlural=*": "{count} images n'ont pas pu être récupérées (trop volumineuses, ou absentes d'Excalidraw+). Les dessins affichent un espace réservé à la place."
+      }
+    }
+  ],
+  "settings_import_failed": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "{count} scène a échoué :",
+        "countPlural=many": "{count} scènes ont échoué :",
+        "countPlural=*": "{count} scènes ont échoué :"
+      }
+    }
+  ],
+  "settings_import_stop": "Arrêter",
+  "settings_import_open_drawings": "Ouvrir les dessins",
+  "settings_import_more": "Importer d'autres scènes",
+  "settings_import_files_title": "Importer des fichiers",
+  "settings_import_files_description": "Ajoutez des fichiers .excalidraw depuis votre ordinateur. Ils vont dans Privé. Les exports PNG et SVG qui contiennent la scène fonctionnent aussi. Pour placer des fichiers dans un dossier ou dans Équipe, ouvrez-le et déposez-les sur les dessins, ou déposez-les sur lui dans la barre latérale.",
+  "settings_import_files_drop": "Déposez des fichiers ici, ou cliquez pour les choisir",
+  "settings_tokens_title": "Jetons d'accès",
+  "settings_tokens_description": "Connectez un client d'IA comme Claude Code via MCP. Un jeton voit ce que vous voyez, et peut créer des dessins et les mettre à la corbeille en votre nom.",
+  "settings_tokens_new": "Nouveau jeton",
+  "settings_tokens_empty": "Aucun jeton d'accès",
+  "settings_tokens_created": "Créé {ago}",
+  "settings_tokens_revoke_failed": "Impossible de révoquer le jeton",
+  "settings_tokens_copy_title": "Copiez votre jeton",
+  "settings_tokens_copy_description": "Vous ne le reverrez plus. Toute personne qui l'a peut lire vos dessins et en créer en votre nom, jusqu'à ce que vous le révoquiez.",
+  "settings_tokens_token_label": "Jeton",
+  "settings_tokens_claude_code_label": "Ajoutez-le à Claude Code",
+  "settings_tokens_new_title": "Nouveau jeton d'accès",
+  "settings_tokens_new_description": "Donnez-lui le nom du client ou de l'appareil qui l'utilisera.",
+  "settings_tokens_name_label": "Nom",
+  "settings_tokens_name_placeholder": "Claude Code sur mon portable",
+  "settings_tokens_create_failed": "Impossible de créer le jeton",
+  "settings_tokens_create": "Créer le jeton",
+  "settings_tokens_creating": "Création…",
+  "settings_apps_title": "Applications connectées",
+  "settings_apps_description": "Les applications auxquelles vous vous êtes connecté avec Excaliself, comme un connecteur Claude.ai. Elles ont le même accès qu'un jeton.",
+  "settings_apps_empty": "Aucune application connectée",
+  "settings_apps_connected": "Connectée {ago}",
+  "settings_apps_disconnect": "Déconnecter",
+  "settings_apps_disconnect_failed": "Impossible de déconnecter l'application",
+  "settings_instance_title": "À propos",
+  "settings_instance_description": "Cette instance en un coup d'œil.",
+  "settings_instance_version": "Version",
+  "settings_instance_users": "Utilisateurs",
+  "settings_instance_drawings": "Dessins",
+  "settings_instance_storage": "Stockage utilisé",
+  "settings_instance_release_notes": "Notes de version sur GitHub",
+  "settings_instance_star": "Mettre une étoile sur GitHub",
+  "settings_instance_follow": "Suivre sur X",
+  "settings_invites_description": "Des liens à usage unique qui ajoutent un membre. Chacun expire au bout de 7 jours — copiez un lien en attente pour l'envoyer à nouveau.",
+  "settings_invites_generate": "Générer un lien",
+  "settings_invites_generating": "Génération...",
+  "settings_invites_expires": "Expire le {date}",
+  "settings_invites_empty": "Aucun lien d'invitation en attente",
+  "settings_members_count": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "{count} membre",
+        "countPlural=many": "{count} membres",
+        "countPlural=*": "{count} membres"
+      }
+    }
+  ],
+  "settings_members_joined": "Membre depuis le {date}",
+  "settings_members_role_admin": "Admin",
+  "settings_members_role_member": "Membre",
+  "settings_members_role_label": "Rôle de {name}",
+  "settings_members_role_change_failed": "Impossible de changer le rôle",
+  "settings_members_last_admin": "Le dernier administrateur ne peut pas être rétrogradé.",
+  "settings_members_actions": "Actions pour {name}",
+  "settings_members_reset_password": "Réinitialiser le mot de passe",
+  "settings_members_reset_pending": "Lien de réinitialisation en attente",
+  "settings_members_reset_copied": "Lien de réinitialisation copié — à usage unique, valable 24 heures",
+  "settings_members_reset_copy_failed": "Impossible de copier le lien de réinitialisation — générez-le à nouveau",
+  "settings_members_reset_create_failed": "Impossible de créer le lien de réinitialisation",
+  "settings_members_reset_revoke_failed": "Impossible de révoquer le lien de réinitialisation",
+  "settings_members_delete": "Supprimer l'utilisateur",
+  "settings_members_delete_title": "Supprimer {name} ?",
+  "settings_members_delete_failed": "Impossible de supprimer {name}",
+  "settings_members_counts_failed": "Impossible de charger le nombre de contenus de {name}. Fermez cette fenêtre et réessayez.",
+  "settings_members_confirm_loading": "Le compte de {name} sera supprimé, ainsi que tout son contenu, définitivement. Cette action est irréversible.",
+  "settings_members_confirm_contents": "Le compte de {name} sera supprimé, ainsi que définitivement : {contents}.",
+  "settings_members_confirm_empty": "Le compte de {name} sera supprimé. Ce compte n'a aucun dessin ni dossier.",
+  "settings_members_confirm_empty_team": "Le compte de {name} sera supprimé. Ce compte n'a aucun dessin ni dossier privé.",
+  "settings_members_kept_team": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "Son dessin d'équipe reste dans l'équipe ({count}).",
+        "countPlural=many": "Ses dessins d'équipe restent dans l'équipe ({count}).",
+        "countPlural=*": "Ses dessins d'équipe restent dans l'équipe ({count})."
+      }
+    }
+  ],
+  "settings_members_demote_title": "Quitter le rôle d'administrateur ?",
+  "settings_members_demote_description": "Vous perdrez immédiatement l'accès aux paramètres de l'instance, comme les membres et les invitations. Un autre administrateur devra vous nommer à nouveau.",
+  "settings_members_demote": "Me rétrograder",
+  "settings_members_demoting": "Rétrogradation…",
+  "settings_profile_save_failed": "Impossible d'enregistrer le nom d'affichage",
+  "settings_sessions_revoke_failed": "Impossible de révoquer la session",
+  "settings_sessions_sign_out_others_failed": "Impossible de déconnecter les autres sessions",
+  "drawings_import_files": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "Import de {count} fichier",
+        "countPlural=many": "Import de {count} fichiers",
+        "countPlural=*": "Import de {count} fichiers"
+      }
+    }
+  ],
+  "drawings_import_progress": "Import {current} sur {total}",
+  "drawings_import_failed_one": "Impossible d'importer {name}",
+  "drawings_import_failed": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "Impossible d'importer {count} fichier",
+        "countPlural=many": "Impossible d'importer {count} fichiers",
+        "countPlural=*": "Impossible d'importer {count} fichiers"
+      }
+    }
+  ],
+  "drawings_import_supported": "Déposez des fichiers .excalidraw, ou des exports .png et .svg qui contiennent la scène.",
+  "drawings_import_failed_names": "Impossible d'importer {names}.",
+  "drawings_import_skipped_images": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "{count} image n'a pas pu être récupérée. Les dessins affichent un espace réservé.",
+        "countPlural=many": "{count} images n'ont pas pu être récupérées. Les dessins affichent un espace réservé.",
+        "countPlural=*": "{count} images n'ont pas pu être récupérées. Les dessins affichent un espace réservé."
+      }
+    }
+  ],
+  "drawings_import_imported": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "{count} dessin importé",
+        "countPlural=many": "{count} dessins importés",
+        "countPlural=*": "{count} dessins importés"
+      }
+    }
+  ]
+}

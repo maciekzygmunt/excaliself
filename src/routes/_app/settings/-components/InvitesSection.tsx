@@ -6,6 +6,8 @@ import { pendingInvitesQueryOptions } from "@/features/invites/queries"
 import { createInvite, deleteInvite } from "@/features/invites/server"
 import { useCopy } from "@/hooks/use-copy"
 import { useDelayedVisible } from "@/hooks/use-delayed-visible"
+import { m } from "@/paraglide/messages"
+import { getLocale } from "@/paraglide/runtime"
 
 // Today's invite model, unchanged (issue #64): anonymous single-use links
 // with a fixed 7-day expiry that always create a Member. Copy doubles as
@@ -46,10 +48,11 @@ export function InvitesSection() {
       {/* Section header */}
       <div className="mb-4 flex items-center justify-between gap-3">
         <div>
-          <h2 className="text-sm font-medium text-foreground">Invites</h2>
+          <h2 className="text-sm font-medium text-foreground">
+            {m.settings_nav_invites()}
+          </h2>
           <p className="text-xs text-muted-foreground">
-            Single-use links that add a member. Each expires after 7 days — copy
-            a pending link to send it again.
+            {m.settings_invites_description()}
           </p>
         </div>
         <Button
@@ -60,7 +63,9 @@ export function InvitesSection() {
           className="h-7 shrink-0 gap-1 px-2.5 text-xs"
         >
           <Plus className="h-3.5 w-3.5" />
-          {isCreatingInvite ? "Generating..." : "Generate link"}
+          {isCreatingInvite
+            ? m.settings_invites_generating()
+            : m.settings_invites_generate()}
         </Button>
       </div>
 
@@ -84,7 +89,11 @@ export function InvitesSection() {
                 {invite.token.slice(0, 20)}...
               </p>
               <p className="text-[11px] text-muted-foreground/60">
-                Expires {new Date(invite.expiresAt).toLocaleDateString()}
+                {m.settings_invites_expires({
+                  date: new Date(invite.expiresAt).toLocaleDateString(
+                    getLocale(),
+                  ),
+                })}
               </p>
             </div>
             <div className="flex shrink-0 items-center gap-1">
@@ -96,12 +105,12 @@ export function InvitesSection() {
                 {copied === invite.token ? (
                   <>
                     <Check className="h-3.5 w-3.5 text-iris animate-in zoom-in-50 fade-in-0 duration-150 ease-out motion-reduce:animate-none" />
-                    Copied
+                    {m.settings_copied()}
                   </>
                 ) : (
                   <>
                     <Copy className="h-3.5 w-3.5" />
-                    Copy
+                    {m.settings_copy()}
                   </>
                 )}
               </button>
@@ -110,14 +119,14 @@ export function InvitesSection() {
                 onClick={() => revokeInviteMutation({ data: invite.id })}
                 className="rounded px-1.5 py-1 text-xs text-muted-foreground transition-all hover:bg-muted hover:text-destructive"
               >
-                Revoke
+                {m.settings_revoke()}
               </button>
             </div>
           </div>
         ))}
         {invites && invites.length === 0 && (
           <p className="py-6 text-center text-sm text-muted-foreground/60">
-            No pending invite links
+            {m.settings_invites_empty()}
           </p>
         )}
       </div>

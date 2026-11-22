@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs"
 import { readdir, readFile } from "node:fs/promises"
 import { join, relative } from "node:path"
 import { fileURLToPath, URL } from "node:url"
+import { paraglideVitePlugin } from "@inlang/paraglide-js"
 import tailwindcss from "@tailwindcss/vite"
 import { devtools } from "@tanstack/devtools-vite"
 import { tanstackStart } from "@tanstack/react-start/plugin/vite"
@@ -153,6 +154,12 @@ const config = defineConfig({
     },
   },
   plugins: [
+    // Compiles messages/*.json into src/paraglide; options in
+    // project.inlang/paraglide.config.ts.
+    paraglideVitePlugin({
+      project: "./project.inlang",
+      outdir: "./src/paraglide",
+    }),
     tailwindcss(),
     devtools(),
     // `serverDir` turns on nitro's own file-based routing for the room

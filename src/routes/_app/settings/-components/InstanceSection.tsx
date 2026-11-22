@@ -4,6 +4,8 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { formatBytes } from "@/features/instance/format-bytes"
 import { instanceStatsQueryOptions } from "@/features/instance/queries"
 import { useDelayedVisible } from "@/hooks/use-delayed-visible"
+import { m } from "@/paraglide/messages"
+import { getLocale } from "@/paraglide/runtime"
 
 const RELEASES_URL = `${REPO_URL}/releases`
 const X_URL = "https://x.com/0xzygmunt"
@@ -18,19 +20,31 @@ export function InstanceSection() {
   if (isPending) return showSkeleton ? <InstanceSkeleton /> : null
   if (!stats) return null
 
+  const count = new Intl.NumberFormat(getLocale())
   const rows = [
-    { label: "Version", value: `v${stats.version}` },
-    { label: "Users", value: String(stats.userCount) },
-    { label: "Drawings", value: String(stats.drawingCount) },
-    { label: "Storage used", value: formatBytes(stats.storageBytes) },
+    { label: m.settings_instance_version(), value: `v${stats.version}` },
+    {
+      label: m.settings_instance_users(),
+      value: count.format(stats.userCount),
+    },
+    {
+      label: m.settings_instance_drawings(),
+      value: count.format(stats.drawingCount),
+    },
+    {
+      label: m.settings_instance_storage(),
+      value: formatBytes(stats.storageBytes),
+    },
   ]
 
   return (
     <section className="animate-in fade-in-0 duration-200 motion-reduce:animate-none">
       <div className="mb-4">
-        <h2 className="text-sm font-medium text-foreground">About</h2>
+        <h2 className="text-sm font-medium text-foreground">
+          {m.settings_instance_title()}
+        </h2>
         <p className="text-xs text-muted-foreground">
-          This instance at a glance.
+          {m.settings_instance_description()}
         </p>
       </div>
 
@@ -57,7 +71,7 @@ export function InstanceSection() {
           rel="noreferrer"
           className="underline underline-offset-2 transition-colors hover:text-foreground"
         >
-          Release notes on GitHub
+          {m.settings_instance_release_notes()}
         </a>
         <span aria-hidden>·</span>
         <a
@@ -67,7 +81,7 @@ export function InstanceSection() {
           className="inline-flex items-center gap-1 underline underline-offset-2 transition-colors hover:text-foreground"
         >
           <GitHubMark className="h-3 w-3" />
-          Star on GitHub
+          {m.settings_instance_star()}
         </a>
         <span aria-hidden>·</span>
         <a
@@ -84,7 +98,7 @@ export function InstanceSection() {
           >
             <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
           </svg>
-          Follow on X
+          {m.settings_instance_follow()}
         </a>
       </p>
     </section>

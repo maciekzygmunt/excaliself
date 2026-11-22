@@ -22,6 +22,7 @@ import { createToken, revokeToken } from "@/features/access-tokens/server"
 import { useCopy } from "@/hooks/use-copy"
 import { useDelayedVisible } from "@/hooks/use-delayed-visible"
 import { formatAgo } from "@/lib/relative-time"
+import { m } from "@/paraglide/messages"
 
 // Access tokens: how a member connects their own AI client to the MCP
 // endpoint. A token is shown once, in the dialog that makes it.
@@ -34,10 +35,11 @@ export function AccessTokensSection() {
     <section>
       <div className="mb-4 flex items-center justify-between gap-3">
         <div>
-          <h2 className="text-sm font-medium text-foreground">Access tokens</h2>
+          <h2 className="text-sm font-medium text-foreground">
+            {m.settings_tokens_title()}
+          </h2>
           <p className="text-xs text-muted-foreground">
-            Connect an AI client such as Claude Code over MCP. A token sees what
-            you see and can create and trash drawings as you.
+            {m.settings_tokens_description()}
           </p>
         </div>
         <Button
@@ -47,7 +49,7 @@ export function AccessTokensSection() {
           className="h-7 shrink-0 gap-1 px-2.5 text-xs"
         >
           <Plus className="h-3.5 w-3.5" />
-          New token
+          {m.settings_tokens_new()}
         </Button>
       </div>
 
@@ -74,14 +76,14 @@ function TokenList({ tokens }: { tokens: AccessToken[] }) {
         list?.filter((token) => token.id !== data.id),
       )
     },
-    onError: () => toast.error("Couldn't revoke token"),
+    onError: () => toast.error(m.settings_tokens_revoke_failed()),
     onSettled: () => queryClient.invalidateQueries({ queryKey: tokensKey }),
   })
 
   if (tokens.length === 0) {
     return (
       <p className="py-6 text-center text-sm text-muted-foreground/60">
-        No access tokens
+        {m.settings_tokens_empty()}
       </p>
     )
   }
@@ -106,10 +108,10 @@ function TokenList({ tokens }: { tokens: AccessToken[] }) {
               suppressHydrationWarning
               className="truncate text-xs text-muted-foreground"
             >
-              Created {formatAgo(token.createdAt)} ·{" "}
+              {m.settings_tokens_created({ ago: formatAgo(token.createdAt) })} ·{" "}
               {token.lastUsedAt
-                ? `Last used ${formatAgo(token.lastUsedAt)}`
-                : "Never used"}
+                ? m.settings_last_used({ ago: formatAgo(token.lastUsedAt) })
+                : m.settings_never_used()}
             </p>
           </div>
           <Button
@@ -118,7 +120,7 @@ function TokenList({ tokens }: { tokens: AccessToken[] }) {
             className="shrink-0 text-muted-foreground hover:text-destructive"
             onClick={() => revoke({ data: { id: token.id } })}
           >
-            Revoke
+            {m.settings_revoke()}
           </Button>
         </li>
       ))}
@@ -167,20 +169,19 @@ function NewTokenDialog({
         {token ? (
           <>
             <DialogHeader>
-              <DialogTitle>Copy your token</DialogTitle>
+              <DialogTitle>{m.settings_tokens_copy_title()}</DialogTitle>
               <DialogDescription>
-                You won't see it again. Anyone with it can read your drawings
-                and create new ones as you, until you revoke it.
+                {m.settings_tokens_copy_description()}
               </DialogDescription>
             </DialogHeader>
-            <CopyBox label="Token" value={token} />
+            <CopyBox label={m.settings_tokens_token_label()} value={token} />
             <CopyBox
-              label="Add it to Claude Code"
+              label={m.settings_tokens_claude_code_label()}
               value={`claude mcp add --transport http excaliself ${window.location.origin}/api/mcp --header "Authorization: Bearer ${token}"`}
             />
             <DialogFooter>
               <Button size="sm" onClick={close}>
-                Done
+                {m.settings_done()}
               </Button>
             </DialogFooter>
           </>
@@ -193,35 +194,41 @@ function NewTokenDialog({
             }}
           >
             <DialogHeader>
-              <DialogTitle>New access token</DialogTitle>
+              <DialogTitle>{m.settings_tokens_new_title()}</DialogTitle>
               <DialogDescription>
-                Name it after the client or device that will use it.
+                {m.settings_tokens_new_description()}
               </DialogDescription>
             </DialogHeader>
             <Field>
-              <FieldLabel htmlFor="token-name">Name</FieldLabel>
+              <FieldLabel htmlFor="token-name">
+                {m.settings_tokens_name_label()}
+              </FieldLabel>
               <Input
                 id="token-name"
                 autoFocus
                 value={name}
                 maxLength={100}
-                placeholder="Claude Code on my laptop"
+                placeholder={m.settings_tokens_name_placeholder()}
                 onChange={(event) => setName(event.target.value)}
               />
             </Field>
             {create.error && (
-              <p className="text-sm text-destructive">Couldn't create token</p>
+              <p className="text-sm text-destructive">
+                {m.settings_tokens_create_failed()}
+              </p>
             )}
             <DialogFooter>
               <Button type="button" variant="outline" size="sm" onClick={close}>
-                Cancel
+                {m.settings_cancel()}
               </Button>
               <Button
                 type="submit"
                 size="sm"
                 disabled={!name.trim() || create.isPending}
               >
-                {create.isPending ? "Creating…" : "Create token"}
+                {create.isPending
+                  ? m.settings_tokens_creating()
+                  : m.settings_tokens_create()}
               </Button>
             </DialogFooter>
           </form>
@@ -249,12 +256,12 @@ function CopyBox({ label, value }: { label: string; value: string }) {
           {copied ? (
             <>
               <Check className="h-3.5 w-3.5 text-iris animate-in zoom-in-50 fade-in-0 duration-150 ease-out motion-reduce:animate-none" />
-              Copied
+              {m.settings_copied()}
             </>
           ) : (
             <>
               <Copy className="h-3.5 w-3.5" />
-              Copy
+              {m.settings_copy()}
             </>
           )}
         </button>

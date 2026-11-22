@@ -1,0 +1,314 @@
+{
+  "$schema": "https://inlang.com/schema/inlang-message-format",
+  "time_just_now": "刚刚",
+  "count_drawings": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=*": "{count} 个绘图"
+      }
+    }
+  ],
+  "count_folders": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=*": "{count} 个文件夹"
+      }
+    }
+  ],
+  "settings_title": "设置",
+  "settings_nav_label": "设置分区",
+  "settings_nav_account": "账户",
+  "settings_nav_import": "导入",
+  "settings_nav_instance": "实例",
+  "settings_nav_members": "成员",
+  "settings_nav_invites": "邀请",
+  "settings_cancel": "取消",
+  "settings_done": "完成",
+  "settings_revoke": "撤销",
+  "settings_copy": "复制",
+  "settings_copied": "已复制",
+  "settings_deleting": "正在删除…",
+  "settings_cannot_undo": "此操作无法撤销。",
+  "settings_last_used": "上次使用：{ago}",
+  "settings_never_used": "从未使用",
+  "settings_signin_title": "登录",
+  "settings_signin_sso": "你通过单点登录以 {#em}{email}{/em} 身份登录。如果还想设置密码，请向管理员索取密码链接。",
+  "settings_profile_title": "个人资料",
+  "settings_profile_description": "你在此实例上向其他人显示的样子",
+  "settings_profile_name_label": "显示名称",
+  "settings_profile_name_hint": "可选 — 留空时将显示你邮箱地址 @ 前面的部分。",
+  "settings_email_title": "邮箱",
+  "settings_email_description": "你使用 {#em}{email}{/em} 登录。更改后立即生效。",
+  "settings_email_new_label": "新邮箱",
+  "settings_email_invalid": "请输入有效的邮箱地址",
+  "settings_email_taken": "该邮箱已被使用",
+  "settings_email_updated": "登录邮箱已更新",
+  "settings_email_submit": "更改邮箱",
+  "settings_email_submitting": "正在更改邮箱...",
+  "settings_password_title": "密码",
+  "settings_password_description": "更改后，你在其他所有地方都会退出登录。",
+  "settings_password_current_label": "当前密码",
+  "settings_password_current_required": "请输入当前密码",
+  "settings_password_incorrect": "密码错误",
+  "settings_password_new_label": "新密码",
+  "settings_password_too_short": "至少需要 8 个字符",
+  "settings_password_change_failed": "无法更改密码",
+  "settings_password_changed": "密码已更改 — 其他会话已退出登录",
+  "settings_password_submit": "更改密码",
+  "settings_password_submitting": "正在更改密码...",
+  "settings_sessions_title": "会话",
+  "settings_sessions_description": "当前已登录你账户的设备",
+  "settings_sessions_current": "当前会话",
+  "settings_sessions_device": "{system} 上的 {browser}",
+  "settings_sessions_unknown_device": "未知设备",
+  "settings_sessions_sign_out_others": "退出其他所有会话",
+  "settings_appearance_title": "外观",
+  "settings_appearance_description": "仅对此浏览器生效",
+  "settings_appearance_theme": "主题",
+  "settings_appearance_canvas": "画布",
+  "settings_appearance_light": "浅色",
+  "settings_appearance_dark": "深色",
+  "settings_appearance_system": "跟随系统",
+  "settings_appearance_match_app": "与应用一致",
+  "settings_appearance_language": "语言",
+  "settings_appearance_language_hint": "翻译设置页面和绘图画布",
+  "settings_danger_title": "危险区域",
+  "settings_danger_description": "不可撤销。你拥有的所有内容都会随账户一起删除。",
+  "settings_danger_description_team": "不可撤销。你的私人内容会随账户一起删除，团队绘图会保留。",
+  "settings_danger_delete": "删除账户",
+  "settings_danger_delete_hint": "永久删除你的账户以及你的所有绘图和文件夹。",
+  "settings_danger_delete_hint_team": "永久删除你的账户以及你的所有私人绘图和文件夹。",
+  "settings_danger_sole_admin": "你是此实例唯一的管理员。删除账户前，请先将另一位成员设为管理员。",
+  "settings_danger_delete_failed": "无法删除你的账户",
+  "settings_danger_confirm_title": "删除你的账户？",
+  "settings_danger_counts_failed": "无法加载你的内容数量。请关闭此对话框后重试。",
+  "settings_danger_confirm_loading": "这将删除你的账户，并永久删除你的所有内容。此操作无法撤销。",
+  "settings_danger_confirm_contents": "这将删除你的账户，并永久删除你的{contents}。",
+  "settings_danger_confirm_empty": "这将删除你的账户。你没有任何绘图或文件夹。",
+  "settings_danger_confirm_empty_team": "这将删除你的账户。你没有任何私人绘图或文件夹。",
+  "settings_danger_kept_team": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=*": "你的 {count} 个团队绘图会保留在团队中。"
+      }
+    }
+  ],
+  "settings_import_title": "从 Excalidraw+ 导入",
+  "settings_import_beta": "（测试版）",
+  "settings_import_description_admin": "导入场景和图片。共享集合会成为“团队”中的文件夹，你的私人场景会放入“私人”。",
+  "settings_import_description_member": "导入你的私人场景和图片，它们会放入“私人”。共享集合由管理员导入。",
+  "settings_import_key_label": "Excalidraw+ API 密钥",
+  "settings_import_key_hint_create": "在 Excalidraw+ 的工作区设置中创建一个（{#link}查看方法{/link}）。",
+  "settings_import_key_hint_admin": "个人密钥（以 uk- 开头）还会导入你的私人场景。",
+  "settings_import_key_hint_member": "请使用个人密钥（以 uk- 开头）。",
+  "settings_import_key_hint_access": "只需读取权限。该密钥仅用于本次导入，不会被保存。",
+  "settings_import_find": "查找场景",
+  "settings_import_finding": "正在查找场景...",
+  "settings_import_error_generic": "出了点问题",
+  "settings_import_untitled": "未命名",
+  "settings_import_found": "{collections}{scenes}。",
+  "settings_import_found_scenes": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=*": "找到 {count} 个场景"
+      }
+    }
+  ],
+  "settings_import_found_collections": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=*": "在 {count} 个集合中"
+      }
+    }
+  ],
+  "settings_import_already_imported": "其中 {count} 个已导入。",
+  "settings_import_workspace_key": "这是工作区密钥，因此不包含你的私人场景。请使用个人密钥将它们一并导入。",
+  "settings_import_nothing_new": "没有可导入的新内容",
+  "settings_import_start": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=*": "导入 {count} 个场景"
+      }
+    }
+  ],
+  "settings_import_use_another_key": "使用其他密钥",
+  "settings_import_progress_label": "导入进度",
+  "settings_import_importing": "正在导入第 {current} 个，共 {total} 个",
+  "settings_import_imported": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=*": "已导入 {count} 个场景。"
+      }
+    }
+  ],
+  "settings_import_stopped": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=*": "已停止。已导入 {count} 个场景。"
+      }
+    }
+  ],
+  "settings_import_skipped_images": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=*": "有 {count} 张图片无法导入（文件过大，或在 Excalidraw+ 中缺失）。绘图中会改为显示占位图。"
+      }
+    }
+  ],
+  "settings_import_failed": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=*": "{count} 个场景导入失败："
+      }
+    }
+  ],
+  "settings_import_stop": "停止",
+  "settings_import_open_drawings": "打开绘图",
+  "settings_import_more": "继续导入",
+  "settings_import_files_title": "导入文件",
+  "settings_import_files_description": "从你的电脑添加 .excalidraw 文件，它们会放入“私人”。包含场景数据的 PNG 和 SVG 导出文件也可以导入。若要将文件放入某个文件夹或“团队”，请打开它并将文件拖放到绘图上，或在侧边栏中将文件拖放到它上面。",
+  "settings_import_files_drop": "将文件拖放到此处，或点击选择",
+  "settings_tokens_title": "访问令牌",
+  "settings_tokens_description": "通过 MCP 连接 Claude Code 等 AI 客户端。令牌能看到你能看到的内容，并能以你的身份创建绘图或将绘图移入回收站。",
+  "settings_tokens_new": "新建令牌",
+  "settings_tokens_empty": "没有访问令牌",
+  "settings_tokens_created": "创建于{ago}",
+  "settings_tokens_revoke_failed": "无法撤销令牌",
+  "settings_tokens_copy_title": "复制你的令牌",
+  "settings_tokens_copy_description": "它只会显示这一次。在你撤销之前，任何拥有它的人都能读取你的绘图，并以你的身份创建新绘图。",
+  "settings_tokens_token_label": "令牌",
+  "settings_tokens_claude_code_label": "添加到 Claude Code",
+  "settings_tokens_new_title": "新建访问令牌",
+  "settings_tokens_new_description": "用将要使用它的客户端或设备来命名。",
+  "settings_tokens_name_label": "名称",
+  "settings_tokens_name_placeholder": "我笔记本上的 Claude Code",
+  "settings_tokens_create_failed": "无法创建令牌",
+  "settings_tokens_create": "创建令牌",
+  "settings_tokens_creating": "正在创建…",
+  "settings_apps_title": "已连接的应用",
+  "settings_apps_description": "你通过 Excaliself 登录的应用，例如 Claude.ai 连接器。它们拥有与令牌相同的访问权限。",
+  "settings_apps_empty": "没有已连接的应用",
+  "settings_apps_connected": "连接于{ago}",
+  "settings_apps_disconnect": "断开连接",
+  "settings_apps_disconnect_failed": "无法断开应用连接",
+  "settings_instance_title": "关于",
+  "settings_instance_description": "此实例概览。",
+  "settings_instance_version": "版本",
+  "settings_instance_users": "用户",
+  "settings_instance_drawings": "绘图",
+  "settings_instance_storage": "已用存储",
+  "settings_instance_release_notes": "GitHub 上的更新日志",
+  "settings_instance_star": "在 GitHub 上点星",
+  "settings_instance_follow": "在 X 上关注",
+  "settings_invites_description": "用于添加成员的一次性链接。每个链接 7 天后过期 — 复制待使用的链接即可再次发送。",
+  "settings_invites_generate": "生成链接",
+  "settings_invites_generating": "正在生成...",
+  "settings_invites_expires": "{date} 过期",
+  "settings_invites_empty": "没有待使用的邀请链接",
+  "settings_members_count": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=*": "{count} 位成员"
+      }
+    }
+  ],
+  "settings_members_joined": "{date} 加入",
+  "settings_members_role_admin": "管理员",
+  "settings_members_role_member": "成员",
+  "settings_members_role_label": "{name} 的角色",
+  "settings_members_role_change_failed": "无法更改角色",
+  "settings_members_last_admin": "最后一位管理员不能被降级。",
+  "settings_members_actions": "{name} 的操作",
+  "settings_members_reset_password": "重置密码",
+  "settings_members_reset_pending": "重置链接待使用",
+  "settings_members_reset_copied": "重置链接已复制 — 仅可使用一次，24 小时内有效",
+  "settings_members_reset_copy_failed": "无法复制重置链接 — 请重新生成",
+  "settings_members_reset_create_failed": "无法创建重置链接",
+  "settings_members_reset_revoke_failed": "无法撤销重置链接",
+  "settings_members_delete": "删除用户",
+  "settings_members_delete_title": "删除 {name}？",
+  "settings_members_delete_failed": "无法删除 {name}",
+  "settings_members_counts_failed": "无法加载 {name} 的内容数量。请关闭此对话框后重试。",
+  "settings_members_confirm_loading": "这将删除 {name} 的账户，并永久删除其所有内容。此操作无法撤销。",
+  "settings_members_confirm_contents": "这将删除 {name} 的账户，并永久删除其{contents}。",
+  "settings_members_confirm_empty": "这将删除 {name} 的账户。该账户没有任何绘图或文件夹。",
+  "settings_members_confirm_empty_team": "这将删除 {name} 的账户。该账户没有任何私人绘图或文件夹。",
+  "settings_members_kept_team": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=*": "其 {count} 个团队绘图会保留在团队中。"
+      }
+    }
+  ],
+  "settings_members_demote_title": "放弃管理员角色？",
+  "settings_members_demote_description": "你将立即失去成员、邀请等实例设置的访问权限，之后只有其他管理员才能把你恢复为管理员。",
+  "settings_members_demote": "将我降级",
+  "settings_members_demoting": "正在降级…",
+  "settings_profile_save_failed": "无法保存显示名称",
+  "settings_sessions_revoke_failed": "无法撤销会话",
+  "settings_sessions_sign_out_others_failed": "无法退出其他会话",
+  "drawings_import_files": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=*": "正在导入 {count} 个文件"
+      }
+    }
+  ],
+  "drawings_import_progress": "正在导入第 {current} 个，共 {total} 个",
+  "drawings_import_failed_one": "无法导入 {name}",
+  "drawings_import_failed": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=*": "无法导入 {count} 个文件"
+      }
+    }
+  ],
+  "drawings_import_supported": "请拖放 .excalidraw 文件，或包含场景数据的 .png 和 .svg 导出文件。",
+  "drawings_import_failed_names": "无法导入：{names}。",
+  "drawings_import_skipped_images": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=*": "有 {count} 张图片无法导入，绘图中会显示占位图。"
+      }
+    }
+  ],
+  "drawings_import_imported": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=*": "已导入 {count} 个绘图"
+      }
+    }
+  ]
+}

@@ -66,9 +66,9 @@ import { forgetDeviceDrawingWhenFree } from "@/features/offline/sync"
 import { useDeviceCopy } from "@/features/offline/use-device-copy"
 import { drawingShareQueryOptions } from "@/features/shares/queries"
 import { useAutoSave } from "@/hooks/use-auto-save"
-import { useCanvasLanguage } from "@/hooks/use-language"
 import { usePreloadTextFont } from "@/hooks/use-preload-text-font"
 import { useCanvasTheme } from "@/hooks/use-theme"
+import { getLocale } from "@/paraglide/runtime"
 import { CommentsButton } from "./comments/CommentsButton"
 import { CommentsLayer } from "./comments/CommentsLayer"
 import { DrawingEditCard } from "./DrawingEditCard"
@@ -115,7 +115,6 @@ export function DrawingCanvas({
 }: Props) {
   const { toggleSidebar } = useSidebar()
   const canvasTheme = useCanvasTheme()
-  const language = useCanvasLanguage()
 
   // The canvas opens fitted to its content, so it waits for its own size.
   const [fitTo, setFitTo] = useState<FitTo>()
@@ -490,7 +489,7 @@ export function DrawingCanvas({
         // Excalidraw disables its toggleTheme action, which also retires the
         // Shift+Alt+D shortcut; `toggleTheme: false` pins that down.
         theme={canvasTheme}
-        langCode={language}
+        langCode={getLocale()}
         viewModeEnabled={readOnly || undefined}
         onChange={handleSceneChange}
         onPointerUpdate={readOnly ? undefined : room.onPointerUpdate}
@@ -629,7 +628,6 @@ export function DrawingCanvas({
           drawingId={drawingId}
           excalidrawAPI={excalidrawAPI}
           theme={canvasTheme}
-          language={language}
         />
       )}
       {!readOnly && (

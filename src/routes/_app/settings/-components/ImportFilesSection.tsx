@@ -2,6 +2,7 @@ import { FileUp } from "lucide-react"
 import { useFileDropTarget } from "@/features/drawings/file-drop"
 import { useImportDrawingFiles } from "@/features/drawings/import-files"
 import { cn } from "@/lib/utils"
+import { m } from "@/paraglide/messages"
 
 const PRIVATE_ROOT = { folderId: null, space: "private" } as const
 
@@ -14,12 +15,11 @@ export function ImportFilesSection() {
   return (
     <section className="animate-in fade-in-0 duration-200 motion-reduce:animate-none">
       <div className="mb-4">
-        <h2 className="text-sm font-medium text-foreground">Import files</h2>
+        <h2 className="text-sm font-medium text-foreground">
+          {m.settings_import_files_title()}
+        </h2>
         <p className="max-w-md text-xs text-muted-foreground">
-          Add .excalidraw files from your computer. They go to Private. PNG and
-          SVG exports that include the scene work too. To put files in a folder
-          or in Team, open it and drop them on the drawings, or drop them on it
-          in the sidebar.
+          {m.settings_import_files_description()}
         </p>
       </div>
       <label
@@ -41,7 +41,7 @@ export function ImportFilesSection() {
           }}
         />
         <FileUp className="h-4 w-4" />
-        Drop files here, or click to choose
+        {m.settings_import_files_drop()}
       </label>
     </section>
   )
