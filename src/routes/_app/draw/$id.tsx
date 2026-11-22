@@ -69,12 +69,12 @@ export const Route = createFileRoute("/_app/draw/$id")({
       owner
         ? deviceDrawingRecord(owner, params.id).catch(() => undefined)
         : undefined
-    // Another tab may have uploaded this device's edits: a cached scene that
-    // differs from the clean copy is stale.
+    // Another tab may have uploaded this device's edits: a cached scene, or a
+    // cached "not found", that differs from the clean copy is stale.
     const cached = queryClient.getQueryData(detail.queryKey)
-    if (cached) {
+    if (cached !== undefined) {
       const kept = await keptHere()
-      if (kept?.status === "clean" && kept.data !== cached.data)
+      if (kept?.status === "clean" && kept.data !== cached?.data)
         queryClient.removeQueries({ queryKey: detail.queryKey, exact: true })
     }
     if (

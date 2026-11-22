@@ -341,6 +341,12 @@ export function DrawingCanvas({
     waitingRef.current = waiting
     setWaitingToSync(waiting)
   }, [])
+  // Live: the Room saves now, and the unsent edits sync as a new drawing.
+  useEffect(() => {
+    if (!isLive) return
+    setWaiting(false)
+    setSaveFailed(false)
+  }, [isLive, setWaiting])
   const deviceSaving = device.saving
   const flushDevice = device.flush
   const saveScene = useCallback(
