@@ -53,8 +53,11 @@ export function useDeviceCopy(
       if (!owner) return
       const fileIds = files.map((file) => file.fileId)
       void flushDraft()
-        .then(() => sceneRevision(data))
-        .then(async (revision) => {
+        .then(async (written) => {
+          // The copy holds an older scene. With this save as its base, a
+          // sync would upload it over the save.
+          if (!written) return
+          const revision = await sceneRevision(data)
           await markDeviceDrawingSaved(
             owner,
             copy,
