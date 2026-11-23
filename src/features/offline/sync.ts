@@ -152,16 +152,25 @@ export async function syncDeviceDrawingNow(
 
 /**
  * For turning offline drawings off: uploads pending edits, then drops every
- * copy. False, with the copies kept, if edits remain.
+ * copy. "pending" or "open", with the copies kept, if edits remain or an
+ * editor has a drawing open, where an edit may not be written yet.
  */
 export async function drainDeviceDrawings(owner: string) {
   for (const id of await listPendingDeviceDrawings(owner)) {
     const outcome = await syncDeviceDrawingNow(owner, id)
     if (outcome.status === "copied") toastCopied(outcome)
   }
-  if ((await listPendingDeviceDrawings(owner)).length > 0) return false
+  if ((await listPendingDeviceDrawings(owner)).length > 0) return "pending"
+  const { held = [] } = await navigator.locks.query()
+  const editors = lockName(owner, "")
+  if (
+    held.some(
+      (lock) => lock.mode === "shared" && lock.name?.startsWith(editors),
+    )
+  )
+    return "open"
   await purgeDeviceDrawings(owner)
-  return true
+  return "done"
 }
 
 let syncing: Promise<void> | undefined

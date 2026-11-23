@@ -917,5 +917,6 @@
   "settings_offline_turn_on": "Einschalten",
   "settings_offline_turn_off": "Ausschalten",
   "settings_offline_pending": "Einige Änderungen auf diesem Gerät sind noch nicht synchronisiert. Stelle die Verbindung zu dieser Instanz wieder her und versuche es erneut.",
+  "settings_offline_open": "Eine Zeichnung ist in einem anderen Tab geöffnet. Schließe sie und versuche es erneut.",
   "settings_offline_failed": "Offline-Zeichnungen konnten nicht geändert werden"
 }

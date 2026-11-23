@@ -977,5 +977,6 @@
   "settings_offline_turn_on": "Włącz",
   "settings_offline_turn_off": "Wyłącz",
   "settings_offline_pending": "Niektóre zmiany na tym urządzeniu nie są jeszcze zsynchronizowane. Połącz się z tą instancją i spróbuj ponownie.",
+  "settings_offline_open": "Rysunek jest otwarty w innej karcie. Zamknij go i spróbuj ponownie.",
   "settings_offline_failed": "Nie udało się zmienić ustawienia rysunków offline"
 }

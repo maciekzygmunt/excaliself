@@ -887,5 +887,6 @@
   "settings_offline_turn_on": "开启",
   "settings_offline_turn_off": "关闭",
   "settings_offline_pending": "此设备上还有未同步的修改。请连接到此实例后重试。",
+  "settings_offline_open": "另一个标签页中打开了绘图。请关闭后重试。",
   "settings_offline_failed": "无法更改离线绘图设置"
 }

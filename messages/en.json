@@ -917,5 +917,6 @@
   "settings_offline_turn_on": "Turn on",
   "settings_offline_turn_off": "Turn off",
   "settings_offline_pending": "Some edits on this device aren't synced yet. Connect to this instance and try again.",
+  "settings_offline_open": "A drawing is open in another tab. Close it and try again.",
   "settings_offline_failed": "Couldn't change offline drawings"
 }

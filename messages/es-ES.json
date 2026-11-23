@@ -947,5 +947,6 @@
   "settings_offline_turn_on": "Activar",
   "settings_offline_turn_off": "Desactivar",
   "settings_offline_pending": "Algunos cambios de este dispositivo aún no se han sincronizado. Recupera la conexión con esta instancia e inténtalo de nuevo.",
+  "settings_offline_open": "Hay un dibujo abierto en otra pestaña. Ciérralo e inténtalo de nuevo.",
   "settings_offline_failed": "No se pudieron cambiar los dibujos sin conexión"
 }

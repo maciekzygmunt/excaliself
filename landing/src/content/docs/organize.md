@@ -50,7 +50,8 @@ Team, shared, or moved to the trash.
 
 To turn offline drawings off, choose **Turn off** in the same place. This
 sends the edits that wait in this browser, and then deletes the offline
-copies. If the edits can't be sent, offline drawings stay on.
+copies. If the edits can't be sent, or a private drawing is open in another
+tab, offline drawings stay on.
 
 Offline drawings need HTTPS or `localhost`. Team drawings and drawings with a
 share link are not kept offline. Clearing this site's data in the browser

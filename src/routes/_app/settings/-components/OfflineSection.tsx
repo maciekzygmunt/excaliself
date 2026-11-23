@@ -22,8 +22,13 @@ export function OfflineSection({ user }: { user: CurrentUser }) {
     try {
       if (on) {
         // Unsent edits go up first; if they can't, it stays on.
-        if (!(await drainDeviceDrawings(user.id))) {
-          toast.error(m.settings_offline_pending())
+        const drained = await drainDeviceDrawings(user.id)
+        if (drained !== "done") {
+          toast.error(
+            drained === "open"
+              ? m.settings_offline_open()
+              : m.settings_offline_pending(),
+          )
           return
         }
         const worker = await navigator.serviceWorker?.getRegistration()

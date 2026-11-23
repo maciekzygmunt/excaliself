@@ -49,6 +49,12 @@ export function supportsDeviceDrawings() {
   return enabled
 }
 
+// Another tab turned it off: stop keeping drawings in this one too.
+if (typeof window !== "undefined")
+  window.addEventListener("storage", (event) => {
+    if (event.key === enabledKey && event.newValue !== "1") enabled = false
+  })
+
 /** Takes effect on the next page load. */
 export function setDeviceDrawingsEnabled(on: boolean) {
   if (on) localStorage.setItem(enabledKey, "1")

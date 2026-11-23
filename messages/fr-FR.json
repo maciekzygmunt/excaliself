@@ -947,5 +947,6 @@
   "settings_offline_turn_on": "Activer",
   "settings_offline_turn_off": "Désactiver",
   "settings_offline_pending": "Certaines modifications sur cet appareil ne sont pas encore synchronisées. Rétablissez la connexion à cette instance, puis réessayez.",
+  "settings_offline_open": "Un dessin est ouvert dans un autre onglet. Fermez-le, puis réessayez.",
   "settings_offline_failed": "Impossible de modifier les dessins hors ligne"
 }
