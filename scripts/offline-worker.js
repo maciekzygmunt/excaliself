@@ -5,12 +5,18 @@
 // assets (fonts, locales) are cached as the app uses them.
 const CACHE = `excaliself-offline-${OFFLINE_VERSION}`
 const SHELL = "/offline"
+// The app's language, from the registration URL: a worker can't read cookies.
+const LANGUAGE = new URL(self.location.href).searchParams.get("lang")
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
     (async () => {
       const cache = await caches.open(CACHE)
-      const shell = await fetch(SHELL, { credentials: "omit", cache: "reload" })
+      const shell = await fetch(SHELL, {
+        credentials: "omit",
+        cache: "reload",
+        headers: LANGUAGE ? { "Accept-Language": LANGUAGE } : {},
+      })
       if (!shell.ok || shell.redirected)
         throw new Error("Offline page unavailable")
       // The entry scripts and styles the page itself links.

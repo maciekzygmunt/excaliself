@@ -4,6 +4,7 @@ import {
   drawingQueryOptions,
   drawingsQueryOptions,
 } from "@/features/drawings/queries"
+import { getLocale } from "@/paraglide/runtime"
 import {
   listDeviceDrawings,
   setDeviceAccount,
@@ -21,8 +22,11 @@ export function useOfflineSupport(owner: string) {
   useEffect(() => {
     if (!supported) return
     setDeviceAccount(owner)
+    // The language rides in the URL, so a new pick installs a fresh page.
     if (import.meta.env.PROD && "serviceWorker" in navigator)
-      navigator.serviceWorker.register("/offline-worker.js").catch(() => {})
+      navigator.serviceWorker
+        .register(`/offline-worker.js?lang=${getLocale()}`)
+        .catch(() => {})
   }, [supported, owner])
   // A cached scene is now stale: an editor opening it would save over the
   // edits that just went up.
