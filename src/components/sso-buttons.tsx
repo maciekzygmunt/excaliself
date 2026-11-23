@@ -2,6 +2,7 @@ import { KeyRound } from "lucide-react"
 import { useState } from "react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
+import { authErrorMessage } from "@/features/auth/errors"
 import type { SsoProvider } from "@/features/auth/sso"
 import { authClient } from "@/lib/auth-client"
 import { m } from "@/paraglide/messages"
@@ -33,7 +34,7 @@ export function SsoButtons({
     })
     if (error) {
       setPending(null)
-      toast.error(error.message ?? m.auth_sso_failed())
+      toast.error(authErrorMessage(error, m.auth_sso_failed()))
     }
   }
 

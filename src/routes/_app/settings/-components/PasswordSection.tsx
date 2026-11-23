@@ -4,6 +4,7 @@ import { z } from "zod"
 import { FormTextField } from "@/components/form-text-field"
 import { Button } from "@/components/ui/button"
 import { FieldGroup } from "@/components/ui/field"
+import { authErrorMessage } from "@/features/auth/errors"
 import { authClient } from "@/lib/auth-client"
 import { m } from "@/paraglide/messages"
 
@@ -32,12 +33,7 @@ export function PasswordSection() {
         revokeOtherSessions: true,
       })
       if (error) {
-        // better-auth reports a failed re-auth as "Invalid password"; the
-        // code check covers versions that add a machine code to the body.
-        if (
-          error.code === "INVALID_PASSWORD" ||
-          error.message === "Invalid password"
-        ) {
+        if (error.code === "INVALID_PASSWORD") {
           formApi.setErrorMap({
             onSubmit: {
               fields: {
@@ -46,7 +42,9 @@ export function PasswordSection() {
             },
           })
         } else {
-          toast.error(error.message ?? m.settings_password_change_failed())
+          toast.error(
+            authErrorMessage(error, m.settings_password_change_failed()),
+          )
         }
         return
       }

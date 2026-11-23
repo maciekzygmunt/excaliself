@@ -8,9 +8,11 @@ import z from "zod"
 import { db } from "@/db"
 import { invites, users } from "@/db/schema"
 import { userDisplayName } from "@/features/account/display-name"
+import { translateAuthError } from "@/features/auth/api-error"
 import { registerFieldsSchema } from "@/features/auth/schema"
 import { auth } from "@/lib/auth"
 import { adminMiddleware } from "@/middleware/admin"
+import { m } from "@/paraglide/messages"
 
 const usableInvite = (token: string) =>
   and(
@@ -56,7 +58,7 @@ export const registerWithInvite = createServerFn({ method: "POST" })
       .where(usableInvite(data.token))
       .returning({ id: invites.id })
     if (!invite) {
-      throw new Error("Invalid or expired invite link")
+      throw new Error(m.auth_invite_error_invalid_link())
     }
 
     // signUpEmail also signs the new member in: better-auth creates a session
@@ -81,11 +83,11 @@ export const registerWithInvite = createServerFn({ method: "POST" })
           .update(invites)
           .set({ usedAt: null })
           .where(eq(invites.id, invite.id))
-        throw error
+        throw translateAuthError(error, m.auth_invite_failed())
       })
 
     if (!result.user || !result.token) {
-      throw new Error("Failed to create account")
+      throw new Error(m.auth_invite_failed())
     }
     await db
       .update(invites)

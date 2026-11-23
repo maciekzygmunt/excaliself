@@ -12,6 +12,7 @@ import {
 } from "@/features/drawings/scene-import"
 import { lockFolderTree, type Tx } from "@/features/folders/tree-lock"
 import { accessibleTo } from "@/features/spaces/access"
+import { m } from "@/paraglide/messages"
 import { PRIVATE_COLLECTION } from "./api"
 
 /** One scene as the import lists it; the client sends it back to import. */
@@ -58,7 +59,7 @@ export async function importScene(
   const { scene } = input
   const space = scene.collection.id === PRIVATE_COLLECTION ? "private" : "team"
   if (space === "team" && !(await canImportShared(db, userId)))
-    throw new Error("Only admins can import shared collections")
+    throw new Error(m.settings_import_error_admins_only())
   const prepared = prepareScene(input.content)
 
   return db.transaction(async (tx) => {

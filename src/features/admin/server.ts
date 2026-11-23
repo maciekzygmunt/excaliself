@@ -6,11 +6,13 @@ import { count, eq, or } from "drizzle-orm"
 import z from "zod"
 import { db } from "@/db"
 import { sessions, users } from "@/db/schema"
+import { translateAuthError } from "@/features/auth/api-error"
 import { setupFieldsSchema } from "@/features/auth/schema"
 import { endRooms, rooms } from "@/features/collab/room-registry"
 import { evictUser } from "@/features/collab/room-session"
 import { auth } from "@/lib/auth"
 import { adminMiddleware } from "@/middleware/admin"
+import { m } from "@/paraglide/messages"
 import {
   countOwnedContent,
   deleteUserAccount,
@@ -33,18 +35,22 @@ export const setupAdmin = createServerFn({ method: "POST" })
       throw redirect({ to: "/login" })
     }
 
-    const result = await auth.api.signUpEmail({
-      body: {
-        email: data.email,
-        password: data.password,
-        // Display names are only ever set in Settings; "" means unset and
-        // the email-prefix fallback covers it (spec §5.12).
-        name: "",
-      },
-    })
+    const result = await auth.api
+      .signUpEmail({
+        body: {
+          email: data.email,
+          password: data.password,
+          // Display names are only ever set in Settings; "" means unset and
+          // the email-prefix fallback covers it (spec §5.12).
+          name: "",
+        },
+      })
+      .catch((error: unknown) => {
+        throw translateAuthError(error, m.auth_setup_failed())
+      })
 
     if (!result.user) {
-      throw new Error("Failed to create admin account")
+      throw new Error(m.auth_setup_failed())
     }
 
     await db

@@ -82,6 +82,13 @@ export function ImportSection() {
       setRun(state)
     }
     update({})
+    const fail = (scene: ScannedScene, message: string) =>
+      update({
+        failures: [
+          ...state.failures,
+          { name: scene.name || m.settings_import_untitled(), message },
+        ],
+      })
 
     for (const scene of scenes) {
       if (stopRequested.current) {
@@ -103,24 +110,19 @@ export function ImportSection() {
             },
           },
         })
+        // A rejected key fails every scene the same way.
+        if (result.status === "key-rejected") {
+          fail(scene, m.settings_import_error_key_rejected())
+          update({ stopped: true })
+          break
+        }
         if (result.status === "imported")
           update({
             imported: state.imported + 1,
             skippedImages: state.skippedImages + result.skippedImages,
           })
       } catch (error) {
-        const message = errorMessage(error)
-        update({
-          failures: [
-            ...state.failures,
-            { name: scene.name || m.settings_import_untitled(), message },
-          ],
-        })
-        // A rejected key fails every scene the same way.
-        if (message.includes("didn't accept this key")) {
-          update({ stopped: true })
-          break
-        }
+        fail(scene, errorMessage(error))
       }
       update({ done: state.done + 1 })
     }

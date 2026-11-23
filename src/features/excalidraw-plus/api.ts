@@ -1,9 +1,11 @@
 // A small client for the Excalidraw+ public API, read-only: just what the
 // import needs. Server-only: the key must not leave the server's requests,
-// and the API does not allow browser calls.
+// and the API does not allow browser calls. Errors are in the request's
+// language, for the import page to show.
 
 import { z } from "zod"
 import { sceneContentSchema } from "@/features/drawings/scene-import"
+import { m } from "@/paraglide/messages"
 
 /** Personal keys act as one user and can read their private scenes. */
 const PERSONAL_KEY_PREFIX = "uk-"
@@ -57,11 +59,8 @@ export function excalidrawPlusApi(apiUrl: string, apiKey: string) {
           Accept: "application/json",
         },
         signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-      }).catch((error: unknown) => {
-        throw new ExcalidrawPlusError(
-          0,
-          `Couldn't reach Excalidraw+ (${error instanceof Error ? error.message : "network error"})`,
-        )
+      }).catch(() => {
+        throw new ExcalidrawPlusError(0, m.settings_import_error_unreachable())
       })
       const retry =
         response.status === 429 ||
@@ -111,7 +110,7 @@ export function excalidrawPlusApi(apiUrl: string, apiKey: string) {
 
 async function apiError(response: Response) {
   if (response.status === 401)
-    return new ExcalidrawPlusError(401, "Excalidraw+ didn't accept this key")
+    return new ExcalidrawPlusError(401, m.settings_import_error_key_rejected())
   let message = response.statusText
   try {
     const body = (await response.json()) as { message?: unknown }
@@ -119,7 +118,7 @@ async function apiError(response: Response) {
   } catch {}
   return new ExcalidrawPlusError(
     response.status,
-    `Excalidraw+ answered ${response.status}: ${message}`,
+    m.settings_import_error_status({ status: response.status, message }),
   )
 }
 

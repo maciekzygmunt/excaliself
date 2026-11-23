@@ -33,6 +33,8 @@ test("a request uses the picked language, else the browser's", async () => {
     await request({ cookie: "language=pl-PL", "accept-language": "fr-CA" }),
   ).toBe("pl-PL")
   expect(await request({ "accept-language": "fr-CA,fr;q=0.9" })).toBe("fr-FR")
+  expect(await request({ "accept-language": "en;q=0.1, pl" })).toBe("pl-PL")
+  expect(await request({ "accept-language": "de;q=0, es" })).toBe("es-ES")
   expect(
     await request({ cookie: "language=it-IT", "accept-language": "de" }),
   ).toBe("de-DE")
