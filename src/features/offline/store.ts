@@ -246,7 +246,8 @@ export const listPendingDeviceDrawings = (owner: string) =>
 
 /**
  * Keeps the server's version of a drawing an editor opened. A copy with
- * edits the server lacks stays as it is.
+ * edits the server lacks stays as it is. A kept copy's name follows the
+ * drawing list instead: see `renameDeviceDrawing`.
  */
 export function keepDeviceDrawing(
   owner: string,
@@ -262,7 +263,6 @@ export function keepDeviceDrawing(
     // Same version: rewrite only to repair missing images.
     if (
       current?.baseRevision === baseRevision &&
-      current.name === name &&
       sameIds(
         await storedFileIds(files, owner, id),
         drawing.files.map((file) => file.fileId),
@@ -272,13 +272,23 @@ export function keepDeviceDrawing(
     drawings.put({
       owner,
       id,
-      name,
+      name: current?.name ?? name,
       data,
       baseRevision,
       status: "clean",
     } satisfies DeviceDrawing)
     files.delete(filesOf(owner, id))
     putFiles(files, owner, id, drawing.files)
+  })
+}
+
+/** Follows a rename made online. Unsent edits stay as they are. */
+export function renameDeviceDrawing(owner: string, id: string, name: string) {
+  return transact("readwrite", async ({ drawings }) => {
+    const current: DeviceDrawing | undefined = await done(
+      drawings.get([owner, id]),
+    )
+    if (current && current.name !== name) drawings.put({ ...current, name })
   })
 }
 

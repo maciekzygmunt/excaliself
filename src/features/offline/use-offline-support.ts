@@ -7,6 +7,7 @@ import {
 import { getLocale } from "@/paraglide/runtime"
 import {
   listDeviceDrawings,
+  renameDeviceDrawing,
   setDeviceAccount,
   supportsDeviceDrawings,
 } from "./store"
@@ -14,8 +15,8 @@ import { forgetUnheldDeviceDrawing, useDeviceSync } from "./sync"
 
 /**
  * The signed-in app's side of offline drawings: installs the offline page,
- * syncs edits kept on this device, and drops copies of drawings that left
- * Private.
+ * syncs edits kept on this device, renames copies with their drawings, and
+ * drops copies of drawings that left Private.
  */
 export function useOfflineSupport(owner: string) {
   const supported = supportsDeviceDrawings()
@@ -41,16 +42,21 @@ export function useOfflineSupport(owner: string) {
   const { data: drawings } = useQuery(drawingsQueryOptions())
   useEffect(() => {
     if (!supported || !drawings) return
-    const inPrivate = new Set(
-      drawings.flatMap((d) => (d.space === "private" ? [d.id] : [])),
+    const names = new Map(
+      drawings.flatMap((d) => (d.space === "private" ? [[d.id, d.name]] : [])),
     )
     void listDeviceDrawings(owner)
       .then((kept) =>
         Promise.all(
-          kept.flatMap(({ id }) =>
+          kept.flatMap(({ id, name }) => {
+            const listed = names.get(id)
             // An open editor keeps its copy; a later list change retries.
-            inPrivate.has(id) ? [] : [forgetUnheldDeviceDrawing(owner, id)],
-          ),
+            if (listed === undefined)
+              return [forgetUnheldDeviceDrawing(owner, id)]
+            return listed === name
+              ? []
+              : [renameDeviceDrawing(owner, id, listed)]
+          }),
         ),
       )
       .catch(() => {})
