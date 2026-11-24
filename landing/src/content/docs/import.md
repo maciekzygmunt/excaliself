@@ -1,5 +1,5 @@
 ---
-title: Import drawings
+title: Import Excalidraw+ drawings and local files
 description: Bring your drawings over from Excalidraw+ or from files on your computer.
 ---
 
@@ -23,6 +23,10 @@ drawing shows a placeholder instead.
 Add `.excalidraw` files from your computer under **Settings**, then **Import**.
 They go to Private. PNG and SVG exports that include the scene work too.
 
-To put files in a folder or in Team, drop them on it in the sidebar.
+To put files somewhere else, drop them on the drawings of a page. On Home,
+they go to the space you have open, Private or Team. On a folder page, they go
+into that folder. You can also drop files on a folder or a space in the
+sidebar.
+
 Imported drawings keep each file's last modified date in Recent. If a file's
 date is in the future, the import time is used instead.

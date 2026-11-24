@@ -1,5 +1,5 @@
 ---
-title: Connect an AI client
+title: "Excaliself MCP: connect Claude and other AI clients"
 description: Let Claude.ai, Claude Code, Claude Desktop, and other MCP clients find, read, create, import, change, export, comment on, and trash drawings, with every drawing change applied only by you.
 ---
 

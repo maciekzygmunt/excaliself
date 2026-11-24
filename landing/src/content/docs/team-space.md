@@ -26,6 +26,8 @@ Team drawings are always live. Members who open the same drawing see each
 other's cursors and edits, and a badge shows who is in each drawing right now.
 Each open Team drawing uses a WebSocket, so your
 [reverse proxy](/docs/docker-compose/#reverse-proxy) must pass them through.
+Because they are live, changes to a Team drawing's background color or grid do
+not sync or save. See [Limits](/docs/sharing/#limits).
 
 To bring in someone without an account, create a guest link. See
 [Share and collaborate](/docs/sharing/#team-drawings).

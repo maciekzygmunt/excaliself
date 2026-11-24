@@ -146,7 +146,7 @@ export function useRoom(options: {
   )
 
   // Image bytes ride HTTP, not the socket.
-  const { uploadPending, fetchMissing } = useRoomFiles({
+  const { uploadPending, fetchMissing, flushUploads } = useRoomFiles({
     room,
     excalidrawAPI,
     storedFileIds,
@@ -438,5 +438,6 @@ export function useRoom(options: {
     onScrollChange: follow.onScrollChange,
     toggleFollow: follow.toggleFollow,
     stopFollowing: follow.stopFollowing,
+    flushUploads,
   }
 }

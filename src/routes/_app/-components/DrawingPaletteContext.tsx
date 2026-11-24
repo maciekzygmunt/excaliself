@@ -1,18 +1,21 @@
 import { useQuery } from "@tanstack/react-query"
 import { useNavigate } from "@tanstack/react-router"
-import { FolderInput, Pencil, Star, StarOff, Trash2 } from "lucide-react"
+import { Copy, FolderInput, Pencil, Star, StarOff, Trash2 } from "lucide-react"
 import { useEffect, useMemo, useRef, useState } from "react"
 import { RenameDialog } from "@/components/rename-dialog"
 import {
+  useDuplicateDrawing,
   useMoveDrawingToFolder,
   useToggleStarDrawing,
   useTrashDrawing,
 } from "@/features/drawings/mutations"
 import { drawingsQueryOptions } from "@/features/drawings/queries"
+import { m } from "@/paraglide/messages"
 import {
   type PaletteContextSection,
   usePaletteContextSection,
 } from "./CommandPalette"
+import { useMoveToTeamDialog } from "./MoveToTeamDialog"
 
 type DrawingPaletteContextProps = {
   drawingId: string
@@ -21,7 +24,7 @@ type DrawingPaletteContextProps = {
 /**
  * Contributes the canvas's "This drawing" palette section (spec §5.4):
  * Rename (closes into the standard rename dialog), Star/Unstar (label follows
- * current state), Move to folder… (nested picker, optimistic move), Move to
+ * current state), Duplicate, Move to folder… (nested picker, optimistic move), Move to
  * trash (tier-1: instant, undo toast, lands on Home).
  * Reads from the live drawings list, so a trashed drawing — whose section is
  * a later slice — contributes nothing.
@@ -41,6 +44,8 @@ export function DrawingPaletteContext({
 
   const starMutation = useToggleStarDrawing()
   const starMutate = starMutation.mutate
+  const duplicateMutate = useDuplicateDrawing().mutate
+  const { flushCanvas } = useMoveToTeamDialog()
   const moveMutation = useMoveDrawingToFolder()
   const moveMutate = moveMutation.mutate
   const trashDrawing = useTrashDrawing()
@@ -54,17 +59,19 @@ export function DrawingPaletteContext({
   const section = useMemo<PaletteContextSection | null>(() => {
     if (!drawing) return null
     return {
-      title: "This drawing",
+      title: m.palette_drawing_section(),
       rows: [
         {
           id: "drawing:rename",
-          label: "Rename",
+          label: m.palette_drawing_rename(),
           icon: Pencil,
           onSelect: () => setRenameOpen(true),
         },
         {
           id: "drawing:star",
-          label: drawing.starred ? "Unstar" : "Star",
+          label: drawing.starred
+            ? m.palette_drawing_unstar()
+            : m.palette_drawing_star(),
           icon: drawing.starred ? StarOff : Star,
           onSelect: () =>
             starMutate({
@@ -72,8 +79,16 @@ export function DrawingPaletteContext({
             }),
         },
         {
+          id: "drawing:duplicate",
+          label: m.palette_drawing_duplicate(),
+          icon: Copy,
+          // The open canvas is this drawing: save its last edits first
+          onSelect: () =>
+            duplicateMutate({ id: drawing.id, beforeDuplicate: flushCanvas }),
+        },
+        {
           id: "drawing:move-folder",
-          label: "Move to folder…",
+          label: m.palette_drawing_move_folder(),
           icon: FolderInput,
           // Reversible mutation, so no confirm: the move lands optimistically
           // and rolls back with an error toast on failure (spec §4.3)
@@ -87,7 +102,7 @@ export function DrawingPaletteContext({
         },
         {
           id: "drawing:trash",
-          label: "Move to trash",
+          label: m.palette_drawing_trash(),
           icon: Trash2,
           destructive: true,
           onSelect: () => {
@@ -100,7 +115,7 @@ export function DrawingPaletteContext({
         },
       ],
     }
-  }, [drawing, starMutate, moveMutate, navigate])
+  }, [drawing, starMutate, duplicateMutate, flushCanvas, moveMutate, navigate])
 
   usePaletteContextSection(section)
 

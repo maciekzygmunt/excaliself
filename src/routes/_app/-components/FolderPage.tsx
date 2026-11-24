@@ -12,10 +12,12 @@ import {
   FolderEmpty,
   NoMatches,
 } from "@/components/drawing-gallery/GalleryEmpty"
+import { FileDropZone } from "@/features/drawings/file-drop"
 import { useTrashDrawing } from "@/features/drawings/mutations"
 import { drawingsQueryOptions } from "@/features/drawings/queries"
 import { foldersQueryOptions } from "@/features/folders/queries"
 import { useDocumentTitle } from "@/lib/document-title"
+import { m } from "@/paraglide/messages"
 import { useCreateDialog } from "./CreateDialog"
 import { useMoveToTeamDialog } from "./MoveToTeamDialog"
 
@@ -60,7 +62,10 @@ export function FolderPage({ folderId }: { folderId: string }) {
   const trimmedQuery = query.trim()
 
   return (
-    <div className="h-full overflow-y-auto">
+    <FileDropZone
+      target={{ folderId: folder.id, space: folder.space }}
+      className="h-full overflow-y-auto"
+    >
       <div className="mx-auto flex min-h-full w-full max-w-4xl flex-col px-6 py-8">
         <div className="flex items-center pb-5">
           <h1 className="text-sm font-semibold tracking-[-0.01em] text-foreground">
@@ -84,7 +89,7 @@ export function FolderPage({ folderId }: { folderId: string }) {
           isPending={isPending}
           sort={sort}
           query={query}
-          loadingLabel="Loading drawings"
+          loadingLabel={m.gallery_loading()}
           onTrash={trashDrawing}
           onMoveToTeam={requestMoveToTeam}
           selectable
@@ -102,6 +107,6 @@ export function FolderPage({ folderId }: { folderId: string }) {
           }
         />
       </div>
-    </div>
+    </FileDropZone>
   )
 }

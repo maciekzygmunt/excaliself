@@ -124,6 +124,18 @@ you deploy, set `POSTGRES_PASSWORD`, `BETTER_AUTH_SECRET`, and `BASE_URL` in the
 project's environment, as for [Docker Compose](#docker-compose). Open `BASE_URL`
 to create the admin account. See the [docs](https://excaliself.com/docs/hostinger/).
 
+### App stores
+
+- **TrueNAS**: in **Apps**, search for Excaliself (community train). Set
+  **App URL** to the address you open it at.
+  [Store page](https://apps.truenas.com/catalog/excaliself_community/).
+- **Unraid**: in **Apps**, search for Excaliself. Install **postgresql17**
+  first. [Store page](https://ca.unraid.net/apps/excaliself-1ulvvg01m0exfg).
+- **Portainer**: in the
+  [Portainer Templates](https://portainer-templates.as93.net/excaliself) list.
+
+The [docs](https://excaliself.com/docs/app-stores/) have the fields to fill in.
+
 ### Configuration
 
 Docker Compose reads these from `.env`. Coolify sets them for you.
@@ -136,6 +148,7 @@ Docker Compose reads these from `.env`. Coolify sets them for you.
 | `EXCALISELF_VERSION` | No | Image tag to run: `latest` (default), a release like `1.0.0` or `1.0`, or `main` |
 | `EXCALISELF_PORT` | No | Host port for the app (default `3000`). `127.0.0.1:3000` keeps it local to a reverse proxy |
 | `POSTGRES_USER`, `POSTGRES_DB` | No | Bundled Postgres user and database (default `excaliself`) |
+| `IMAGE_UPLOADS_PER_MINUTE` | No | Image uploads allowed per minute, per IP, in each live drawing (default `30`). See [Environment variables](https://excaliself.com/docs/environment/#limits) |
 | `GOOGLE_*`, `MICROSOFT_*`, `OIDC_*`, `SSO_ALLOWED_DOMAINS` | No | Single sign-on. See [Single sign-on](https://excaliself.com/docs/single-sign-on/) |
 | `PREVIEW_MODE` | No | `true` runs a throwaway instance for a pull request preview: an in-memory PGlite instead of Postgres, seeded with an admin and example drawings. It ignores `DATABASE_URL` and `BASE_URL` and makes `BETTER_AUTH_SECRET` optional. `/preview/login` signs in as the admin (`admin@example.com` / `preview-password`), `/preview/login?account=new` as a new member. Data is lost on restart. See [PR previews](./docs/pr-previews.md) |
 | `PREVIEW_HOSTS` | With `PREVIEW_MODE` behind a domain | Comma-separated hosts a preview answers on, e.g. `*.draw.example.com`. Auth refuses other hosts; localhost always works |

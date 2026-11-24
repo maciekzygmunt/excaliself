@@ -3,7 +3,10 @@ import {
   MainMenu,
   useEditorInterface,
 } from "@excalidraw/excalidraw"
-import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types"
+import type {
+  ExcalidrawImperativeAPI,
+  ExcalidrawProps,
+} from "@excalidraw/excalidraw/types"
 import { useNavigate } from "@tanstack/react-router"
 import { LogInIcon } from "lucide-react"
 import { useCallback, useMemo, useState } from "react"
@@ -21,10 +24,12 @@ import { roomPathForToken } from "@/features/collab/room-url"
 import { useRoom } from "@/features/collab/use-room"
 import {
   buildInitialSceneData,
-  fitToContent,
   type PersistedFile,
 } from "@/features/drawings/scene"
+import { useDrawingViewport } from "@/features/drawings/use-drawing-viewport"
 import { useBlockClearCanvasShortcut } from "@/hooks/use-block-clear-canvas-shortcut"
+import { m } from "@/paraglide/messages"
+import { getLocale } from "@/paraglide/runtime"
 import { GuestAttribution } from "./GuestAttribution"
 import { GuestNamePill } from "./GuestNamePill"
 import { GuestTitle } from "./GuestTitle"
@@ -59,7 +64,10 @@ export function SharedCanvas({
     () => buildInitialSceneData({ data: drawing.data, files }).initialData,
     [drawing.data, files],
   )
-  const initialState = useMemo(() => fitToContent(initialData), [initialData])
+  const { getInitialData, initialState, observeViewport } = useDrawingViewport(
+    drawing.id,
+    initialData,
+  )
   // Already stored, so this tab must not upload them again.
   const storedFileIds = useMemo(() => files.map((file) => file.fileId), [files])
   const [excalidrawAPI, setExcalidrawAPI] =
@@ -78,6 +86,17 @@ export function SharedCanvas({
     storedFileIds,
   })
   const followStatusFrame = useFollowStatusFrame(room)
+  const roomChange = room.onChange
+  const following = room.userToFollow !== null
+  const handleSceneChange = useCallback<
+    NonNullable<ExcalidrawProps["onChange"]>
+  >(
+    (elements, appState, files) => {
+      observeViewport(appState, following)
+      roomChange(elements, appState, files)
+    },
+    [observeViewport, roomChange, following],
+  )
   // A reset would wipe the drawing for everyone in the room.
   useBlockClearCanvasShortcut()
 
@@ -95,11 +114,12 @@ export function SharedCanvas({
   return (
     <div className="@container/canvas relative h-dvh w-full">
       <Excalidraw
-        initialData={initialData}
+        initialData={getInitialData}
         initialState={initialState}
         onExcalidrawAPI={setExcalidrawAPI}
         theme="light"
-        onChange={room.onChange}
+        langCode={getLocale()}
+        onChange={handleSceneChange}
         onPointerUpdate={room.onPointerUpdate}
         onScrollChange={room.onScrollChange}
         userToFollow={room.userToFollow}
@@ -163,7 +183,7 @@ export function SharedCanvas({
           <MainMenu.DefaultItems.SearchMenu />
           <MainMenu.DefaultItems.Help />
           <MainMenu.Separator />
-          <MainMenu.Group title="Excalidraw links">
+          <MainMenu.Group title={m.guest_excalidraw_links()}>
             <MainMenu.DefaultItems.Socials />
           </MainMenu.Group>
         </MainMenu>
@@ -186,7 +206,7 @@ function MenuSignIn({ token }: { token: string }) {
         navigate({ to: "/login", search: { redirect: `/share/${token}` } })
       }
     >
-      Sign in
+      {m.guest_sign_in()}
     </MainMenu.Item>
   )
 }

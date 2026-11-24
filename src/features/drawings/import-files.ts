@@ -3,6 +3,7 @@ import { createClientOnlyFn } from "@tanstack/react-start"
 import { useCallback } from "react"
 import { toast } from "sonner"
 import type { Space } from "@/db/schema"
+import { m } from "@/paraglide/messages"
 import { drawingsQueryOptions } from "./queries"
 import { importDrawingFile } from "./server"
 
@@ -14,12 +15,6 @@ const loadExcalidraw = createClientOnlyFn(
 /** "Plan.excalidraw" → "Plan", also for .json and .excalidraw.png exports. */
 const drawingName = (fileName: string) =>
   fileName.replace(/(\.(excalidraw|json|png|svg))+$/i, "")
-
-const plural = (count: number, noun: string) =>
-  `${count} ${noun}${count === 1 ? "" : "s"}`
-
-const SUPPORTED_FILES =
-  "Drop .excalidraw files, or .png and .svg exports that include the scene."
 
 export type ImportTarget = { folderId: string | null; space: Space }
 
@@ -33,7 +28,9 @@ export function useImportDrawingFiles() {
 
   return useCallback(
     async (files: File[], target: ImportTarget) => {
-      const toastId = toast.loading(`Importing ${plural(files.length, "file")}`)
+      const toastId = toast.loading(
+        m.drawings_import_files({ count: files.length }),
+      )
       const { getNonDeletedElements, loadFromBlob, serializeAsJSON } =
         await loadExcalidraw()
       const failed: string[] = []
@@ -41,9 +38,15 @@ export function useImportDrawingFiles() {
 
       for (const [index, file] of files.entries()) {
         if (files.length > 1)
-          toast.loading(`Importing ${index + 1} of ${files.length}`, {
-            id: toastId,
-          })
+          toast.loading(
+            m.drawings_import_progress({
+              current: index + 1,
+              total: files.length,
+            }),
+            {
+              id: toastId,
+            },
+          )
         try {
           const scene = await loadFromBlob(file, null, null)
           const json = serializeAsJSON(
@@ -72,18 +75,19 @@ export function useImportDrawingFiles() {
       if (imported === 0) {
         toast.error(
           files.length === 1
-            ? `Couldn't import ${files[0].name}`
-            : `Couldn't import ${plural(files.length, "file")}`,
-          { id: toastId, description: SUPPORTED_FILES },
+            ? m.drawings_import_failed_one({ name: files[0].name })
+            : m.drawings_import_failed({ count: files.length }),
+          { id: toastId, description: m.drawings_import_supported() },
         )
         return
       }
       const notes = [
-        failed.length > 0 && `Couldn't import ${failed.join(", ")}.`,
+        failed.length > 0 &&
+          m.drawings_import_failed_names({ names: failed.join(", ") }),
         skippedImages > 0 &&
-          `${plural(skippedImages, "image")} could not be brought over. The drawings show a placeholder.`,
+          m.drawings_import_skipped_images({ count: skippedImages }),
       ].filter(Boolean)
-      toast.success(`Imported ${plural(imported, "drawing")}`, {
+      toast.success(m.drawings_import_imported({ count: imported }), {
         id: toastId,
         description: notes.length > 0 ? notes.join(" ") : undefined,
       })

@@ -6,11 +6,12 @@ import { useQuery } from "@tanstack/react-query"
 import { SPACES } from "@/components/space-label"
 import type { Space } from "@/db/schema"
 import { liveDrawingsQueryOptions } from "@/features/collab/queries"
+import { isFileDrag } from "@/features/drawings/file-drop"
 import { cn } from "@/lib/utils"
 import { useActiveSpace } from "../ActiveSpace"
 import { useSpringLoad } from "./space-gestures"
 import type { DropTarget } from "./tree"
-import { isFileDrag, useSidebarDnD } from "./use-sidebar-dnd"
+import { useSidebarDnD } from "./use-sidebar-dnd"
 
 export function SpaceSegments({ activeSpace }: { activeSpace: Space }) {
   const { data: teamLive = 0 } = useQuery({
@@ -95,7 +96,7 @@ function Segment({
         )}
         strokeWidth={2.25}
       />
-      {label}
+      {label()}
       {liveCount > 0 && (
         <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-live-muted px-1 text-[10px] font-semibold text-live tabular-nums">
           {liveCount}

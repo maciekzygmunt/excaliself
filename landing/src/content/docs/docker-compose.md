@@ -1,5 +1,5 @@
 ---
-title: Docker Compose
+title: Deploy Excaliself with Docker Compose
 description: Run the prebuilt image behind a reverse proxy, pin a version, and upgrade.
 ---
 
@@ -30,6 +30,14 @@ is reachable; the image uses it as its container healthcheck.
 
 See the [Quick start](/docs/) for the install commands and
 [Environment variables](/docs/environment/) for every setting.
+
+## Run one app container
+
+Run exactly one app container (one replica, one process). The app keeps each
+live drawing's collaboration room in its own memory. Do not scale the app
+service or put several replicas behind a load balancer: people on different
+replicas would not see each other's edits, and the replicas' saves would
+overwrite each other.
 
 ## Reverse proxy
 
@@ -88,9 +96,12 @@ migrations, so restoring it is the safe way back to the older version.
 
 In Portainer, add a stack from **Repository** with the URL
 `https://github.com/maciekzygmunt/excaliself` and the compose path
-`docker-compose.yaml`. Add `POSTGRES_PASSWORD`, `BETTER_AUTH_SECRET`, and
-`BASE_URL` as environment variables, then deploy. The repository's
-`portainer-template.json` is the same stack as a Portainer app template.
+`docker-compose.portainer.yaml`. Add `POSTGRES_PASSWORD`, `BETTER_AUTH_SECRET`,
+and `BASE_URL` as environment variables, then deploy. Set `BASE_URL` to the
+address you open the app at, e.g. `http://192.168.1.10:3000`. The stack does
+not start without it. The repository's `portainer-template.json` is the same
+stack as a Portainer app template, and it is in the
+[Portainer Templates](/docs/app-stores/#portainer) list.
 
 ## Build from source
 

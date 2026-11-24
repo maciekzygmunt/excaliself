@@ -2,8 +2,10 @@ import { KeyRound } from "lucide-react"
 import { useState } from "react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
+import { authErrorMessage } from "@/features/auth/errors"
 import type { SsoProvider } from "@/features/auth/sso"
 import { authClient } from "@/lib/auth-client"
+import { m } from "@/paraglide/messages"
 
 type Props = {
   providers: SsoProvider[]
@@ -32,7 +34,7 @@ export function SsoButtons({
     })
     if (error) {
       setPending(null)
-      toast.error(error.message ?? "Couldn't start sign-in")
+      toast.error(authErrorMessage(error, m.auth_sso_failed()))
     }
   }
 
@@ -48,14 +50,14 @@ export function SsoButtons({
           >
             <ProviderIcon id={provider.id} />
             {pending === provider.id
-              ? "Redirecting..."
-              : `Continue with ${provider.name}`}
+              ? m.auth_sso_redirecting()
+              : m.auth_sso_continue({ provider: provider.name })}
           </Button>
         ))}
       </div>
       <div className="flex items-center gap-3 text-xs text-muted-foreground">
         <span className="h-px flex-1 bg-border" />
-        or
+        {m.auth_or()}
         <span className="h-px flex-1 bg-border" />
       </div>
     </div>

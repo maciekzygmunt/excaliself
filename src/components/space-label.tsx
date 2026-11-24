@@ -1,12 +1,14 @@
 import { Lock, type LucideIcon, Users } from "lucide-react"
 import type { Space } from "@/db/schema"
 import { cn } from "@/lib/utils"
+import { m } from "@/paraglide/messages"
 
 /** Each space's name and icon, shared by the space switch and labels. */
-export const SPACES: Record<Space, { label: string; icon: LucideIcon }> = {
-  private: { label: "Private", icon: Lock },
-  team: { label: "Team", icon: Users },
-}
+export const SPACES: Record<Space, { label: () => string; icon: LucideIcon }> =
+  {
+    private: { label: m.spaces_private, icon: Lock },
+    team: { label: m.spaces_team, icon: Users },
+  }
 
 /** Which space a search result lives in. Meta text, inheriting its color. */
 export function SpaceLabel({
@@ -20,7 +22,7 @@ export function SpaceLabel({
   return (
     <span className={cn("flex shrink-0 items-center gap-1", className)}>
       <Icon aria-hidden className="h-3 w-3" strokeWidth={2.25} />
-      {label}
+      {label()}
     </span>
   )
 }

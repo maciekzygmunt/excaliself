@@ -1,3 +1,4 @@
+import { ParaglideMessage } from "@inlang/paraglide-js-react"
 import { Link } from "@tanstack/react-router"
 import { Plus } from "lucide-react"
 import { AuthIllustration } from "@/components/auth-illustration"
@@ -5,6 +6,7 @@ import { KEYCAP_CLASS } from "@/components/ui/button"
 import { Kbd } from "@/components/ui/kbd"
 import { INVITES_ROUTE } from "@/lib/routes"
 import { cn } from "@/lib/utils"
+import { m } from "@/paraglide/messages"
 
 // First-run cascade: each child fades in and rises 8px, staggered so the eye
 // reads illustration → CTA → hint (→ invite). Backwards fill keeps delayed
@@ -53,7 +55,7 @@ export function IllustratedEmptyState({
         )}
       >
         <Plus className="h-3.5 w-3.5 text-iris" strokeWidth={2.5} />
-        Create your first drawing
+        {m.home_empty_create()}
       </button>
       <p
         className={cn(
@@ -62,7 +64,10 @@ export function IllustratedEmptyState({
           "text-[13px] text-muted-foreground",
         )}
       >
-        or press <Kbd>N</Kbd> anytime
+        <ParaglideMessage
+          message={m.home_empty_shortcut}
+          markup={{ key: ({ children }) => <Kbd>{children}</Kbd> }}
+        />
       </p>
       {isAdmin && (
         <Link
@@ -73,7 +78,7 @@ export function IllustratedEmptyState({
             "mt-3 text-[13px] font-medium text-iris transition-colors duration-150 hover:text-iris-strong",
           )}
         >
-          Invite your team <span aria-hidden>→</span>
+          {m.home_empty_invite()} <span aria-hidden>→</span>
         </Link>
       )}
     </div>

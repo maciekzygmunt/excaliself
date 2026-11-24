@@ -1,3 +1,4 @@
+import { ParaglideMessage } from "@inlang/paraglide-js-react"
 import { useQuery } from "@tanstack/react-query"
 import { createFileRoute } from "@tanstack/react-router"
 import { Separator } from "@/components/ui/separator"
@@ -5,9 +6,12 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { currentUserQueryOptions } from "@/features/account/queries"
 import { useDelayedVisible } from "@/hooks/use-delayed-visible"
 import { useDocumentTitle } from "@/lib/document-title"
+import { m } from "@/paraglide/messages"
 import { AppearanceSection } from "./-components/AppearanceSection"
 import { DangerZoneSection } from "./-components/DangerZoneSection"
 import { EmailSection } from "./-components/EmailSection"
+import { Emphasis } from "./-components/Emphasis"
+import { OfflineSection } from "./-components/OfflineSection"
 import { PasswordSection } from "./-components/PasswordSection"
 import { ProfileSection } from "./-components/ProfileSection"
 import { SessionsSection } from "./-components/SessionsSection"
@@ -21,7 +25,7 @@ export const Route = createFileRoute("/_app/settings/")({
 // skeleton (spec §4.3) covers cold loads without flashing on cache hits.
 function AccountPage() {
   const { data: user, isPending } = useQuery(currentUserQueryOptions())
-  useDocumentTitle("Settings", { chrome: true })
+  useDocumentTitle(m.settings_title(), { chrome: true })
   const showSkeleton = useDelayedVisible(isPending)
 
   if (isPending) return showSkeleton ? <AccountSkeleton /> : null
@@ -45,6 +49,8 @@ function AccountPage() {
       <Separator />
       <AppearanceSection />
       <Separator />
+      <OfflineSection user={user} />
+      <Separator />
       <DangerZoneSection user={user} />
     </div>
   )
@@ -55,11 +61,15 @@ function AccountPage() {
 function SsoSignInSection({ email }: { email: string }) {
   return (
     <section>
-      <h2 className="text-sm font-medium text-foreground">Sign-in</h2>
+      <h2 className="text-sm font-medium text-foreground">
+        {m.settings_signin_title()}
+      </h2>
       <p className="text-xs text-muted-foreground">
-        You sign in as <span className="text-foreground">{email}</span> with
-        single sign-on. To also have a password, ask an admin for a password
-        link.
+        <ParaglideMessage
+          message={m.settings_signin_sso}
+          inputs={{ email }}
+          markup={{ em: Emphasis }}
+        />
       </p>
     </section>
   )

@@ -1,0 +1,922 @@
+{
+  "$schema": "https://inlang.com/schema/inlang-message-format",
+  "time_just_now": "gerade eben",
+  "count_drawings": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "{count} Zeichnung",
+        "countPlural=*": "{count} Zeichnungen"
+      }
+    }
+  ],
+  "count_folders": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "{count} Ordner",
+        "countPlural=*": "{count} Ordner"
+      }
+    }
+  ],
+  "settings_title": "Einstellungen",
+  "settings_nav_label": "Bereiche der Einstellungen",
+  "settings_nav_account": "Konto",
+  "settings_nav_import": "Import",
+  "settings_nav_instance": "Instanz",
+  "settings_nav_members": "Mitglieder",
+  "settings_nav_invites": "Einladungen",
+  "settings_cancel": "Abbrechen",
+  "settings_done": "Fertig",
+  "settings_revoke": "Widerrufen",
+  "settings_copy": "Kopieren",
+  "settings_copied": "Kopiert",
+  "settings_deleting": "Wird gelöscht…",
+  "settings_cannot_undo": "Das lässt sich nicht rückgängig machen.",
+  "settings_last_used": "Zuletzt verwendet {ago}",
+  "settings_never_used": "Nie verwendet",
+  "settings_signin_title": "Anmeldung",
+  "settings_signin_sso": "Du meldest dich als {#em}{email}{/em} per Single Sign-on an. Wenn du zusätzlich ein Passwort möchtest, bitte einen Admin um einen Passwort-Link.",
+  "settings_profile_title": "Profil",
+  "settings_profile_description": "So sehen dich andere auf dieser Instanz",
+  "settings_profile_name_label": "Anzeigename",
+  "settings_profile_name_hint": "Optional — ohne Namen wirst du mit dem Anfang deiner E-Mail-Adresse angezeigt.",
+  "settings_email_title": "E-Mail",
+  "settings_email_description": "Du meldest dich mit {#em}{email}{/em} an. Eine Änderung gilt sofort.",
+  "settings_email_new_label": "Neue E-Mail-Adresse",
+  "settings_email_invalid": "Gib eine gültige E-Mail-Adresse ein",
+  "settings_email_taken": "Diese E-Mail-Adresse wird bereits verwendet",
+  "settings_email_updated": "Anmelde-E-Mail aktualisiert",
+  "settings_email_submit": "E-Mail ändern",
+  "settings_email_submitting": "E-Mail wird geändert...",
+  "settings_password_title": "Passwort",
+  "settings_password_description": "Eine Änderung meldet dich überall sonst ab.",
+  "settings_password_current_label": "Aktuelles Passwort",
+  "settings_password_current_required": "Gib dein aktuelles Passwort ein",
+  "settings_password_incorrect": "Falsches Passwort",
+  "settings_password_new_label": "Neues Passwort",
+  "settings_password_too_short": "Mindestens 8 Zeichen",
+  "settings_password_change_failed": "Passwort konnte nicht geändert werden",
+  "settings_password_changed": "Passwort geändert — andere Sitzungen wurden abgemeldet",
+  "settings_password_submit": "Passwort ändern",
+  "settings_password_submitting": "Passwort wird geändert...",
+  "settings_sessions_title": "Sitzungen",
+  "settings_sessions_description": "Geräte, die gerade bei deinem Konto angemeldet sind",
+  "settings_sessions_current": "Aktuelle Sitzung",
+  "settings_sessions_device": "{browser} auf {system}",
+  "settings_sessions_unknown_device": "Unbekanntes Gerät",
+  "settings_sessions_sign_out_others": "Alle anderen Sitzungen abmelden",
+  "settings_appearance_title": "Darstellung",
+  "settings_appearance_description": "Gilt nur für diesen Browser",
+  "settings_appearance_theme": "Design",
+  "settings_appearance_canvas": "Zeichenfläche",
+  "settings_appearance_light": "Hell",
+  "settings_appearance_dark": "Dunkel",
+  "settings_appearance_system": "System",
+  "settings_appearance_match_app": "Wie App",
+  "settings_appearance_language": "Sprache",
+  "settings_appearance_language_hint": "Übersetzt die ganze App",
+  "settings_danger_title": "Gefahrenzone",
+  "settings_danger_description": "Unwiderruflich. Alles, was dir gehört, wird mit dem Konto gelöscht.",
+  "settings_danger_description_team": "Unwiderruflich. Deine privaten Inhalte werden mit dem Konto gelöscht. Team-Zeichnungen bleiben erhalten.",
+  "settings_danger_delete": "Konto löschen",
+  "settings_danger_delete_hint": "Lösche dein Konto und alle deine Zeichnungen und Ordner endgültig.",
+  "settings_danger_delete_hint_team": "Lösche dein Konto und alle deine privaten Zeichnungen und Ordner endgültig.",
+  "settings_danger_sole_admin": "Du bist der einzige Admin dieser Instanz. Mache ein anderes Mitglied zum Admin, bevor du dein Konto löschst.",
+  "settings_danger_delete_failed": "Dein Konto konnte nicht gelöscht werden",
+  "settings_danger_confirm_title": "Dein Konto löschen?",
+  "settings_danger_counts_failed": "Die Anzahl deiner Inhalte konnte nicht geladen werden. Schließe diesen Dialog und versuche es erneut.",
+  "settings_danger_confirm_loading": "Dadurch werden dein Konto und alle deine Inhalte endgültig gelöscht. Das lässt sich nicht rückgängig machen.",
+  "settings_danger_confirm_contents": "Dadurch wird dein Konto gelöscht. Endgültig gelöscht werden außerdem: {contents}.",
+  "settings_danger_confirm_empty": "Dadurch wird dein Konto gelöscht. Du hast keine Zeichnungen oder Ordner.",
+  "settings_danger_confirm_empty_team": "Dadurch wird dein Konto gelöscht. Du hast keine privaten Zeichnungen oder Ordner.",
+  "settings_danger_kept_team": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "Deine 1 Team-Zeichnung bleibt beim Team.",
+        "countPlural=*": "Deine {count} Team-Zeichnungen bleiben beim Team."
+      }
+    }
+  ],
+  "settings_import_title": "Aus Excalidraw+ importieren",
+  "settings_import_beta": "(Beta)",
+  "settings_import_description_admin": "Übernimm Szenen und Bilder. Geteilte Sammlungen werden zu Ordnern in Team, deine privaten Szenen landen in Privat.",
+  "settings_import_description_member": "Übernimm deine privaten Szenen und Bilder. Sie landen in Privat. Geteilte Sammlungen importiert ein Admin.",
+  "settings_import_key_label": "Excalidraw+-API-Schlüssel",
+  "settings_import_key_hint_create": "Erstelle einen in Excalidraw+ in den Workspace-Einstellungen ({#link}so geht's{/link}).",
+  "settings_import_key_hint_admin": "Ein persönlicher Schlüssel (beginnt mit uk-) übernimmt auch deine privaten Szenen.",
+  "settings_import_key_hint_member": "Verwende einen persönlichen Schlüssel (beginnt mit uk-).",
+  "settings_import_key_hint_access": "Lesezugriff genügt. Der Schlüssel wird nur für diesen Import verwendet und nicht gespeichert.",
+  "settings_import_find": "Szenen suchen",
+  "settings_import_finding": "Szenen werden gesucht...",
+  "settings_import_error_generic": "Etwas ist schiefgelaufen",
+  "settings_import_error_unreachable": "Excalidraw+ ist nicht erreichbar",
+  "settings_import_error_key_rejected": "Excalidraw+ hat diesen Schlüssel nicht akzeptiert",
+  "settings_import_error_status": "Excalidraw+ hat mit {status} geantwortet: {message}",
+  "settings_import_error_admins_only": "Nur Admins können geteilte Sammlungen importieren",
+  "settings_import_error_workspace_key": "Ein Workspace-Schlüssel kann deine privaten Szenen nicht lesen. Verwende einen persönlichen Schlüssel (uk-…).",
+  "settings_import_error_unreadable": "Excalidraw+ hat Daten gesendet, die dieser Import nicht lesen kann",
+  "settings_import_untitled": "Ohne Titel",
+  "settings_import_found": "{scenes} {collections} gefunden.",
+  "settings_import_found_scenes": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "{count} Szene",
+        "countPlural=*": "{count} Szenen"
+      }
+    }
+  ],
+  "settings_import_found_collections": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "in {count} Sammlung",
+        "countPlural=*": "in {count} Sammlungen"
+      }
+    }
+  ],
+  "settings_import_already_imported": "{count} davon schon importiert.",
+  "settings_import_workspace_key": "Das ist ein Workspace-Schlüssel, deine privaten Szenen sind also nicht dabei. Verwende einen persönlichen Schlüssel, um sie auch zu übernehmen.",
+  "settings_import_nothing_new": "Nichts Neues zu importieren",
+  "settings_import_start": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "{count} Szene importieren",
+        "countPlural=*": "{count} Szenen importieren"
+      }
+    }
+  ],
+  "settings_import_use_another_key": "Anderen Schlüssel verwenden",
+  "settings_import_progress_label": "Importfortschritt",
+  "settings_import_importing": "Importiere {current} von {total}",
+  "settings_import_imported": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "{count} Szene importiert.",
+        "countPlural=*": "{count} Szenen importiert."
+      }
+    }
+  ],
+  "settings_import_stopped": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "Angehalten. {count} Szene importiert.",
+        "countPlural=*": "Angehalten. {count} Szenen importiert."
+      }
+    }
+  ],
+  "settings_import_skipped_images": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "{count} Bild konnte nicht übernommen werden (zu groß oder in Excalidraw+ nicht vorhanden). Die Zeichnungen zeigen stattdessen einen Platzhalter.",
+        "countPlural=*": "{count} Bilder konnten nicht übernommen werden (zu groß oder in Excalidraw+ nicht vorhanden). Die Zeichnungen zeigen stattdessen einen Platzhalter."
+      }
+    }
+  ],
+  "settings_import_failed": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "{count} Szene fehlgeschlagen:",
+        "countPlural=*": "{count} Szenen fehlgeschlagen:"
+      }
+    }
+  ],
+  "settings_import_stop": "Anhalten",
+  "settings_import_open_drawings": "Zeichnungen öffnen",
+  "settings_import_more": "Weitere importieren",
+  "settings_import_files_title": "Dateien importieren",
+  "settings_import_files_description": "Füge .excalidraw-Dateien von deinem Computer hinzu. Sie landen in Privat. PNG- und SVG-Exporte, die die Szene enthalten, funktionieren auch. Um Dateien in einen Ordner oder in Team zu legen, öffne ihn und zieh sie auf die Zeichnungen – oder zieh sie in der Seitenleiste darauf.",
+  "settings_import_files_drop": "Dateien hier ablegen oder zum Auswählen klicken",
+  "settings_tokens_title": "Zugriffstoken",
+  "settings_tokens_description": "Verbinde einen KI-Client wie Claude Code über MCP. Ein Token sieht, was du siehst, und kann in deinem Namen Zeichnungen erstellen und in den Papierkorb verschieben.",
+  "settings_tokens_new": "Neues Token",
+  "settings_tokens_empty": "Keine Zugriffstoken",
+  "settings_tokens_created": "Erstellt {ago}",
+  "settings_tokens_revoke_failed": "Token konnte nicht widerrufen werden",
+  "settings_tokens_copy_title": "Kopiere dein Token",
+  "settings_tokens_copy_description": "Du siehst es kein zweites Mal. Wer es hat, kann deine Zeichnungen lesen und in deinem Namen neue erstellen, bis du es widerrufst.",
+  "settings_tokens_token_label": "Token",
+  "settings_tokens_claude_code_label": "Zu Claude Code hinzufügen",
+  "settings_tokens_new_title": "Neues Zugriffstoken",
+  "settings_tokens_new_description": "Benenne es nach dem Client oder Gerät, das es verwenden wird.",
+  "settings_tokens_name_label": "Name",
+  "settings_tokens_name_placeholder": "Claude Code auf meinem Laptop",
+  "settings_tokens_create_failed": "Token konnte nicht erstellt werden",
+  "settings_tokens_create": "Token erstellen",
+  "settings_tokens_creating": "Wird erstellt…",
+  "settings_apps_title": "Verbundene Apps",
+  "settings_apps_description": "Apps, bei denen du dich mit Excaliself angemeldet hast, etwa ein Claude.ai-Connector. Sie haben denselben Zugriff wie ein Token.",
+  "settings_apps_empty": "Keine verbundenen Apps",
+  "settings_apps_connected": "Verbunden {ago}",
+  "settings_apps_disconnect": "Trennen",
+  "settings_apps_disconnect_failed": "App konnte nicht getrennt werden",
+  "settings_instance_title": "Über",
+  "settings_instance_description": "Diese Instanz auf einen Blick.",
+  "settings_instance_version": "Version",
+  "settings_instance_users": "Benutzer",
+  "settings_instance_drawings": "Zeichnungen",
+  "settings_instance_storage": "Belegter Speicher",
+  "settings_instance_release_notes": "Versionshinweise auf GitHub",
+  "settings_instance_star": "Auf GitHub einen Stern geben",
+  "settings_instance_follow": "Auf X folgen",
+  "settings_invites_description": "Einmal-Links, die ein Mitglied hinzufügen. Jeder läuft nach 7 Tagen ab — kopiere einen offenen Link, um ihn noch einmal zu senden.",
+  "settings_invites_generate": "Link erstellen",
+  "settings_invites_generating": "Wird erstellt...",
+  "settings_invites_expires": "Läuft am {date} ab",
+  "settings_invites_empty": "Keine offenen Einladungslinks",
+  "settings_members_count": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "{count} Mitglied",
+        "countPlural=*": "{count} Mitglieder"
+      }
+    }
+  ],
+  "settings_members_joined": "Beigetreten am {date}",
+  "settings_members_role_admin": "Admin",
+  "settings_members_role_member": "Mitglied",
+  "settings_members_role_label": "Rolle von {name}",
+  "settings_members_role_change_failed": "Rolle konnte nicht geändert werden",
+  "settings_members_last_admin": "Der letzte Admin kann nicht herabgestuft werden.",
+  "settings_members_actions": "Aktionen für {name}",
+  "settings_members_reset_password": "Passwort zurücksetzen",
+  "settings_members_reset_pending": "Link zum Zurücksetzen offen",
+  "settings_members_reset_copied": "Link zum Zurücksetzen kopiert — einmalig, 24 Stunden gültig",
+  "settings_members_reset_copy_failed": "Link zum Zurücksetzen konnte nicht kopiert werden — erstelle ihn erneut",
+  "settings_members_reset_create_failed": "Link zum Zurücksetzen konnte nicht erstellt werden",
+  "settings_members_reset_revoke_failed": "Link zum Zurücksetzen konnte nicht widerrufen werden",
+  "settings_members_delete": "Benutzer löschen",
+  "settings_members_delete_title": "{name} löschen?",
+  "settings_members_delete_failed": "{name} konnte nicht gelöscht werden",
+  "settings_members_counts_failed": "Die Anzahl der Inhalte von {name} konnte nicht geladen werden. Schließe diesen Dialog und versuche es erneut.",
+  "settings_members_confirm_loading": "Dadurch werden das Konto von {name} und alle zugehörigen Inhalte endgültig gelöscht. Das lässt sich nicht rückgängig machen.",
+  "settings_members_confirm_contents": "Dadurch wird das Konto von {name} gelöscht. Endgültig gelöscht werden außerdem: {contents}.",
+  "settings_members_confirm_empty": "Dadurch wird das Konto von {name} gelöscht. Es enthält keine Zeichnungen oder Ordner.",
+  "settings_members_confirm_empty_team": "Dadurch wird das Konto von {name} gelöscht. Es enthält keine privaten Zeichnungen oder Ordner.",
+  "settings_members_kept_team": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "1 Team-Zeichnung bleibt beim Team.",
+        "countPlural=*": "{count} Team-Zeichnungen bleiben beim Team."
+      }
+    }
+  ],
+  "settings_members_demote_title": "Admin-Rolle abgeben?",
+  "settings_members_demote_description": "Du verlierst sofort den Zugriff auf Instanzeinstellungen wie Mitglieder und Einladungen. Nur ein anderer Admin kann dich wieder zum Admin machen.",
+  "settings_members_demote": "Mich herabstufen",
+  "settings_members_demoting": "Wird herabgestuft…",
+  "settings_profile_save_failed": "Anzeigename konnte nicht gespeichert werden",
+  "settings_sessions_revoke_failed": "Sitzung konnte nicht widerrufen werden",
+  "settings_sessions_sign_out_others_failed": "Andere Sitzungen konnten nicht abgemeldet werden",
+  "drawings_import_files": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "{count} Datei wird importiert",
+        "countPlural=*": "{count} Dateien werden importiert"
+      }
+    }
+  ],
+  "drawings_import_progress": "Importiere {current} von {total}",
+  "drawings_import_failed_one": "{name} konnte nicht importiert werden",
+  "drawings_import_failed": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "{count} Datei konnte nicht importiert werden",
+        "countPlural=*": "{count} Dateien konnten nicht importiert werden"
+      }
+    }
+  ],
+  "drawings_import_supported": "Lege .excalidraw-Dateien ab oder .png- und .svg-Exporte, die die Szene enthalten.",
+  "drawings_import_failed_names": "Nicht importiert: {names}.",
+  "drawings_import_skipped_images": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "{count} Bild konnte nicht übernommen werden. Die Zeichnungen zeigen einen Platzhalter.",
+        "countPlural=*": "{count} Bilder konnten nicht übernommen werden. Die Zeichnungen zeigen einen Platzhalter."
+      }
+    }
+  ],
+  "drawings_import_imported": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "{count} Zeichnung importiert",
+        "countPlural=*": "{count} Zeichnungen importiert"
+      }
+    }
+  ],
+  "drawings_actions_for": "Aktionen für {name}",
+  "drawings_action_star": "Mit Stern markieren",
+  "drawings_action_unstar": "Stern entfernen",
+  "drawings_action_rename": "Umbenennen",
+  "drawings_action_duplicate": "Duplizieren",
+  "drawings_action_export": "Als .excalidraw exportieren",
+  "drawings_action_move_to_team": "Ins Team verschieben",
+  "drawings_action_trash": "In den Papierkorb",
+  "drawings_star_failed": "Markieren fehlgeschlagen",
+  "drawings_unstar_failed": "Stern entfernen fehlgeschlagen",
+  "drawings_move_failed": "Verschieben fehlgeschlagen",
+  "drawings_rename_failed": "Umbenennen fehlgeschlagen",
+  "drawings_restore_failed": "Zeichnung konnte nicht wiederhergestellt werden",
+  "drawings_restore_many_failed": "Zeichnungen konnten nicht wiederhergestellt werden",
+  "drawings_duplicated": "„{name}“ erstellt",
+  "drawings_open": "Öffnen",
+  "drawings_duplicate_failed": "Zeichnung konnte nicht dupliziert werden",
+  "drawings_export_failed": "„{name}“ konnte nicht exportiert werden",
+  "drawings_export_failed_hint": "Versuch es noch einmal oder öffne die Zeichnung und speichere sie über ihr Menü.",
+  "drawings_reload_failed": "Die neueste Version dieser Zeichnung konnte nicht geladen werden",
+  "drawings_reload_failed_hint": "Deine Änderungen werden nicht gespeichert. Lade die Seite neu, um weiterzumachen.",
+  "folder_restore_failed": "Ordner konnte nicht wiederhergestellt werden",
+  "spaces_moved": "Ins Team verschoben",
+  "spaces_moved_many": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "{count} Zeichnung in Team verschoben",
+        "countPlural=*": "{count} Zeichnungen in Team verschoben"
+      }
+    }
+  ],
+  "spaces_move_failed": "Verschieben ins Team fehlgeschlagen",
+  "gallery_cancel": "Abbrechen",
+  "gallery_sort_last_edited": "Zuletzt bearbeitet",
+  "gallery_sort_date_created": "Erstellungsdatum",
+  "gallery_sort_name": "Name",
+  "gallery_sort_label": "Sortierung: {order}",
+  "gallery_search_placeholder": "Zeichnungen durchsuchen…",
+  "gallery_search_label": "Zeichnungen durchsuchen",
+  "gallery_filter_label": "Nach Ordner filtern",
+  "gallery_filter_all": "Alle",
+  "gallery_filter_unfiled": "Ohne Ordner",
+  "gallery_no_matches": "Keine Zeichnungen passen zu „{query}“",
+  "gallery_folder_empty": "Dieser Ordner ist leer",
+  "gallery_folder_empty_create": "Neue Zeichnung hier",
+  "gallery_team_empty": "Noch keine Zeichnungen im Team",
+  "gallery_team_empty_create": "Neue Zeichnung im Team",
+  "gallery_select": "{name} auswählen",
+  "gallery_former_member": "Ehemaliges Mitglied",
+  "gallery_created_by": "Erstellt von {name}",
+  "gallery_preview_of": "Vorschau von {name}",
+  "gallery_no_preview": "Keine Vorschau",
+  "gallery_selection_label": "Ausgewählte Zeichnungen",
+  "gallery_selection_clear": "Auswahl aufheben",
+  "gallery_selection_count": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "{count} ausgewählt",
+        "countPlural=*": "{count} ausgewählt"
+      }
+    }
+  ],
+  "gallery_selection_select_all": "Alle auswählen",
+  "gallery_selection_export": "Exportieren",
+  "gallery_selection_exporting": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "{count} Zeichnung wird exportiert",
+        "countPlural=*": "{count} Zeichnungen werden exportiert"
+      }
+    }
+  ],
+  "gallery_selection_export_failed": "Export fehlgeschlagen",
+  "gallery_selection_team_title": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "{count} Zeichnung in Team verschieben?",
+        "countPlural=*": "{count} Zeichnungen in Team verschieben?"
+      }
+    }
+  ],
+  "gallery_selection_team_description": "Alle Mitglieder können sie sehen und bearbeiten. Du kannst sie nicht zurück nach Privat verschieben.",
+  "gallery_selection_move_to_folder": "In Ordner verschieben",
+  "gallery_selection_no_folder": "Kein Ordner",
+  "trash_moved": "In den Papierkorb verschoben",
+  "trash_moved_many": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "{count} Zeichnung in den Papierkorb verschoben",
+        "countPlural=*": "{count} Zeichnungen in den Papierkorb verschoben"
+      }
+    }
+  ],
+  "trash_undo": "Rückgängig",
+  "trash_move_failed": "Verschieben in den Papierkorb fehlgeschlagen",
+  "trash_restored_to_root": "Auf oberster Ebene wiederhergestellt – sein Ordner existiert nicht mehr",
+  "trash_delete_failed": "Löschen fehlgeschlagen – nichts wurde entfernt",
+  "trash_empty_failed": "Papierkorb konnte nicht geleert werden",
+  "trash_purges_today": "Wird heute gelöscht",
+  "trash_purges_in": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "Wird in {count} Tag gelöscht",
+        "countPlural=*": "Wird in {count} Tagen gelöscht"
+      }
+    }
+  ],
+  "trash_view": "{name} ansehen",
+  "trash_restore": "Wiederherstellen",
+  "trash_restore_named": "{name} wiederherstellen",
+  "trash_delete_forever": "Endgültig löschen",
+  "trash_delete_forever_named": "{name} endgültig löschen",
+  "trash_delete_forever_title": "Endgültig löschen?",
+  "trash_delete_forever_description": "„{name}“ wird endgültig gelöscht. Das kann nicht rückgängig gemacht werden.",
+  "trash_delete_forever_folder_description": "„{name}“ und sein Inhalt ({contents}) werden endgültig gelöscht. Das kann nicht rückgängig gemacht werden.",
+  "trash_deleting": "Wird gelöscht…",
+  "trash_item_count": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "{count} Element",
+        "countPlural=*": "{count} Elemente"
+      }
+    }
+  ],
+  "trash_trashed_by": "Gelöscht von {name}",
+  "sidebar_new_drawing": "Neue Zeichnung",
+  "sidebar_new_folder": "Neuer Ordner",
+  "sidebar_search": "Suchen",
+  "sidebar_home": "Start",
+  "sidebar_all_drawings": "Alle Zeichnungen",
+  "sidebar_trash": "Papierkorb",
+  "sidebar_drawings": "Zeichnungen",
+  "sidebar_starred": "Markiert",
+  "sidebar_unstar_named": "Stern von {name} entfernen",
+  "sidebar_toggle": "Seitenleiste ein- oder ausblenden",
+  "sidebar_open": "Seitenleiste öffnen",
+  "sidebar_sign_out": "Abmelden",
+  "sidebar_star_dismiss": "Schließen",
+  "sidebar_star_title": "Gefällt dir Excaliself?",
+  "sidebar_star_body": "Ein Stern auf GitHub hilft anderen, es zu finden.",
+  "sidebar_star_link": "Auf GitHub einen Stern geben",
+  "spaces_private": "Privat",
+  "spaces_team": "Team",
+  "home_recent": "Zuletzt bearbeitet",
+  "home_view_all": "Alle anzeigen",
+  "home_loading": "Letzte Zeichnungen werden geladen",
+  "home_empty_create": "Erstelle deine erste Zeichnung",
+  "home_empty_shortcut": "oder drück jederzeit {#key}N{/key}",
+  "home_empty_invite": "Lade dein Team ein",
+  "gallery_loading": "Zeichnungen werden geladen",
+  "gallery_unfiled_empty": "Keine Zeichnungen ohne Ordner",
+  "drawings_untitled": "Unbenannte Zeichnung",
+  "drawings_rename_hint": "Klicken, um die Szene umzubenennen",
+  "trash_loading": "Papierkorb wird geladen",
+  "trash_empty": "Papierkorb leeren",
+  "trash_empty_title": "Papierkorb leeren?",
+  "trash_emptying": "Wird geleert…",
+  "trash_empty_description": "Folgendes wird endgültig gelöscht: {contents}. Das kann nicht rückgängig gemacht werden.",
+  "trash_empty_description_private": "Folgendes wird in deinem privaten Papierkorb endgültig gelöscht: {contents}. Das kann nicht rückgängig gemacht werden.",
+  "trash_section_private": "Privater Papierkorb",
+  "trash_section_team": "Team-Papierkorb",
+  "trash_empty_state": "Der Papierkorb ist leer. Gelöschte Zeichnungen bleiben 30 Tage hier, bevor sie endgültig entfernt werden.",
+  "trash_empty_state_private": "Der private Papierkorb ist leer. Gelöschte Zeichnungen bleiben 30 Tage hier, bevor sie endgültig entfernt werden.",
+  "trash_empty_state_team": "Der Team-Papierkorb ist leer. Jedes Mitglied kann Inhalte hier innerhalb von 30 Tagen wiederherstellen.",
+  "dialog_cancel": "Abbrechen",
+  "dialog_close": "Schließen",
+  "dialog_type_to_confirm": "Gib zur Bestätigung unten {#em}{challenge}{/em} ein",
+  "dialog_sidebar_title": "Seitenleiste",
+  "dialog_sidebar_description": "Zeigt die mobile Seitenleiste an.",
+  "rename_drawing_title": "Zeichnung umbenennen",
+  "rename_folder_title": "Ordner umbenennen",
+  "rename_drawing_placeholder": "Name der Zeichnung…",
+  "rename_folder_placeholder": "Ordnername…",
+  "rename_hint": "{#key}↵{/key} zum Umbenennen",
+  "create_drawing_title": "Zeichnung erstellen",
+  "create_folder_title": "Ordner erstellen",
+  "create_drawing_placeholder": "Name der Zeichnung…",
+  "create_folder_placeholder": "Ordnername…",
+  "create_in_folder": "in {name}",
+  "create_in_team": "im Team",
+  "create_in_private": "in Privat",
+  "create_new_drawing": "Neue Zeichnung",
+  "create_new_folder": "Neuer Ordner",
+  "create_hint": "{#key}↵{/key} zum Erstellen",
+  "create_drawing_failed": "Zeichnung konnte nicht erstellt werden",
+  "create_folder_failed": "Ordner konnte nicht erstellt werden",
+  "move_title": "„{name}“ ins Team verschieben?",
+  "move_description": "Alle Mitglieder können es sehen und bearbeiten. Du kannst es nicht zurück nach Privat verschieben.",
+  "move_description_contents": "Alle Mitglieder können es sehen und bearbeiten. Du kannst es nicht zurück nach Privat verschieben. Dabei werden auch die {contents} darin verschoben.",
+  "move_confirm": "Ins Team verschieben",
+  "share_title": "Zeichnung teilen",
+  "share_audience_members_label": "Mitglieder dieser Instanz",
+  "share_audience_members_hint": "Besucher müssen sich anmelden, um ihn zu öffnen.",
+  "share_audience_anyone_label": "Alle mit dem Link",
+  "share_audience_anyone_hint": "Kein Konto nötig – Gäste wählen einen Anzeigenamen.",
+  "share_copy": "Kopieren",
+  "share_copied": "Kopiert",
+  "share_members_have_access": "Mitglieder haben bereits Zugriff",
+  "share_members_find_in_team": "Sie finden sie im Team.",
+  "share_copy_member_link": "Mitglieder-Link kopieren",
+  "share_description_team_shared": "Alle mit diesem Link können live mitbearbeiten. Kein Konto nötig.",
+  "share_description_team": "Erstelle einen Gast-Link, mit dem Personen außerhalb dieser Instanz die Zeichnung live mit dir bearbeiten.",
+  "share_description_shared": "Alle mit diesem Link können live mitbearbeiten.",
+  "share_description": "Erstelle einen Link, mit dem andere die Zeichnung live mit dir bearbeiten.",
+  "share_creating": "Wird erstellt…",
+  "share_create_guest_link": "Gast-Link erstellen",
+  "share_create_link": "Freigabe-Link erstellen",
+  "share_stopping": "Wird beendet…",
+  "share_stop": "Teilen beenden",
+  "share_regenerating": "Wird neu erstellt…",
+  "share_regenerate": "Link neu erstellen",
+  "share_create_failed": "Freigabe-Link konnte nicht erstellt werden",
+  "share_stopped": "Teilen beendet",
+  "share_stopped_team": "Der Link ist ungültig. Gäste können ihn nicht mehr öffnen.",
+  "share_stopped_private": "Der Link ist ungültig und die Zeichnung ist wieder privat.",
+  "share_stop_failed": "Teilen konnte nicht beendet werden",
+  "share_regenerated": "Link neu erstellt",
+  "share_regenerated_description": "Der alte Link funktioniert nicht mehr.",
+  "share_regenerate_failed": "Link konnte nicht neu erstellt werden",
+  "share_audience_failed": "Konnte nicht ändern, wer den Link öffnen kann",
+  "copy_failed": "Kopieren fehlgeschlagen – markiere den Text und kopiere ihn manuell",
+  "palette_title": "Befehlspalette",
+  "palette_results": "Ergebnisse der Befehlspalette",
+  "palette_search": "Suchen…",
+  "palette_search_folders": "Ordner suchen…",
+  "palette_no_results": "Keine Ergebnisse",
+  "palette_section_move": "In Ordner verschieben",
+  "palette_section_drawings": "Zeichnungen",
+  "palette_section_goto": "Gehe zu",
+  "palette_section_actions": "Aktionen",
+  "palette_home": "Start",
+  "palette_all_drawings": "Alle Zeichnungen",
+  "palette_trash": "Papierkorb",
+  "palette_settings": "Einstellungen",
+  "palette_new_drawing": "Neue Zeichnung",
+  "palette_new_folder": "Neuer Ordner",
+  "palette_sign_out": "Abmelden",
+  "palette_no_folder": "Kein Ordner",
+  "palette_hint_navigate": "{#key}↑↓{/key} navigieren",
+  "palette_hint_open": "{#key}↵{/key} öffnen",
+  "palette_hint_back": "{#key}⌫{/key} zurück",
+  "palette_hint_close": "{#key}esc{/key} schließen",
+  "palette_drawing_section": "Diese Zeichnung",
+  "palette_drawing_rename": "Umbenennen",
+  "palette_drawing_star": "Mit Stern markieren",
+  "palette_drawing_unstar": "Stern entfernen",
+  "palette_drawing_duplicate": "Duplizieren",
+  "palette_drawing_move_folder": "In Ordner verschieben…",
+  "palette_drawing_trash": "In den Papierkorb",
+  "palette_folder_section": "Dieser Ordner",
+  "palette_folder_new_drawing": "Neue Zeichnung in diesem Ordner",
+  "palette_folder_rename": "Ordner umbenennen",
+  "palette_folder_trash": "Ordner in den Papierkorb",
+  "tour_spaces_title": "Privat und Team",
+  "tour_spaces_body": "Private Zeichnungen gehören nur dir. Team-Zeichnungen teilst du mit allen Mitgliedern, und Änderungen erscheinen live.",
+  "tour_search_title": "Alles finden",
+  "tour_search_body": "Durchsuche Zeichnungsnamen und den Text darin oder führe einen Befehl aus. Drücke {palette} von überall.",
+  "tour_new_drawing_title": "Zeichnung erstellen",
+  "tour_new_drawing_body": "Starte hier oder drücke N von überall. Der letzte Tipp wartet in der Zeichnung.",
+  "tour_new_drawing_try": "Zeichnung erstellen",
+  "tour_share_title": "Gemeinsam zeichnen",
+  "tour_share_body": "Mit Teilen schickst du einen Link, um gemeinsam live zu zeichnen. Mitglieder dieser Instanz können mitmachen, Gäste auch, wenn du es erlaubst.",
+  "tour_progress": "{step} von {total}",
+  "tour_skip": "Tour überspringen",
+  "tour_next": "Weiter",
+  "tour_done": "Fertig",
+  "drawing_room_full_title": "Gerade sind zu viele Personen in dieser Zeichnung",
+  "drawing_room_full_description": "Deine Änderungen werden nicht gespeichert. Lade die Seite neu, um erneut beizutreten.",
+  "drawing_room_refused_title": "Live-Bearbeitung beendet",
+  "drawing_room_refused_description": "Deine Änderungen werden nicht gespeichert. Lade die Seite neu, um es erneut zu versuchen.",
+  "drawing_scene_unreadable_title": "Diese Zeichnung kann nicht live bearbeitet werden",
+  "drawing_scene_unreadable_team": "Die gespeicherten Daten sind beschädigt, daher werden deine Änderungen nicht gespeichert.",
+  "drawing_scene_unreadable_shared": "Die gespeicherten Daten sind beschädigt, daher werden deine Änderungen nicht gespeichert. Beende die Freigabe, um sie allein zu bearbeiten.",
+  "drawing_corrupt_title": "Die gespeicherten Daten dieser Zeichnung konnten nicht gelesen werden",
+  "drawing_corrupt_description": "Sie wurde als leere Zeichenfläche geöffnet. Automatisches Speichern ist pausiert, damit die gespeicherten Daten nicht überschrieben werden.",
+  "drawing_corrupt_edit_anyway": "Trotzdem bearbeiten",
+  "drawing_save_failed": "Zeichnung konnte nicht gespeichert werden",
+  "drawing_share": "Teilen",
+  "drawing_menu_drawings": "Zeichnungen",
+  "drawing_menu_move_to_team": "Ins Team verschieben",
+  "drawing_menu_excalidraw_links": "Excalidraw-Links",
+  "drawing_saving": "Speichern…",
+  "drawing_saved": "Gespeichert",
+  "drawing_loading": "Zeichnung wird geladen",
+  "drawing_not_found": "Zeichnung nicht gefunden",
+  "drawing_palette_title": "Diese Zeichnung",
+  "drawing_trashed_purge_today": "Diese Zeichnung wird heute endgültig gelöscht.",
+  "drawing_trashed_purge_in": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "Diese Zeichnung wird in {count} Tag endgültig gelöscht.",
+        "countPlural=*": "Diese Zeichnung wird in {count} Tagen endgültig gelöscht."
+      }
+    }
+  ],
+  "drawing_trashed_by": "Von {name} in den Papierkorb verschoben",
+  "drawing_trashed_restore": "Wiederherstellen",
+  "drawing_trashed_delete_forever": "Endgültig löschen",
+  "drawing_trashed_delete_title": "Endgültig löschen?",
+  "drawing_trashed_delete_description": "„{name}“ wird endgültig gelöscht. Das kann nicht rückgängig gemacht werden.",
+  "drawing_trashed_delete_folder_contents": "Diese Zeichnung wurde mit ihrem Ordner in den Papierkorb verschoben. „{folder}“ und der Inhalt ({contents}) werden endgültig gelöscht. Das kann nicht rückgängig gemacht werden.",
+  "drawing_trashed_delete_folder": "Diese Zeichnung wurde mit ihrem Ordner in den Papierkorb verschoben. Der Ordner wird mit seinem gesamten Inhalt endgültig gelöscht. Das kann nicht rückgängig gemacht werden.",
+  "drawing_trashed_deleting": "Wird gelöscht…",
+  "drawing_edit_not_open": "Dieser Vorschlag ist nicht mehr offen",
+  "drawing_edit_nothing_changed": "Es wurde nichts geändert.",
+  "drawing_edit_stale": "Die Zeichnung hat sich geändert, bevor du das anwenden konntest",
+  "drawing_edit_stale_description": "Es wurde nichts geändert. Bitte deinen KI-Client, es erneut zu versuchen.",
+  "drawing_edit_discard": "Verwerfen",
+  "drawing_edit_applying": "Wird angewendet…",
+  "drawing_edit_apply": "Anwenden",
+  "drawing_edit_title": "{client} schlägt eine Änderung vor",
+  "drawing_edit_label": "Vorgeschlagene Änderung",
+  "drawing_edit_view_larger_label": "Änderung größer anzeigen",
+  "drawing_edit_view_larger": "Größer anzeigen",
+  "drawing_edit_hint": "Nichts ändert sich, bis du sie anwendest, und du kannst sie rückgängig machen.",
+  "drawing_edit_legend_new": "Neu",
+  "drawing_edit_legend_changed": "Geändert",
+  "drawing_edit_legend_removed": "Entfernt",
+  "collab_live_count": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "{count} Person ist in dieser Zeichnung",
+        "countPlural=*": "{count} Personen sind in dieser Zeichnung"
+      }
+    }
+  ],
+  "collab_live_named": "{name} ist in dieser Zeichnung",
+  "collab_others_here": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "{count} weitere Person hier",
+        "countPlural=*": "{count} weitere Personen hier"
+      }
+    }
+  ],
+  "collab_follow": "{name} folgen",
+  "collab_stop_following": "{name} nicht mehr folgen",
+  "collab_following": "Du folgst {name} – zum Beenden klicken",
+  "collab_reconnecting": "Verbindung wird wiederhergestellt…",
+  "collab_image_cap_title": "Diese Zeichnung kann keine weiteren Bilder aufnehmen",
+  "collab_image_cap_description": "Eine Zeichnung speichert bis zu {size} MB an Bildern. Entferne einige, um weitere hinzuzufügen. Während der Freigabe kann es bis zu einem Tag dauern, bis entfernte Bilder ihren Platz freigeben.",
+  "collab_image_too_large_title": "Dieses Bild ist zu groß zum Speichern",
+  "collab_image_too_large_description": "Bilder bis {size} MB werden mit der Zeichnung gespeichert.",
+  "collab_image_rate_limited_title": "Zu viele Bilder auf einmal",
+  "collab_image_rate_limited_description": "Warte eine Minute und füge das Bild dann erneut hinzu.",
+  "collab_image_invalid_title": "Dieses Bild kann nicht gespeichert werden",
+  "collab_image_invalid_description": "Dateityp oder Daten werden nicht unterstützt.",
+  "collab_image_upload_failed_title": "Dieses Bild konnte nicht gespeichert werden",
+  "collab_image_upload_failed_description": "Prüfe deine Verbindung und füge das Bild dann erneut hinzu.",
+  "library_save_failed": "Die Änderung an der Bibliothek konnte nicht gespeichert werden",
+  "library_error_rate_limited": "Zu viele Änderungen an der Bibliothek. Versuch es in einer Minute noch einmal.",
+  "library_error_item_too_large": "Dieses Element ist zu groß für die Team-Bibliothek. Jedes Element darf bis zu {max} MB groß sein.",
+  "library_error_full": "Die Team-Bibliothek ist voll ({max} MB). Entferne einige Elemente, um neue hinzuzufügen.",
+  "comments_title": "Kommentare",
+  "comments_button_unread": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "Kommentare, {count} ungelesen",
+        "countPlural=*": "Kommentare, {count} ungelesen"
+      }
+    }
+  ],
+  "comments_button_open": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "Kommentare, {count} offen",
+        "countPlural=*": "Kommentare, {count} offen"
+      }
+    }
+  ],
+  "comments_cancel": "Abbrechen",
+  "comments_former_member": "Ehemaliges Mitglied",
+  "comments_author_via": "{name} über {client}",
+  "comments_edited": "bearbeitet",
+  "comments_actions": "Kommentaraktionen",
+  "comments_edit": "Bearbeiten",
+  "comments_delete": "Löschen",
+  "comments_save": "Speichern",
+  "comments_delete_comment": "Kommentar löschen",
+  "comments_delete_description": "Dieser Kommentar wird für alle gelöscht. Das kann nicht rückgängig gemacht werden.",
+  "comments_deleting": "Wird gelöscht…",
+  "comments_resolved_by": "Erledigt von {name}, {ago}",
+  "comments_shape_deleted": "Form gelöscht",
+  "comments_thread_label": "Kommentar",
+  "comments_reopen_thread": "Diskussion wieder öffnen",
+  "comments_resolve_thread": "Diskussion als erledigt markieren",
+  "comments_reopen": "Wieder öffnen",
+  "comments_resolve": "Erledigt",
+  "comments_close_thread": "Diskussion schließen",
+  "comments_reopen_to_reply": "Zum Antworten wieder öffnen",
+  "comments_reply": "Antworten",
+  "comments_placing_hint": "Klicke auf eine Stelle oder Form, um zu kommentieren. Esc zum Abbrechen.",
+  "comments_add_placeholder": "Kommentar hinzufügen",
+  "comments_submit": "Kommentieren",
+  "comments_pin_label": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "Kommentar von {name}, {count} Kommentar",
+        "countPlural=*": "Kommentar von {name}, {count} Kommentare"
+      }
+    }
+  ],
+  "comments_pin_resolved": "erledigt",
+  "comments_pin_unread": "ungelesen",
+  "comments_close_panel": "Kommentare schließen",
+  "comments_add": "Kommentieren",
+  "comments_show_resolved": "Erledigte anzeigen",
+  "comments_empty_readonly": "Keine Kommentare.",
+  "comments_empty": "Noch keine Kommentare. Füge einen hinzu, um auf eine Stelle oder Form zu zeigen.",
+  "comments_unread": "Ungelesen",
+  "comments_replies": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "{count} Antwort",
+        "countPlural=*": "{count} Antworten"
+      }
+    }
+  ],
+  "comments_resolved": "Erledigt",
+  "comments_save_failed": "Dein Kommentar wurde nicht gespeichert",
+  "comments_error_empty": "Schreib zuerst einen Kommentar.",
+  "comments_error_too_long": "Kommentare dürfen bis zu {max} Zeichen lang sein.",
+  "comments_error_resolved": "Öffne diesen Thread wieder, um zu antworten.",
+  "comments_error_no_drawing": "Diese Zeichnung ist nicht mehr verfügbar.",
+  "comments_error_no_comment": "Dieser Kommentar ist nicht mehr verfügbar.",
+  "app_tagline": "Das Whiteboard deines Teams, auf deinem Server.",
+  "app_error_title": "Etwas ist schiefgelaufen",
+  "app_error_hint": "Lade die Seite bitte neu",
+  "app_not_found_title": "Seite nicht gefunden",
+  "app_not_found_hint": "Die gesuchte Seite gibt es nicht",
+  "auth_email_label": "E-Mail",
+  "auth_password_label": "Passwort",
+  "auth_new_password_label": "Neues Passwort",
+  "auth_confirm_password_label": "Passwort bestätigen",
+  "auth_email_invalid": "Gib eine gültige E-Mail-Adresse ein",
+  "auth_password_too_short": "Mindestens 8 Zeichen",
+  "auth_passwords_mismatch": "Die Passwörter stimmen nicht überein",
+  "auth_sign_in": "Anmelden",
+  "auth_signing_in": "Anmeldung...",
+  "auth_sso_continue": "Weiter mit {provider}",
+  "auth_sso_redirecting": "Weiterleitung...",
+  "auth_sso_failed": "Anmeldung konnte nicht gestartet werden",
+  "auth_or": "oder",
+  "auth_login_title": "Willkommen zurück",
+  "auth_login_subtitle": "Melde dich bei deinem Excaliself-Konto an",
+  "auth_login_sso_no_account": "Für diese E-Mail-Adresse gibt es kein Konto. Bitte deinen Admin um eine Einladung.",
+  "auth_login_sso_not_linked": "Es gibt bereits ein Konto mit dieser E-Mail-Adresse. Melde dich mit deinem Passwort an.",
+  "auth_login_failed": "Anmeldung fehlgeschlagen. Versuch es noch einmal.",
+  "auth_login_new_sso": "Neu hier? Melde dich mit deinem {domains}-Konto an oder bitte um eine Einladung.",
+  "auth_login_invite_only": "Auf dieser Instanz ist die Registrierung nur mit Einladung möglich",
+  "auth_login_forgot": "Passwort vergessen? Bitte deinen Admin, es zurückzusetzen.",
+  "auth_setup_title": "Richte deine Instanz ein",
+  "auth_setup_subtitle": "Lege das Admin-Konto an, um loszulegen",
+  "auth_setup_submit": "Admin anlegen und starten",
+  "auth_setup_submitting": "Wird angelegt...",
+  "auth_setup_failed": "Einrichtung fehlgeschlagen",
+  "auth_go_to_sign_in": "Zur Anmeldung",
+  "auth_invite_dead_title": "Dieser Einladungslink ist nicht aktiv",
+  "auth_invite_dead_subtitle": "Dieser Einladungslink ist abgelaufen oder wurde schon verwendet. Bitte die Person, die dich eingeladen hat, um einen neuen Link.",
+  "auth_invite_title_named": "{name} hat dich eingeladen",
+  "auth_invite_title": "Du bist eingeladen",
+  "auth_invite_subtitle": "Erstelle dein Konto",
+  "auth_invite_submit": "Konto erstellen",
+  "auth_invite_submitting": "Konto wird erstellt...",
+  "auth_invite_failed": "Registrierung fehlgeschlagen",
+  "auth_reset_dead_title": "Dieser Link zum Zurücksetzen ist nicht aktiv",
+  "auth_reset_dead_subtitle": "Dieser Link zum Zurücksetzen ist abgelaufen oder wurde schon verwendet. Bitte einen Admin, einen neuen zu erstellen.",
+  "auth_reset_title": "Neues Passwort festlegen",
+  "auth_reset_subtitle": "für {email}",
+  "auth_reset_submit": "Passwort festlegen",
+  "auth_reset_submitting": "Passwort wird festgelegt...",
+  "auth_reset_failed": "Passwort konnte nicht zurückgesetzt werden",
+  "auth_error_wrong_credentials": "Falsche E-Mail-Adresse oder falsches Passwort",
+  "auth_error_user_exists": "Mit dieser E-Mail-Adresse gibt es schon ein Konto. Verwende eine andere.",
+  "auth_error_password_too_short": "Das Passwort ist zu kurz. Verwende mindestens 8 Zeichen.",
+  "auth_error_password_too_long": "Das Passwort ist zu lang. Verwende höchstens 128 Zeichen.",
+  "auth_error_no_password": "Dieses Konto hat noch kein Passwort. Bitte einen Admin um einen Link zum Zurücksetzen, um eins festzulegen.",
+  "auth_error_session_expired": "Deine Sitzung ist abgelaufen. Melde dich erneut an und versuch es dann noch einmal.",
+  "auth_error_invalid_token": "Dieser Link ist ungültig oder abgelaufen.",
+  "auth_error_rate_limited": "Zu viele Versuche. Versuch es in einer Minute noch einmal.",
+  "auth_invite_error_invalid_link": "Ungültiger oder abgelaufener Einladungslink",
+  "auth_reset_error_invalid_link": "Ungültiger oder abgelaufener Link zum Zurücksetzen",
+  "oauth_page_title": "App verbinden",
+  "oauth_invalid_title": "Diese App kann nicht verbunden werden",
+  "oauth_unknown_client": "Diese App ist nicht bei Excaliself registriert. Füge sie erneut hinzu.",
+  "oauth_unknown_redirect": "Diese App möchte zu einer Adresse zurückkehren, die sie nicht registriert hat.",
+  "oauth_go_home": "Zu Excaliself",
+  "oauth_title": "{client} verbinden",
+  "oauth_subtitle": "mit deinem Excaliself-Konto",
+  "oauth_signed_in_as": "Angemeldet als",
+  "oauth_can_intro": "{client} handelt in deinem Namen. Es kann:",
+  "oauth_can_see": "Die Zeichnungen und Ordner sehen, die du siehst",
+  "oauth_can_create": "Neue Zeichnungen und Ordner erstellen",
+  "oauth_can_propose": "Änderungen an Zeichnungen vorschlagen, die du übernimmst oder verwirfst",
+  "oauth_can_move": "Zeichnungen zwischen Ordnern verschieben",
+  "oauth_can_trash": "Zeichnungen und Ordner in den Papierkorb verschieben",
+  "oauth_cannot": "Es kann keine Zeichnung ohne deine Zustimmung ändern und nichts endgültig löschen",
+  "oauth_cancel": "Abbrechen",
+  "oauth_allow": "Zulassen",
+  "oauth_allowing": "Wird zugelassen…",
+  "oauth_connect_failed": "Verbindung fehlgeschlagen",
+  "oauth_return_note": "Danach geht es zurück zu {#em}{host}{/em}. Du kannst die Verbindung jederzeit in den Einstellungen unter MCP trennen.",
+  "oauth_returning_title": "Zurück zur App",
+  "oauth_returning_subtitle": "Einen Moment",
+  "guest_loading": "Zeichnung wird geladen",
+  "guest_go_home": "Zu Excaliself",
+  "guest_try_again": "Erneut versuchen",
+  "guest_dead_title": "Dieser Link ist nicht mehr aktiv",
+  "guest_dead_subtitle": "Der Eigentümer der Zeichnung hat ihn vielleicht deaktiviert oder ersetzt.",
+  "guest_damaged_title": "Diese Zeichnung kann nicht geöffnet werden",
+  "guest_damaged_subtitle": "Die gespeicherten Daten sind beschädigt, daher kann sie nicht live bearbeitet werden. Gib dem Eigentümer der Zeichnung Bescheid.",
+  "guest_full_title": "Diese Zeichnung ist voll besetzt",
+  "guest_full_subtitle": "Gerade bearbeiten zu viele Personen sie. Versuch es in ein paar Minuten noch einmal.",
+  "guest_throttled_title": "Zu viele Versuche",
+  "guest_throttled_subtitle": "Aus diesem Netzwerk wurden gerade sehr viele Links geöffnet. Versuch es in einer Minute noch einmal.",
+  "guest_made_with": "Erstellt mit Excaliself",
+  "guest_sign_in": "Anmelden",
+  "guest_your_name": "Dein Name",
+  "guest_shared": "Geteilt",
+  "guest_excalidraw_links": "Excalidraw-Links",
+  "guest_gate_title": "Melde dich an, um diese Zeichnung zu öffnen",
+  "guest_gate_subtitle": "„{name}“ ist für Mitglieder dieser Instanz freigegeben",
+  "guest_gate_return": "Nach der Anmeldung kommst du direkt zur Zeichnung zurück.",
+  "offline_title": "Offline-Zeichnungen",
+  "offline_back": "Zurück zu Excaliself",
+  "offline_opening": "Offline-Zeichnungen werden geöffnet…",
+  "offline_needs_https": "Offline-Zeichnungen benötigen HTTPS oder localhost.",
+  "offline_turned_off": "Offline-Zeichnungen sind in diesem Browser ausgeschaltet. Schalte sie in den Einstellungen ein.",
+  "offline_storage_unavailable": "Der Speicher dieses Browsers ist nicht verfügbar.",
+  "offline_sign_in_first": "Melde dich an und öffne Excaliself in diesem Browser, um Offline-Zeichnungen zu nutzen.",
+  "offline_new_name": "Name der neuen Zeichnung",
+  "offline_create": "Zeichnung erstellen",
+  "offline_create_failed": "Auf diesem Gerät konnte keine Zeichnung erstellt werden",
+  "offline_list_label": "Zeichnungen auf diesem Gerät",
+  "offline_pick": "Öffne eine Zeichnung von diesem Gerät oder erstelle eine neue.",
+  "offline_reading_list": "Zeichnungen auf diesem Gerät werden gelesen…",
+  "offline_reading_drawing": "Diese Zeichnung wird von diesem Gerät gelesen…",
+  "offline_not_here": "Diese Zeichnung ist auf diesem Gerät nicht verfügbar.",
+  "offline_status_corrupt": "Diese Zeichnung konnte nicht geöffnet werden",
+  "offline_status_write_failed": "Speichern auf diesem Gerät fehlgeschlagen",
+  "offline_status_waiting": "Auf diesem Gerät gespeichert · wartet auf Synchronisierung",
+  "offline_status_synced": "Synchronisiert",
+  "offline_switch_failed_title": "Diese Zeichnung konnte nicht auf diesem Gerät gespeichert werden",
+  "offline_switch_failed_description": "Deine letzte Änderung ist nur in diesem Tab vorhanden.",
+  "offline_switch_anyway": "Trotzdem wechseln",
+  "offline_copied_title": "„{name}“ wurde woanders geändert",
+  "offline_copied_description": "Deine Offline-Änderungen sind als „{copyName}“ gespeichert.",
+  "offline_copy_label": "Offline-Kopie",
+  "offline_images_refused_title": "Einige Bilder in „{name}“ wurden nicht gespeichert",
+  "offline_images_refused_description": "Sie waren zu groß, um mit der Zeichnung gespeichert zu werden.",
+  "settings_offline_title": "Offline-Zeichnungen (Beta)",
+  "settings_offline_label": "Private Zeichnungen auf diesem Gerät behalten",
+  "settings_offline_hint": "Öffne und bearbeite sie, wenn diese Instanz nicht erreichbar ist. Deine Änderungen werden synchronisiert, sobald du wieder online bist. Gilt nur für diesen Browser.",
+  "settings_offline_turn_on": "Einschalten",
+  "settings_offline_turn_off": "Ausschalten",
+  "settings_offline_pending": "Einige Änderungen auf diesem Gerät sind noch nicht synchronisiert. Stelle die Verbindung zu dieser Instanz wieder her und versuche es erneut.",
+  "settings_offline_open": "Eine Zeichnung ist in einem anderen Tab geöffnet. Schließe sie und versuche es erneut.",
+  "settings_offline_failed": "Offline-Zeichnungen konnten nicht geändert werden"
+}

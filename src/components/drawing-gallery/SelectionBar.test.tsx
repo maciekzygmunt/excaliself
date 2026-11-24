@@ -17,6 +17,7 @@ vi.mock("@/features/collab/server", () => ({
 vi.mock("@/features/drawings/server", () => ({
   getDrawingScene: vi.fn(async () => "{}"),
   setDrawingStarred: vi.fn(),
+  duplicateDrawing: vi.fn(),
   updateDrawing: vi.fn(),
 }))
 vi.mock("@/features/drawings/bulk-server", () => ({
@@ -36,6 +37,8 @@ vi.mock("@/features/folders/server", () => ({
 }))
 vi.mock("./preview", () => ({ renderPreviewSvg: vi.fn(async () => null) }))
 vi.mock("@tanstack/react-router", () => ({
+  // The card menu's Duplicate toast opens the copy
+  useNavigate: () => vi.fn(),
   Link: ({
     to: _to,
     params,

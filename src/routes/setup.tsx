@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { FieldGroup } from "@/components/ui/field"
 import { getUserCount, setupAdmin } from "@/features/admin/server"
 import { setupFieldsSchema } from "@/features/auth/schema"
+import { m } from "@/paraglide/messages"
 
 export const Route = createFileRoute("/setup")({
   beforeLoad: async () => {
@@ -27,7 +28,7 @@ function SetupPage() {
         // cookie rides back on this same request.
         await setupAdmin({ data: value })
       } catch (err) {
-        toast.error(err instanceof Error ? err.message : "Setup failed")
+        toast.error(err instanceof Error ? err.message : m.auth_setup_failed())
         return
       }
       navigate({ to: "/" })
@@ -35,10 +36,7 @@ function SetupPage() {
   })
 
   return (
-    <AuthPage
-      title="Set up your instance"
-      subtitle="Create the admin account to get started"
-    >
+    <AuthPage title={m.auth_setup_title()} subtitle={m.auth_setup_subtitle()}>
       <form
         onSubmit={(e) => {
           e.preventDefault()
@@ -52,7 +50,7 @@ function SetupPage() {
             children={(field) => (
               <FormTextField
                 field={field}
-                label="Email"
+                label={m.auth_email_label()}
                 type="email"
                 placeholder="admin@company.com"
                 autoComplete="email"
@@ -65,7 +63,7 @@ function SetupPage() {
             children={(field) => (
               <FormTextField
                 field={field}
-                label="Password"
+                label={m.auth_password_label()}
                 type="password"
                 placeholder="••••••••••"
                 autoComplete="new-password"
@@ -79,7 +77,7 @@ function SetupPage() {
         >
           {([canSubmit, isSubmitting]) => (
             <Button type="submit" className="w-full" disabled={!canSubmit}>
-              {isSubmitting ? "Creating..." : "Create admin & start"}
+              {isSubmitting ? m.auth_setup_submitting() : m.auth_setup_submit()}
             </Button>
           )}
         </form.Subscribe>

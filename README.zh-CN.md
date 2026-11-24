@@ -56,7 +56,7 @@ docker run --rm -p 127.0.0.1:3000:3000 -e PREVIEW_MODE=true ghcr.io/maciekzygmun
 
 ## 部署
 
-下面两种部署方式都会通过一份 Compose 配置同时启动应用和 PostgreSQL 数据库，并拉取预先构建好的镜像 `ghcr.io/maciekzygmunt/excaliself`（支持 amd64 和 arm64），无需在服务器上自行构建。`latest` 标签对应最新发布版本。应用会在启动时自动执行数据库迁移，更新时拉取新镜像并重新部署即可。
+Docker Compose 和 Coolify 两种部署方式都会通过一份 Compose 配置同时启动应用和 PostgreSQL 数据库，并拉取预先构建好的镜像 `ghcr.io/maciekzygmunt/excaliself`（支持 amd64 和 arm64），无需在服务器上自行构建。`latest` 标签对应最新发布版本。应用会在启动时自动执行数据库迁移，更新时拉取新镜像并重新部署即可。
 
 ### Docker Compose
 
@@ -80,6 +80,14 @@ docker compose up -d
 
 Coolify 会创建数据库、生成密钥并分配域名，因此不需要额外配置。如果服务器尚未配置通配符域名，请先为 `excaliself` 服务配置域名，并在地址中注明容器端口，例如 `https://draw.example.com:3000`。访问该地址后即可创建管理员账号。若要使用指定版本而不是 `latest`，请在资源的环境变量中设置 `EXCALISELF_VERSION`（例如 `1.0.0`）。绘图保存在 `pgdata` 数据卷中，重新部署后仍会保留。
 
+### 应用商店
+
+- **TrueNAS**：在 **Apps** 中搜索 Excaliself（位于 **community** train 中）。将 **App URL** 设为你访问应用时使用的地址。[商店页面](https://apps.truenas.com/catalog/excaliself_community/)。
+- **Unraid**：在 **Apps** 中搜索 Excaliself，并先安装 **postgresql17**。[商店页面](https://ca.unraid.net/apps/excaliself-1ulvvg01m0exfg)。
+- **Portainer**：已收录在 [Portainer Templates](https://portainer-templates.as93.net/excaliself) 列表中。
+
+各项需要填写的字段请参阅[英文文档](https://excaliself.com/docs/app-stores/)。
+
 ### 配置
 
 使用 Docker Compose 时，以下环境变量从 `.env` 文件读取；使用 Coolify 时，由 Coolify 自动设置。
@@ -92,6 +100,7 @@ Coolify 会创建数据库、生成密钥并分配域名，因此不需要额外
 | `EXCALISELF_VERSION`                                             | 否                               | 镜像标签：默认 `latest`，也可使用 `1.0.0`、`1.0` 或 `main` 等标签                                                                                                                                                                                                                                                                                                                               |
 | `EXCALISELF_PORT`                                                | 否                               | 应用在宿主机上的监听端口，默认为 `3000`。设为 `127.0.0.1:3000` 可限制为仅本机可访问，供本机反向代理转发请求                                                                                                                                                                                                                                                                                         |
 | `POSTGRES_USER`、`POSTGRES_DB`                                 | 否                               | 配套 PostgreSQL 数据库的用户名和数据库名，默认均为 `excaliself`                                                                                                                                                                                                                                                                                                                                       |
+| `IMAGE_UPLOADS_PER_MINUTE` | 否 | 每个实时绘图中每个 IP 每分钟可上传的图片数，默认为 `30`，参阅[英文环境变量文档](https://excaliself.com/docs/environment/#limits) |
 | `GOOGLE_*`、`MICROSOFT_*`、`OIDC_*`、`SSO_ALLOWED_DOMAINS` | 否                               | 单点登录配置，参阅[英文单点登录文档](https://excaliself.com/docs/single-sign-on/)                                                                                                                                                                                                                                                                                                                        |
 | `PREVIEW_MODE`                                                   | 否                               | 设为 `true` 时启动用于预览拉取请求（PR）的临时环境，使用内存中的 PGlite 代替 PostgreSQL，并预置管理员账号和示例绘图。该模式不使用 `DATABASE_URL` 和 `BASE_URL`，`BETTER_AUTH_SECRET` 可以省略。`/preview/login` 以管理员身份登录（`admin@example.com` / `preview-password`）；`/preview/login?account=new` 以新成员身份登录。重启后数据会丢失。参阅 [PR 预览说明](./docs/pr-previews.md) |
 | `PREVIEW_HOSTS`                                                  | 使用预览模式且通过域名访问时必需 | 预览环境允许访问的主机名，多个值以逗号分隔，例如 `*.draw.example.com`。使用其他主机名访问时无法通过身份验证；`localhost` 始终允许访问                                                                                                                                                                                                                                                               |

@@ -1,9 +1,10 @@
 import { cn } from "@/lib/utils"
+import { m } from "@/paraglide/messages"
 
 type Props = { name: string; className?: string }
 
 export function GuestTitle({ name, className }: Props) {
-  const label = name || "Untitled Drawing"
+  const label = name || m.drawings_untitled()
   return (
     <div
       className={cn(
@@ -17,7 +18,9 @@ export function GuestTitle({ name, className }: Props) {
       >
         {label}
       </span>
-      <span className="shrink-0 text-xs text-(--color-gray-60)">Shared</span>
+      <span className="shrink-0 text-xs text-(--color-gray-60)">
+        {m.guest_shared()}
+      </span>
     </div>
   )
 }

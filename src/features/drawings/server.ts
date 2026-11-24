@@ -6,13 +6,15 @@ import { z } from "zod"
 import { db } from "@/db"
 import { drawingFiles, drawings, spaces, stars } from "@/db/schema"
 import { userDisplayName } from "@/features/account/display-name"
-import { endTrashedRooms } from "@/features/collab/room-registry"
+import { endTrashedRooms, rooms } from "@/features/collab/room-registry"
+import { roomElements } from "@/features/collab/room-session"
 import { accessibleTo } from "@/features/spaces/access"
 import { restoreDrawingUnit } from "@/features/trash/restore"
 import { trashDrawingUnit } from "@/features/trash/trash"
 import { authMiddleware } from "@/middleware/auth"
 import { listsChangedMiddleware } from "@/middleware/lists-changed"
 import { insertDrawing } from "./create"
+import { copyDrawing } from "./duplicate"
 import { bytesToDataUrl } from "./file-bytes"
 import { listDrawings } from "./list"
 import { drawingColumns, MAX_NAME_LENGTH } from "./list-columns"
@@ -93,6 +95,20 @@ export const createDrawing = createServerFn({ method: "POST" })
     })
     return id
   })
+
+/** The "Duplicate" menu action: a copy next to the drawing, named "… (copy)". */
+export const duplicateDrawing = createServerFn({ method: "POST" })
+  .middleware([authMiddleware, listsChangedMiddleware])
+  .validator(z.string())
+  .handler(async ({ data: id, context }) =>
+    copyDrawing(
+      db,
+      context.session.user.id,
+      id,
+      // A live Room holds newer edits than the stored scene
+      await roomElements(rooms, id),
+    ),
+  )
 
 /** One .excalidraw file dropped on the sidebar, as a new drawing. */
 export const importDrawingFile = createServerFn({ method: "POST" })

@@ -9,6 +9,7 @@ import {
 } from "@testing-library/react"
 import { afterEach, beforeEach, expect, test, vi } from "vitest"
 import { renderPreviewSvg } from "@/components/drawing-gallery/preview"
+import type { Space } from "@/db/schema"
 import type { Drawing } from "@/features/drawings/queries"
 import { drawingsQueryOptions } from "@/features/drawings/queries"
 import { getDrawings } from "@/features/drawings/server"
@@ -16,12 +17,21 @@ import type { Folder } from "@/features/folders/queries"
 import { foldersQueryOptions } from "@/features/folders/queries"
 import { FolderPage } from "./FolderPage"
 
-const { openCreateDrawingDialog, openCreateFolderDialog, navigate } =
-  vi.hoisted(() => ({
-    openCreateDrawingDialog: vi.fn(),
-    openCreateFolderDialog: vi.fn(),
-    navigate: vi.fn(),
-  }))
+const {
+  openCreateDrawingDialog,
+  openCreateFolderDialog,
+  navigate,
+  importFiles,
+} = vi.hoisted(() => ({
+  openCreateDrawingDialog: vi.fn(),
+  openCreateFolderDialog: vi.fn(),
+  navigate: vi.fn(),
+  importFiles: vi.fn(),
+}))
+
+vi.mock("@/features/drawings/import-files", () => ({
+  useImportDrawingFiles: () => importFiles,
+}))
 
 // Cards and rows poll for live sessions (spec §1.5); these tests are not
 // about the badge, so the poll answers "nobody".
@@ -73,10 +83,11 @@ vi.mock("@/features/drawings/server", () => ({
   getDrawingScene: vi.fn(async () => "{}"),
   getDrawings: vi.fn(),
   getDrawingWithFiles: vi.fn(),
-  // The gallery card menu (trash, star, rename) binds these
+  // The gallery card menu (trash, star, rename, duplicate) binds these
   trashDrawing: vi.fn(),
   restoreDrawing: vi.fn(),
   setDrawingStarred: vi.fn(),
+  duplicateDrawing: vi.fn(),
   updateDrawing: vi.fn(),
 }))
 
@@ -114,11 +125,15 @@ function makeDrawing(overrides: Partial<Drawing> & { id: string }): Drawing {
   }
 }
 
-function makeFolder(id: string, name: string): Folder {
+function makeFolder(
+  id: string,
+  name: string,
+  space: Space = "private",
+): Folder {
   return {
     id,
     name,
-    space: "private",
+    space,
     createdBy: "user-1",
     deletedBy: null,
     parentId: null,
@@ -292,6 +307,22 @@ test("a folder deleted while the page is open lands on /drawings", async () => {
   )
   // No error screen, no ghost content
   expect(screen.queryByRole("heading")).toBeNull()
+})
+
+test("files dropped on the folder grid import into that folder", () => {
+  renderFolderPage({
+    folders: [makeFolder("f1", "Projects", "team")],
+  })
+
+  const file = new File(["{}"], "Plan.excalidraw")
+  fireEvent.drop(screen.getByRole("heading", { name: "Projects" }), {
+    dataTransfer: { types: ["Files"], files: [file] },
+  })
+
+  expect(importFiles).toHaveBeenCalledWith([file], {
+    folderId: "f1",
+    space: "team",
+  })
 })
 
 test("loading holds the grid with the delayed skeleton, not a spinner", () => {

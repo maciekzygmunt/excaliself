@@ -75,6 +75,8 @@ export const env = createEnv({
     // Where the Excalidraw+ import calls the public API. Override it only to
     // test against a fake server.
     EXCALIDRAW_PLUS_API_URL: z.url().default("https://api.excalidraw.com"),
+    // Image uploads per minute, per IP, in each live drawing.
+    IMAGE_UPLOADS_PER_MINUTE: z.coerce.number().int().positive().default(30),
   },
   clientPrefix: "VITE_",
   client: {

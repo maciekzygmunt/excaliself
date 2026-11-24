@@ -1,5 +1,7 @@
-import { expect, test } from "vitest"
+import { expect, test, vi } from "vitest"
 import { allowImageUpload, IMAGE_UPLOADS_PER_MINUTE } from "./upload-rate-limit"
+
+vi.mock("@/env", () => ({ env: { IMAGE_UPLOADS_PER_MINUTE: 30 } }))
 
 // The limiter is process-wide on purpose, so each test uses an address and a
 // room of its own rather than resetting it.

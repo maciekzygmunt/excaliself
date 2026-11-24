@@ -53,3 +53,23 @@ test("TRUSTED_ORIGINS refuses a value that is not an http(s) URL", async () => {
   vi.spyOn(console, "error").mockImplementation(() => {})
   await expect(import("./env")).rejects.toThrow("Invalid environment variables")
 })
+
+test("IMAGE_UPLOADS_PER_MINUTE defaults to 30 and reads an override", async () => {
+  vi.stubEnv("PREVIEW_MODE", "true")
+  expect((await import("./env")).env.IMAGE_UPLOADS_PER_MINUTE).toBe(30)
+  vi.resetModules()
+  vi.stubEnv("IMAGE_UPLOADS_PER_MINUTE", "60")
+  expect((await import("./env")).env.IMAGE_UPLOADS_PER_MINUTE).toBe(60)
+})
+
+test.each(["0", "-1", "3.5", "many"])(
+  "IMAGE_UPLOADS_PER_MINUTE refuses %s",
+  async (value) => {
+    vi.stubEnv("PREVIEW_MODE", "true")
+    vi.stubEnv("IMAGE_UPLOADS_PER_MINUTE", value)
+    vi.spyOn(console, "error").mockImplementation(() => {})
+    await expect(import("./env")).rejects.toThrow(
+      "Invalid environment variables",
+    )
+  },
+)

@@ -4,14 +4,15 @@ import type { BinaryFileData } from "@excalidraw/excalidraw/types"
 import { parseFilePayload, type RoomFileUpload } from "./room-files"
 import { type RoomPath, roomFileUrl } from "./room-url"
 
-// Statuses about the image itself; a 401/5xx/network error must not mark it broken.
-const IMAGE_VERDICTS = new Set([400, 413, 429])
-
 export type UploadOutcome =
   | "stored"
-  /** 400/413/429: final, the image shows as errored. */
-  | "refused"
-  /** 409: the drawing's image cap is full. Final, like `refused`. */
+  /** 413: image payload exceeds max allowed size. Final. */
+  | "too-large"
+  /** 429: upload rate limit reached. Final. */
+  | "rate-limited"
+  /** 400: malformed payload or unsupported mime type. Final. */
+  | "invalid"
+  /** 409: the drawing's image cap is full. Final. */
   | "full"
   /** No verdict on the image (network, 5xx, 401); retryable. */
   | "failed"
@@ -27,8 +28,11 @@ export async function uploadRoomFile(
       body: JSON.stringify({ dataUrl: file.dataUrl }),
     })
     if (response.ok) return "stored"
+    if (response.status === 413) return "too-large"
+    if (response.status === 429) return "rate-limited"
+    if (response.status === 400) return "invalid"
     if (response.status === 409) return "full"
-    return IMAGE_VERDICTS.has(response.status) ? "refused" : "failed"
+    return "failed"
   } catch {
     return "failed"
   }

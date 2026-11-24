@@ -7,11 +7,12 @@ import {
 } from "@/components/ui/sidebar"
 import type { SpaceSearch } from "@/features/spaces/browse"
 import { cn } from "@/lib/utils"
+import { m } from "@/paraglide/messages"
 import { useActiveSpace } from "../ActiveSpace"
 
 const items = [
-  { to: "/draw", label: "Home", icon: House },
-  { to: "/drawings", label: "All drawings", icon: LayoutGrid },
+  { to: "/draw", label: m.sidebar_home, icon: House },
+  { to: "/drawings", label: m.sidebar_all_drawings, icon: LayoutGrid },
 ] as const
 
 /** Home and All drawings, scoped to the sidebar's active space. */
@@ -24,7 +25,7 @@ export function SidebarNav() {
           key={to}
           to={to}
           search={activeSpace ? { space: activeSpace } : undefined}
-          label={label}
+          label={label()}
           icon={icon}
         />
       ))}

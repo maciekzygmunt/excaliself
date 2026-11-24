@@ -30,17 +30,30 @@ export type Anchor =
 
 type Person = { name: string; initials: string; image: string | null }
 
-/** Thrown for a missing body or one past {@link MAX_COMMENT_LENGTH}. */
-export class InvalidComment extends Error {}
+const REFUSALS = {
+  empty: "Write a comment first.",
+  "too-long": `Comments can be up to ${MAX_COMMENT_LENGTH} characters.`,
+  resolved: "Reopen this thread to reply.",
+  "no-drawing": "Drawing not found",
+  "no-comment": "Comment not found",
+}
+
+/**
+ * A read or write the store refused. The message is English for MCP; the
+ * app's server functions translate `reason` (see `server.ts`).
+ */
+export class CommentRefused extends Error {
+  constructor(readonly reason: keyof typeof REFUSALS) {
+    super(REFUSALS[reason])
+  }
+}
 
 /** The body as stored: trimmed, and checked against the limit. */
 export function commentBody(body: string): string {
   const trimmed = body.trim()
-  if (!trimmed) throw new InvalidComment("Write a comment first.")
+  if (!trimmed) throw new CommentRefused("empty")
   if ([...trimmed].length > MAX_COMMENT_LENGTH)
-    throw new InvalidComment(
-      `Comments can be up to ${MAX_COMMENT_LENGTH} characters.`,
-    )
+    throw new CommentRefused("too-long")
   return trimmed
 }
 
@@ -72,7 +85,7 @@ async function findDrawing(
         forWrite ? isNull(drawings.deletedAt) : undefined,
       ),
     )
-  if (!drawing) throw new Error("Drawing not found")
+  if (!drawing) throw new CommentRefused("no-drawing")
 }
 
 /** A thread on an untrashed drawing `userId` can see. */
@@ -92,7 +105,7 @@ async function findWritableThread(db: Db, userId: string, threadId: string) {
         isNull(drawings.deletedAt),
       ),
     )
-  if (!thread) throw new Error("Comment not found")
+  if (!thread) throw new CommentRefused("no-comment")
   return thread
 }
 
@@ -122,7 +135,7 @@ async function findOwnComment(db: Db, userId: string, commentId: string) {
         isNull(drawings.deletedAt),
       ),
     )
-  if (!comment) throw new Error("Comment not found")
+  if (!comment) throw new CommentRefused("no-comment")
   return comment
 }
 
@@ -252,8 +265,8 @@ export async function addReply(
   const now = new Date()
   await db.transaction(async (tx) => {
     const [locked] = await lockThread(tx, thread.id)
-    if (!locked) throw new Error("Comment not found")
-    if (locked.resolvedAt) throw new Error("Reopen this thread to reply.")
+    if (!locked) throw new CommentRefused("no-comment")
+    if (locked.resolvedAt) throw new CommentRefused("resolved")
     await tx.insert(comments).values({
       id: randomUUID(),
       threadId: thread.id,
@@ -341,7 +354,7 @@ export async function markRead(
     .from(commentThreads)
     .innerJoin(drawings, eq(drawings.id, commentThreads.drawingId))
     .where(and(eq(commentThreads.id, threadId), accessibleTo(drawings, userId)))
-  if (!thread) throw new Error("Comment not found")
+  if (!thread) throw new CommentRefused("no-comment")
   const readAt = new Date()
   await db
     .insert(commentReads)

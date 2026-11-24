@@ -10,6 +10,7 @@ import {
 import { useLiveDrawing } from "@/features/collab/queries"
 import { useToggleStarDrawing } from "@/features/drawings/mutations"
 import { cn } from "@/lib/utils"
+import { m } from "@/paraglide/messages"
 import type { Drawing } from "./tree"
 
 // Renders nothing until the first star exists — the section never shows empty.
@@ -21,7 +22,7 @@ export function StarredSection({ drawings }: { drawings: Drawing[] }) {
     <div className="pt-1">
       <div className="pt-1 pb-0.5 pl-4">
         <span className="text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground/60">
-          Starred
+          {m.sidebar_starred()}
         </span>
       </div>
       <SidebarMenu className="gap-0 px-2">
@@ -67,7 +68,7 @@ function StarredItem({ drawing }: { drawing: Drawing }) {
       </SidebarMenuButton>
 
       <SidebarMenuAction
-        aria-label={`Unstar ${drawing.name}`}
+        aria-label={m.sidebar_unstar_named({ name: drawing.name })}
         className="text-muted-foreground/30 md:opacity-0 group-hover/starred-row:opacity-100 group-focus-within/starred-row:opacity-100 [&>svg]:size-auto"
         onClick={() =>
           starMutation.mutate({ data: { id: drawing.id, starred: false } })

@@ -16,6 +16,7 @@ import {
   resetPasswordWithToken,
   validatePasswordReset,
 } from "@/features/password-resets/server"
+import { m } from "@/paraglide/messages"
 
 export const Route = createFileRoute("/reset-password")({
   validateSearch: (search: Record<string, unknown>) => ({
@@ -40,15 +41,15 @@ function ResetPasswordPage() {
 function DeadResetPage() {
   return (
     <AuthPage
-      title="This reset link isn't active"
-      subtitle="This reset link has expired or was already used. Ask an admin to generate a new one."
+      title={m.auth_reset_dead_title()}
+      subtitle={m.auth_reset_dead_subtitle()}
     >
       <Button
         render={<Link to="/login" />}
         nativeButton={false}
         className="w-full"
       >
-        Go to sign in
+        {m.auth_go_to_sign_in()}
       </Button>
     </AuthPage>
   )
@@ -66,7 +67,7 @@ function SetNewPasswordPage({ email }: { email: string }) {
     mutationFn: resetPasswordWithToken,
     onSuccess: () => navigate({ to: "/" }),
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Password reset failed")
+      toast.error(err instanceof Error ? err.message : m.auth_reset_failed())
       // The link may have died since the page loaded (revoked, regenerated,
       // or used in another tab) — revalidate so a dead link flips to the
       // explanation state instead of leaving a form that can never succeed.
@@ -87,7 +88,10 @@ function SetNewPasswordPage({ email }: { email: string }) {
   })
 
   return (
-    <AuthPage title="Set a new password" subtitle={`for ${email}`}>
+    <AuthPage
+      title={m.auth_reset_title()}
+      subtitle={m.auth_reset_subtitle({ email })}
+    >
       <form
         onSubmit={(e) => {
           e.preventDefault()
@@ -101,7 +105,7 @@ function SetNewPasswordPage({ email }: { email: string }) {
             children={(field) => (
               <FormTextField
                 field={field}
-                label="New password"
+                label={m.auth_new_password_label()}
                 type="password"
                 placeholder="••••••••••"
                 autoComplete="new-password"
@@ -114,7 +118,7 @@ function SetNewPasswordPage({ email }: { email: string }) {
             children={(field) => (
               <FormTextField
                 field={field}
-                label="Confirm password"
+                label={m.auth_confirm_password_label()}
                 type="password"
                 placeholder="••••••••••"
                 autoComplete="new-password"
@@ -128,7 +132,7 @@ function SetNewPasswordPage({ email }: { email: string }) {
         >
           {([canSubmit, isSubmitting]) => (
             <Button type="submit" className="w-full" disabled={!canSubmit}>
-              {isSubmitting ? "Setting password..." : "Set password"}
+              {isSubmitting ? m.auth_reset_submitting() : m.auth_reset_submit()}
             </Button>
           )}
         </form.Subscribe>

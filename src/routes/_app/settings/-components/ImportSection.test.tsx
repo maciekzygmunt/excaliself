@@ -89,12 +89,13 @@ test("imports each new scene and keeps going past a failed one", async () => {
 })
 
 test("stops at once when Excalidraw+ rejects the key", async () => {
-  vi.mocked(importExcalidrawPlusScene).mockRejectedValue(
-    new Error("Excalidraw+ didn't accept this key"),
-  )
+  vi.mocked(importExcalidrawPlusScene).mockResolvedValue({
+    status: "key-rejected",
+  })
 
   await scanAndImport([scene("a"), scene("b")])
 
   expect(importedIds()).toEqual(["a"])
   expect(screen.getByText("Stopped. Imported 0 scenes.")).toBeTruthy()
+  expect(screen.getByText(/Excalidraw\+ didn't accept this key/)).toBeTruthy()
 })

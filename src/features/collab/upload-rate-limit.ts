@@ -3,11 +3,12 @@
  * fetches every image, and the token guards reads.
  */
 
+import { env } from "@/env"
 import { clientIpKey } from "@/lib/client-ip"
 import { processSingleton } from "@/lib/process-singleton"
 import { createRateLimiter } from "@/lib/rate-limit"
 
-export const IMAGE_UPLOADS_PER_MINUTE = 30
+export const IMAGE_UPLOADS_PER_MINUTE = env.IMAGE_UPLOADS_PER_MINUTE
 
 const limiter = processSingleton("room-upload-rate-limit", () =>
   createRateLimiter({ limit: IMAGE_UPLOADS_PER_MINUTE, windowMs: 60_000 }),

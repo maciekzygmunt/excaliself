@@ -3,6 +3,7 @@ import { PanelLeft } from "lucide-react"
 import { KEYCAP_CLASS } from "@/components/ui/button"
 import { useSidebar } from "@/components/ui/sidebar"
 import { cn } from "@/lib/utils"
+import { m } from "@/paraglide/messages"
 
 // Floating panel toggle in the content area's top-left, shown only while the
 // sidebar is collapsed — once it's open, closing is handled from the sidebar
@@ -29,8 +30,8 @@ export function SidebarReopenButton() {
     <button
       type="button"
       onClick={toggleSidebar}
-      aria-label="Open Sidebar"
-      title="Open Sidebar"
+      aria-label={m.sidebar_open()}
+      title={m.sidebar_open()}
       className={cn(
         KEYCAP_CLASS,
         "absolute top-1.5 left-1.5 z-20 flex size-7 items-center justify-center text-muted-foreground transition-[border-color,scale,color] hover:text-foreground",

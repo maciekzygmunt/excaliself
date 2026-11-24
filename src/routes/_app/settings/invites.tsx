@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router"
 import { pendingInvitesQueryOptions } from "@/features/invites/queries"
 import { useDocumentTitle } from "@/lib/document-title"
 import { adminMiddleware } from "@/middleware/admin"
+import { m } from "@/paraglide/messages"
 import { InvitesSection } from "./-components/InvitesSection"
 
 // Admin-only: the middleware guards document requests, and the loader's
@@ -17,6 +18,6 @@ export const Route = createFileRoute("/_app/settings/invites")({
 })
 
 function InvitesPage() {
-  useDocumentTitle("Invites", { chrome: true })
+  useDocumentTitle(m.settings_nav_invites(), { chrome: true })
   return <InvitesSection />
 }

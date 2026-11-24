@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query"
 import { Link } from "@tanstack/react-router"
 import { createClientOnlyFn } from "@tanstack/react-start"
 import {
+  Copy,
   Download,
   Folder as FolderIcon,
   MoreHorizontal,
@@ -32,7 +33,10 @@ import {
 import { UserAvatar } from "@/components/user-avatar"
 import { useLiveDrawing } from "@/features/collab/queries"
 import { exportDrawing } from "@/features/drawings/export"
-import { useToggleStarDrawing } from "@/features/drawings/mutations"
+import {
+  useDuplicateDrawing,
+  useToggleStarDrawing,
+} from "@/features/drawings/mutations"
 import {
   type Drawing,
   drawingSceneQueryOptions,
@@ -42,6 +46,7 @@ import type { MoveItem } from "@/features/spaces/move-to-team"
 import { useDelayedVisible } from "@/hooks/use-delayed-visible"
 import { formatAgo } from "@/lib/relative-time"
 import { cn } from "@/lib/utils"
+import { m } from "@/paraglide/messages"
 import { compareDrawings, DEFAULT_SORT, type SortOrder } from "./browse"
 import { SelectionCheckbox } from "./SelectionCheckbox"
 import { useGallerySelection } from "./selection"
@@ -63,7 +68,7 @@ const DEFAULT_SKELETON_COUNT = 8
 
 // Loaded with the first selection: it brings the bulk mutations along
 const SelectionBar = lazy(() =>
-  import("./SelectionBar").then((m) => ({ default: m.SelectionBar })),
+  import("./SelectionBar").then((mod) => ({ default: mod.SelectionBar })),
 )
 
 // Client-only: @excalidraw/excalidraw is not server-safe, and this keeps it
@@ -340,7 +345,7 @@ function DrawingCard({
  * two never meet. A deleted creator reads "Former member".
  */
 function CreatorAvatar({ creator }: { creator: Drawing["creator"] }) {
-  const name = creator?.name ?? "Former member"
+  const name = creator?.name ?? m.gallery_former_member()
   return (
     <Tooltip>
       {/* z-10 lifts it above the stretched link so hover reaches it */}
@@ -348,7 +353,7 @@ function CreatorAvatar({ creator }: { creator: Drawing["creator"] }) {
         render={
           <span
             role="img"
-            aria-label={`Created by ${name}`}
+            aria-label={m.gallery_created_by({ name })}
             className="relative z-10 shrink-0 rounded-full"
           />
         }
@@ -385,6 +390,7 @@ function CardActions({
 }) {
   const name = drawing.name
   const starMutation = useToggleStarDrawing()
+  const duplicateMutation = useDuplicateDrawing()
   const [renameOpen, setRenameOpen] = useState(false)
 
   return (
@@ -394,7 +400,7 @@ function CardActions({
           render={
             <button
               type="button"
-              aria-label={`Actions for ${name}`}
+              aria-label={m.drawings_actions_for({ name })}
               className="relative z-10 -mr-1.5 shrink-0 rounded-md p-1 text-muted-foreground/50 transition-[color,background-color,opacity] duration-150 hover:bg-accent hover:text-foreground focus-visible:bg-accent focus-visible:text-foreground focus-visible:outline-none pointer-fine:opacity-0 pointer-fine:group-focus-within:opacity-100 pointer-fine:group-hover:opacity-100 pointer-fine:data-popup-open:opacity-100"
             />
           }
@@ -414,22 +420,31 @@ function CardActions({
             ) : (
               <Star className="mr-2 h-4 w-4" />
             )}
-            {drawing.starred ? "Unstar" : "Star"}
+            {drawing.starred
+              ? m.drawings_action_unstar()
+              : m.drawings_action_star()}
           </DropdownMenuItem>
           <DropdownMenuItem onClick={() => setRenameOpen(true)}>
             <Pencil className="mr-2 h-4 w-4" />
-            Rename
+            {m.drawings_action_rename()}
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            // Gallery pages have no open canvas, so nothing to flush
+            onClick={() => duplicateMutation.mutate({ id: drawing.id })}
+          >
+            <Copy className="mr-2 h-4 w-4" />
+            {m.drawings_action_duplicate()}
           </DropdownMenuItem>
           <DropdownMenuItem onClick={() => exportDrawing(drawing)}>
             <Download className="mr-2 h-4 w-4" />
-            Export .excalidraw
+            {m.drawings_action_export()}
           </DropdownMenuItem>
           {onMoveToTeam && (
             <>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={onMoveToTeam}>
                 <Users className="mr-2 h-4 w-4" />
-                Move to Team
+                {m.drawings_action_move_to_team()}
               </DropdownMenuItem>
             </>
           )}
@@ -439,7 +454,7 @@ function CardActions({
             className="text-destructive focus:text-destructive"
           >
             <Trash2 className="mr-2 h-4 w-4" />
-            Move to trash
+            {m.drawings_action_trash()}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -525,7 +540,9 @@ export function Preview({
       <div
         ref={containerRef}
         role="img"
-        aria-label={state === "ready" ? `Preview of ${name}` : undefined}
+        aria-label={
+          state === "ready" ? m.gallery_preview_of({ name }) : undefined
+        }
         // Reduced-motion keeps the fade: opacity-only is already the gentle form.
         //
         // In dark chrome, element colors assume a light canvas (default stroke
@@ -541,7 +558,7 @@ export function Preview({
       {state === "empty" && (
         <div
           role="img"
-          aria-label="No preview"
+          aria-label={m.gallery_no_preview()}
           className="absolute inset-0 flex items-center justify-center"
         >
           <Pencil className="h-5 w-5 text-muted-foreground/30" />

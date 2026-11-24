@@ -67,7 +67,11 @@ test("a too-short new password surfaces inline without hitting the server", asyn
 
 test("a wrong current password shows an inline error and allows a retry", async () => {
   changePassword.mockResolvedValueOnce({
-    error: { message: "Invalid password", status: 400 },
+    error: {
+      code: "INVALID_PASSWORD",
+      message: "Invalid password",
+      status: 400,
+    },
   })
   render(<PasswordSection />)
   fillAndSubmit("wrong-pass")

@@ -1,5 +1,6 @@
 import { Check } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { m } from "@/paraglide/messages"
 
 /**
  * A card's select box, above the stretched link. Hidden until hover or focus
@@ -21,7 +22,7 @@ export function SelectionCheckbox({
       type="button"
       role="checkbox"
       aria-checked={checked}
-      aria-label={`Select ${name}`}
+      aria-label={m.gallery_select({ name })}
       onClick={(event) => onToggle(event.shiftKey)}
       className={cn(
         "pointer-events-auto absolute top-2 left-2 z-10 flex size-5 items-center justify-center rounded-[5px] border transition-[opacity,background-color,border-color] duration-150 outline-none focus-visible:ring-[2px] focus-visible:ring-ring/30",

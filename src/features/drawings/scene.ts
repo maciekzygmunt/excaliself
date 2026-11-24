@@ -12,13 +12,13 @@ import type {
   BinaryFiles,
   ExcalidrawImperativeAPI,
   ExcalidrawInitialDataState,
-  ExcalidrawInitialState,
 } from "@excalidraw/excalidraw/types"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
 import { parseFileUpload } from "@/features/collab/room-files"
 import { drawingShareQueryOptions } from "@/features/shares/queries"
+import { m } from "@/paraglide/messages"
 import { drawingQueryOptions, drawingsQueryOptions } from "./queries"
 import { extractSceneText } from "./search"
 import { saveDrawingScene } from "./server"
@@ -167,21 +167,6 @@ export function buildInitialSceneData(
   }
 }
 
-/**
- * Opens the view on the content, zoomed out to fit beside the editor's UI,
- * but never past 100%. Saved scenes carry no scroll or zoom, so without it
- * the view opens at the origin.
- */
-export function fitToContent(
-  initialData: ExcalidrawInitialDataState,
-): ExcalidrawInitialState | undefined {
-  const elements = getNonDeletedElements(initialData.elements ?? [])
-  if (elements.length === 0) return undefined
-  return {
-    viewport: { target: elements, fit: "scale-down", offsets: { ui: true } },
-  }
-}
-
 export function useDrawingScene(id: string) {
   const { data: drawing } = useQuery(drawingQueryOptions(id))
   const scene = useMemo(
@@ -237,11 +222,10 @@ export function useReloadSceneAfterRoom(
         },
         () => {
           if (cancelled) return
-          toast.error("Couldn't load the latest version of this drawing", {
+          toast.error(m.drawings_reload_failed(), {
             id: `scene-reload:${drawingId}`,
             duration: Number.POSITIVE_INFINITY,
-            description:
-              "Your changes aren't being saved. Reload the page to continue.",
+            description: m.drawings_reload_failed_hint(),
           })
         },
       )

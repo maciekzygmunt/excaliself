@@ -14,6 +14,10 @@ Default label vocabulary: `needs-triage`, `needs-info`, `ready-for-agent`, `read
 
 Single-context layout — one `CONTEXT.md` and `docs/adr/` at the repo root (created lazily by `/domain-modeling`). See `docs/agents/domain.md`.
 
+## UI text
+
+UI text goes through `m.*()` from `@/paraglide/messages`, in all 6 languages (`messages/*.json`), and `pnpm i18n:check` must pass. Rules and a Polish plural example: `docs/agents/i18n.md`.
+
 ## Keep the docs current
 
 User-facing docs live in `landing/src/content/docs/` and publish to `excaliself.com/docs/`.

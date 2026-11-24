@@ -37,7 +37,11 @@ exists.
 
 - A live drawing has 25 seats. One seat is kept for the owner.
 - An image can be up to 2 MB, and a drawing can store up to 20 MB of images.
-  Other people see a placeholder for an image that is refused.
+  Other people see a placeholder for an image that is refused, and you see a
+  message that says why.
+- One IP address can add up to 30 images a minute to a live drawing. A
+  self-hoster can change this with
+  [`IMAGE_UPLOADS_PER_MINUTE`](/docs/environment/#limits).
 - A live drawing holds up to 50,000 elements (deleted ones count) and 20 MB of
   drawing data, not counting images. Past that, new content does not sync or
   save. Changes that do not make the drawing larger still sync.
@@ -45,3 +49,8 @@ exists.
   size of the drawing plus 8 MB. The app reconnects by itself and loads the
   drawing again.
 - Guests do not see the [Team library](/docs/team-library/).
+- In a live drawing, only the drawing elements (shapes, text, arrows, and
+  images) sync and save. Changes to the canvas background color or the grid do
+  not reach others and are not saved: the drawing keeps the background and grid
+  it had before it went live. Team drawings are always live, so this applies to
+  them all the time. A private drawing is live while it has a share link.

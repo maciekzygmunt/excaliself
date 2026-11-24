@@ -1,6 +1,7 @@
 import type { ViewportStatusFrame } from "@excalidraw/excalidraw/types"
 import { useMemo } from "react"
 import type { RoomPresence } from "@/features/collab/use-room"
+import { m } from "@/paraglide/messages"
 
 /**
  * The canvas's `viewportStatusFrame` while following someone: a ring and a
@@ -15,7 +16,7 @@ export function useFollowStatusFrame(
       participant && {
         border: participant.color.background,
         label: {
-          label: `Following ${participant.name} — click to stop`,
+          label: m.collab_following({ name: participant.name }),
           color: "#fff",
           onClick: stopFollowing,
         },

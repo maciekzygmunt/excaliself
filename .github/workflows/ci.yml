@@ -27,6 +27,8 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
+      # Fails on a missing translation, variable or plural form.
+      - run: pnpm i18n:check
       - run: pnpm lint
       - run: pnpm test
       # No build step: the Docker workflow builds the app on every PR and main.

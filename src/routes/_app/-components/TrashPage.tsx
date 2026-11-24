@@ -16,6 +16,7 @@ import {
 } from "@/features/trash/mutations"
 import { trashQueryOptions } from "@/features/trash/queries"
 import { useDocumentTitle } from "@/lib/document-title"
+import { m } from "@/paraglide/messages"
 import {
   type PaletteContextSection,
   usePaletteContextSection,
@@ -35,7 +36,7 @@ export function TrashPage() {
   const restoreFolder = useRestoreTrashedFolder()
   const deleteForever = useDeleteTrashUnitForever()
   const emptyTrash = useEmptyTrash()
-  useDocumentTitle("Trash", { chrome: true })
+  useDocumentTitle(m.sidebar_trash(), { chrome: true })
 
   const units = useMemo(() => {
     const inSpace = (space: Space) => ({
@@ -56,11 +57,11 @@ export function TrashPage() {
   const section = useMemo<PaletteContextSection | null>(() => {
     if (!hasPrivateUnits) return null
     return {
-      title: "Trash",
+      title: m.sidebar_trash(),
       rows: [
         {
           id: "trash:empty",
-          label: "Empty trash",
+          label: m.trash_empty(),
           icon: Trash2,
           destructive: true,
           onSelect: () => setEmptyTrashOpen(true),
@@ -80,7 +81,7 @@ export function TrashPage() {
       drawings={units[space].drawings}
       folders={units[space].folders}
       isPending={isPending}
-      loadingLabel="Loading trash"
+      loadingLabel={m.trash_loading()}
       onRestoreDrawing={restoreDrawing}
       onRestoreFolder={restoreFolder}
       onDeleteForever={deleteForever}
@@ -101,13 +102,17 @@ export function TrashPage() {
           size="sm"
           className="text-destructive hover:bg-destructive/5 hover:text-destructive"
         >
-          Empty trash
+          {m.trash_empty()}
         </Button>
       }
-      title="Empty trash?"
-      description={`This will permanently delete ${totalsPhrase}${teamEnabled ? " in your Private trash" : ""}. This can't be undone.`}
-      confirmLabel="Empty trash"
-      pendingLabel="Emptying…"
+      title={m.trash_empty_title()}
+      description={
+        teamEnabled
+          ? m.trash_empty_description_private({ contents: totalsPhrase })
+          : m.trash_empty_description({ contents: totalsPhrase })
+      }
+      confirmLabel={m.trash_empty()}
+      pendingLabel={m.trash_emptying()}
       onConfirm={emptyTrash}
     />
   )
@@ -117,31 +122,32 @@ export function TrashPage() {
       <div className="mx-auto flex min-h-full w-full max-w-4xl flex-col px-6 py-8">
         <div className="flex items-center justify-between pb-5">
           <h1 className="text-sm font-semibold tracking-[-0.01em] text-foreground">
-            Trash
+            {m.sidebar_trash()}
           </h1>
           {!teamEnabled && emptyTrashButton}
         </div>
 
         {teamEnabled ? (
           <>
-            <TrashSection icon={Lock} title="Private" action={emptyTrashButton}>
-              {gallery(
-                "private",
-                "Nothing in Private trash. Deleted drawings stay here for 30 days before being removed forever.",
-              )}
+            <TrashSection
+              icon={Lock}
+              title={m.spaces_private()}
+              label={m.trash_section_private()}
+              action={emptyTrashButton}
+            >
+              {gallery("private", m.trash_empty_state_private())}
             </TrashSection>
-            <TrashSection icon={Users} title="Team" className="pt-10">
-              {gallery(
-                "team",
-                "Nothing in Team trash. Any member can restore what lands here within 30 days.",
-              )}
+            <TrashSection
+              icon={Users}
+              title={m.spaces_team()}
+              label={m.trash_section_team()}
+              className="pt-10"
+            >
+              {gallery("team", m.trash_empty_state_team())}
             </TrashSection>
           </>
         ) : (
-          gallery(
-            "private",
-            "Nothing in trash. Deleted drawings stay here for 30 days before being removed forever.",
-          )
+          gallery("private", m.trash_empty_state())
         )}
       </div>
     </div>
@@ -152,18 +158,21 @@ export function TrashPage() {
 function TrashSection({
   icon: Icon,
   title,
+  label,
   action,
   className,
   children,
 }: {
   icon: LucideIcon
   title: string
+  /** The section's accessible name, such as "Private trash". */
+  label: string
   action?: React.ReactNode
   className?: string
   children: React.ReactNode
 }) {
   return (
-    <section aria-label={`${title} trash`} className={className}>
+    <section aria-label={label} className={className}>
       <div className="flex min-h-8 items-center justify-between pb-3">
         <h2 className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
           <Icon className="h-3 w-3" strokeWidth={2.25} />

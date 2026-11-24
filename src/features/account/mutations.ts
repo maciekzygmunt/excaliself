@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { usersQueryOptions } from "@/features/admin/queries"
+import { m } from "@/paraglide/messages"
 import {
   type ActiveSession,
   type CurrentUser,
@@ -38,7 +39,7 @@ export function useUpdateProfile() {
     },
     onError: (_err, _vars, context) => {
       queryClient.setQueryData(currentUserKey, context?.previous)
-      toast.error("Couldn't save display name")
+      toast.error(m.settings_profile_save_failed())
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: currentUserKey })
@@ -102,7 +103,7 @@ export function useRevokeSession() {
   const mutation = useRevokeMutation({
     mutationFn: revokeSessionById,
     keep: (session, vars) => session.id !== vars.data.id,
-    errorMessage: "Couldn't revoke session",
+    errorMessage: m.settings_sessions_revoke_failed(),
   })
   return (id: string) => mutation.mutate({ data: { id } })
 }
@@ -111,7 +112,7 @@ export function useRevokeOtherSessions() {
   const mutation = useRevokeMutation({
     mutationFn: () => revokeOtherSessions(),
     keep: (session) => session.current,
-    errorMessage: "Couldn't sign out all other sessions",
+    errorMessage: m.settings_sessions_sign_out_others_failed(),
   })
   return () => mutation.mutate(undefined)
 }

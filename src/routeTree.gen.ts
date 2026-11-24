@@ -14,6 +14,7 @@ import { Route as AppRouteRouteImport } from './routes/_app/route'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as InviteRouteImport } from './routes/invite'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as OfflineRouteImport } from './routes/offline'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as SetupRouteImport } from './routes/setup'
 import { Route as DotwellKnownOauthAuthorizationServerRouteImport } from './routes/[.]well-known/oauth-authorization-server'
@@ -64,6 +65,11 @@ const InviteRoute = InviteRouteImport.update({
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OfflineRoute = OfflineRouteImport.update({
+  id: '/offline',
+  path: '/offline',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
@@ -212,6 +218,7 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AdminRoute
   '/invite': typeof InviteRoute
   '/login': typeof LoginRoute
+  '/offline': typeof OfflineRoute
   '/reset-password': typeof ResetPasswordRoute
   '/setup': typeof SetupRoute
   '/settings': typeof AppSettingsRouteRouteWithChildren
@@ -245,6 +252,7 @@ export interface FileRoutesByTo {
   '/admin': typeof AdminRoute
   '/invite': typeof InviteRoute
   '/login': typeof LoginRoute
+  '/offline': typeof OfflineRoute
   '/reset-password': typeof ResetPasswordRoute
   '/setup': typeof SetupRoute
   '/.well-known/oauth-authorization-server': typeof DotwellKnownOauthAuthorizationServerRoute
@@ -279,6 +287,7 @@ export interface FileRoutesById {
   '/admin': typeof AdminRoute
   '/invite': typeof InviteRoute
   '/login': typeof LoginRoute
+  '/offline': typeof OfflineRoute
   '/reset-password': typeof ResetPasswordRoute
   '/setup': typeof SetupRoute
   '/_app/settings': typeof AppSettingsRouteRouteWithChildren
@@ -314,6 +323,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/invite'
     | '/login'
+    | '/offline'
     | '/reset-password'
     | '/setup'
     | '/settings'
@@ -347,6 +357,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/invite'
     | '/login'
+    | '/offline'
     | '/reset-password'
     | '/setup'
     | '/.well-known/oauth-authorization-server'
@@ -380,6 +391,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/invite'
     | '/login'
+    | '/offline'
     | '/reset-password'
     | '/setup'
     | '/_app/settings'
@@ -415,6 +427,7 @@ export interface RootRouteChildren {
   AdminRoute: typeof AdminRoute
   InviteRoute: typeof InviteRoute
   LoginRoute: typeof LoginRoute
+  OfflineRoute: typeof OfflineRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   SetupRoute: typeof SetupRoute
   DotwellKnownOauthAuthorizationServerRoute: typeof DotwellKnownOauthAuthorizationServerRoute
@@ -467,6 +480,13 @@ declare module '@tanstack/react-router' {
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/offline': {
+      id: '/offline'
+      path: '/offline'
+      fullPath: '/offline'
+      preLoaderRoute: typeof OfflineRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/reset-password': {
@@ -710,6 +730,7 @@ const rootRouteChildren: RootRouteChildren = {
   AdminRoute: AdminRoute,
   InviteRoute: InviteRoute,
   LoginRoute: LoginRoute,
+  OfflineRoute: OfflineRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   SetupRoute: SetupRoute,
   DotwellKnownOauthAuthorizationServerRoute:

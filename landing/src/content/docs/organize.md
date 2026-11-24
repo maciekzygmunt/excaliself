@@ -1,6 +1,6 @@
 ---
 title: Organize and find
-description: Folders, stars, selecting many drawings, search, the command palette, export, and the trash.
+description: Folders, stars, copies, offline drawings, selecting many drawings, search, the command palette, export, and the trash.
 ---
 
 ## Folders and stars
@@ -11,8 +11,54 @@ were last edited. **All drawings** shows them all. Drawing and folder names
 can be up to 1,000 characters.
 
 Each drawing card has a **⋯** menu, like each row in the sidebar. Use it to
-**Star** or **Unstar**, **Rename**, **Export .excalidraw**, **Move to Team**, or
-**Move to trash**.
+**Star** or **Unstar**, **Rename**, **Duplicate**, **Export .excalidraw**,
+**Move to Team**, or **Move to trash**.
+
+**Duplicate** makes a copy of the drawing, with its images, in the same folder
+and space. The copy is named like the drawing, with " (copy)" at the end. It
+has no stars and no share link.
+
+## Pick up where you left off
+
+When you reopen a drawing, Excaliself restores your last canvas position and
+zoom, even if you only panned or zoomed. Each browser remembers its own view,
+also on shared drawings and share links.
+
+## Offline drawings
+
+Offline drawings are in beta and off by default. To turn them on, open
+**Settings** and choose **Turn on** under **Offline drawings (beta)**. The
+setting applies to this browser only.
+
+When they are on, each Private drawing you open is also kept in this browser.
+When your instance can't be reached, opening Excaliself shows **Offline
+drawings** instead. There you can open the drawings this browser keeps, and make new
+ones. You can also choose **Offline drawings** from your account menu.
+
+Edits made offline stay in this browser, also after a reload or a browser
+restart. If a save fails while you draw online, the drawing shows **Saved on
+this device · waiting to sync**. Excaliself sends the edits when the instance
+can be reached again, while Excaliself is open. A drawing open on the
+**Offline drawings** page is sent when you close it or choose **Back to
+Excaliself**. Sign in again if your session has ended. Drawings made offline
+go to your Private space.
+
+If the drawing changed somewhere else while you were offline, Excaliself does
+not overwrite it. It saves your version as a new drawing with " (offline
+copy)" at the end of its name. This also happens if the drawing was moved to
+Team, shared, or moved to the trash.
+
+To turn offline drawings off, choose **Turn off** in the same place. This
+sends the edits that wait in this browser, and then deletes the offline
+copies. If the edits can't be sent, or a private drawing is open in another
+tab, offline drawings stay on. Turning it off handles the account that is
+signed in. Offline copies of another account in the same browser stay there,
+and sync when that account turns offline drawings on again.
+
+Offline drawings need HTTPS or `localhost`. Team drawings and drawings with a
+share link are not kept offline. Clearing this site's data in the browser
+deletes the offline copies, also edits that are not sent yet. Signing out
+hides them until you sign in again in the same browser.
 
 ## Select many drawings
 

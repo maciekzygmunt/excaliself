@@ -11,9 +11,13 @@ import { createServerFn } from "@tanstack/react-start"
 import { getRequest } from "@tanstack/react-start/server"
 import { Toaster } from "@/components/ui/sonner"
 import { env } from "@/env"
-import { PRODUCT_NAME, TAGLINE } from "@/lib/document-title"
+import { PRODUCT_NAME } from "@/lib/document-title"
+// Registers the locale strategies before anything calls getLocale().
+import "@/lib/language"
 import { resolveOrigin } from "@/lib/site-origin"
 import { THEME_COLORS, themeBootstrapScript } from "@/lib/theme"
+import { m } from "@/paraglide/messages"
+import { getLocale } from "@/paraglide/runtime"
 import appCss from "../styles.css?url"
 
 // Set by the excalidrawFonts plugin in vite.config.ts.
@@ -44,6 +48,8 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
   head: ({ loaderData }) => {
     // og:image must be absolute to resolve in link previews (spec §1).
     const ogImage = `${loaderData?.origin ?? ""}/og.png`
+    // Spec §1: the product tagline, also in the auth panel corner.
+    const tagline = m.app_tagline()
     return {
       meta: [
         {
@@ -62,7 +68,7 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
         },
         {
           name: "description",
-          content: TAGLINE,
+          content: tagline,
         },
         {
           property: "og:type",
@@ -78,7 +84,7 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
         },
         {
           property: "og:description",
-          content: TAGLINE,
+          content: tagline,
         },
         {
           property: "og:image",
@@ -102,7 +108,7 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
         },
         {
           name: "twitter:description",
-          content: TAGLINE,
+          content: tagline,
         },
         {
           name: "twitter:image",
@@ -139,9 +145,9 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
         <div className="mx-auto mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-destructive/10 text-lg text-destructive">
           !
         </div>
-        <p className="text-sm text-foreground">Something went wrong</p>
+        <p className="text-sm text-foreground">{m.app_error_title()}</p>
         <p className="mt-1 text-xs text-muted-foreground">
-          Please try refreshing the page
+          {m.app_error_hint()}
         </p>
       </div>
     </div>
@@ -152,9 +158,9 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
         <div className="mx-auto mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-muted text-lg text-muted-foreground">
           ?
         </div>
-        <p className="text-sm text-foreground">Page not found</p>
+        <p className="text-sm text-foreground">{m.app_not_found_title()}</p>
         <p className="mt-1 text-xs text-muted-foreground">
-          The page you're looking for doesn't exist
+          {m.app_not_found_hint()}
         </p>
       </div>
     </div>
@@ -166,7 +172,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
   return (
     // The bootstrap script may add .dark before hydration; the class is
     // client-only state, so the mismatch with the SSR'd markup is expected.
-    <html lang="en" suppressHydrationWarning>
+    <html lang={getLocale()} suppressHydrationWarning>
       <head>
         <HeadContent />
         {/* After HeadContent so the theme-color meta it renders already

@@ -27,6 +27,8 @@ import { foldersQueryOptions } from "@/features/folders/queries"
 import { collectFolderSubtreeIds } from "@/features/folders/subtree"
 import type { MoveItem } from "@/features/spaces/move-to-team"
 import { useMoveToTeam } from "@/features/spaces/mutations"
+import { describeContents } from "@/features/trash/destroy-copy"
+import { m } from "@/paraglide/messages"
 import { useActiveSpace } from "./ActiveSpace"
 
 export type PendingMove = {
@@ -36,8 +38,6 @@ export type PendingMove = {
   folderId: string | null
   counts: { drawings: number; folders: number }
 }
-
-const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`
 
 export function MoveToTeamDialog({
   open,
@@ -55,12 +55,7 @@ export function MoveToTeamDialog({
     folders: 0,
   }
   // Zero parts drop out; a drawing or an empty folder gets no sentence.
-  const contents = [
-    drawings && plural(drawings, "drawing"),
-    folders && plural(folders, "folder"),
-  ]
-    .filter(Boolean)
-    .join(" and ")
+  const contents = describeContents(drawings, folders)
 
   return (
     <AlertDialog
@@ -72,17 +67,18 @@ export function MoveToTeamDialog({
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>
-            Move “{pendingMove?.name}” to Team?
+            {m.move_title({ name: pendingMove?.name ?? "" })}
           </AlertDialogTitle>
           <AlertDialogDescription>
-            All members can see and edit it. You can't move it back to Private.
-            {contents && ` This also moves the ${contents} inside it.`}
+            {contents
+              ? m.move_description_contents({ contents })
+              : m.move_description()}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogCancel>{m.dialog_cancel()}</AlertDialogCancel>
           <Button variant="primary" onClick={onConfirm}>
-            Move to Team
+            {m.move_confirm()}
           </Button>
         </AlertDialogFooter>
       </AlertDialogContent>
@@ -100,6 +96,8 @@ type MoveToTeamContextValue = {
    * point saves the last solo edits first. Returns the unregister.
    */
   registerFlush: (flush: () => Promise<void>) => () => void
+  /** Runs the open canvas's autosave flush; resolves at once without one. */
+  flushCanvas: () => Promise<void>
 }
 
 const MoveToTeamContext = createContext<MoveToTeamContextValue | null>(null)
@@ -158,12 +156,17 @@ export function MoveToTeamProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  const flushCanvas = useCallback(async () => {
+    await flushRef.current?.()
+  }, [])
+
   const value = useMemo(
     () => ({
       requestMoveToTeam: teamEnabled ? requestMoveToTeam : null,
       registerFlush,
+      flushCanvas,
     }),
-    [teamEnabled, requestMoveToTeam, registerFlush],
+    [teamEnabled, requestMoveToTeam, registerFlush, flushCanvas],
   )
 
   return (

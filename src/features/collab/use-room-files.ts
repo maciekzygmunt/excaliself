@@ -11,6 +11,7 @@ import type {
 } from "@excalidraw/excalidraw/types"
 import { useCallback, useEffect, useRef } from "react"
 import { toast } from "sonner"
+import { m } from "@/paraglide/messages"
 import {
   type ImageStatus,
   selectMissingFileIds,
@@ -18,7 +19,7 @@ import {
 } from "./file-sync"
 import { fetchRoomFile, uploadRoomFile } from "./file-transport"
 import type { SceneElement } from "./protocol"
-import { MAX_DRAWING_IMAGE_BYTES } from "./room-files"
+import { MAX_DRAWING_IMAGE_BYTES, MAX_IMAGE_BYTES } from "./room-files"
 import type { RoomPath } from "./room-url"
 
 const MAX_FETCH_ATTEMPTS = 3
@@ -34,10 +35,43 @@ const MAX_UPLOAD_ATTEMPTS = 3
  * Room keeps removed images for undo (see `saveRoomScene`), so they still count.
  */
 export function toastImageCapFull() {
-  toast.error("This drawing can't hold more images", {
+  toast.error(m.collab_image_cap_title(), {
     // One toast for a batch of refusals.
     id: "image-cap-full",
-    description: `A drawing saves up to ${MAX_DRAWING_IMAGE_BYTES / 1024 / 1024} MB of images. Remove some to add more. While shared, removed images can take up to a day to free their space.`,
+    description: m.collab_image_cap_description({
+      size: MAX_DRAWING_IMAGE_BYTES / 1024 / 1024,
+    }),
+  })
+}
+
+// One toast per kind, so a batch of refusals shows it once.
+export function toastImageTooLarge() {
+  toast.error(m.collab_image_too_large_title(), {
+    id: "image-too-large",
+    description: m.collab_image_too_large_description({
+      size: MAX_IMAGE_BYTES / 1024 / 1024,
+    }),
+  })
+}
+
+export function toastImageRateLimited() {
+  toast.error(m.collab_image_rate_limited_title(), {
+    id: "image-rate-limited",
+    description: m.collab_image_rate_limited_description(),
+  })
+}
+
+export function toastImageInvalid() {
+  toast.error(m.collab_image_invalid_title(), {
+    id: "image-invalid",
+    description: m.collab_image_invalid_description(),
+  })
+}
+
+export function toastImageUploadFailed() {
+  toast.error(m.collab_image_upload_failed_title(), {
+    id: "image-upload-failed",
+    description: m.collab_image_upload_failed_description(),
   })
 }
 
@@ -76,6 +110,7 @@ export function useRoomFiles(options: {
   /** Stored, in flight, or given up on. Claimed before the request goes out. */
   const skipUploadRef = useRef<Set<string>>(new Set(storedFileIds))
   const uploadAttemptsRef = useRef<Map<string, number>>(new Map())
+  const uploadsRef = useRef<Set<Promise<unknown>>>(new Set())
   const inFlightFetchRef = useRef<Set<string>>(new Set())
   const fetchAttemptsRef = useRef<Map<string, number>>(new Map())
   const retryTimersRef = useRef<Set<ReturnType<typeof setTimeout>>>(new Set())
@@ -115,25 +150,41 @@ export function useRoomFiles(options: {
         const attempt = (uploadAttemptsRef.current.get(file.fileId) ?? 0) + 1
         uploadAttemptsRef.current.set(file.fileId, attempt)
 
-        void uploadRoomFile(room, file).then((outcome) => {
+        const upload = uploadRoomFile(room, file).then((outcome) => {
           // A network blip leaves it `pending` for the next onChange to retry.
           if (outcome === "failed" && attempt < MAX_UPLOAD_ATTEMPTS) {
             skipUploadRef.current.delete(file.fileId)
             return
           }
+          // Their toasts say to add the image again; a re-add must upload.
+          if (outcome === "rate-limited" || outcome === "failed") {
+            skipUploadRef.current.delete(file.fileId)
+            uploadAttemptsRef.current.delete(file.fileId)
+          }
           const api = apiRef.current
           if (!api) return
           if (outcome === "full") toastImageCapFull()
+          else if (outcome === "too-large") toastImageTooLarge()
+          else if (outcome === "rate-limited") toastImageRateLimited()
+          else if (outcome === "invalid") toastImageInvalid()
+          else if (outcome === "failed") toastImageUploadFailed()
           markImageStatus(
             api,
             file.fileId,
             outcome === "stored" ? "saved" : "error",
           )
         })
+        uploadsRef.current.add(upload)
+        void upload.finally(() => uploadsRef.current.delete(upload))
       }
     },
     [],
   )
+
+  /** Resolves once the uploads in flight now have settled. */
+  const flushUploads = useCallback(async () => {
+    await Promise.allSettled(uploadsRef.current)
+  }, [])
 
   // A ref so the retry can call itself and see the latest room.
   const requestFileRef = useRef<(room: RoomPath, fileId: string) => void>(
@@ -169,5 +220,5 @@ export function useRoomFiles(options: {
     }
   }, [])
 
-  return { uploadPending, fetchMissing }
+  return { uploadPending, fetchMissing, flushUploads }
 }

@@ -4,8 +4,10 @@ import { toast } from "sonner"
 import { FormTextField } from "@/components/form-text-field"
 import { Button } from "@/components/ui/button"
 import { FieldGroup } from "@/components/ui/field"
+import { authErrorMessage } from "@/features/auth/errors"
 import { signInFormSchema } from "@/features/auth/schema"
 import { authClient } from "@/lib/auth-client"
+import { m } from "@/paraglide/messages"
 
 type Props = {
   /** Awaited, so the button stays pending while the page revalidates. */
@@ -21,7 +23,7 @@ export function SignInForm({ onSignedIn, children }: Props) {
     onSubmit: async ({ value }) => {
       const result = await authClient.signIn.email(value)
       if (result.error) {
-        toast.error(result.error.message)
+        toast.error(authErrorMessage(result.error, m.auth_login_failed()))
         return
       }
       await onSignedIn()
@@ -42,7 +44,7 @@ export function SignInForm({ onSignedIn, children }: Props) {
           children={(field) => (
             <FormTextField
               field={field}
-              label="Email"
+              label={m.auth_email_label()}
               type="email"
               placeholder="you@example.com"
               autoComplete="email"
@@ -55,7 +57,7 @@ export function SignInForm({ onSignedIn, children }: Props) {
           children={(field) => (
             <FormTextField
               field={field}
-              label="Password"
+              label={m.auth_password_label()}
               type="password"
               placeholder="••••••••••"
               autoComplete="current-password"
@@ -67,7 +69,7 @@ export function SignInForm({ onSignedIn, children }: Props) {
       <form.Subscribe selector={(s) => [s.canSubmit, s.isSubmitting] as const}>
         {([canSubmit, isSubmitting]) => (
           <Button type="submit" className="w-full" disabled={!canSubmit}>
-            {isSubmitting ? "Signing in..." : "Sign in"}
+            {isSubmitting ? m.auth_signing_in() : m.auth_sign_in()}
           </Button>
         )}
       </form.Subscribe>

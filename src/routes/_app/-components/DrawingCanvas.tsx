@@ -5,14 +5,21 @@ import type {
   BinaryFiles,
   ExcalidrawImperativeAPI,
 } from "@excalidraw/excalidraw/types"
-import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { onlineManager, useQuery, useQueryClient } from "@tanstack/react-query"
 import {
   MessageSquareIcon,
   PanelLeftIcon,
   Share2Icon,
   Users,
 } from "lucide-react"
-import { useCallback, useEffect, useMemo, useState } from "react"
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react"
 import { toast } from "sonner"
 import { FooterRightPortal } from "@/components/excalidraw-portal"
 import { useFollowStatusFrame } from "@/components/follow-status-frame"
@@ -22,6 +29,7 @@ import { PresenceAvatars } from "@/components/presence-avatars"
 import { ReconnectingIndicator } from "@/components/reconnecting-indicator"
 import { Button } from "@/components/ui/button"
 import { useSidebar } from "@/components/ui/sidebar"
+import { currentUserQueryOptions } from "@/features/account/queries"
 import { useRefreshLiveOnRoster } from "@/features/collab/queries"
 import {
   roomPathForDrawing,
@@ -31,6 +39,7 @@ import { useRoom } from "@/features/collab/use-room"
 import {
   markImageStatus,
   toastImageCapFull,
+  toastImageTooLarge,
 } from "@/features/collab/use-room-files"
 import { useRenameDrawing } from "@/features/drawings/mutations"
 import {
@@ -39,18 +48,24 @@ import {
 } from "@/features/drawings/queries"
 import {
   buildScenePayload,
-  fitToContent,
   getScenePayloadSignature,
+  type ScenePayload,
   selectOversizedImages,
   useDrawingScene,
   useReloadSceneAfterRoom,
   useSaveScenePayload,
 } from "@/features/drawings/scene"
+import { useDrawingViewport } from "@/features/drawings/use-drawing-viewport"
 import { useTeamLibrary } from "@/features/library/use-team-library"
+import { supportsDeviceDrawings } from "@/features/offline/store"
+import { forgetDeviceDrawingWhenFree } from "@/features/offline/sync"
+import { useDeviceCopy } from "@/features/offline/use-device-copy"
 import { drawingShareQueryOptions } from "@/features/shares/queries"
 import { useAutoSave } from "@/hooks/use-auto-save"
 import { useCanvasTheme } from "@/hooks/use-theme"
 import { cn } from "@/lib/utils"
+import { m } from "@/paraglide/messages"
+import { getLocale } from "@/paraglide/runtime"
 import { CommentsButton } from "./comments/CommentsButton"
 import { CommentsLayer } from "./comments/CommentsLayer"
 import { DrawingEditCard } from "./DrawingEditCard"
@@ -100,9 +115,9 @@ export function DrawingCanvas({
   const canvasTheme = useCanvasTheme()
 
   const { drawing, initialData, isDataCorrupt } = useDrawingScene(drawingId)
-  const initialState = useMemo(
-    () => initialData && fitToContent(initialData),
-    [initialData],
+  const { getInitialData, initialState, observeViewport } = useDrawingViewport(
+    drawingId,
+    initialData,
   )
   // `useRoom` needs a stable reference.
   const storedFileIds = useMemo(
@@ -139,11 +154,10 @@ export function DrawingCanvas({
   // Only a first join hits this (rejoins retry), so nothing recovers on its
   // own: the tab is offline until reload.
   const handleRoomFull = useCallback(() => {
-    toast.error("This drawing has too many people in it right now", {
+    toast.error(m.drawing_room_full_title(), {
       id: `room-full:${drawingId}`,
       duration: Number.POSITIVE_INFINITY,
-      description:
-        "Your changes aren't being saved. Reload the page to try joining again.",
+      description: m.drawing_room_full_description(),
     })
   }, [drawingId])
 
@@ -220,11 +234,10 @@ export function DrawingCanvas({
   useEffect(() => {
     if (!roomRefused) return
     const toastId = `room-refused:${drawingId}`
-    toast.error("Live editing stopped", {
+    toast.error(m.drawing_room_refused_title(), {
       id: toastId,
       duration: Number.POSITIVE_INFINITY,
-      description:
-        "Your changes aren't being saved. Reload the page to try again.",
+      description: m.drawing_room_refused_description(),
     })
     return () => {
       toast.dismiss(toastId)
@@ -235,12 +248,12 @@ export function DrawingCanvas({
   useEffect(() => {
     if (!sceneUnreadable) return
     const toastId = `scene-unreadable:${drawingId}`
-    toast.error("This drawing can't be opened for live editing", {
+    toast.error(m.drawing_scene_unreadable_title(), {
       id: toastId,
       duration: Number.POSITIVE_INFINITY,
       description: isTeam
-        ? "Its saved data is damaged, so your changes aren't being saved."
-        : "Its saved data is damaged, so your changes aren't being saved. Stop sharing to edit it on your own.",
+        ? m.drawing_scene_unreadable_team()
+        : m.drawing_scene_unreadable_shared(),
     })
     return () => {
       toast.dismiss(toastId)
@@ -262,13 +275,12 @@ export function DrawingCanvas({
     if (isTeam || share !== null) return
     if (!isDataCorrupt || corruptAcknowledged) return
     const toastId = `corrupt-scene:${drawingId}`
-    toast.error("This drawing's saved data couldn't be read", {
+    toast.error(m.drawing_corrupt_title(), {
       id: toastId,
       duration: Number.POSITIVE_INFINITY,
-      description:
-        "It opened as an empty canvas. Auto-save is paused so the stored data isn't overwritten.",
+      description: m.drawing_corrupt_description(),
       action: {
-        label: "Edit anyway",
+        label: m.drawing_corrupt_edit_anyway(),
         onClick: () => setCorruptAcknowledged(true),
       },
     })
@@ -276,6 +288,71 @@ export function DrawingCanvas({
       toast.dismiss(toastId)
     }
   }, [isDataCorrupt, corruptAcknowledged, drawingId, readOnly, isTeam, share])
+
+  // A solo private drawing is also kept on this device, so it opens offline
+  // and a failed save waits there instead of being lost.
+  const { data: userId } = useQuery({
+    ...currentUserQueryOptions(),
+    select: (user) => user.id,
+  })
+  const device = useDeviceCopy(
+    userId,
+    drawing,
+    supportsDeviceDrawings() &&
+      drawing?.space === "private" &&
+      share === null &&
+      !readOnly &&
+      !isLive &&
+      !isDataCorrupt &&
+      !reloadingScene,
+  )
+  // Shared or moved to Team: the Room owns it now. Unsent edits stay, and
+  // sync as a new drawing.
+  useEffect(() => {
+    if (isLive && userId && supportsDeviceDrawings())
+      // Waits for every editor, here and in other tabs, to let go first.
+      void forgetDeviceDrawingWhenFree(userId, drawingId).catch(() => {})
+  }, [isLive, userId, drawingId])
+  const [waitingToSync, setWaitingToSync] = useState(false)
+  // A save failed. Retried once the device copy holds the edits, even if it
+  // wasn't ready when the save failed.
+  const [saveFailed, setSaveFailed] = useState(false)
+  // Set with the state, so a flush that just failed is seen before a render.
+  const waitingRef = useRef(false)
+  const setWaiting = useCallback((waiting: boolean) => {
+    waitingRef.current = waiting
+    setWaitingToSync(waiting)
+  }, [])
+  // Live: the Room saves now, and the unsent edits sync as a new drawing.
+  useEffect(() => {
+    if (!isLive) return
+    setWaiting(false)
+    setSaveFailed(false)
+  }, [isLive, setWaiting])
+  const deviceSaving = device.saving
+  const flushDevice = device.flush
+  const saveScene = useCallback(
+    async (payload: ScenePayload) => {
+      const deviceSaved = deviceSaving()
+      try {
+        const result = await saveScenePayload(payload)
+        if (result === "saved") {
+          deviceSaved(payload)
+          setWaiting(false)
+          setSaveFailed(false)
+        }
+        return result
+      } catch (error) {
+        // The latest edits are on neither: stop claiming the device has them.
+        const kept = await flushDevice()
+        setSaveFailed(true)
+        setWaiting(kept)
+        if (!kept) throw error
+        return "skipped" as const
+      }
+    },
+    [saveScenePayload, deviceSaving, flushDevice, setWaiting],
+  )
 
   const {
     saving,
@@ -285,7 +362,7 @@ export function DrawingCanvas({
   } = useAutoSave({
     toPayload: buildScenePayload,
     getSignature: getScenePayloadSignature,
-    onSave: saveScenePayload,
+    onSave: saveScene,
     scopeId: `save-drawing:${drawingId}`,
     skipInitialChange: true,
     // `readOnly` also unwires onChange below; pausing here is belt and
@@ -294,23 +371,63 @@ export function DrawingCanvas({
     // stops. After it stops, the stored scene replaces them first.
     paused: autoSavePaused || readOnly || isLive || reloadingScene,
     onError: () => {
-      toast.error("Failed to save drawing", { id: "drawing-save-error" })
+      toast.error(m.drawing_save_failed(), { id: "drawing-save-error" })
     },
   })
 
-  // Any move to Team flushes this canvas first, whichever menu started it.
-  const { requestMoveToTeam, registerFlush } = useMoveToTeamDialog()
+  // Offline, react-query holds saves until the browser reconnects.
+  const online = useSyncExternalStore(
+    onlineManager.subscribe.bind(onlineManager),
+    () => onlineManager.isOnline(),
+    () => true,
+  )
+  const onDevice = waitingToSync || (!online && device.keeping)
+
+  // Edits kept on the device go up with the next save that gets through.
+  const retrying = waitingToSync || (saveFailed && device.keeping)
   useEffect(() => {
-    if (!readOnly) return registerFlush(flushAutoSave)
-  }, [readOnly, registerFlush, flushAutoSave])
+    if (!retrying) return
+    // Resent even if unchanged: an undo may have returned to the last saved
+    // scene, and the failed request may have landed or not.
+    const retry = () => void flushAutoSave({ resend: true }).catch(() => {})
+    const interval = setInterval(retry, 10_000)
+    window.addEventListener("online", retry)
+    return () => {
+      clearInterval(interval)
+      window.removeEventListener("online", retry)
+    }
+  }, [retrying, flushAutoSave])
+
+  // Rejects while edits only sit on the device, so a share or a move to
+  // Team never starts from a stale stored scene.
+  const flushToServer = useCallback(async () => {
+    await flushAutoSave()
+    if (waitingRef.current)
+      throw new Error("Changes are saved only on this device")
+  }, [flushAutoSave])
+
+  // Any move to Team or Duplicate flushes this canvas first, whichever menu
+  // started it: the solo save, and the live Room's image uploads.
+  const { requestMoveToTeam, registerFlush } = useMoveToTeamDialog()
+  const flushRoomUploads = room.flushUploads
+  useEffect(() => {
+    if (readOnly) return
+    return registerFlush(async () => {
+      await Promise.all([flushToServer(), flushRoomUploads()])
+    })
+  }, [readOnly, registerFlush, flushToServer, flushRoomUploads])
 
   const roomChange = room.onChange
+  const deviceChange = device.onChange
+  const following = room.userToFollow !== null
   const handleSceneChange = useCallback(
     (
       elements: readonly OrderedExcalidrawElement[],
       appState: AppState,
       files: BinaryFiles,
     ) => {
+      observeViewport(appState, following)
+      if (readOnly) return
       // A room flags these itself, from the upload's answer.
       if (!isLive && excalidrawAPI) {
         for (const fileId of selectOversizedImages(
@@ -319,16 +436,26 @@ export function DrawingCanvas({
           storedFileIdSet,
         )) {
           markImageStatus(excalidrawAPI, fileId, "error")
-          toast.error("This image is too large to save", {
-            description: "Images up to 2 MB are saved with the drawing.",
-          })
+          toastImageTooLarge()
         }
       }
       handleChange({ elements, appState, files })
+      // No-op until the device copy is kept.
+      deviceChange({ elements, appState, files })
       // No-op until the room is joined.
       roomChange(elements, appState, files)
     },
-    [handleChange, roomChange, isLive, excalidrawAPI, storedFileIdSet],
+    [
+      observeViewport,
+      following,
+      readOnly,
+      handleChange,
+      deviceChange,
+      roomChange,
+      isLive,
+      excalidrawAPI,
+      storedFileIdSet,
+    ],
   )
 
   const handleNameSubmit = (newName: string) => {
@@ -351,16 +478,17 @@ export function DrawingCanvas({
       )}
     >
       <Excalidraw
-        initialData={initialData}
-        initialState={initialState ?? undefined}
+        initialData={getInitialData}
+        initialState={initialState}
         onExcalidrawAPI={setExcalidrawAPI}
         // Controlled: the canvas renders in the app theme, and a theme baked
         // into the saved scene state is ignored on load. With the prop set,
         // Excalidraw disables its toggleTheme action, which also retires the
         // Shift+Alt+D shortcut; `toggleTheme: false` pins that down.
         theme={canvasTheme}
+        langCode={getLocale()}
         viewModeEnabled={readOnly || undefined}
-        onChange={readOnly ? undefined : handleSceneChange}
+        onChange={handleSceneChange}
         onPointerUpdate={readOnly ? undefined : room.onPointerUpdate}
         onScrollChange={readOnly ? undefined : room.onScrollChange}
         onLibraryChange={handleLibraryChange}
@@ -395,12 +523,14 @@ export function DrawingCanvas({
                     <Button
                       data-tour="share"
                       onClick={() => setShareOpen(true)}
-                      aria-label="Share"
-                      title="Share"
+                      aria-label={m.drawing_share()}
+                      title={m.drawing_share()}
                       className={SHARE_BUTTON_CLASS}
                     >
                       <Share2Icon className="h-3.5 w-3.5" />
-                      <span className={SHARE_LABEL_CLASS}>Share</span>
+                      <span className={SHARE_LABEL_CLASS}>
+                        {m.drawing_share()}
+                      </span>
                       {share && <SharingDot />}
                     </Button>
                   </>
@@ -424,7 +554,7 @@ export function DrawingCanvas({
             icon={<PanelLeftIcon className="h-4 w-4" />}
             onSelect={toggleSidebar}
           >
-            Drawings
+            {m.drawing_menu_drawings()}
           </MainMenu.Item>
           {!readOnly && (
             <MainMenu.Item
@@ -433,7 +563,7 @@ export function DrawingCanvas({
               onSelect={() => setShareOpen(true)}
             >
               <span className="inline-flex items-center gap-1.5">
-                Share
+                {m.drawing_share()}
                 {share != null && <SharingDot />}
               </span>
             </MainMenu.Item>
@@ -444,7 +574,7 @@ export function DrawingCanvas({
             icon={<MessageSquareIcon className="h-4 w-4" />}
             onSelect={toggleComments}
           >
-            Comments
+            {m.comments_title()}
           </MainMenu.Item>
           {!readOnly && !isTeam && requestMoveToTeam && (
             <MainMenu.Item
@@ -456,7 +586,7 @@ export function DrawingCanvas({
                 )
               }
             >
-              Move to Team
+              {m.drawing_menu_move_to_team()}
             </MainMenu.Item>
           )}
           <MainMenu.Separator />
@@ -468,7 +598,7 @@ export function DrawingCanvas({
           <MainMenu.DefaultItems.Help />
           <MainMenu.DefaultItems.ClearCanvas />
           <MainMenu.Separator />
-          <MainMenu.Group title="Excalidraw links">
+          <MainMenu.Group title={m.drawing_menu_excalidraw_links()}>
             <MainMenu.DefaultItems.Socials />
           </MainMenu.Group>
           <MainMenu.Separator />
@@ -481,7 +611,11 @@ export function DrawingCanvas({
               status={room.connectionStatus}
               className="order-first mr-2 h-auto self-stretch"
             />
-            <SaveStatusPill saving={saving} saved={saved} />
+            <SaveStatusPill
+              saving={saving && !onDevice}
+              saved={saved}
+              onDevice={onDevice}
+            />
           </FooterRightPortal>
         )}
       </Excalidraw>
@@ -505,7 +639,7 @@ export function DrawingCanvas({
           isTeam={isTeam}
           open={shareOpen}
           onOpenChange={setShareOpen}
-          onBeforeCreate={flushAutoSave}
+          onBeforeCreate={flushToServer}
         />
       )}
     </div>

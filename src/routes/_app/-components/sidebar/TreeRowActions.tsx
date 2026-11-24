@@ -1,4 +1,5 @@
 import {
+  Copy,
   Download,
   FilePlus,
   MoreHorizontal,
@@ -17,6 +18,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { SidebarMenuAction } from "@/components/ui/sidebar"
 import { cn } from "@/lib/utils"
+import { m } from "@/paraglide/messages"
 
 type TreeRowActionsProps = {
   isRenaming: boolean
@@ -32,6 +34,8 @@ type TreeRowActionsProps = {
   onToggleStar?: () => void
   // Private rows offer the move to Team (opens its confirm)
   onMoveToTeam?: () => void
+  // Drawing rows offer a copy next to the original
+  onDuplicate?: () => void
   // Drawing rows offer a download as an `.excalidraw` file
   onExport?: () => void
 }
@@ -48,6 +52,7 @@ export function TreeRowActions({
   starred,
   onToggleStar,
   onMoveToTeam,
+  onDuplicate,
   onExport,
 }: TreeRowActionsProps) {
   return (
@@ -83,29 +88,35 @@ export function TreeRowActions({
         {onCreateDrawing && (
           <DropdownMenuItem onClick={onCreateDrawing}>
             <FilePlus className="mr-2 h-4 w-4" />
-            New drawing
+            {m.sidebar_new_drawing()}
           </DropdownMenuItem>
         )}
         {onToggleStar &&
           (starred ? (
             <DropdownMenuItem onClick={onToggleStar}>
               <StarOff className="mr-2 h-4 w-4" />
-              Unstar
+              {m.drawings_action_unstar()}
             </DropdownMenuItem>
           ) : (
             <DropdownMenuItem onClick={onToggleStar}>
               <Star className="mr-2 h-4 w-4" />
-              Star
+              {m.drawings_action_star()}
             </DropdownMenuItem>
           ))}
         <DropdownMenuItem onClick={onStartRename}>
           <Pencil className="mr-2 h-4 w-4" />
-          Rename
+          {m.drawings_action_rename()}
         </DropdownMenuItem>
+        {onDuplicate && (
+          <DropdownMenuItem onClick={onDuplicate}>
+            <Copy className="mr-2 h-4 w-4" />
+            {m.drawings_action_duplicate()}
+          </DropdownMenuItem>
+        )}
         {onExport && (
           <DropdownMenuItem onClick={onExport}>
             <Download className="mr-2 h-4 w-4" />
-            Export .excalidraw
+            {m.drawings_action_export()}
           </DropdownMenuItem>
         )}
         {onMoveToTeam && (
@@ -113,7 +124,7 @@ export function TreeRowActions({
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={onMoveToTeam}>
               <Users className="mr-2 h-4 w-4" />
-              Move to Team
+              {m.drawings_action_move_to_team()}
             </DropdownMenuItem>
           </>
         )}
@@ -123,7 +134,7 @@ export function TreeRowActions({
           className="text-destructive focus:text-destructive"
         >
           <Trash2 className="mr-2 h-4 w-4" />
-          Move to trash
+          {m.drawings_action_trash()}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

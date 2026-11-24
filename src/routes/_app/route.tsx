@@ -7,6 +7,7 @@ import { currentUserQueryOptions } from "@/features/account/queries"
 import { drawingsQueryOptions } from "@/features/drawings/queries"
 import { foldersQueryOptions } from "@/features/folders/queries"
 import { useListUpdates } from "@/features/list-updates/use-list-updates"
+import { useOfflineSupport } from "@/features/offline/use-offline-support"
 import { useSettingsShortcut } from "@/hooks/use-settings-shortcut"
 import { useStoredTheme } from "@/hooks/use-theme"
 import { authMiddleware } from "@/middleware/auth"
@@ -55,6 +56,7 @@ function AppShellLayout() {
   useStoredTheme()
   // Teammates' creates, moves, and trashes show up without waiting for the poll.
   useListUpdates()
+  useOfflineSupport(session.user.id)
 
   return (
     <SidebarProvider

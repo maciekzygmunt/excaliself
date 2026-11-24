@@ -49,6 +49,14 @@ Optional. Each provider is on when its variables are set. See
 | `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET` | Sign-in with one OIDC provider |
 | `OIDC_NAME` | Label of the OIDC button (default `SSO`) |
 
+## Limits
+
+Optional.
+
+| Variable | Description |
+|---|---|
+| `IMAGE_UPLOADS_PER_MINUTE` | Images that one IP address can add to one [live drawing](/docs/sharing/) each minute (default `30`). Past that, the server refuses them |
+
 ## Previews
 
 For throwaway instances: a [quick try](/docs/#try-it-first) on your machine, or

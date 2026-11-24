@@ -5,11 +5,13 @@ import { DrawingGallery } from "@/components/drawing-gallery/DrawingGallery"
 import { TeamEmpty } from "@/components/drawing-gallery/GalleryEmpty"
 import { IllustratedEmptyState } from "@/components/illustrated-empty-state"
 import { KEYCAP_CLASS } from "@/components/ui/button"
+import { FileDropZone } from "@/features/drawings/file-drop"
 import { useTrashDrawing } from "@/features/drawings/mutations"
 import { drawingsQueryOptions } from "@/features/drawings/queries"
 import { foldersQueryOptions } from "@/features/folders/queries"
 import { inBrowsedSpace, useBrowsedSpace } from "@/features/spaces/browse"
 import { cn } from "@/lib/utils"
+import { m } from "@/paraglide/messages"
 import { useCreateDialog } from "../CreateDialog"
 import { useMoveToTeamDialog } from "../MoveToTeamDialog"
 
@@ -26,11 +28,14 @@ export function Home({ isAdmin }: { isAdmin: boolean }) {
   const { requestMoveToTeam } = useMoveToTeamDialog()
 
   return (
-    <div className="h-full overflow-y-auto">
+    <FileDropZone
+      target={{ folderId: null, space: space ?? "private" }}
+      className="h-full overflow-y-auto"
+    >
       <div className="mx-auto flex min-h-full w-full max-w-4xl flex-col px-6 py-8">
         <div className="flex items-center justify-between pb-5">
           <h1 className="text-sm font-semibold tracking-[-0.01em] text-foreground">
-            Recent
+            {m.home_recent()}
           </h1>
           <div className="flex items-center gap-4">
             {/* Pointless next to the empty state — only offered once there is
@@ -41,7 +46,7 @@ export function Home({ isAdmin }: { isAdmin: boolean }) {
                 search={space === "team" ? { space } : {}}
                 className="text-[13px] font-medium text-muted-foreground transition-colors hover:text-foreground"
               >
-                View all
+                {m.home_view_all()}
               </Link>
             )}
             <button
@@ -53,7 +58,7 @@ export function Home({ isAdmin }: { isAdmin: boolean }) {
               )}
             >
               <Plus className="h-3.5 w-3.5 text-iris" strokeWidth={2.5} />
-              New drawing
+              {m.sidebar_new_drawing()}
             </button>
           </div>
         </div>
@@ -63,7 +68,7 @@ export function Home({ isAdmin }: { isAdmin: boolean }) {
           folders={folders}
           isPending={isPending}
           limit={RECENT_LIMIT}
-          loadingLabel="Loading recent drawings"
+          loadingLabel={m.home_loading()}
           onTrash={trashDrawing}
           onMoveToTeam={requestMoveToTeam}
           selectable
@@ -79,6 +84,6 @@ export function Home({ isAdmin }: { isAdmin: boolean }) {
           }
         />
       </div>
-    </div>
+    </FileDropZone>
   )
 }

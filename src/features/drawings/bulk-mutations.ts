@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { drawingShareQueryOptions } from "@/features/shares/queries"
 import { useOptimisticListMutation } from "@/hooks/use-optimistic-list-mutation"
+import { m } from "@/paraglide/messages"
 import {
   moveDrawingsToFolder,
   moveDrawingsToTeam,
@@ -11,8 +12,6 @@ import {
 } from "./bulk-server"
 import { insertByRecency } from "./mutations"
 import { type Drawing, drawingsQueryOptions } from "./queries"
-
-export const countDrawings = (n: number) => `${n} drawing${n === 1 ? "" : "s"}`
 
 // Patches the listed drawings, leaves the rest.
 const patchIds = (list: Drawing[], ids: string[], patch: Partial<Drawing>) => {
@@ -31,7 +30,9 @@ export function useBulkStar() {
     optimisticUpdate: (list, { data }) =>
       patchIds(list, data.ids, { starred: data.starred }),
     onRollback: ({ data }) =>
-      toast.error(data.starred ? "Failed to star" : "Failed to unstar"),
+      toast.error(
+        data.starred ? m.drawings_star_failed() : m.drawings_unstar_failed(),
+      ),
   })
 }
 
@@ -45,7 +46,7 @@ export function useBulkMoveToFolder() {
     mutationFn: moveDrawingsToFolder,
     optimisticUpdate: (list, { data }) =>
       patchIds(list, data.ids, { folderId: data.folderId }),
-    onRollback: () => toast.error("Failed to move"),
+    onRollback: () => toast.error(m.drawings_move_failed()),
   })
 }
 
@@ -62,7 +63,7 @@ export function useBulkTrash() {
 
   const restoreMutation = useMutation({
     mutationFn: restoreDrawings,
-    onError: () => toast.error("Couldn't restore drawings"),
+    onError: () => toast.error(m.drawings_restore_many_failed()),
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey })
       invalidateTrash()
@@ -85,9 +86,9 @@ export function useBulkTrash() {
     const ids = drawings.map((d) => d.id)
     const trashed = trashMutation.mutateAsync({ data: ids })
     trashed.then(invalidateTrash, () => {})
-    const toastId = toast(`Moved ${countDrawings(ids.length)} to trash`, {
+    const toastId = toast(m.trash_moved_many({ count: ids.length }), {
       action: {
-        label: "Undo",
+        label: m.trash_undo(),
         onClick: () => {
           // Wait out the trash call so restore can't race it server-side.
           trashed
@@ -103,7 +104,7 @@ export function useBulkTrash() {
     })
     trashed.catch(() => {
       toast.dismiss(toastId)
-      toast.error("Couldn't move to trash")
+      toast.error(m.trash_move_failed())
     })
   }
 }
@@ -126,8 +127,8 @@ export function useBulkMoveToTeam() {
           queryKey: drawingShareQueryOptions(id).queryKey,
         })
       void queryClient.invalidateQueries({ queryKey })
-      toast(`Moved ${countDrawings(ids.length)} to Team`)
+      toast(m.spaces_moved_many({ count: ids.length }))
     },
-    onError: () => toast.error("Failed to move to Team"),
+    onError: () => toast.error(m.spaces_move_failed()),
   })
 }

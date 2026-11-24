@@ -1,4 +1,5 @@
 import type { Folder } from "@/features/folders/queries"
+import { m } from "@/paraglide/messages"
 
 /** Tier-2 "container is empty" line (spec §5.10): quiet, no illustration. */
 export function QuietLine({ children }: { children: React.ReactNode }) {
@@ -12,7 +13,7 @@ export function QuietLine({ children }: { children: React.ReactNode }) {
 /** Tier-2 line for empty search results — one string, shared by every
  * surface with on-page search (spec §5.10). */
 export function NoMatches({ query }: { query: string }) {
-  return <QuietLine>No drawings match “{query}”</QuietLine>
+  return <QuietLine>{m.gallery_no_matches({ query })}</QuietLine>
 }
 
 /** The empty-folder tier-2 state: quiet line + its contextual create action. */
@@ -26,14 +27,16 @@ export function FolderEmpty({
 }) {
   return (
     <div className="flex flex-col items-center py-16">
-      <p className="text-sm text-muted-foreground">This folder is empty</p>
+      <p className="text-sm text-muted-foreground">
+        {m.gallery_folder_empty()}
+      </p>
       {folder && (
         <button
           type="button"
           onClick={() => onCreateInFolder(folder)}
           className="mt-3 text-[13px] font-medium text-iris transition-colors duration-150 hover:text-iris-strong"
         >
-          New drawing here
+          {m.gallery_folder_empty_create()}
         </button>
       )}
     </div>
@@ -44,13 +47,13 @@ export function FolderEmpty({
 export function TeamEmpty({ onCreate }: { onCreate: () => void }) {
   return (
     <div className="flex flex-col items-center py-16">
-      <p className="text-sm text-muted-foreground">No drawings in Team yet</p>
+      <p className="text-sm text-muted-foreground">{m.gallery_team_empty()}</p>
       <button
         type="button"
         onClick={() => onCreate()}
         className="mt-3 text-[13px] font-medium text-iris transition-colors duration-150 hover:text-iris-strong"
       >
-        New drawing in Team
+        {m.gallery_team_empty_create()}
       </button>
     </div>
   )

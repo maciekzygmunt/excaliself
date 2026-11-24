@@ -1,13 +1,16 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query"
+import { useNavigate } from "@tanstack/react-router"
 import { toast } from "sonner"
 import {
   patchById,
   removeById,
   useOptimisticListMutation,
 } from "@/hooks/use-optimistic-list-mutation"
+import { m } from "@/paraglide/messages"
 import { type Drawing, drawingsQueryOptions } from "./queries"
 import {
   createDrawing,
+  duplicateDrawing,
   restoreDrawing,
   setDrawingStarred,
   trashDrawing,
@@ -31,13 +34,40 @@ export function useCreateDrawing() {
   })
 }
 
+type DuplicateVars = {
+  id: string
+  /** Flushes the open canvas's last solo save, so the copy has it. */
+  beforeDuplicate?: () => Promise<void>
+}
+
+/** The "Duplicate" menu action. The toast offers to open the copy. */
+export function useDuplicateDrawing() {
+  const queryClient = useQueryClient()
+  const navigate = useNavigate()
+  return useMutation({
+    mutationFn: async ({ id, beforeDuplicate }: DuplicateVars) => {
+      await beforeDuplicate?.()
+      return duplicateDrawing({ data: id })
+    },
+    onSuccess: (copy) =>
+      toast(m.drawings_duplicated({ name: copy.name }), {
+        action: {
+          label: m.drawings_open(),
+          onClick: () => navigate({ to: "/draw/$id", params: { id: copy.id } }),
+        },
+      }),
+    onError: () => toast.error(m.drawings_duplicate_failed()),
+    onSettled: () => queryClient.invalidateQueries(drawingsQueryOptions()),
+  })
+}
+
 export function useRenameDrawing() {
   return useOptimisticListMutation<Drawing, UpdateVars>({
     queryKey: drawingsQueryOptions().queryKey,
     mutationFn: updateDrawing,
     optimisticUpdate: (drawings, { data }) =>
       patchById(drawings, data.id, { name: data.updateData.name }),
-    onRollback: () => toast.error("Failed to rename"),
+    onRollback: () => toast.error(m.drawings_rename_failed()),
   })
 }
 
@@ -49,7 +79,7 @@ export function useMoveDrawingToFolder() {
       patchById(drawings, data.id, {
         folderId: data.updateData.folderId ?? null,
       }),
-    onRollback: () => toast.error("Failed to move"),
+    onRollback: () => toast.error(m.drawings_move_failed()),
   })
 }
 
@@ -63,7 +93,9 @@ export function useToggleStarDrawing() {
     optimisticUpdate: (drawings, { data }) =>
       patchById(drawings, data.id, { starred: data.starred }),
     onRollback: ({ data }) =>
-      toast.error(data.starred ? "Failed to star" : "Failed to unstar"),
+      toast.error(
+        data.starred ? m.drawings_star_failed() : m.drawings_unstar_failed(),
+      ),
   })
 }
 
@@ -83,7 +115,7 @@ export function useTrashDrawing() {
 
   const restoreMutation = useMutation({
     mutationFn: restoreDrawing,
-    onError: () => toast.error("Couldn't restore drawing"),
+    onError: () => toast.error(m.drawings_restore_failed()),
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey })
       invalidateTrash()
@@ -102,9 +134,9 @@ export function useTrashDrawing() {
   return (drawing: Drawing) => {
     const trashed = trashMutation.mutateAsync({ data: drawing.id })
     trashed.then(invalidateTrash, () => {})
-    const toastId = toast("Moved to trash", {
+    const toastId = toast(m.trash_moved(), {
       action: {
-        label: "Undo",
+        label: m.trash_undo(),
         onClick: () => {
           // Wait out the in-flight trash call so restore can't race it
           // server-side; if trashing failed there is nothing to restore.
@@ -121,7 +153,7 @@ export function useTrashDrawing() {
     })
     trashed.catch(() => {
       toast.dismiss(toastId)
-      toast.error("Couldn't move to trash")
+      toast.error(m.trash_move_failed())
     })
   }
 }

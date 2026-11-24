@@ -1,9 +1,10 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
-import type { ReactNode } from "react"
+import { type ReactNode, useEffect } from "react"
 import { afterEach, beforeEach, expect, test, vi } from "vitest"
 import type { Drawing } from "@/features/drawings/queries"
 import {
+  duplicateDrawing,
   setDrawingStarred,
   trashDrawing,
   updateDrawing,
@@ -11,6 +12,7 @@ import {
 import type { Folder } from "@/features/folders/queries"
 import { CommandPaletteProvider } from "./CommandPalette"
 import { DrawingPaletteContext } from "./DrawingPaletteContext"
+import { MoveToTeamProvider, useMoveToTeamDialog } from "./MoveToTeamDialog"
 
 const { navigate, toastMock } = vi.hoisted(() => ({
   navigate: vi.fn(),
@@ -29,6 +31,7 @@ vi.mock("@/features/drawings/server", () => ({
   createDrawing: vi.fn(),
   updateDrawing: vi.fn(),
   setDrawingStarred: vi.fn(),
+  duplicateDrawing: vi.fn(),
   trashDrawing: vi.fn(),
   restoreDrawing: vi.fn(),
 }))
@@ -47,6 +50,10 @@ vi.mock("@/features/folders/server", () => ({
 vi.mock("@/features/account/server", () => ({
   getCurrentUser: vi.fn(async () => ({ teamEnabled: false })),
 }))
+
+// The canvas's autosave flush is shared through the Move to Team provider.
+vi.mock("@/features/spaces/server", () => ({ moveToTeam: vi.fn() }))
+vi.mock("@/features/shares/server", () => ({ getDrawingShare: vi.fn() }))
 
 vi.mock("./CreateDialog", () => ({
   useCreateDialog: () => ({
@@ -93,7 +100,11 @@ function makeFolder(overrides: Partial<Folder> & { id: string }): Folder {
   }
 }
 
-function setup(drawings: Drawing[], folders: Folder[] = []) {
+function setup(
+  drawings: Drawing[],
+  folders: Folder[] = [],
+  canvas: ReactNode = null,
+) {
   // Fresh-forever seeded cache: no mount refetch racing the assertions
   const queryClient = new QueryClient({
     defaultOptions: {
@@ -104,10 +115,18 @@ function setup(drawings: Drawing[], folders: Folder[] = []) {
   queryClient.setQueryData<Folder[]>(["folders"], folders)
   const wrapper = ({ children }: { children: ReactNode }) => (
     <QueryClientProvider client={queryClient}>
-      <CommandPaletteProvider>{children}</CommandPaletteProvider>
+      <MoveToTeamProvider>
+        <CommandPaletteProvider>{children}</CommandPaletteProvider>
+      </MoveToTeamProvider>
     </QueryClientProvider>
   )
-  render(<DrawingPaletteContext drawingId="d1" />, { wrapper })
+  render(
+    <>
+      {canvas}
+      <DrawingPaletteContext drawingId="d1" />
+    </>,
+    { wrapper },
+  )
   return { queryClient }
 }
 
@@ -133,6 +152,7 @@ test("the palette shows a This drawing section above Go to on the canvas", () =>
   expect(screen.getAllByRole("option").map((r) => r.textContent)).toEqual([
     "Rename",
     "Star",
+    "Duplicate",
     "Move to folder…",
     "Move to trash",
     // The open drawing is also the most recent, so the empty-input launcher
@@ -146,6 +166,31 @@ test("the palette shows a This drawing section above Go to on the canvas", () =>
     "New folder",
     "Sign out",
   ])
+})
+
+/** Stands in for the open canvas: registers its autosave flush. */
+function Canvas({ flush }: { flush: () => Promise<void> }) {
+  const { registerFlush } = useMoveToTeamDialog()
+  useEffect(() => registerFlush(flush), [registerFlush, flush])
+  return null
+}
+
+test("Duplicate saves the open canvas's last edits before copying", async () => {
+  let saved!: () => void
+  const save = vi.fn(() => new Promise<void>((resolve) => (saved = resolve)))
+  setup([makeDrawing()], [], <Canvas flush={save} />)
+  openPalette()
+
+  fireEvent.click(screen.getByRole("option", { name: "Duplicate" }))
+  await flush()
+  expect(save).toHaveBeenCalledOnce()
+  expect(duplicateDrawing).not.toHaveBeenCalled()
+
+  saved()
+  await flush()
+  expect(vi.mocked(duplicateDrawing).mock.calls[0]?.[0]).toEqual({
+    data: "d1",
+  })
 })
 
 test("a drawing missing from the live list contributes no section", () => {

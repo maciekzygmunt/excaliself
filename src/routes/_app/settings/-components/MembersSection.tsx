@@ -41,19 +41,13 @@ import {
   currentUserQueryOptions,
 } from "@/features/account/queries"
 import type { OwnedContentCounts } from "@/features/admin/delete-user"
-import { describeKeptTeamDrawings } from "@/features/admin/delete-user-copy"
-import { ROLE_CHANGE_ERROR_TOAST, useSetRole } from "@/features/admin/mutations"
+import { useSetRole } from "@/features/admin/mutations"
 import {
   type AdminUser,
   userContentCountsQueryOptions,
   usersQueryOptions,
 } from "@/features/admin/queries"
-import {
-  adminIds,
-  isLastAdmin,
-  ROLE_LABELS,
-  type Role,
-} from "@/features/admin/roles"
+import { adminIds, isLastAdmin, type Role } from "@/features/admin/roles"
 import { deleteUser, setUserRole } from "@/features/admin/server"
 import { pendingPasswordResetsQueryOptions } from "@/features/password-resets/queries"
 import {
@@ -63,6 +57,8 @@ import {
 import { describeContents } from "@/features/trash/destroy-copy"
 import { copyText } from "@/hooks/use-copy"
 import { useDelayedVisible } from "@/hooks/use-delayed-visible"
+import { m } from "@/paraglide/messages"
+import { getLocale } from "@/paraglide/runtime"
 
 // Members list with inline role management (issue #65), admin delete
 // (issue #66), and admin-generated password resets (issue #68).
@@ -82,7 +78,7 @@ export function MembersSection() {
     mutationFn: revokePasswordReset,
     onError: () => {
       // Without this a failed revoke would leave the link silently live.
-      toast.error("Couldn't revoke the reset link")
+      toast.error(m.settings_members_reset_revoke_failed())
     },
     onSettled: () => {
       queryClient.invalidateQueries({
@@ -118,9 +114,11 @@ export function MembersSection() {
   return (
     <section className="animate-in fade-in-0 duration-200 motion-reduce:animate-none">
       <div className="mb-4">
-        <h2 className="text-sm font-medium text-foreground">Members</h2>
+        <h2 className="text-sm font-medium text-foreground">
+          {m.settings_nav_members()}
+        </h2>
         <p className="text-xs text-muted-foreground">
-          {members.length} {members.length === 1 ? "member" : "members"}
+          {m.settings_members_count({ count: members.length })}
         </p>
       </div>
 
@@ -150,7 +148,7 @@ export function MembersSection() {
             <div className="flex shrink-0 items-center gap-3">
               {pendingByUserId.has(member.id) && (
                 <span className="flex items-center gap-1 text-[11px] text-muted-foreground/60">
-                  Reset link pending
+                  {m.settings_members_reset_pending()}
                   <button
                     type="button"
                     onClick={() =>
@@ -158,12 +156,16 @@ export function MembersSection() {
                     }
                     className="rounded px-1.5 py-1 text-xs text-muted-foreground transition-all hover:bg-muted hover:text-destructive"
                   >
-                    Revoke
+                    {m.settings_revoke()}
                   </button>
                 </span>
               )}
               <p className="hidden text-xs text-muted-foreground/60 sm:block">
-                Joined {new Date(member.createdAt).toLocaleDateString()}
+                {m.settings_members_joined({
+                  date: new Date(member.createdAt).toLocaleDateString(
+                    getLocale(),
+                  ),
+                })}
               </p>
               <RoleSelect
                 member={member}
@@ -225,13 +227,11 @@ function MemberRowActions({ user }: { user: AdminUser }) {
       copyText(`${window.location.origin}/reset-password?token=${token}`).then(
         (ok) =>
           ok
-            ? toast.success(
-                "Reset link copied — single-use, valid for 24 hours",
-              )
-            : toast.error("Couldn't copy the reset link — generate it again"),
+            ? toast.success(m.settings_members_reset_copied())
+            : toast.error(m.settings_members_reset_copy_failed()),
       )
     },
-    onError: () => toast.error("Couldn't create reset link"),
+    onError: () => toast.error(m.settings_members_reset_create_failed()),
     onSettled: () => {
       queryClient.invalidateQueries({
         queryKey: pendingPasswordResetsQueryOptions().queryKey,
@@ -250,7 +250,8 @@ function MemberRowActions({ user }: { user: AdminUser }) {
         queryKey: currentUserQueryOptions().queryKey,
       })
     },
-    onError: () => toast.error(`Couldn't delete ${displayName}`),
+    onError: () =>
+      toast.error(m.settings_members_delete_failed({ name: displayName })),
   })
 
   return (
@@ -261,7 +262,7 @@ function MemberRowActions({ user }: { user: AdminUser }) {
             <Button
               variant="ghost"
               size="icon-sm"
-              aria-label={`Actions for ${displayName}`}
+              aria-label={m.settings_members_actions({ name: displayName })}
               className="text-muted-foreground/60"
             />
           }
@@ -271,7 +272,7 @@ function MemberRowActions({ user }: { user: AdminUser }) {
         <DropdownMenuContent align="end">
           <DropdownMenuItem onClick={() => createResetLink.mutate()}>
             <KeyRound />
-            Reset password
+            {m.settings_members_reset_password()}
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem
@@ -279,18 +280,18 @@ function MemberRowActions({ user }: { user: AdminUser }) {
             onClick={() => setConfirmOpen(true)}
           >
             <Trash2 />
-            Delete user
+            {m.settings_members_delete()}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
       <TypeToConfirmDialog
         open={confirmOpen}
         onOpenChange={setConfirmOpen}
-        title={`Delete ${displayName}?`}
+        title={m.settings_members_delete_title({ name: displayName })}
         description={deleteDescription(displayName, counts, countsFailed)}
         challenge={user.email}
-        confirmLabel="Delete user"
-        pendingLabel="Deleting…"
+        confirmLabel={m.settings_members_delete()}
+        pendingLabel={m.settings_deleting()}
         // No confirm until the copy can state real counts.
         confirmDisabled={!counts}
         onConfirm={() => deleteMutation.mutateAsync()}
@@ -304,16 +305,19 @@ function deleteDescription(
   counts: OwnedContentCounts | undefined,
   countsFailed: boolean,
 ) {
-  if (countsFailed)
-    return `Couldn't load ${displayName}'s content counts. Close this dialog and try again.`
-  if (!counts)
-    return `This will delete ${displayName}'s account and permanently delete all of their content. This can't be undone.`
+  const name = displayName
+  if (countsFailed) return m.settings_members_counts_failed({ name })
+  if (!counts) return m.settings_members_confirm_loading({ name })
   const contents = describeContents(counts.drawings, counts.folders)
-  const kept = describeKeptTeamDrawings("Their", counts.teamDrawings)
+  const kept =
+    counts.teamDrawings > 0 &&
+    m.settings_members_kept_team({ count: counts.teamDrawings })
   const destroyed = contents
-    ? `This will delete ${displayName}'s account and permanently delete their ${contents}.`
-    : `This will delete ${displayName}'s account. They have no ${kept ? "private " : ""}drawings or folders.`
-  return [destroyed, "This can't be undone.", kept].filter(Boolean).join(" ")
+    ? m.settings_members_confirm_contents({ name, contents })
+    : kept
+      ? m.settings_members_confirm_empty_team({ name })
+      : m.settings_members_confirm_empty({ name })
+  return [destroyed, m.settings_cannot_undo(), kept].filter(Boolean).join(" ")
 }
 
 function RoleSelect({
@@ -325,17 +329,23 @@ function RoleSelect({
   lastAdmin: boolean
   onChange: (role: Role) => void
 }) {
+  const roleLabels: Record<Role, string> = {
+    admin: m.settings_members_role_admin(),
+    user: m.settings_members_role_member(),
+  }
   const select = (
     <Select
       value={member.role}
       disabled={lastAdmin}
       // Base UI's Value renders the raw value unless items provides labels
-      items={ROLE_LABELS}
+      items={roleLabels}
       onValueChange={(role) => onChange(role as Role)}
     >
       <SelectTrigger
         size="sm"
-        aria-label={`Role for ${userDisplayName(member)}`}
+        aria-label={m.settings_members_role_label({
+          name: userDisplayName(member),
+        })}
         // Fixed width: "Admin" and "Member" render at different natural
         // widths, which would stagger the Joined column row to row.
         className="h-7 w-24 text-xs"
@@ -344,10 +354,10 @@ function RoleSelect({
       </SelectTrigger>
       <SelectContent>
         <SelectItem value="user" className="text-xs">
-          {ROLE_LABELS.user}
+          {roleLabels.user}
         </SelectItem>
         <SelectItem value="admin" className="text-xs">
-          {ROLE_LABELS.admin}
+          {roleLabels.admin}
         </SelectItem>
       </SelectContent>
     </Select>
@@ -372,7 +382,7 @@ function RoleSelect({
       >
         {select}
       </TooltipTrigger>
-      <TooltipContent>The last admin can't be demoted.</TooltipContent>
+      <TooltipContent>{m.settings_members_last_admin()}</TooltipContent>
     </Tooltip>
   )
 }
@@ -404,7 +414,7 @@ function SelfDemoteDialog({
       await setUserRole({ data: { userId: currentUser.id, role: "user" } })
     } catch {
       // Stay open — the intent is still live for a retry or a cancel.
-      toast.error(ROLE_CHANGE_ERROR_TOAST)
+      toast.error(m.settings_members_role_change_failed())
       setPending(false)
       return
     }
@@ -426,16 +436,21 @@ function SelfDemoteDialog({
     >
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Leave the admin role?</AlertDialogTitle>
+          <AlertDialogTitle>
+            {m.settings_members_demote_title()}
+          </AlertDialogTitle>
           <AlertDialogDescription>
-            You'll immediately lose access to instance settings like members and
-            invites. Another admin would have to promote you back.
+            {m.settings_members_demote_description()}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={pending}>Cancel</AlertDialogCancel>
+          <AlertDialogCancel disabled={pending}>
+            {m.settings_cancel()}
+          </AlertDialogCancel>
           <Button variant="destructive" disabled={pending} onClick={confirm}>
-            {pending ? "Demoting…" : "Demote me"}
+            {pending
+              ? m.settings_members_demoting()
+              : m.settings_members_demote()}
           </Button>
         </AlertDialogFooter>
       </AlertDialogContent>

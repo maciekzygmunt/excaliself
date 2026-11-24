@@ -1,5 +1,13 @@
 import { MonitorIcon, MoonIcon, SunIcon } from "lucide-react"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { useCanvasThemePreference, useThemePreference } from "@/hooks/use-theme"
+import { LANGUAGES, setLanguage } from "@/lib/language"
 import {
   type CanvasThemePreference,
   setCanvasThemePreference,
@@ -7,23 +15,26 @@ import {
   type ThemeChoice,
 } from "@/lib/theme"
 import { cn } from "@/lib/utils"
+import { m } from "@/paraglide/messages"
+import { getLocale } from "@/paraglide/runtime"
 
+// `label` is a message, called at render so it reads the request language.
 type Option<T extends string> = {
   value: T
-  label: string
+  label: () => string
   icon: typeof SunIcon
 }
 
 const THEME_OPTIONS: Array<Option<ThemeChoice>> = [
-  { value: "light", label: "Light", icon: SunIcon },
-  { value: "dark", label: "Dark", icon: MoonIcon },
-  { value: "system", label: "System", icon: MonitorIcon },
+  { value: "light", label: m.settings_appearance_light, icon: SunIcon },
+  { value: "dark", label: m.settings_appearance_dark, icon: MoonIcon },
+  { value: "system", label: m.settings_appearance_system, icon: MonitorIcon },
 ]
 
 const CANVAS_OPTIONS: Array<Option<CanvasThemePreference>> = [
-  { value: "match", label: "Match app", icon: MonitorIcon },
-  { value: "light", label: "Light", icon: SunIcon },
-  { value: "dark", label: "Dark", icon: MoonIcon },
+  { value: "match", label: m.settings_appearance_match_app, icon: MonitorIcon },
+  { value: "light", label: m.settings_appearance_light, icon: SunIcon },
+  { value: "dark", label: m.settings_appearance_dark, icon: MoonIcon },
 ]
 
 function ChoiceGroup<T extends string>({
@@ -66,7 +77,7 @@ function ChoiceGroup<T extends string>({
               )}
             >
               <option.icon aria-hidden className="size-3.5" />
-              {option.label}
+              {option.label()}
             </button>
           )
         })}
@@ -75,11 +86,46 @@ function ChoiceGroup<T extends string>({
   )
 }
 
+// Too many choices for a segmented control, so a select.
+function LanguageSelect() {
+  return (
+    <div>
+      <p className="mb-1.5 text-xs font-medium text-foreground">
+        {m.settings_appearance_language()}
+      </p>
+      <Select
+        value={getLocale()}
+        // Base UI's Value renders the raw value unless items provides labels
+        items={LANGUAGES}
+        onValueChange={(code) => code && setLanguage(code)}
+      >
+        <SelectTrigger
+          aria-label={m.settings_appearance_language()}
+          className="w-40"
+        >
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {Object.entries(LANGUAGES).map(([code, label]) => (
+            <SelectItem key={code} value={code}>
+              {label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <p className="mt-1.5 text-xs text-muted-foreground">
+        {m.settings_appearance_language_hint()}
+      </p>
+    </div>
+  )
+}
+
 // Appearance block (spec §4.4): Theme picks Light / Dark for the app
 // chrome, or System to follow the OS setting live; Canvas either follows it
 // (Match app, the default) or pins the drawing canvas to a theme of its own
-// (#111). Both stored on this browser only — these are the sole theme
-// controls; the canvas has none of its own.
+// (#111). Language sets the app and canvas language (#302); a pick reloads
+// the page. All stored on this browser only — these are the sole theme controls; the canvas has none of
+// its own.
 export function AppearanceSection() {
   const preference = useThemePreference()
   const canvasPreference = useCanvasThemePreference()
@@ -87,25 +133,28 @@ export function AppearanceSection() {
   return (
     <section>
       <div className="mb-4">
-        <h2 className="text-sm font-medium text-foreground">Appearance</h2>
+        <h2 className="text-sm font-medium text-foreground">
+          {m.settings_appearance_title()}
+        </h2>
         <p className="text-xs text-muted-foreground">
-          Applies to this browser only
+          {m.settings_appearance_description()}
         </p>
       </div>
 
       <div className="space-y-4">
         <ChoiceGroup
-          label="Theme"
+          label={m.settings_appearance_theme()}
           options={THEME_OPTIONS}
           value={preference}
           onSelect={setThemePreference}
         />
         <ChoiceGroup
-          label="Canvas"
+          label={m.settings_appearance_canvas()}
           options={CANVAS_OPTIONS}
           value={canvasPreference}
           onSelect={setCanvasThemePreference}
         />
+        <LanguageSelect />
       </div>
     </section>
   )

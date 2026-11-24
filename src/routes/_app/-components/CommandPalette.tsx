@@ -1,3 +1,4 @@
+import { ParaglideMessage } from "@inlang/paraglide-js-react"
 import { useQuery } from "@tanstack/react-query"
 import { useNavigate } from "@tanstack/react-router"
 import fuzzysort from "fuzzysort"
@@ -23,17 +24,19 @@ import {
   useMemo,
   useState,
 } from "react"
+import { HintKey } from "@/components/key-hint"
 import { SpaceLabel } from "@/components/space-label"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
-import { Kbd } from "@/components/ui/kbd"
 import type { Space } from "@/db/schema"
 import { currentUserQueryOptions } from "@/features/account/queries"
 import { drawingsQueryOptions } from "@/features/drawings/queries"
 import { findInScene } from "@/features/drawings/search"
 import { foldersQueryOptions } from "@/features/folders/queries"
+import { setDeviceAccount } from "@/features/offline/store"
 import { useCommandPaletteShortcut } from "@/hooks/use-command-palette-shortcut"
 import { authClient } from "@/lib/auth-client"
 import { cn } from "@/lib/utils"
+import { m } from "@/paraglide/messages"
 import { useCreateDialog } from "./CreateDialog"
 
 // A row inside a route-contributed context section. An onSelect row closes
@@ -92,29 +95,52 @@ type PaletteRow =
       folderId: string | null
     }
 
-const goToRows: PaletteRow[] = [
-  { kind: "goto", id: "home", label: "Home", icon: House, to: "/draw" },
+// Functions, so the labels are read in the current locale at render.
+const goToRows = (): PaletteRow[] => [
+  {
+    kind: "goto",
+    id: "home",
+    label: m.palette_home(),
+    icon: House,
+    to: "/draw",
+  },
   {
     kind: "goto",
     id: "drawings",
-    label: "All drawings",
+    label: m.palette_all_drawings(),
     icon: LayoutGrid,
     to: "/drawings",
   },
-  { kind: "goto", id: "trash", label: "Trash", icon: Trash2, to: "/trash" },
+  {
+    kind: "goto",
+    id: "trash",
+    label: m.palette_trash(),
+    icon: Trash2,
+    to: "/trash",
+  },
   {
     kind: "goto",
     id: "settings",
-    label: "Settings",
+    label: m.palette_settings(),
     icon: Settings,
     to: "/settings",
   },
 ]
 
-const actionRows: PaletteRow[] = [
-  { kind: "action", id: "new-drawing", label: "New drawing", icon: File },
-  { kind: "action", id: "new-folder", label: "New folder", icon: Folder },
-  { kind: "action", id: "sign-out", label: "Sign out", icon: LogOut },
+const actionRows = (): PaletteRow[] => [
+  {
+    kind: "action",
+    id: "new-drawing",
+    label: m.palette_new_drawing(),
+    icon: File,
+  },
+  {
+    kind: "action",
+    id: "new-folder",
+    label: m.palette_new_folder(),
+    icon: Folder,
+  },
+  { kind: "action", id: "sign-out", label: m.palette_sign_out(), icon: LogOut },
 ]
 
 type CommandPaletteProps = {
@@ -241,7 +267,7 @@ export function CommandPalette({
       {
         kind: "pick-folder" as const,
         id: "move-root",
-        label: "No folder",
+        label: m.palette_no_folder(),
         icon: FolderX,
         folderId: null,
       },
@@ -260,18 +286,28 @@ export function CommandPalette({
   // so arrow keys walk the whole list, not one section
   const sections = (
     folderPicker
-      ? [{ title: "Move to folder", rows: folderPickerRows, offset: 0 }]
+      ? [
+          {
+            title: m.palette_section_move(),
+            rows: folderPickerRows,
+            offset: 0,
+          },
+        ]
       : [
           ...(contextSection
             ? [{ title: contextSection.title, rows: contextRows, offset: 0 }]
             : []),
-          { title: "Drawings", rows: drawingRows, offset: 0 },
+          { title: m.palette_section_drawings(), rows: drawingRows, offset: 0 },
           {
-            title: "Go to",
-            rows: [...goToRows.filter(matches), ...folderRows],
+            title: m.palette_section_goto(),
+            rows: [...goToRows().filter(matches), ...folderRows],
             offset: 0,
           },
-          { title: "Actions", rows: actionRows.filter(matches), offset: 0 },
+          {
+            title: m.palette_section_actions(),
+            rows: actionRows().filter(matches),
+            offset: 0,
+          },
         ]
   ).filter((section) => section.rows.length > 0)
   for (let i = 1; i < sections.length; i++) {
@@ -304,6 +340,7 @@ export function CommandPalette({
       openCreateFolderDialog()
     } else {
       await authClient.signOut()
+      setDeviceAccount(null)
       window.location.href = "/login"
     }
   }
@@ -348,7 +385,7 @@ export function CommandPalette({
         // which a bare motion-reduce:animate-none loses to (spec §4.3)
         className="top-[30%] translate-y-0 gap-0 overflow-hidden p-0 sm:max-w-md motion-reduce:animate-none!"
       >
-        <DialogTitle className="sr-only">Command palette</DialogTitle>
+        <DialogTitle className="sr-only">{m.palette_title()}</DialogTitle>
         {/* The sunken input well — the palette's place-to-type. */}
         <div className="flex items-center gap-2.5 rounded-md bg-well px-3 py-2.5 shadow-well m-2 mb-0">
           <Search
@@ -372,14 +409,16 @@ export function CommandPalette({
                 ? `command-palette-row-${rows[activeIndex].id}`
                 : undefined
             }
-            placeholder={folderPicker ? "Search folders…" : "Search…"}
+            placeholder={
+              folderPicker ? m.palette_search_folders() : m.palette_search()
+            }
             className="flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground/60"
           />
         </div>
         <div
           id="command-palette-list"
           role="listbox"
-          aria-label="Command palette results"
+          aria-label={m.palette_results()}
           className="scrollbar-subtle max-h-80 overflow-y-auto p-1.5"
         >
           {rows.length > 0 ? (
@@ -438,24 +477,36 @@ export function CommandPalette({
             ))
           ) : (
             <p className="px-2.5 py-6 text-center text-[13px] text-muted-foreground/60">
-              No results
+              {m.palette_no_results()}
             </p>
           )}
         </div>
         <div className="flex items-center gap-3 border-t border-hairline bg-muted/40 px-4 py-2 text-xs text-muted-foreground/60">
           <span className="flex items-center gap-1">
-            <Kbd className="h-4 min-w-4 text-[10px]">↑↓</Kbd> navigate
+            <ParaglideMessage
+              message={m.palette_hint_navigate}
+              markup={{ key: HintKey }}
+            />
           </span>
           <span className="flex items-center gap-1">
-            <Kbd className="h-4 min-w-4 text-[10px]">↵</Kbd> open
+            <ParaglideMessage
+              message={m.palette_hint_open}
+              markup={{ key: HintKey }}
+            />
           </span>
           {folderPicker && (
             <span className="flex items-center gap-1">
-              <Kbd className="h-4 min-w-4 text-[10px]">⌫</Kbd> back
+              <ParaglideMessage
+                message={m.palette_hint_back}
+                markup={{ key: HintKey }}
+              />
             </span>
           )}
           <span className="flex items-center gap-1">
-            <Kbd className="h-4 min-w-4 text-[10px]">esc</Kbd> close
+            <ParaglideMessage
+              message={m.palette_hint_close}
+              markup={{ key: HintKey }}
+            />
           </span>
         </div>
       </DialogContent>

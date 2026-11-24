@@ -1,3 +1,4 @@
+import { ParaglideMessage } from "@inlang/paraglide-js-react"
 import { useForm } from "@tanstack/react-form"
 import { useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
@@ -9,10 +10,15 @@ import type { CurrentUser } from "@/features/account/queries"
 import { currentUserQueryOptions } from "@/features/account/queries"
 import { changeEmail } from "@/features/account/server"
 import { usersQueryOptions } from "@/features/admin/queries"
+import { m } from "@/paraglide/messages"
+import { Emphasis } from "./Emphasis"
 
+// Errors are functions, so they read the language when they show.
 const formSchema = z.object({
-  newEmail: z.email("Enter a valid email"),
-  currentPassword: z.string().min(1, "Enter your current password"),
+  newEmail: z.email({ error: () => m.settings_email_invalid() }),
+  currentPassword: z
+    .string()
+    .min(1, { error: () => m.settings_password_current_required() }),
 })
 
 // Email change (spec §5.12, #62): re-authenticate with the current password
@@ -32,8 +38,12 @@ export function EmailSection({ user }: { user: CurrentUser }) {
           onSubmit: {
             fields:
               result.error === "invalid-password"
-                ? { currentPassword: { message: "Incorrect password" } }
-                : { newEmail: { message: "That email is already in use" } },
+                ? {
+                    currentPassword: {
+                      message: m.settings_password_incorrect(),
+                    },
+                  }
+                : { newEmail: { message: m.settings_email_taken() } },
           },
         })
         return
@@ -44,17 +54,22 @@ export function EmailSection({ user }: { user: CurrentUser }) {
       })
       queryClient.invalidateQueries(usersQueryOptions())
       formApi.reset()
-      toast.success("Sign-in email updated")
+      toast.success(m.settings_email_updated())
     },
   })
 
   return (
     <section>
       <div className="mb-4">
-        <h2 className="text-sm font-medium text-foreground">Email</h2>
+        <h2 className="text-sm font-medium text-foreground">
+          {m.settings_email_title()}
+        </h2>
         <p className="text-xs text-muted-foreground">
-          You sign in as <span className="text-foreground">{user.email}</span>.
-          Changing it takes effect immediately.
+          <ParaglideMessage
+            message={m.settings_email_description}
+            inputs={{ email: user.email }}
+            markup={{ em: Emphasis }}
+          />
         </p>
       </div>
 
@@ -74,7 +89,7 @@ export function EmailSection({ user }: { user: CurrentUser }) {
             children={(field) => (
               <FormTextField
                 field={field}
-                label="New email"
+                label={m.settings_email_new_label()}
                 type="email"
                 placeholder="you@example.com"
                 autoComplete="email"
@@ -89,7 +104,7 @@ export function EmailSection({ user }: { user: CurrentUser }) {
                 field={field}
                 // The Password section has a same-named field on this page.
                 id="email-current-password"
-                label="Current password"
+                label={m.settings_password_current_label()}
                 type="password"
                 placeholder="••••••••••"
                 autoComplete="current-password"
@@ -108,7 +123,9 @@ export function EmailSection({ user }: { user: CurrentUser }) {
               className="self-start"
               disabled={isSubmitting}
             >
-              {isSubmitting ? "Changing email..." : "Change email"}
+              {isSubmitting
+                ? m.settings_email_submitting()
+                : m.settings_email_submit()}
             </Button>
           )}
         </form.Subscribe>
