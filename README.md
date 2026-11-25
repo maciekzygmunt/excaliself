@@ -19,6 +19,7 @@
 
 <p align="center">
   <a href="https://www.opensourcealternatives.to"><img src="https://www.opensourcealternatives.to/badge-osa.svg" height="20" alt="As seen on Open Source Alternatives"></a>
+  <a href="https://glama.ai/mcp/servers/maciekzygmunt/excaliself"><img src="https://glama.ai/mcp/servers/maciekzygmunt/excaliself/badges/score.svg" height="20" alt="maciekzygmunt/excaliself MCP server"></a>
 </p>
 
 <p align="center">
