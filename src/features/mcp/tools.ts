@@ -55,11 +55,13 @@ import {
   storedAppState,
 } from "./export/scene-data"
 import { MAX_SCENE_BYTES, toExcalidrawFile } from "./export/scene-file"
+import { listLibraryItems, planLibraryPlacements } from "./library"
 import { buildScene } from "./scene/build"
 import { elementChange, planEdit } from "./scene/edit"
 import { parseImportedScene } from "./scene/import"
 import { parseMermaid } from "./scene/mermaid"
 import {
+  coordinate,
   directions,
   elementSkeleton,
   MAX_ELEMENTS,
@@ -649,6 +651,26 @@ Up to ${MAX_ROOM_ELEMENTS.toLocaleString("en")} elements and ${MAX_ROOM_SCENE_BY
     })
 
   server.registerTool(
+    "list_library_items",
+    {
+      title: "List Team library items",
+      description:
+        "Find reusable items in the member's Team library, newest first. Use their ids with edit_drawing.libraryItems. For the next page, pass nextOffset as offset.",
+      inputSchema: z.object({
+        limit: limit(50),
+        offset: z.number().int().nonnegative().default(0),
+      }),
+      annotations: { readOnlyHint: true },
+    },
+    async ({ limit, offset }) => {
+      const items = await listLibraryItems(db, limit + 1, offset)
+      const more = items.length > limit
+      if (more) items.pop()
+      return json({ items, nextOffset: more ? offset + limit : null })
+    },
+  )
+
+  server.registerTool(
     "edit_drawing",
     {
       title: "Propose a drawing edit",
@@ -656,6 +678,7 @@ Up to ${MAX_ROOM_ELEMENTS.toLocaleString("en")} elements and ${MAX_ROOM_SCENE_BY
 
 Read the drawing with read_drawing first, and refer to its elements by the [id â€¦] it shows.
 - add: new elements, in create_drawing's format. Arrows may join existing shapes by element id ("from", "to"). Give new shapes x/y next to the shapes they relate to (read_drawing gives positions); without x/y they are laid out beside the drawing.
+- libraryItems: place copies of Team library items (shapes, images with files, or multi-element drawings). Get item ids with list_library_items; x/y position each copy's top-left corner. This accepts library item ids, not drawing ids.
 - change: by element id. Shapes take label, x/y (move), width/height, colors, and strokeStyle; text takes text, x/y, and strokeColor; arrows take label, strokeColor, and strokeStyle. Arrows bound to a moved shape follow it. To attach an arrow to other shapes, remove it and add a new one.
 - remove: element ids. A shape's label goes with it; arrows bound to it stay, unattached.`,
       inputSchema: z.object({
@@ -671,6 +694,10 @@ Read the drawing with read_drawing first, and refer to its elements by the [id â
             'One line the member reads before Apply, e.g. "Add a CDN in front of the API".',
           ),
         add: z.array(elementSkeleton).max(MAX_ELEMENTS).default([]),
+        libraryItems: z
+          .array(z.object({ id: z.string().min(1), x: coordinate, y: coordinate }))
+          .max(MAX_ELEMENTS)
+          .default([]),
         change: z.array(elementChange).max(MAX_ELEMENTS).default([]),
         remove: z
           .array(z.string())
@@ -685,9 +712,9 @@ Read the drawing with read_drawing first, and refer to its elements by the [id â
         idempotentHint: false,
       },
     },
-    async ({ id, summary, add, change, remove }) => {
-      if (add.length + change.length + remove.length === 0)
-        throw new Error("Nothing to change: give add, change, or remove.")
+    async ({ id, summary, add, libraryItems, change, remove }) => {
+      if (add.length + libraryItems.length + change.length + remove.length === 0)
+        throw new Error("Nothing to change: give add, libraryItems, change, or remove.")
       const drawing = await findDrawing(id)
       // A live Room holds newer edits than the stored scene.
       const live = await roomElements(rooms, id)
@@ -699,12 +726,16 @@ Read the drawing with read_drawing first, and refer to its elements by the [id â
         change,
         remove,
       })
+      const library = await planLibraryPlacements(db, libraryItems, add.length)
       const edit = drawingEdits.propose({
         drawingId: id,
         userId: member.id,
         client: member.client,
         summary,
-        ...plan,
+        base: plan.base,
+        elements: plan.elements.concat(library.elements),
+        changes: plan.changes.concat(library.changes),
+        files: library.files,
       })
       listUpdates.notify(EDITS_CHANGED)
       const decided = await drawingEdits.wait(edit.id, member.id, EDIT_WAIT_MS)

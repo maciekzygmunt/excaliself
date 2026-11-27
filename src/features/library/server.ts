@@ -11,6 +11,7 @@ import { LIBRARY_CHANGED } from "@/features/list-updates/protocol"
 import { createRateLimiter } from "@/lib/rate-limit"
 import { authMiddleware } from "@/middleware/auth"
 import { m } from "@/paraglide/messages"
+import { InvalidLibraryImage, libraryImageFiles } from "./image-files"
 import {
   LIBRARY_CHANGES_PER_MINUTE,
   MAX_LIBRARY_BYTES,
@@ -46,7 +47,7 @@ const libraryResponse = (json: string) =>
 const MiB = 1024 * 1024
 
 /** Why a change was not saved, for the editor to show, in the member's language. */
-const refusal = (status: 413 | 429, message: string) =>
+const refusal = (status: 400 | 413 | 429, message: string) =>
   new Response(message, { status })
 
 /** Thrown to roll back a change that makes the library too large. */
@@ -90,6 +91,32 @@ export const changeLibrary = createServerFn({ method: "POST" })
         m.library_error_item_too_large({ max: MAX_LIBRARY_ITEM_BYTES / MiB }),
       )
 
+    let additions: { id: string; item: LibraryItem }[]
+    try {
+      additions = data.add.map((item) => {
+        const files = libraryImageFiles(item)
+        if (files.length === 0 && !Object.hasOwn(item, "files"))
+          return { id: item.id, item }
+        // Store the inline binaries with the item. That makes the existing
+        // item/library caps, replacement, removal, and export cover them too.
+        const stored = {
+          ...item,
+          files: files.length
+            ? Object.fromEntries(
+                files.map(({ fileId, dataUrl, mimeType, created }) => [
+                  fileId,
+                  { id: fileId, dataURL: dataUrl, mimeType, created },
+                ]),
+              )
+            : undefined,
+        }
+        return { id: item.id, item: stored }
+      })
+    } catch (error) {
+      if (!(error instanceof InvalidLibraryImage)) throw error
+      return refusal(400, m.library_error_invalid_image())
+    }
+
     let json: string
     try {
       json = await db.transaction(async (tx) => {
@@ -102,20 +129,18 @@ export const changeLibrary = createServerFn({ method: "POST" })
           await tx
             .delete(libraryItems)
             .where(inArray(libraryItems.id, data.remove))
-        if (data.add.length > 0)
+        if (additions.length > 0)
           await tx
             .insert(libraryItems)
             // `add` is newest first; the last row inserted gets the highest seq.
-            .values(
-              [...data.add].reverse().map((item) => ({ id: item.id, item })),
-            )
+            .values(additions.reverse())
             .onConflictDoUpdate({
               target: libraryItems.id,
               set: { item: sql`excluded.item` },
             })
         const library = await readLibraryJson(tx)
         if (
-          data.add.length > 0 &&
+          additions.length > 0 &&
           Buffer.byteLength(library) > MAX_LIBRARY_BYTES
         )
           throw new LibraryFull()

@@ -17,6 +17,7 @@ import type {
   OrderedExcalidrawElement,
 } from "@excalidraw/excalidraw/element/types"
 import type {
+  BinaryFileData,
   BinaryFiles,
   ExcalidrawImperativeAPI,
 } from "@excalidraw/excalidraw/types"
@@ -77,6 +78,29 @@ export function DrawingEditCard({ drawingId, excalidrawAPI, theme }: Props) {
         : [],
     [edit, elements, excalidrawAPI],
   )
+  const proposalFiles = useMemo(
+    () =>
+      (edit?.files ?? []).map(
+        ({ fileId, mimeType, dataUrl, created }): BinaryFileData => ({
+          id: fileId as BinaryFileData["id"],
+          mimeType: mimeType as BinaryFileData["mimeType"],
+          dataURL: dataUrl as BinaryFileData["dataURL"],
+          created,
+        }),
+      ),
+    [edit],
+  )
+  const currentFiles = excalidrawAPI?.getFiles()
+  const previewFiles = useMemo(
+    () =>
+      proposalFiles.length > 0
+        ? {
+            ...currentFiles,
+            ...Object.fromEntries(proposalFiles.map((file) => [file.id, file])),
+          }
+        : (currentFiles ?? {}),
+    [currentFiles, proposalFiles],
+  )
 
   const decide = useMutation({
     // The id rides along: the claim refetches the query to null mid-apply.
@@ -103,11 +127,13 @@ export function DrawingEditCard({ drawingId, excalidrawAPI, theme }: Props) {
     // Checked and applied with no await between, so no remote edit slips in.
     const current = excalidrawAPI.getSceneElementsIncludingDeleted()
     const stale = isStale(current, edit.base)
-    if (!stale)
+    if (!stale) {
+      if (proposalFiles.length > 0) excalidrawAPI.addFiles(proposalFiles)
       excalidrawAPI.updateScene({
         elements: withEdit(current, elements as OrderedExcalidrawElement[]),
         captureUpdate: CaptureUpdateAction.IMMEDIATELY,
       })
+    }
     await decide.mutateAsync({
       id: edit.id,
       decision: stale ? "stale" : "applied",
@@ -169,7 +195,7 @@ export function DrawingEditCard({ drawingId, excalidrawAPI, theme }: Props) {
         >
           <PreviewImage
             elements={preview}
-            files={excalidrawAPI.getFiles()}
+            files={previewFiles}
             theme={theme}
           />
           <span className="flex items-center justify-end gap-1 text-[11px] text-muted-foreground transition-colors group-hover:text-foreground">
@@ -194,7 +220,7 @@ export function DrawingEditCard({ drawingId, excalidrawAPI, theme }: Props) {
             <Excalidraw
               initialData={{
                 elements: preview,
-                files: excalidrawAPI.getFiles(),
+                files: previewFiles,
               }}
               // Look, zoom, and pan; nothing here can be edited or saved.
               viewModeEnabled

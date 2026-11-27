@@ -3,6 +3,7 @@
 
 import { randomUUID } from "node:crypto"
 import type { SceneElement } from "@/features/collab/protocol"
+import type { RoomFilePayload } from "@/features/collab/room-files"
 import { processSingleton } from "@/lib/process-singleton"
 import type { Revision } from "./apply"
 
@@ -39,6 +40,8 @@ export type DrawingEdit = {
   changes: string[]
   /** New and changed elements, whole. */
   elements: SceneElement[]
+  /** New image files, not written to the drawing until the member applies. */
+  files?: RoomFilePayload[]
   /** Element id → the revision the edit was planned on. */
   base: Record<string, Revision>
   createdAt: number

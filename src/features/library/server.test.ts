@@ -61,6 +61,42 @@ beforeEach(async () => {
   await change([item("kept")])
 })
 
+const imageFile = {
+  id: "logo",
+  mimeType: "image/png",
+  dataURL:
+    "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aIfoAAAAASUVORK5CYII=",
+  created: 1,
+}
+const imageItem = {
+  ...item("image"),
+  elements: [{ id: "e", type: "image", fileId: imageFile.id } as never],
+  files: { logo: imageFile, unused: { ...imageFile, id: "unused" } },
+}
+
+test("persists only the image binaries a library item uses", async () => {
+  expect((await change([imageItem])).status).toBe(200)
+
+  as.userId = "teammate"
+  const [stored] = await (await getLibrary()).json()
+  expect(stored).toEqual({ ...imageItem, files: { logo: imageFile } })
+  expect(await ids(await change([], [imageItem.id]))).toEqual(["kept"])
+})
+
+test("refuses missing or invalid image binaries without changing the library", async () => {
+  const noFiles = { ...imageItem, files: {} }
+  const wrongMime = {
+    ...imageItem,
+    files: { logo: { ...imageFile, mimeType: "image/jpeg" } },
+  }
+  for (const entry of [noFiles, wrongMime]) {
+    const response = await change([entry], ["kept"])
+    expect(response.status).toBe(400)
+    expect(await response.text()).toMatch(/missing or invalid image/)
+  }
+  expect(await ids(await getLibrary())).toEqual(["kept"])
+})
+
 test("refuses an item over the per-item cap and keeps the library as it was", async () => {
   const response = await change([item("huge", MAX_LIBRARY_ITEM_BYTES)])
 

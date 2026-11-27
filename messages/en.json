@@ -706,6 +706,7 @@
   "library_error_rate_limited": "Too many library changes. Try again in a minute.",
   "library_error_item_too_large": "This item is too large for the team library. Each item can be up to {max} MB.",
   "library_error_full": "The team library is full ({max} MB). Remove some items to add more.",
+  "library_error_invalid_image": "A library item has a missing or invalid image.",
   "comments_title": "Comments",
   "comments_button_unread": [
     {

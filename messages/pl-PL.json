@@ -758,6 +758,7 @@
   "library_error_rate_limited": "Za dużo zmian w bibliotece. Spróbuj ponownie za minutę.",
   "library_error_item_too_large": "Ten element jest za duży dla biblioteki zespołu. Każdy element może mieć najwyżej {max} MB.",
   "library_error_full": "Biblioteka zespołu jest pełna ({max} MB). Usuń kilka elementów, aby dodać nowe.",
+  "library_error_invalid_image": "W elemencie biblioteki brakuje obrazu lub obraz jest nieprawidłowy.",
   "comments_title": "Komentarze",
   "comments_button_unread": [
     {
