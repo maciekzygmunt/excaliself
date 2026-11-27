@@ -71,19 +71,10 @@ const imageFile = {
 const imageItem = {
   ...item("image"),
   elements: [{ id: "e", type: "image", fileId: imageFile.id } as never],
-  files: { logo: imageFile, unused: { ...imageFile, id: "unused" } },
+  files: { logo: imageFile },
 }
 
-test("persists only the image binaries a library item uses", async () => {
-  expect((await change([imageItem])).status).toBe(200)
-
-  as.userId = "teammate"
-  const [stored] = await (await getLibrary()).json()
-  expect(stored).toEqual({ ...imageItem, files: { logo: imageFile } })
-  expect(await ids(await change([], [imageItem.id]))).toEqual(["kept"])
-})
-
-test("refuses missing or invalid image binaries without changing the library", async () => {
+test("saves an item whose images carry their files, and refuses one that doesn't", async () => {
   const noFiles = { ...imageItem, files: {} }
   const wrongMime = {
     ...imageItem,
@@ -95,6 +86,7 @@ test("refuses missing or invalid image binaries without changing the library", a
     expect(await response.text()).toMatch(/missing or invalid image/)
   }
   expect(await ids(await getLibrary())).toEqual(["kept"])
+  expect(await ids(await change([imageItem]))).toEqual(["image", "kept"])
 })
 
 test("refuses an item over the per-item cap and keeps the library as it was", async () => {

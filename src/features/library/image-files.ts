@@ -1,45 +1,33 @@
-import type { LibraryItem } from "@excalidraw/excalidraw/types"
-import {
-  parseFileUpload,
-  type RoomFilePayload,
-} from "@/features/collab/room-files"
+import type { BinaryFileData, LibraryItem } from "@excalidraw/excalidraw/types"
+import { parseFileUpload } from "@/features/collab/room-files"
 
 export class InvalidLibraryImage extends Error {}
 
-/** Item-local files from an imported library. Only live image references count. */
-export function libraryImageFiles(item: LibraryItem): RoomFilePayload[] {
-  const { files } = item as LibraryItem & { files?: unknown }
-  const entries =
-    files && typeof files === "object" && !Array.isArray(files)
-      ? (files as Record<string, unknown>)
-      : null
-  const found = new Map<string, RoomFilePayload>()
+/**
+ * The files of an item's live images, from the `files` map an imported
+ * library keeps inside each item. Throws if one is missing or malformed.
+ */
+export function libraryImageFiles(item: LibraryItem): BinaryFileData[] {
+  // Persisted JSON: each entry used below is checked field by field.
+  const files =
+    (item as { files?: Record<string, BinaryFileData> | null }).files ?? {}
+  const found = new Map<string, BinaryFileData>()
   for (const element of item.elements) {
     if (element.type !== "image" || element.isDeleted) continue
-    const fileId = typeof element.fileId === "string" ? element.fileId : ""
-    if (found.has(fileId)) continue
-    const entry =
-      entries && Object.hasOwn(entries, fileId)
-        ? (entries[fileId] as {
-            id?: unknown
-            mimeType?: unknown
-            dataURL?: unknown
-            created?: unknown
-          } | null)
-        : null
+    const fileId = element.fileId ?? ""
+    const entry = Object.hasOwn(files, fileId) ? files[fileId] : undefined
     const upload = parseFileUpload(fileId, { dataUrl: entry?.dataURL })
     if (
       upload.status !== "ok" ||
-      !entry ||
-      entry.id !== fileId ||
+      entry?.id !== fileId ||
       entry.mimeType !== upload.file.mimeType ||
-      typeof entry.created !== "number" ||
       !Number.isFinite(entry.created)
     )
       throw new InvalidLibraryImage(
         `Library item ${item.id} has a missing or invalid image file for element ${element.id}.`,
       )
-    found.set(upload.file.fileId, { ...upload.file, created: entry.created })
+    const { id, mimeType, dataURL, created } = entry
+    found.set(fileId, { id, mimeType, dataURL, created })
   }
   return [...found.values()]
 }

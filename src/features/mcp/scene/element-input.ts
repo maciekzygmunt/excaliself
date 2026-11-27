@@ -126,3 +126,21 @@ export const sceneElement = z.discriminatedUnion(
   ],
   { error: `Unknown element type. Use one of: ${ELEMENT_TYPES.join(", ")}.` },
 )
+
+/** Lists the first few problems, each with where it is in the input. */
+export function describeIssues(issues: z.core.$ZodIssue[]): string {
+  const lines = issues.slice(0, 10).map((issue) => {
+    const path = issue.path
+      .map((key, i) =>
+        typeof key === "number"
+          ? `[${key}]`
+          : i === 0
+            ? key
+            : `.${String(key)}`,
+      )
+      .join("")
+    return `${path || "scene"}: ${issue.message}`
+  })
+  if (issues.length > 10) lines.push(`… and ${issues.length - 10} more.`)
+  return lines.join("\n")
+}

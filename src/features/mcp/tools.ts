@@ -695,7 +695,9 @@ Read the drawing with read_drawing first, and refer to its elements by the [id â
           ),
         add: z.array(elementSkeleton).max(MAX_ELEMENTS).default([]),
         libraryItems: z
-          .array(z.object({ id: z.string().min(1), x: coordinate, y: coordinate }))
+          .array(
+            z.object({ id: z.string().min(1), x: coordinate, y: coordinate }),
+          )
           .max(MAX_ELEMENTS)
           .default([]),
         change: z.array(elementChange).max(MAX_ELEMENTS).default([]),
@@ -713,8 +715,13 @@ Read the drawing with read_drawing first, and refer to its elements by the [id â
       },
     },
     async ({ id, summary, add, libraryItems, change, remove }) => {
-      if (add.length + libraryItems.length + change.length + remove.length === 0)
-        throw new Error("Nothing to change: give add, libraryItems, change, or remove.")
+      if (
+        add.length + libraryItems.length + change.length + remove.length ===
+        0
+      )
+        throw new Error(
+          "Nothing to change: give add, libraryItems, change, or remove.",
+        )
       const drawing = await findDrawing(id)
       // A live Room holds newer edits than the stored scene.
       const live = await roomElements(rooms, id)

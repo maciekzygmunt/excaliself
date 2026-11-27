@@ -16,7 +16,7 @@ import {
 import { dataUrlToBytes } from "@/features/drawings/file-bytes"
 import type { SceneContent } from "@/features/drawings/scene-import"
 import { referencedFileIds } from "@/features/drawings/scene-write"
-import { sceneElement } from "./element-input"
+import { describeIssues, sceneElement } from "./element-input"
 import { newId, withIndices } from "./elements"
 import { ref, SceneInputError } from "./skeleton"
 
@@ -42,24 +42,6 @@ const scene = z.object({
   appState: appState.optional(),
   files: z.record(z.string(), z.unknown()).optional(),
 })
-
-/** Lists the first few problems, each with where it is in the scene. */
-function describe(issues: z.core.$ZodIssue[]): string {
-  const lines = issues.slice(0, 10).map((issue) => {
-    const path = issue.path
-      .map((key, i) =>
-        typeof key === "number"
-          ? `[${key}]`
-          : i === 0
-            ? key
-            : `.${String(key)}`,
-      )
-      .join("")
-    return `${path || "scene"}: ${issue.message}`
-  })
-  if (issues.length > 10) lines.push(`… and ${issues.length - 10} more.`)
-  return lines.join("\n")
-}
 
 /** Below 2^31, like Excalidraw's own values, so +1 keeps counting. */
 const isVersion = (value: unknown): value is number =>
@@ -89,7 +71,8 @@ function readJson(input: string | object): unknown {
  */
 export function parseImportedScene(input: string | object): ImportedScene {
   const parsed = scene.safeParse(readJson(input))
-  if (!parsed.success) throw new SceneInputError(describe(parsed.error.issues))
+  if (!parsed.success)
+    throw new SceneInputError(describeIssues(parsed.error.issues))
 
   // The Room refuses deeper elements, so its later syncs would fail.
   const deep = parsed.data.elements.findIndex((element) =>
