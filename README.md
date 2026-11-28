@@ -223,7 +223,8 @@ The tools:
 - `create_drawing` makes a new drawing in your private space or in Team,
   optionally in a folder, from simple shapes and arrows or a Mermaid flowchart.
 - `list_library_items` finds reusable shapes, images, and multi-element drawings
-  in the Team library. Pass their IDs and positions to `edit_drawing` to place copies.
+  in the Team library. Pass their IDs and positions to `create_drawing` or
+  `edit_drawing` to place copies.
 - `edit_drawing` proposes additions, changes, and removals. Nothing changes until
   you click **Apply**. `get_drawing_edit` tells the client whether you applied it.
 - `create_folder` makes a folder in your private space or in Team, optionally

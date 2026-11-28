@@ -128,7 +128,8 @@ client still works, but you can't open the app.
   it in your documentation. `export_scene` exports it as an `.excalidraw`
   file. See [Export a drawing](#export-a-drawing).
 - `create_drawing` makes a new drawing in your private space or in Team,
-  optionally in a folder, from simple shapes and arrows or a Mermaid flowchart.
+  optionally in a folder. Use Team library items on their own or combine them
+  with shapes, arrows, and a Mermaid flowchart.
   Mermaid `style` lines color the nodes (`fill` and `stroke`, as hex or named colors).
 - `import_scene` makes a new drawing from a `.excalidraw` file, as
   Excalidraw's **Save to file** writes it, with its images. It takes an
@@ -139,6 +140,8 @@ client still works, but you can't open the app.
 - `list_library_items` lists reusable items from your [Team library](/docs/team-library/),
   including unnamed items. Each result includes its ID, element types, and a text
   sample when present. Use `nextOffset` to read the next page.
+  Pass `libraryItems: [{ id, x, y }]` to `create_drawing` or `edit_drawing`;
+  `x` and `y` position the top-left of each copy.
 - `edit_drawing` proposes a change to an existing drawing: shapes, text, and
   arrows to add, change, or remove. Nothing changes until you click **Apply**.
   See [Change a drawing](#change-a-drawing). `get_drawing_edit` tells the

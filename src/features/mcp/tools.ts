@@ -58,6 +58,7 @@ import { MAX_SCENE_BYTES, toExcalidrawFile } from "./export/scene-file"
 import { listLibraryItems, planLibraryPlacements } from "./library"
 import { buildScene } from "./scene/build"
 import { elementChange, planEdit } from "./scene/edit"
+import { withIndices } from "./scene/elements"
 import { parseImportedScene } from "./scene/import"
 import { parseMermaid } from "./scene/mermaid"
 import {
@@ -66,6 +67,7 @@ import {
   elementSkeleton,
   MAX_ELEMENTS,
   type SceneGraph,
+  SceneInputError,
 } from "./scene/skeleton"
 import { summarizeScene } from "./summary"
 
@@ -83,6 +85,11 @@ export const EDIT_WAIT_MS = 25_000
 const space = z
   .enum(spaces)
   .describe('"private" (only you) or "team" (every member).')
+
+const libraryPlacements = z
+  .array(z.object({ id: z.string().min(1), x: coordinate, y: coordinate }))
+  .max(MAX_ELEMENTS)
+  .default([])
 
 const text = (value: string) => ({
   content: [{ type: "text" as const, text: value }],
@@ -486,11 +493,13 @@ Images are left out by default: their elements stay, but show as missing images.
     "create_drawing",
     {
       title: "Create drawing",
-      description: `Creates a NEW drawing from simple elements and/or a Mermaid flowchart, and returns its link. To change an existing drawing, use edit_drawing.
+      description: `Creates a NEW drawing from simple elements, a Mermaid flowchart, and/or Team library items, and returns its link. To change an existing drawing, use edit_drawing.
 
 Elements: shapes ("rectangle", "ellipse", "diamond") with an optional label; "text"; and "arrow" or "line" connectors that join shapes by id ("from", "to") or run between points ("start", "end"). Shapes and text without x/y are laid out automatically, in "direction", with arrows routed between them; labels wrap and shapes grow to fit. Auto-layout gives the cleanest diagrams: give x/y (top-left, pixels, y grows down) only for layouts a graph can't express, such as grids or timelines. Keep arrow labels to a few words; put detail in shape labels or a text note.
 
-Mermaid: a "flowchart"/"graph" diagram, with node shapes, edge labels, dotted and thick edges, subgraphs (drawn as titled boxes), and node colors from "style id fill:#a5d8ff,stroke:#1971c2" lines (hex or named colors) (classDef and class are ignored). Other Mermaid diagram types are not supported. Both can be sent at once: they are laid out together, and arrows may join flowchart nodes by their Mermaid ids. Up to ${MAX_ELEMENTS} elements in all, Mermaid nodes and edges included.
+Mermaid: a "flowchart"/"graph" diagram, with node shapes, edge labels, dotted and thick edges, subgraphs (drawn as titled boxes), and node colors from "style id fill:#a5d8ff,stroke:#1971c2" lines (hex or named colors) (classDef and class are ignored). Other Mermaid diagram types are not supported. Simple elements and Mermaid are laid out together; arrows may join flowchart nodes by their Mermaid ids.
+
+Library items: place copies of reusable Team library items, including images and multi-element drawings. Get their ids with list_library_items; x/y position each copy's top-left corner. Library copies are not part of auto-layout. The ${MAX_ELEMENTS}-element limit includes Mermaid nodes, edges, and subgraphs and all copied library elements.
 
 Colors: Excalidraw's palette reads best, e.g. backgrounds "#a5d8ff" (blue), "#b2f2bb" (green), "#ffec99" (yellow), "#ffc9c9" (red), "#d0bfff" (violet), "#e9ecef" (gray).`,
       inputSchema: z.object({
@@ -505,6 +514,7 @@ Colors: Excalidraw's palette reads best, e.g. backgrounds "#a5d8ff" (blue), "#b2
           .optional()
           .describe("Put it in this folder (see list_folders)."),
         elements: z.array(elementSkeleton).max(MAX_ELEMENTS).optional(),
+        libraryItems: libraryPlacements,
         mermaid: z
           .string()
           .max(50_000)
@@ -527,17 +537,52 @@ Colors: Excalidraw's palette reads best, e.g. backgrounds "#a5d8ff" (blue), "#b2
       const flowchart: SceneGraph = input.mermaid
         ? parseMermaid(input.mermaid)
         : { elements: [], clusters: [], direction: "TB" }
-      const elements = buildScene({
-        elements: [...flowchart.elements, ...(input.elements ?? [])],
+      const skeletons = [...flowchart.elements, ...(input.elements ?? [])]
+      const built = buildScene({
+        elements: skeletons,
         clusters: flowchart.clusters,
         direction: input.direction ?? flowchart.direction,
       })
-      const created = await insertDrawing(db, member.id, {
+      const library = input.libraryItems.length
+        ? await planLibraryPlacements(
+            db,
+            input.libraryItems,
+            skeletons.length + flowchart.clusters.length,
+          )
+        : undefined
+      // Unlike an edit proposal, a new drawing stores its images immediately.
+      for (const copy of library?.elements ?? []) {
+        if (copy.type === "image") copy.status = "saved"
+      }
+      const elements = library
+        ? withIndices([...built, ...library.elements])
+        : built
+      if (
+        library &&
+        Buffer.byteLength(JSON.stringify(elements)) > MAX_ROOM_SCENE_BYTES
+      )
+        throw new SceneInputError(
+          `The elements are over ${MAX_ROOM_SCENE_BYTES / 1024 / 1024} MB.`,
+        )
+      const destination = {
         name: input.name,
         folderId: input.folderId ?? null,
         space: input.space,
-        elements,
-      })
+      }
+      const created = library?.files.length
+        ? await importDrawing(db, member.id, {
+            ...destination,
+            lastModified: Date.now(),
+            content: {
+              elements,
+              appState: {},
+              files: Object.fromEntries(
+                library.files.map((file) => [file.id, file]),
+              ),
+              filesFailedToEmbed: [],
+            },
+          })
+        : await insertDrawing(db, member.id, { ...destination, elements })
       listUpdates.notify()
       const folder = input.folderId
         ? folderPaths(await listFolders(db, member.id)).get(input.folderId)
@@ -655,7 +700,7 @@ Up to ${MAX_ROOM_ELEMENTS.toLocaleString("en")} elements and ${MAX_ROOM_SCENE_BY
     {
       title: "List Team library items",
       description:
-        "Find reusable items in the member's Team library, newest first. Use their ids with edit_drawing.libraryItems. For the next page, pass nextOffset as offset.",
+        "Find reusable items in the member's Team library, newest first. Use their ids with libraryItems in create_drawing or edit_drawing. For the next page, pass nextOffset as offset.",
       inputSchema: z.object({
         limit: limit(50),
         offset: z.number().int().nonnegative().default(0),
@@ -694,12 +739,7 @@ Read the drawing with read_drawing first, and refer to its elements by the [id â
             'One line the member reads before Apply, e.g. "Add a CDN in front of the API".',
           ),
         add: z.array(elementSkeleton).max(MAX_ELEMENTS).default([]),
-        libraryItems: z
-          .array(
-            z.object({ id: z.string().min(1), x: coordinate, y: coordinate }),
-          )
-          .max(MAX_ELEMENTS)
-          .default([]),
+        libraryItems: libraryPlacements,
         change: z.array(elementChange).max(MAX_ELEMENTS).default([]),
         remove: z
           .array(z.string())

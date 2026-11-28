@@ -1,9 +1,17 @@
 // @vitest-environment node
 import type { LibraryItem } from "@excalidraw/excalidraw/types"
-import { expect, test } from "vitest"
+import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/server"
+import { eq } from "drizzle-orm"
+import { expect, test, vi } from "vitest"
+import { demoAdmin } from "@/db/demo-content"
 import { createPreviewDb } from "@/db/preview"
-import { libraryItems } from "@/db/schema"
+import { drawings, libraryItems } from "@/db/schema"
+import { loadImageFiles } from "./export/scene-data"
 import { listLibraryItems, planLibraryPlacements } from "./library"
+import { createMcpServer } from "./tools"
+
+// No live rooms in this test; don't initialize the app's database singleton.
+vi.mock("@/db", () => ({ db: undefined }))
 
 // Imported libraries can use the same file id for unrelated images.
 const imageItem = (id: string, bytes: string) => ({
@@ -72,4 +80,56 @@ test("copies repeated and conflicting image references without leaking or replac
   await expect(
     planLibraryPlacements(db, [...placements, { id: "gone", x: 0, y: 0 }], 0),
   ).rejects.toThrow(/gone/)
+}, 30_000)
+
+test("creates a drawing from just a library image, ready for export without an editor", async () => {
+  const db = await createPreviewDb()
+  await db.insert(libraryItems).values(imageItem("badge", "AQID"))
+  const origin = "http://localhost"
+  const server = createMcpServer(db, { ...demoAdmin, client: "test" }, origin)
+  const transport = new WebStandardStreamableHTTPServerTransport({
+    enableJsonResponse: true,
+    sessionIdGenerator: undefined,
+  })
+  await server.connect(transport)
+  try {
+    const response = await transport.handleRequest(
+      new Request(`${origin}/api/mcp`, {
+        method: "POST",
+        headers: {
+          accept: "application/json, text/event-stream",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: 1,
+          method: "tools/call",
+          params: {
+            name: "create_drawing",
+            arguments: {
+              name: "Badge",
+              libraryItems: [{ id: "badge", x: 90, y: -20 }],
+            },
+          },
+        }),
+      }),
+    )
+    const { result } = await response.json()
+    expect(result.isError, result.content[0].text).not.toBe(true)
+    const { id } = JSON.parse(result.content[0].text)
+    const [drawing] = await db
+      .select()
+      .from(drawings)
+      .where(eq(drawings.id, id))
+    const { elements } = JSON.parse(drawing.data ?? "null")
+    expect(elements).toMatchObject([
+      { type: "image", x: 90, y: -20, status: "saved" },
+    ])
+    const files = await loadImageFiles(db, id, elements)
+    expect(files.get(elements[0].fileId)?.dataURL).toBe(
+      "data:image/png;base64,AQID",
+    )
+  } finally {
+    await server.close()
+  }
 }, 30_000)

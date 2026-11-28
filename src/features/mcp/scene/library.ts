@@ -1,6 +1,5 @@
-// Copies a Team library item for edit_drawing: fresh ids, links inside the
-// item remapped, links to anything outside it dropped. The member's tab runs
-// restoreElements on the proposal, which repairs whatever else is off.
+// Copies a Team library item: fresh ids, links inside the item remapped,
+// links to anything outside it dropped.
 
 import { randomInt } from "node:crypto"
 import { z } from "zod"

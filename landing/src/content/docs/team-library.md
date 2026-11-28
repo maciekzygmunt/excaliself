@@ -27,9 +27,11 @@ Start with a version 2 `.excalidrawlib` export. Add the elements from your
 and `created` fields. A `files` map at the top level of the library file
 does not attach images to the items.
 
-Use `list_library_items` to find the item and `edit_drawing` to propose
-inserting it. The proposal's preview shows the images. The drawing gets its
-own copy when you apply the proposal.
+Use `list_library_items` to find the item. To start a new drawing with it,
+pass its ID and position to `create_drawing` in `libraryItems`. The new
+drawing has its own copy, including images, ready to export. For an existing
+drawing, use the same `libraryItems` input with `edit_drawing`; the copy is
+added only when you click **Apply**.
 
 ## Limits
 
