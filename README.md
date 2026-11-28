@@ -222,9 +222,11 @@ The tools:
   exports it as an `.excalidraw` file.
 - `create_drawing` makes a new drawing in your private space or in Team,
   optionally in a folder, from simple shapes and arrows or a Mermaid flowchart.
-- `edit_drawing` proposes a change to a drawing: shapes, text, and arrows to
-  add, change, or remove. Nothing changes until you click **Apply** on the
-  drawing. `get_drawing_edit` tells the client whether you applied it.
+- `list_library_items` finds reusable shapes, images, and multi-element drawings
+  in the Team library. Pass their IDs and positions to `create_drawing` or
+  `edit_drawing` to place copies.
+- `edit_drawing` proposes additions, changes, and removals. Nothing changes until
+  you click **Apply**. `get_drawing_edit` tells the client whether you applied it.
 - `create_folder` makes a folder in your private space or in Team, optionally
   inside another folder.
 - `move_drawing` moves a drawing into a folder, or to the top of its space. A

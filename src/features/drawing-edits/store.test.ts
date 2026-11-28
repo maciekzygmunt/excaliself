@@ -13,6 +13,7 @@ const proposal = (overrides: Partial<ProposedEdit> = {}): ProposedEdit => ({
   summary: "Add a CDN",
   changes: ['Add rectangle "CDN"'],
   elements: [],
+  files: [],
   base: {},
   ...overrides,
 })

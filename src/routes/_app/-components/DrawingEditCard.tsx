@@ -77,6 +77,13 @@ export function DrawingEditCard({ drawingId, excalidrawAPI, theme }: Props) {
         : [],
     [edit, elements, excalidrawAPI],
   )
+  const files: BinaryFiles = useMemo(
+    () => ({
+      ...excalidrawAPI?.getFiles(),
+      ...Object.fromEntries((edit?.files ?? []).map((file) => [file.id, file])),
+    }),
+    [edit, excalidrawAPI],
+  )
 
   const decide = useMutation({
     // The id rides along: the claim refetches the query to null mid-apply.
@@ -103,11 +110,13 @@ export function DrawingEditCard({ drawingId, excalidrawAPI, theme }: Props) {
     // Checked and applied with no await between, so no remote edit slips in.
     const current = excalidrawAPI.getSceneElementsIncludingDeleted()
     const stale = isStale(current, edit.base)
-    if (!stale)
+    if (!stale) {
+      excalidrawAPI.addFiles(edit.files)
       excalidrawAPI.updateScene({
         elements: withEdit(current, elements as OrderedExcalidrawElement[]),
         captureUpdate: CaptureUpdateAction.IMMEDIATELY,
       })
+    }
     await decide.mutateAsync({
       id: edit.id,
       decision: stale ? "stale" : "applied",
@@ -167,11 +176,7 @@ export function DrawingEditCard({ drawingId, excalidrawAPI, theme }: Props) {
           aria-label={m.drawing_edit_view_larger_label()}
           className="group flex cursor-zoom-in flex-col gap-1 rounded-md border border-border bg-background p-2"
         >
-          <PreviewImage
-            elements={preview}
-            files={excalidrawAPI.getFiles()}
-            theme={theme}
-          />
+          <PreviewImage elements={preview} files={files} theme={theme} />
           <span className="flex items-center justify-end gap-1 text-[11px] text-muted-foreground transition-colors group-hover:text-foreground">
             <Maximize2Icon className="size-3" />
             {m.drawing_edit_view_larger()}
@@ -194,7 +199,7 @@ export function DrawingEditCard({ drawingId, excalidrawAPI, theme }: Props) {
             <Excalidraw
               initialData={{
                 elements: preview,
-                files: excalidrawAPI.getFiles(),
+                files,
               }}
               // Look, zoom, and pan; nothing here can be edited or saved.
               viewModeEnabled

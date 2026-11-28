@@ -680,6 +680,7 @@
   "library_error_rate_limited": "素材库更改过于频繁，请一分钟后重试。",
   "library_error_item_too_large": "此项目太大，无法放入团队素材库。每个项目最大 {max} MB。",
   "library_error_full": "团队素材库已满（{max} MB）。请移除一些项目后再添加。",
+  "library_error_invalid_image": "素材库项目中的图片缺失或无效。",
   "comments_title": "评论",
   "comments_button_unread": [
     {

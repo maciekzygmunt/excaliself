@@ -61,6 +61,34 @@ beforeEach(async () => {
   await change([item("kept")])
 })
 
+const imageFile = {
+  id: "logo",
+  mimeType: "image/png",
+  dataURL:
+    "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aIfoAAAAASUVORK5CYII=",
+  created: 1,
+}
+const imageItem = {
+  ...item("image"),
+  elements: [{ id: "e", type: "image", fileId: imageFile.id } as never],
+  files: { logo: imageFile },
+}
+
+test("saves an item whose images carry their files, and refuses one that doesn't", async () => {
+  const noFiles = { ...imageItem, files: {} }
+  const wrongMime = {
+    ...imageItem,
+    files: { logo: { ...imageFile, mimeType: "image/jpeg" } },
+  }
+  for (const entry of [noFiles, wrongMime]) {
+    const response = await change([entry], ["kept"])
+    expect(response.status).toBe(400)
+    expect(await response.text()).toMatch(/missing or invalid image/)
+  }
+  expect(await ids(await getLibrary())).toEqual(["kept"])
+  expect(await ids(await change([imageItem]))).toEqual(["image", "kept"])
+})
+
 test("refuses an item over the per-item cap and keeps the library as it was", async () => {
   const response = await change([item("huge", MAX_LIBRARY_ITEM_BYTES)])
 

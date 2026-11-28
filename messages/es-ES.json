@@ -732,6 +732,7 @@
   "library_error_rate_limited": "Demasiados cambios en la biblioteca. Inténtalo de nuevo dentro de un minuto.",
   "library_error_item_too_large": "Este elemento es demasiado grande para la biblioteca del equipo. Cada elemento puede ocupar hasta {max} MB.",
   "library_error_full": "La biblioteca del equipo está llena ({max} MB). Quita algunos elementos para añadir más.",
+  "library_error_invalid_image": "Falta una imagen de un elemento de la biblioteca o la imagen no es válida.",
   "comments_title": "Comentarios",
   "comments_button_unread": [
     {

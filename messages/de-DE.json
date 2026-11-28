@@ -706,6 +706,7 @@
   "library_error_rate_limited": "Zu viele Änderungen an der Bibliothek. Versuch es in einer Minute noch einmal.",
   "library_error_item_too_large": "Dieses Element ist zu groß für die Team-Bibliothek. Jedes Element darf bis zu {max} MB groß sein.",
   "library_error_full": "Die Team-Bibliothek ist voll ({max} MB). Entferne einige Elemente, um neue hinzuzufügen.",
+  "library_error_invalid_image": "Bei einem Bibliothekselement fehlt ein Bild oder das Bild ist ungültig.",
   "comments_title": "Kommentare",
   "comments_button_unread": [
     {

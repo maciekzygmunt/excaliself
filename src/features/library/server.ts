@@ -11,6 +11,7 @@ import { LIBRARY_CHANGED } from "@/features/list-updates/protocol"
 import { createRateLimiter } from "@/lib/rate-limit"
 import { authMiddleware } from "@/middleware/auth"
 import { m } from "@/paraglide/messages"
+import { InvalidLibraryImage, libraryImageFiles } from "./image-files"
 import {
   LIBRARY_CHANGES_PER_MINUTE,
   MAX_LIBRARY_BYTES,
@@ -46,7 +47,7 @@ const libraryResponse = (json: string) =>
 const MiB = 1024 * 1024
 
 /** Why a change was not saved, for the editor to show, in the member's language. */
-const refusal = (status: 413 | 429, message: string) =>
+const refusal = (status: 400 | 413 | 429, message: string) =>
   new Response(message, { status })
 
 /** Thrown to roll back a change that makes the library too large. */
@@ -89,6 +90,13 @@ export const changeLibrary = createServerFn({ method: "POST" })
         413,
         m.library_error_item_too_large({ max: MAX_LIBRARY_ITEM_BYTES / MiB }),
       )
+
+    try {
+      for (const item of data.add) libraryImageFiles(item)
+    } catch (error) {
+      if (!(error instanceof InvalidLibraryImage)) throw error
+      return refusal(400, m.library_error_invalid_image())
+    }
 
     let json: string
     try {

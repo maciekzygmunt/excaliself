@@ -2,6 +2,7 @@
 // Apply. In memory, per process: a restart drops them, and nothing was written.
 
 import { randomUUID } from "node:crypto"
+import type { BinaryFileData } from "@excalidraw/excalidraw/types"
 import type { SceneElement } from "@/features/collab/protocol"
 import { processSingleton } from "@/lib/process-singleton"
 import type { Revision } from "./apply"
@@ -39,6 +40,8 @@ export type DrawingEdit = {
   changes: string[]
   /** New and changed elements, whole. */
   elements: SceneElement[]
+  /** New image files, not written to the drawing until the member applies. */
+  files: BinaryFileData[]
   /** Element id → the revision the edit was planned on. */
   base: Record<string, Revision>
   createdAt: number

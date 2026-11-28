@@ -15,7 +15,7 @@ export const getDrawingEdit = createServerFn({ method: "GET" })
   .handler(({ data: drawingId, context }) => {
     const edit = drawingEdits.pending(context.session.user.id, drawingId)
     if (!edit) return null
-    const { id, client, summary, base } = edit
+    const { id, client, summary, base, files } = edit
     // A string: elements are untyped JSON, which server functions won't type.
     return {
       id,
@@ -23,6 +23,7 @@ export const getDrawingEdit = createServerFn({ method: "GET" })
       summary,
       base,
       elements: JSON.stringify(edit.elements),
+      files,
     }
   })
 

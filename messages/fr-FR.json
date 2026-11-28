@@ -732,6 +732,7 @@
   "library_error_rate_limited": "Trop de modifications de la bibliothèque. Réessayez dans une minute.",
   "library_error_item_too_large": "Cet élément est trop volumineux pour la bibliothèque de l'équipe. Chaque élément peut faire jusqu'à {max} Mo.",
   "library_error_full": "La bibliothèque de l'équipe est pleine ({max} Mo). Supprimez des éléments pour en ajouter d'autres.",
+  "library_error_invalid_image": "Il manque une image dans un élément de la bibliothèque, ou l’image n’est pas valide.",
   "comments_title": "Commentaires",
   "comments_button_unread": [
     {

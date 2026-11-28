@@ -128,7 +128,8 @@ client still works, but you can't open the app.
   it in your documentation. `export_scene` exports it as an `.excalidraw`
   file. See [Export a drawing](#export-a-drawing).
 - `create_drawing` makes a new drawing in your private space or in Team,
-  optionally in a folder, from simple shapes and arrows or a Mermaid flowchart.
+  optionally in a folder. Use Team library items on their own or combine them
+  with shapes, arrows, and a Mermaid flowchart.
   Mermaid `style` lines color the nodes (`fill` and `stroke`, as hex or named colors).
 - `import_scene` makes a new drawing from a `.excalidraw` file, as
   Excalidraw's **Save to file** writes it, with its images. It takes an
@@ -136,6 +137,11 @@ client still works, but you can't open the app.
   be up to 4 MB. The server refuses a scene that Excalidraw can't open, and
   tells the client why. Images that the file does not carry show as
   placeholders.
+- `list_library_items` lists reusable items from your [Team library](/docs/team-library/),
+  including unnamed items. Each result includes its ID, element types, and a text
+  sample when present. Use `nextOffset` to read the next page.
+  Pass `libraryItems: [{ id, x, y }]` to `create_drawing` or `edit_drawing`;
+  `x` and `y` position the top-left of each copy.
 - `edit_drawing` proposes a change to an existing drawing: shapes, text, and
   arrows to add, change, or remove. Nothing changes until you click **Apply**.
   See [Change a drawing](#change-a-drawing). `get_drawing_edit` tells the
@@ -158,6 +164,13 @@ client still works, but you can't open the app.
 Ask your AI client for a change, for example "Add a CDN in front of the API".
 The client reads the drawing and proposes the change. The drawing does not
 change yet.
+
+To reuse saved artwork, ask the client to list your library and place an item.
+For example, `libraryItems: [{"id":"badge","x":100,"y":80}]` places a copy
+of the item with ID `badge`. You can place the same item twice at different
+coordinates. A multi-element drawing stays together with its internal groups
+and bindings; an image needs its file in the library item. This uses library
+item IDs, not drawing IDs, and never changes the source item.
 
 1. Open the drawing in Excaliself. The client gives you its link. If the
    drawing is open already, the proposal shows at once.
