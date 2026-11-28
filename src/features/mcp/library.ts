@@ -33,10 +33,15 @@ export function listLibraryItems(db: Db, limit: number, offset: number) {
 
 type Placement = { id: string; x: number; y: number }
 
+/**
+ * `imageStatus`: "pending" for an edit proposal, whose Room writer uploads
+ * the images on Apply; "saved" for a new drawing, stored with its files.
+ */
 export async function planLibraryPlacements(
   db: Db,
   placements: Placement[],
   added: number,
+  imageStatus: "pending" | "saved",
 ) {
   const ids = [...new Set(placements.map(({ id }) => id))]
   const rows = ids.length
@@ -83,8 +88,7 @@ export async function planLibraryPlacements(
             `Missing image file in library item "${id}".`,
           )
         copy.fileId = fileId
-        // Room writers upload pending images, not ones saved in the source.
-        copy.status = "pending"
+        copy.status = imageStatus
       }
       elements.push(copy)
     }

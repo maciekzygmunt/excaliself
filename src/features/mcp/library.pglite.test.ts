@@ -63,7 +63,12 @@ test("copies repeated and conflicting image references without leaking or replac
     x,
     y: 0,
   }))
-  const { elements, files } = await planLibraryPlacements(db, placements, 0)
+  const { elements, files } = await planLibraryPlacements(
+    db,
+    placements,
+    0,
+    "pending",
+  )
   expect(files).toHaveLength(2)
   const byId = new Map<string, string>(
     files.map((file) => [file.id, file.dataURL]),
@@ -74,11 +79,16 @@ test("copies repeated and conflicting image references without leaking or replac
   expect(
     elements.every((el) => el.fileId !== "logo" && el.status === "pending"),
   ).toBe(true)
-  await expect(planLibraryPlacements(db, placements, 499)).rejects.toThrow(
-    /at most/,
-  )
   await expect(
-    planLibraryPlacements(db, [...placements, { id: "gone", x: 0, y: 0 }], 0),
+    planLibraryPlacements(db, placements, 499, "pending"),
+  ).rejects.toThrow(/at most/)
+  await expect(
+    planLibraryPlacements(
+      db,
+      [...placements, { id: "gone", x: 0, y: 0 }],
+      0,
+      "pending",
+    ),
   ).rejects.toThrow(/gone/)
 }, 30_000)
 

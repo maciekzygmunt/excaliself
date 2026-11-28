@@ -543,24 +543,14 @@ Colors: Excalidraw's palette reads best, e.g. backgrounds "#a5d8ff" (blue), "#b2
         clusters: flowchart.clusters,
         direction: input.direction ?? flowchart.direction,
       })
-      const library = input.libraryItems.length
-        ? await planLibraryPlacements(
-            db,
-            input.libraryItems,
-            skeletons.length + flowchart.clusters.length,
-          )
-        : undefined
-      // Unlike an edit proposal, a new drawing stores its images immediately.
-      for (const copy of library?.elements ?? []) {
-        if (copy.type === "image") copy.status = "saved"
-      }
-      const elements = library
-        ? withIndices([...built, ...library.elements])
-        : built
-      if (
-        library &&
-        Buffer.byteLength(JSON.stringify(elements)) > MAX_ROOM_SCENE_BYTES
+      const library = await planLibraryPlacements(
+        db,
+        input.libraryItems,
+        skeletons.length + flowchart.clusters.length,
+        "saved",
       )
+      const elements = withIndices([...built, ...library.elements])
+      if (Buffer.byteLength(JSON.stringify(elements)) > MAX_ROOM_SCENE_BYTES)
         throw new SceneInputError(
           `The elements are over ${MAX_ROOM_SCENE_BYTES / 1024 / 1024} MB.`,
         )
@@ -569,7 +559,8 @@ Colors: Excalidraw's palette reads best, e.g. backgrounds "#a5d8ff" (blue), "#b2
         folderId: input.folderId ?? null,
         space: input.space,
       }
-      const created = library?.files.length
+      // Only importDrawing stores image files with the scene.
+      const created = library.files.length
         ? await importDrawing(db, member.id, {
             ...destination,
             lastModified: Date.now(),
@@ -773,7 +764,12 @@ Read the drawing with read_drawing first, and refer to its elements by the [id â
         change,
         remove,
       })
-      const library = await planLibraryPlacements(db, libraryItems, add.length)
+      const library = await planLibraryPlacements(
+        db,
+        libraryItems,
+        add.length,
+        "pending",
+      )
       const edit = drawingEdits.propose({
         drawingId: id,
         userId: member.id,
